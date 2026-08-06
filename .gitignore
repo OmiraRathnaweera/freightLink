@@ -1,0 +1,36 @@
+# ===== .NET =====
+backend/**/bin/
+backend/**/obj/
+*.user
+.vs/
+
+# ===== Node / React =====
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# ===== Python / uv =====
+agent/.venv/
+agent/**/__pycache__/
+agent/**/*.pyc
+agent/.pytest_cache/
+
+# ===== Flutter / Dart =====
+mobile/**/.dart_tool/
+mobile/**/.flutter-plugins
+mobile/**/.flutter-plugins-dependencies
+mobile/**/build/
+mobile/**/.packages
+mobile/**/*.g.dart
+
+# ===== Env & secrets — never commit real values =====
+.env
+.env.local
+
+# ===== IDE / OS =====
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+.DS_Store
