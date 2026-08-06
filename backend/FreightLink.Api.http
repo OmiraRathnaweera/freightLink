@@ -1,0 +1,6 @@
+@FreightLink.Api_HostAddress = http://localhost:5159
+
+GET {{FreightLink.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
