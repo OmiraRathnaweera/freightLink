@@ -482,3 +482,12 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+
+
+CLAUDE.md
+
+# Claude Code skills (locally installed, not project source)
+.claude/
+.agents/
+skills-lock.json
