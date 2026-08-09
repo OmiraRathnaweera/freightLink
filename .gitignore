@@ -26,6 +26,18 @@ mobile/**/*.g.dart
 # ===== Env & secrets — never commit real values =====
 .env
 .env.local
+.env.*.local
+**/appsettings.Development.json
+**/appsettings.*.json
+!**/appsettings.json
+**/secrets.json
+**/*.pfx
+**/*.pem
+**/*.key
+mobile/**/android/key.properties
+mobile/**/android/app/*.jks
+mobile/**/ios/Runner/GoogleService-Info.plist
+mobile/**/android/app/google-services.json
 
 # ===== IDE / OS =====
 .idea/
