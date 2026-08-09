@@ -7,5 +7,5 @@ public enum WorkflowRunStatus
     AwaitingApproval,
     Completed,
     Failed,
-    Cancelled
+    Aborted
 }

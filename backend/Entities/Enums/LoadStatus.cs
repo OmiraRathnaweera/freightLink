@@ -4,10 +4,9 @@ public enum LoadStatus
 {
     Draft,
     Posted,
-    MatchingInProgress,
-    Assigned,
+    Matched,
     InTransit,
     Delivered,
-    Cancelled,
-    Disputed
+    Closed,
+    Cancelled
 }

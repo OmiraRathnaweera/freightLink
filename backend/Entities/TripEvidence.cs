@@ -7,7 +7,7 @@ public class TripEvidence
     public Guid TripEvidenceId { get; set; }
     public Guid TripId { get; set; }
     public Guid CapturedByUserId { get; set; }
-    public TripEvidenceType EvidenceType { get; set; }
+    public EvidenceType EvidenceType { get; set; }
     public string StorageKey { get; set; } = string.Empty;
     public decimal? CapturedLat { get; set; }
     public decimal? CapturedLng { get; set; }

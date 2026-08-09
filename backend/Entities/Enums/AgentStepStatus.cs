@@ -5,6 +5,5 @@ public enum AgentStepStatus
     Pending,
     Running,
     Succeeded,
-    Failed,
-    Skipped
+    Failed
 }

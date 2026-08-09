@@ -3,9 +3,8 @@ namespace FreightLink.Api.Entities.Enums;
 public enum ComplianceDocType
 {
     BusinessRegistration,
-    InsuranceCertificate,
-    VehiclePermit,
-    DriverLicence,
-    TaxCertificate,
+    VehicleInsurance,
+    RevenueLicence,
+    GoodsTransportPermit,
     Other
 }

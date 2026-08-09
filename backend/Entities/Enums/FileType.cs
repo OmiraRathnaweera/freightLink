@@ -1,8 +1,9 @@
 namespace FreightLink.Api.Entities.Enums;
 
-public enum LoadFileType
+public enum FileType
 {
+    Manifest,
+    Invoice,
     CargoPhoto,
-    SupportingDocument,
     Other
 }

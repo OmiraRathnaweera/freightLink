@@ -1,6 +1,6 @@
 namespace FreightLink.Api.Entities.Enums;
 
-public enum TripEvidenceType
+public enum EvidenceType
 {
     PickupProof,
     DeliveryProof

@@ -5,6 +5,5 @@ public enum AssignmentStatus
     Proposed,
     Accepted,
     Declined,
-    Expired,
     Cancelled
 }

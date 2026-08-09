@@ -4,7 +4,8 @@ public enum InvoiceStatus
 {
     Draft,
     Issued,
+    PaymentPending,
     Paid,
-    Overdue,
-    Cancelled
+    Failed,
+    Void
 }

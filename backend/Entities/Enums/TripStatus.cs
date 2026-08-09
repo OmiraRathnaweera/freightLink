@@ -2,12 +2,9 @@ namespace FreightLink.Api.Entities.Enums;
 
 public enum TripStatus
 {
-    Created,
-    EnRouteToPickup,
-    ArrivedAtPickup,
-    Loaded,
+    Assigned,
+    PickedUp,
     InTransit,
-    ArrivedAtDropoff,
     Delivered,
     Cancelled
 }

@@ -1,10 +1,12 @@
+using FreightLink.Api.Entities.Enums;
+
 namespace FreightLink.Api.Entities;
 
 public class ToolCall
 {
     public Guid ToolCallId { get; set; }
     public Guid AgentStepId { get; set; }
-    public string ToolName { get; set; } = string.Empty;
+    public ToolName ToolName { get; set; }
     public int AttemptNo { get; set; }
     public string? RequestJson { get; set; }
     public string? ResponseJson { get; set; }

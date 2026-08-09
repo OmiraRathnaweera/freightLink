@@ -2,11 +2,12 @@ namespace FreightLink.Api.Entities.Enums;
 
 public enum NotificationCategory
 {
-    LoadStatusUpdate,
-    MatchingUpdate,
-    AssignmentUpdate,
-    TripUpdate,
-    PaymentUpdate,
-    DisputeUpdate,
-    General
+    MatchProposed,
+    AgencyDeclined,
+    NewMatchFound,
+    NoAutomaticMatch,
+    TripStatusChanged,
+    InvoiceIssued,
+    PaymentReceived,
+    DisputeUpdate
 }

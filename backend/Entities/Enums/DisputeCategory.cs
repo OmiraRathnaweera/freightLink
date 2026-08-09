@@ -2,9 +2,8 @@ namespace FreightLink.Api.Entities.Enums;
 
 public enum DisputeCategory
 {
-    DamagedCargo,
-    LateDelivery,
-    PricingDiscrepancy,
-    MissingItems,
+    Damage,
+    Delay,
+    Billing,
     Other
 }

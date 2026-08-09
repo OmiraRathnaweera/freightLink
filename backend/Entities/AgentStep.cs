@@ -7,7 +7,7 @@ public class AgentStep
     public Guid AgentStepId { get; set; }
     public Guid WorkflowRunId { get; set; }
     public int StepNo { get; set; }
-    public string AgentRole { get; set; } = string.Empty;
+    public AgentRole AgentRole { get; set; }
     public AgentStepStatus Status { get; set; }
     public string? InputJson { get; set; }
     public string? OutputJson { get; set; }
