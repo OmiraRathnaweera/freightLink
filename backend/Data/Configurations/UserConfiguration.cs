@@ -14,7 +14,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(x => x.Email).IsUnique().HasDatabaseName("uq_user_email");
 
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
-        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
+        // ValueGeneratedOnAddOrUpdate: trg_set_updated_at_users overwrites UpdatedAt on
+        // every UPDATE — needed so EF reads back the trigger-written value instead of keeping
+        // the stale in-memory one after SaveChanges.
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()").ValueGeneratedOnAddOrUpdate();
 
         builder.ToTable(t => t.HasCheckConstraint("ck_user_email_format",
             "\"Email\" ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$'"));

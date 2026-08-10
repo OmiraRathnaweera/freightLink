@@ -15,7 +15,10 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
         builder.Property(x => x.RoutedDistanceKm).HasPrecision(10, 2);
 
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
-        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
+        // ValueGeneratedOnAddOrUpdate: trg_set_updated_at_assignments overwrites UpdatedAt on
+        // every UPDATE — needed so EF reads back the trigger-written value instead of keeping
+        // the stale in-memory one after SaveChanges.
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()").ValueGeneratedOnAddOrUpdate();
 
         builder.HasOne(x => x.Load)
             .WithMany(l => l.Assignments)
