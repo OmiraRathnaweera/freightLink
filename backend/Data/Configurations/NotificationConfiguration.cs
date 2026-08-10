@@ -22,5 +22,18 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
             .WithMany(l => l.Notifications)
             .HasForeignKey(x => x.LoadId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => new { x.RecipientUserId, x.CreatedAt })
+            .HasDatabaseName("ix_notification_unread")
+            .HasFilter("\"ReadAt\" IS NULL")
+            .IsDescending(false, true);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_notification_email_delivery",
+                "\"Channel\" <> 'Email' OR \"DeliveryStatus\" IS NOT NULL");
+            t.HasCheckConstraint("ck_notification_failure",
+                "\"DeliveryStatus\" <> 'Failed' OR \"ErrorMessage\" IS NOT NULL");
+        });
     }
 }

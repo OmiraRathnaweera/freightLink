@@ -22,5 +22,20 @@ public class MatchCandidateConfiguration : IEntityTypeConfiguration<MatchCandida
             .WithMany(a => a.MatchCandidates)
             .HasForeignKey(x => x.AgencyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => new { x.WorkflowRunId, x.AgencyId })
+            .IsUnique()
+            .HasDatabaseName("uq_mc_run_agency");
+
+        builder.HasIndex(x => new { x.WorkflowRunId, x.Rank })
+            .IsUnique()
+            .HasDatabaseName("ux_mc_run_rank")
+            .HasFilter("\"Eligible\" = true");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_mc_score", "\"EligibilityScore\" BETWEEN 0 AND 100");
+            t.HasCheckConstraint("ck_mc_reason", "\"Eligible\" = true OR \"RejectionReason\" IS NOT NULL");
+        });
     }
 }

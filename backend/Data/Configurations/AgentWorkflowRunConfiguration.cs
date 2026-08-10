@@ -25,5 +25,19 @@ public class AgentWorkflowRunConfiguration : IEntityTypeConfiguration<AgentWorkf
             .WithMany()
             .HasForeignKey(x => x.TriggeredByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => new { x.LoadId, x.AttemptNo })
+            .IsUnique()
+            .HasDatabaseName("uq_awr_load_attempt");
+
+        builder.HasIndex(x => x.StartedAt)
+            .HasDatabaseName("ix_awr_awaiting")
+            .HasFilter("\"Status\" = 'AwaitingApproval'");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_awr_attempt", "\"AttemptNo\" BETWEEN 1 AND 3");
+            t.HasCheckConstraint("ck_awr_completed", "\"CompletedAt\" IS NULL OR \"CompletedAt\" >= \"StartedAt\"");
+        });
     }
 }

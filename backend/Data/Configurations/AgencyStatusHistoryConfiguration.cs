@@ -14,11 +14,14 @@ public class AgencyStatusHistoryConfiguration : IEntityTypeConfiguration<AgencyS
         builder.HasOne(x => x.Agency)
             .WithMany(a => a.StatusHistory)
             .HasForeignKey(x => x.AgencyId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.ChangedByUser)
             .WithMany()
             .HasForeignKey(x => x.ChangedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_ash_transition",
+            "\"FromStatus\" IS DISTINCT FROM \"ToStatus\""));
     }
 }

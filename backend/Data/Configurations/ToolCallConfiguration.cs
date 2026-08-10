@@ -18,5 +18,16 @@ public class ToolCallConfiguration : IEntityTypeConfiguration<ToolCall>
             .WithMany(s => s.ToolCalls)
             .HasForeignKey(x => x.AgentStepId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(x => new { x.AgentStepId, x.ToolName, x.AttemptNo })
+            .IsUnique()
+            .HasDatabaseName("uq_toolcall_attempt");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_toolcall_allowlist", "\"ToolName\" IN ('get_route_and_eta')");
+            t.HasCheckConstraint("ck_toolcall_attempt", "\"AttemptNo\" >= 1");
+            t.HasCheckConstraint("ck_toolcall_failure", "\"Success\" = true OR \"ErrorMessage\" IS NOT NULL");
+        });
     }
 }

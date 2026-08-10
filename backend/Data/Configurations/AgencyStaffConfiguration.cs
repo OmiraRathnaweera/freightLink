@@ -16,7 +16,7 @@ public class AgencyStaffConfiguration : IEntityTypeConfiguration<AgencyStaff>
         builder.HasOne(x => x.User)
             .WithOne(u => u.AgencyStaff)
             .HasForeignKey<AgencyStaff>(x => x.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.Agency)
             .WithMany(a => a.Staff)

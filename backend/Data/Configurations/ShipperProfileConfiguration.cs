@@ -10,12 +10,14 @@ public class ShipperProfileConfiguration : IEntityTypeConfiguration<ShipperProfi
     {
         builder.HasKey(x => x.UserId);
 
+        builder.HasIndex(x => x.BusinessRegNo).IsUnique().HasDatabaseName("uq_shipperprofile_regno");
+
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
         builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
 
         builder.HasOne(x => x.User)
             .WithOne(u => u.ShipperProfile)
             .HasForeignKey<ShipperProfile>(x => x.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

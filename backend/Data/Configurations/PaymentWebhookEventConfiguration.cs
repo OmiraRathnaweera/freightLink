@@ -13,5 +13,10 @@ public class PaymentWebhookEventConfiguration : IEntityTypeConfiguration<Payment
 
         // Deliberately no HasOne/FK: an unverified gateway callback must be recorded
         // before it can be trusted or linked to a Payment.
+
+        builder.HasIndex(x => x.RawPayloadHash).IsUnique().HasDatabaseName("uq_pwe_payloadhash");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_pwe_error",
+            "\"ProcessingStatus\" <> 'Error' OR \"ErrorMessage\" IS NOT NULL"));
     }
 }

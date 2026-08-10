@@ -31,5 +31,21 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
             .WithMany(w => w.Assignments)
             .HasForeignKey(x => x.WorkflowRunId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.LoadId)
+            .IsUnique()
+            .HasDatabaseName("ux_assignment_live_per_load")
+            .HasFilter("\"Status\" IN ('Proposed','Accepted')");
+
+        builder.HasIndex(x => new { x.LoadId, x.AgencyId })
+            .IsUnique()
+            .HasDatabaseName("ux_assignment_load_agency");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_assignment_price", "\"ProposedPrice\" > 0");
+            t.HasCheckConstraint("ck_assignment_distance", "\"RoutedDistanceKm\" IS NULL OR \"RoutedDistanceKm\" > 0");
+            t.HasCheckConstraint("ck_assignment_eta", "\"ProposedEtaMinutes\" IS NULL OR \"ProposedEtaMinutes\" > 0");
+        });
     }
 }

@@ -11,7 +11,7 @@ public class LoadConfiguration : IEntityTypeConfiguration<Load>
         builder.HasKey(x => x.LoadId);
         builder.Property(x => x.LoadId).HasDefaultValueSql("gen_random_uuid()");
 
-        builder.HasIndex(x => x.ReferenceCode).IsUnique();
+        builder.HasIndex(x => x.ReferenceCode).IsUnique().HasDatabaseName("uq_load_reference");
 
         builder.Property(x => x.WeightKg).HasPrecision(10, 2);
         builder.Property(x => x.VolumeM3).HasPrecision(10, 3);
@@ -28,5 +28,23 @@ public class LoadConfiguration : IEntityTypeConfiguration<Load>
             .WithMany()
             .HasForeignKey(x => x.ShipperUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.CreatedAt)
+            .HasDatabaseName("ix_load_posted")
+            .HasFilter("\"Status\" = 'Posted'");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_load_weight", "\"WeightKg\" > 0");
+            t.HasCheckConstraint("ck_load_volume", "\"VolumeM3\" > 0");
+            t.HasCheckConstraint("ck_load_price", "\"EstimatedPrice\" IS NULL OR \"EstimatedPrice\" > 0");
+            t.HasCheckConstraint("ck_load_pickup_lat", "\"PickupLat\" BETWEEN -90 AND 90");
+            t.HasCheckConstraint("ck_load_pickup_lng", "\"PickupLng\" BETWEEN -180 AND 180");
+            t.HasCheckConstraint("ck_load_dropoff_lat", "\"DropoffLat\" BETWEEN -90 AND 90");
+            t.HasCheckConstraint("ck_load_dropoff_lng", "\"DropoffLng\" BETWEEN -180 AND 180");
+            t.HasCheckConstraint("ck_load_window", "\"PickupWindowEnd\" > \"PickupWindowStart\"");
+            t.HasCheckConstraint("ck_load_distinct_points",
+                "\"PickupLat\" <> \"DropoffLat\" OR \"PickupLng\" <> \"DropoffLng\"");
+        });
     }
 }

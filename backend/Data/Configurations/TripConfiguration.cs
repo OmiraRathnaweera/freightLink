@@ -28,5 +28,15 @@ public class TripConfiguration : IEntityTypeConfiguration<Trip>
             .WithMany(d => d.Trips)
             .HasForeignKey(x => x.DriverId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.VehicleId)
+            .IsUnique()
+            .HasDatabaseName("ux_trip_vehicle_live")
+            .HasFilter("\"Status\" IN ('Assigned','PickedUp','InTransit')");
+
+        builder.HasIndex(x => x.DriverId)
+            .IsUnique()
+            .HasDatabaseName("ux_trip_driver_live")
+            .HasFilter("\"Status\" IN ('Assigned','PickedUp','InTransit')");
     }
 }

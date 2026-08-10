@@ -23,5 +23,13 @@ public class DisputeConfiguration : IEntityTypeConfiguration<Dispute>
             .WithMany()
             .HasForeignKey(x => x.RaisedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => new { x.TripId, x.Category })
+            .IsUnique()
+            .HasDatabaseName("ux_dispute_open")
+            .HasFilter("\"Status\" IN ('Open','UnderReview')");
+
+        builder.ToTable(t => t.HasCheckConstraint("ck_dispute_description",
+            "length(trim(\"Description\")) >= 10"));
     }
 }

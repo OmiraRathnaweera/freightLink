@@ -11,7 +11,9 @@ public class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
         builder.HasKey(x => x.VehicleId);
         builder.Property(x => x.VehicleId).HasDefaultValueSql("gen_random_uuid()");
 
-        builder.HasIndex(x => x.RegistrationNo).IsUnique();
+        builder.HasIndex(x => new { x.AgencyId, x.RegistrationNo })
+            .IsUnique()
+            .HasDatabaseName("uq_vehicle_agency_regno");
 
         builder.Property(x => x.CapacityKg).HasPrecision(10, 2);
         builder.Property(x => x.VolumeM3).HasPrecision(10, 3);
@@ -23,5 +25,11 @@ public class VehicleConfiguration : IEntityTypeConfiguration<Vehicle>
             .WithMany(a => a.Vehicles)
             .HasForeignKey(x => x.AgencyId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_vehicle_capacity", "\"CapacityKg\" > 0");
+            t.HasCheckConstraint("ck_vehicle_volume", "\"VolumeM3\" > 0");
+        });
     }
 }
