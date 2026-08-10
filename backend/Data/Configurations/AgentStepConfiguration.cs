@@ -18,5 +18,15 @@ public class AgentStepConfiguration : IEntityTypeConfiguration<AgentStep>
             .WithMany(w => w.Steps)
             .HasForeignKey(x => x.WorkflowRunId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(x => new { x.WorkflowRunId, x.StepNo })
+            .IsUnique()
+            .HasDatabaseName("uq_agentstep_order");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_agentstep_stepno", "\"StepNo\" >= 1");
+            t.HasCheckConstraint("ck_agentstep_failure", "\"Status\" <> 'Failed' OR \"ErrorMessage\" IS NOT NULL");
+        });
     }
 }

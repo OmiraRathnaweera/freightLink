@@ -3,6 +3,7 @@ using System;
 using FreightLink.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FreightLink.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260810173916_RelaxAgentWorkflowRunAttemptMax")]
+    partial class RelaxAgentWorkflowRunAttemptMax
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -952,7 +955,7 @@ namespace FreightLink.Api.Migrations
 
                     b.ToTable("Notifications", t =>
                         {
-                            t.HasCheckConstraint("ck_notification_email_delivery", "\"Channel\" <> 'Email' OR \"DeliveryStatus\" <> 'Sent' OR (\"SentAt\" IS NOT NULL AND \"ProviderMessageId\" IS NOT NULL)");
+                            t.HasCheckConstraint("ck_notification_email_delivery", "\"Channel\" <> 'Email' OR \"DeliveryStatus\" IS NOT NULL");
 
                             t.HasCheckConstraint("ck_notification_failure", "\"DeliveryStatus\" <> 'Failed' OR \"ErrorMessage\" IS NOT NULL");
                         });

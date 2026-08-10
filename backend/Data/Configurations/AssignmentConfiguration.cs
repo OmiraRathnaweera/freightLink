@@ -15,7 +15,10 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
         builder.Property(x => x.RoutedDistanceKm).HasPrecision(10, 2);
 
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");
-        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()");
+        // ValueGeneratedOnAddOrUpdate: trg_set_updated_at_assignments overwrites UpdatedAt on
+        // every UPDATE — needed so EF reads back the trigger-written value instead of keeping
+        // the stale in-memory one after SaveChanges.
+        builder.Property(x => x.UpdatedAt).HasDefaultValueSql("now()").ValueGeneratedOnAddOrUpdate();
 
         builder.HasOne(x => x.Load)
             .WithMany(l => l.Assignments)
@@ -31,5 +34,21 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
             .WithMany(w => w.Assignments)
             .HasForeignKey(x => x.WorkflowRunId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.LoadId)
+            .IsUnique()
+            .HasDatabaseName("ux_assignment_live_per_load")
+            .HasFilter("\"Status\" IN ('Proposed','Accepted')");
+
+        builder.HasIndex(x => new { x.LoadId, x.AgencyId })
+            .IsUnique()
+            .HasDatabaseName("ux_assignment_load_agency");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_assignment_price", "\"ProposedPrice\" > 0");
+            t.HasCheckConstraint("ck_assignment_distance", "\"RoutedDistanceKm\" IS NULL OR \"RoutedDistanceKm\" > 0");
+            t.HasCheckConstraint("ck_assignment_eta", "\"ProposedEtaMinutes\" IS NULL OR \"ProposedEtaMinutes\" > 0");
+        });
     }
 }

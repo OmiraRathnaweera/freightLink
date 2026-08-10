@@ -19,5 +19,22 @@ public class PaymentConfiguration : IEntityTypeConfiguration<Payment>
             .WithMany(i => i.Payments)
             .HasForeignKey(x => x.InvoiceId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.GatewayRef).IsUnique().HasDatabaseName("uq_payment_gatewayref");
+
+        builder.HasIndex(x => new { x.InvoiceId, x.AttemptNo })
+            .IsUnique()
+            .HasDatabaseName("uq_payment_attempt");
+
+        builder.HasIndex(x => x.InvoiceId)
+            .IsUnique()
+            .HasDatabaseName("ux_payment_success")
+            .HasFilter("\"Status\" = 'Success'");
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_payment_amount", "\"Amount\" > 0");
+            t.HasCheckConstraint("ck_payment_attempt", "\"AttemptNo\" >= 1");
+        });
     }
 }
