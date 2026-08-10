@@ -14,11 +14,18 @@ public class LoadStatusHistoryConfiguration : IEntityTypeConfiguration<LoadStatu
         builder.HasOne(x => x.Load)
             .WithMany(l => l.StatusHistory)
             .HasForeignKey(x => x.LoadId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.ChangedByUser)
             .WithMany()
             .HasForeignKey(x => x.ChangedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("ck_lsh_transition", "\"FromStatus\" IS DISTINCT FROM \"ToStatus\"");
+            t.HasCheckConstraint("ck_lsh_cancel_reason",
+                "\"ToStatus\" <> 'Cancelled' OR \"Reason\" IS NOT NULL");
+        });
     }
 }

@@ -17,11 +17,17 @@ public class TripEvidenceConfiguration : IEntityTypeConfiguration<TripEvidence>
         builder.HasOne(x => x.Trip)
             .WithMany(t => t.Evidence)
             .HasForeignKey(x => x.TripId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.CapturedByUser)
             .WithMany()
             .HasForeignKey(x => x.CapturedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(x => x.StorageKey).IsUnique().HasDatabaseName("uq_tripevidence_storagekey");
+
+        builder.HasIndex(x => new { x.TripId, x.EvidenceType })
+            .IsUnique()
+            .HasDatabaseName("uq_tripevidence_type");
     }
 }

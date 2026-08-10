@@ -13,7 +13,7 @@ public class DisputeResolutionConfiguration : IEntityTypeConfiguration<DisputeRe
         builder.HasOne(x => x.Dispute)
             .WithOne(d => d.Resolution)
             .HasForeignKey<DisputeResolution>(x => x.DisputeId)
-            .OnDelete(DeleteBehavior.Cascade);
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasOne(x => x.ResolvedByUser)
             .WithMany()

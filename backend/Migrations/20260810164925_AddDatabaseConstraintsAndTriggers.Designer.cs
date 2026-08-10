@@ -3,6 +3,7 @@ using System;
 using FreightLink.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FreightLink.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260810164925_AddDatabaseConstraintsAndTriggers")]
+    partial class AddDatabaseConstraintsAndTriggers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -47,7 +50,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -98,7 +101,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -239,7 +242,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -257,7 +260,7 @@ namespace FreightLink.Api.Migrations
 
                     b.ToTable("AgentWorkflowRuns", t =>
                         {
-                            t.HasCheckConstraint("ck_awr_attempt", "\"AttemptNo\" >= 1");
+                            t.HasCheckConstraint("ck_awr_attempt", "\"AttemptNo\" BETWEEN 1 AND 3");
 
                             t.HasCheckConstraint("ck_awr_completed", "\"CompletedAt\" IS NULL OR \"CompletedAt\" >= \"StartedAt\"");
                         });
@@ -344,7 +347,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -442,7 +445,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -490,7 +493,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -561,7 +564,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -619,7 +622,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -704,7 +707,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -952,7 +955,7 @@ namespace FreightLink.Api.Migrations
 
                     b.ToTable("Notifications", t =>
                         {
-                            t.HasCheckConstraint("ck_notification_email_delivery", "\"Channel\" <> 'Email' OR \"DeliveryStatus\" <> 'Sent' OR (\"SentAt\" IS NOT NULL AND \"ProviderMessageId\" IS NOT NULL)");
+                            t.HasCheckConstraint("ck_notification_email_delivery", "\"Channel\" <> 'Email' OR \"DeliveryStatus\" IS NOT NULL");
 
                             t.HasCheckConstraint("ck_notification_failure", "\"DeliveryStatus\" <> 'Failed' OR \"ErrorMessage\" IS NOT NULL");
                         });
@@ -1044,7 +1047,8 @@ namespace FreightLink.Api.Migrations
                     b.HasKey("PaymentWebhookEventId");
 
                     b.HasIndex("RawPayloadHash")
-                        .HasDatabaseName("ix_pwe_payloadhash");
+                        .IsUnique()
+                        .HasDatabaseName("uq_pwe_payloadhash");
 
                     b.ToTable("PaymentWebhookEvents", t =>
                         {
@@ -1118,7 +1122,7 @@ namespace FreightLink.Api.Migrations
                         .HasDefaultValueSql("now()");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -1208,7 +1212,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -1365,7 +1369,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
@@ -1411,7 +1415,7 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
