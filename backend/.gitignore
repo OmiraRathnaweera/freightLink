@@ -491,3 +491,6 @@ CLAUDE.md
 .claude/
 .agents/
 skills-lock.json
+
+# Local Postman collections (not committed source)
+postman/
