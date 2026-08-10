@@ -44,5 +44,5 @@ mobile/**/android/app/google-services.json
 .vscode/
 .DS_Store
 Thumbs.db
-
+/.claude/
 .DS_Store
