@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 2**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 3**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -12,6 +12,7 @@
 |---|---|---|
 | 1 | 7 Aug 2026 | Initial Sprint 1 skeleton |
 | 2 | 9 Aug 2026 | Corrected against architecture review: fixed `Load`/`Assignment`/`Trip` status enums, added missing `Assignment` list/detail/decline endpoints (Component C), corrected all `/workflows/*` approval endpoints from `Admin` to `Shipper (own load)` per **ADR-016**, corrected the 409 conflict example (previously implied competitive bidding, contradicting **ADR-017**), flagged `disputes/resolve` role as provisional pending team decision, added explicit JSON casing + ownership-guard conventions |
+| 3 | 9 Aug 2026 | Auth layer implemented: resolved the Section 4.1 open design note by splitting `/auth/register` into `/auth/register/shipper` and `/auth/register/agency` (Driver is not publicly self-registered; Admin has no public registration and is seeded on startup instead); added the previously-missing `/auth/logout` row (`Any (authenticated)`, revokes the caller's own refresh token); clarified that `POST /auth/login` returns **only** `accessToken`/`refreshToken`, never a full user profile; added corresponding YAML skeleton paths |
 
 ---
 
@@ -119,13 +120,14 @@ Query parameters, applied consistently across all `GET` list endpoints:
 
 | Method | Path | Description | Roles |
 |---|---|---|---|
-| POST | `/auth/register` | Register a new user (role-specific payload) | Public |
-| POST | `/auth/login` | Issue access + refresh token | Public |
-| POST | `/auth/refresh` | Exchange a valid refresh token for a new access token | Public (valid refresh token) |
-| POST | `/auth/logout` | Revoke the current refresh token | Any (authenticated) |
-| GET | `/auth/me` | Current user profile + role | Any (authenticated) |
+| POST | `/auth/register/shipper` | Register a new Shipper (self-service) | Public |
+| POST | `/auth/register/agency` | Register a new Agency org + its first Agency Staff user, atomically (self-service) | Public |
+| POST | `/auth/login` | Shared login for all roles — returns **only** `{ accessToken, refreshToken }`, never the user profile | Public |
+| POST | `/auth/refresh` | Exchange a valid refresh token for a new access + refresh token pair (rotates the old one) | Public (valid refresh token) |
+| POST | `/auth/logout` | Revoke a refresh token belonging to the caller | Any (authenticated) |
+| GET | `/auth/me` | Current user profile + role, read from the access token | Any (authenticated) |
 
-> **Open design note (non-blocking):** the approved Figma UI has two separate public registration entry points (Shipper, Agency). Confirm before Sprint 2 whether `/auth/register` stays a single endpoint with a role-discriminated payload, or splits into `/auth/register/shipper` and `/auth/register/agency`. Either is fine architecturally — pick one so both clients build against the same assumption.
+> **Resolved in Rev. 3:** the open design note below was decided — `/auth/register` is split into `/auth/register/shipper` and `/auth/register/agency`, matching the two public entry points in the approved Figma UI. `Driver` accounts are not publicly self-registered (created by Agency Staff via a future Component B endpoint). `Admin` has no public registration endpoint at all — a default Admin is seeded automatically on API startup from `ADMIN_USER_EMAIL`/`ADMIN_USER_PASSWORD` env vars.
 
 ### 4.2 Component A — Load Management (Owner: Dias H.N.P.K.)
 
@@ -275,25 +277,42 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
-  /auth/register:
+  /auth/register/shipper:
     post:
       tags: [Auth]
-      summary: Register a new user (role-specific payload)
+      summary: Register a new Shipper (self-service)
       security: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: '#/components/schemas/RegisterShipperRequest'
       responses:
         '201': { description: Created }
         '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /auth/register/agency:
+    post:
+      tags: [Auth]
+      summary: Register a new Agency org + its first Agency Staff user, atomically (self-service)
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAgencyRequest'
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /auth/refresh:
     post:
       tags: [Auth]
-      summary: Exchange a refresh token for a new access token
+      summary: Exchange a refresh token for a new access + refresh token pair (rotates the old one)
       security: []
       responses:
         '200':
@@ -302,6 +321,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthTokens'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke a refresh token belonging to the caller
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /auth/me:
     get:
@@ -309,6 +337,7 @@ paths:
       summary: Current user profile + role
       responses:
         '200': { description: OK }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /loads:
     post:
@@ -668,25 +697,43 @@ components:
         email: { type: string, format: email }
         password: { type: string, format: password }
 
-    RegisterRequest:
+    RegisterShipperRequest:
       type: object
-      description: >
-        Skeleton placeholder. Confirm before Sprint 2 whether this single schema carries
-        a discriminating `role` field (Shipper | AgencyStaff | Admin) with role-specific
-        optional properties, or whether registration splits into separate endpoints/schemas
-        per the two dedicated Figma entry points (Shipper, Agency) — see Section 4.1 note.
-      required: [email, password, role]
+      required: [email, password, fullName, companyName, billingAddress]
       properties:
         email: { type: string, format: email }
         password: { type: string, format: password }
-        role: { type: string, enum: [Shipper, AgencyStaff, Admin] }
+        fullName: { type: string }
+        phoneE164: { type: string }
+        companyName: { type: string }
+        businessRegNo: { type: string }
+        billingAddress: { type: string }
+
+    RegisterAgencyRequest:
+      type: object
+      description: >
+        Creates the Agency org and its first Agency Staff user (the caller) atomically —
+        AgencyStaff.agencyId is a required foreign key, so there is no schema-safe way to
+        register an Agency Staff account without also creating the Agency row it belongs to.
+      required: [email, password, fullName, agencyName, businessRegNo, yardAddress, yardLat, yardLng]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, format: password }
+        fullName: { type: string }
+        phoneE164: { type: string }
+        jobTitle: { type: string }
+        agencyName: { type: string }
+        businessRegNo: { type: string }
+        yardAddress: { type: string }
+        yardLat: { type: number, format: double }
+        yardLng: { type: number, format: double }
 
     AuthTokens:
       type: object
+      description: Returned by /auth/login and /auth/refresh — intentionally only these two fields, never the user profile.
       properties:
         accessToken: { type: string }
         refreshToken: { type: string }
-        expiresIn: { type: integer, example: 300 }
 
     PriceEstimate:
       type: object
@@ -717,7 +764,7 @@ components:
 | `Invoice`, `Dispute` schemas + webhook payload; confirm `disputes/resolve` ownership (README §10 #9) | Balasooriya B.K.N.N. | Sprint 2–5 (`Y3S01-36`–`38`, `81`, `93`) |
 | `Workflows` request/response schemas (`AgentWorkflowRun`, `AgentStep`, `ApprovalDecision`); implement the `load.ShipperId == currentUserId` ownership guard on `approve`/`reject`/`revise` per ADR-016 | All four (agent owners) | Sprint 5 (`Y3S01-90`–`92`, `95`–`97`) |
 | Role-based authorization scheme wired to every endpoint above, including ownership guards flagged with `(own)` | Ratnaweera O.V. | Sprint 1 (`Y3S01-19`), enforced per-controller Sprint 2+ |
-| Confirm `/auth/register` single-vs-split design (Section 4.1 note) | Dias H.N.P.K. (owns Auth foundation alongside Component A) | Sprint 2 |
+| ~~Confirm `/auth/register` single-vs-split design~~ — resolved Rev. 3, split into `/auth/register/shipper` + `/auth/register/agency`; Auth layer (JWT issuance/rotation, admin seed) implemented | Dias H.N.P.K. (owns Auth foundation alongside Component A) | Done |
 | Publish live Swagger/OpenAPI UI from the ASP.NET Core project | Ratnaweera O.V. | Verified Sprint 7 (`Y3S01-123`) |
 
 This document is the Sprint 1 deliverable for `Y3S01-15`. Update it whenever an endpoint's path, method, or role requirement changes — it is the single source of truth both clients (React, Flutter) build against.
