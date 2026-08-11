@@ -32,6 +32,21 @@ public enum ErrorCode
     /// <summary>The authenticated caller's user record could not be found.</summary>
     USER_NOT_FOUND,
 
+    /// <summary>The requested load could not be found.</summary>
+    LOAD_NOT_FOUND,
+
+    /// <summary>A load's <c>PickupWindowEnd</c> was not after its <c>PickupWindowStart</c>.</summary>
+    INVALID_PICKUP_WINDOW,
+
+    /// <summary>An edit or cancel was attempted on a load whose current status doesn't allow it.</summary>
+    INVALID_LOAD_STATUS_TRANSITION,
+
+    /// <summary>A load cancellation was attempted without a reason.</summary>
+    LOAD_CANCEL_REASON_REQUIRED,
+
+    /// <summary>The server-generated load reference code collided with an existing one.</summary>
+    LOAD_REFERENCE_CODE_CONFLICT,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's
