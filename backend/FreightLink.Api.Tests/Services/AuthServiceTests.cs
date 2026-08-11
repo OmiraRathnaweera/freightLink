@@ -259,6 +259,25 @@ public class AuthServiceTests
             sut.RefreshAsync(new RefreshRequestDto { RefreshToken = "garbage-token" }, null));
     }
 
+    /// <summary>Refreshing with a valid token belonging to a deactivated account is rejected, mirroring LoginAsync.</summary>
+    [Fact]
+    public async Task RefreshAsync_Throws_ForInactiveAccount()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registerResult = await sut.RegisterShipperAsync(request);
+        var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
+
+        var user = await dbContext.Users.FindAsync(registerResult.UserId);
+        user!.IsActive = false;
+        await dbContext.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null));
+        Assert.Equal(ErrorCode.ACCOUNT_INACTIVE, exception.Code);
+    }
+
     /// <summary>After one refresh, the old refresh token is revoked and can no longer be used (rotation).</summary>
     [Fact]
     public async Task RefreshAsync_RotatesToken_OldTokenBecomesInvalid()
@@ -360,6 +379,23 @@ public class AuthServiceTests
     {
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext, new AdminSeedOptions { Email = "not-an-email", Password = "Adm1n$trongPass!" });
+
+        await sut.SeedAdminIfNotExistsAsync();
+
+        Assert.Empty(dbContext.Users);
+    }
+
+    /// <summary>
+    /// An ADMIN_USER_PASSWORD exceeding BCrypt's 72-byte limit must be rejected before hashing,
+    /// not silently truncated — mirrors the MaxUtf8BytesAttribute check the Password DTOs enforce,
+    /// which this env-var-driven path has no equivalent model-validation pass for.
+    /// </summary>
+    [Fact]
+    public async Task SeedAdminIfNotExistsAsync_SkipsSeed_WhenPasswordExceedsUtf8ByteLimit()
+    {
+        using var dbContext = CreateContext();
+        var oversizedPassword = "Aa1!" + new string('中', 30); // 94 UTF-8 bytes, 34 chars
+        var sut = CreateSut(dbContext, new AdminSeedOptions { Email = "admin@freightlink.test", Password = oversizedPassword });
 
         await sut.SeedAdminIfNotExistsAsync();
 

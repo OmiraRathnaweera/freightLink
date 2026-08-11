@@ -1,4 +1,7 @@
+using System.Net;
 using System.Security.Claims;
+using FreightLink.Api.Common.Errors;
+using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -90,9 +93,23 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>Extracts the authenticated user's id from the <c>NameIdentifier</c> claim on the access token.</summary>
+    /// <returns>The caller's user id.</returns>
+    /// <exception cref="ApiException">
+    /// 401 if the claim is absent or not a well-formed GUID. Not currently reachable with tokens
+    /// minted by <see cref="Services.TokenService.GenerateAccessToken"/> (which always sets this
+    /// claim to a valid GUID) — this guards against a future JWT validation/claim-shape change or a
+    /// differently-configured issuer being accepted, so that case fails as a clean 401 instead of
+    /// an unhandled exception surfacing as a generic 500.
+    /// </exception>
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        return Guid.Parse(userIdClaim!);
+
+        if (!Guid.TryParse(userIdClaim, out var userId))
+        {
+            throw new ApiException(HttpStatusCode.Unauthorized, ErrorCode.UNAUTHORIZED, "The access token does not contain a valid user id.");
+        }
+
+        return userId;
     }
 }

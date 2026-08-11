@@ -101,6 +101,42 @@ public class TokenService : ITokenService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task<string> RotateRefreshTokenAsync(RefreshToken refreshToken, string? userAgent, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        refreshToken.RevokedAt = now;
+
+        var rawToken = GenerateRawRefreshToken();
+        var successor = new RefreshToken
+        {
+            RefreshTokenId = Guid.NewGuid(),
+            UserId = refreshToken.UserId,
+            TokenHash = HashToken(rawToken),
+            UserAgent = userAgent,
+            IssuedAt = now,
+            ExpiresAt = now.AddDays(_jwtOptions.RefreshTokenDays)
+        };
+        _dbContext.RefreshTokens.Add(successor);
+
+        try
+        {
+            // Single SaveChangesAsync = single transaction: the revoke and the successor insert
+            // either both land or neither does, so a failure here never leaves the caller with a
+            // burned token and no replacement.
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // The xmin concurrency token on RefreshToken (RefreshTokenConfiguration) caught a
+            // concurrent rotation of this exact token that committed first — that request wins,
+            // this one loses. Nothing from this attempt was persisted.
+            throw new ApiException(System.Net.HttpStatusCode.Unauthorized, ErrorCode.INVALID_REFRESH_TOKEN, "The refresh token is invalid, expired, or has already been revoked.");
+        }
+
+        return rawToken;
+    }
+
     /// <summary>Generates a cryptographically random, base64url-encoded 256-bit refresh token.</summary>
     private static string GenerateRawRefreshToken()
     {

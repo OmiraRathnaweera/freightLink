@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Options;
@@ -55,12 +56,20 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Connection string comes only from ConnectionStrings:DefaultConnection (env var
-// CONNECTIONSTRINGS__DEFAULTCONNECTION) — never hardcoded in appsettings.json.
+// CONNECTIONSTRINGS__DEFAULTCONNECTION) — never hardcoded in appsettings.json. The mixed-case
+// section/key names here vs. .env.example's SCREAMING_CASE are not a mismatch to fix: ASP.NET
+// Core's environment-variable configuration provider maps "__" to ":" and every configuration
+// lookup (GetSection, GetConnectionString, the [] indexer) is case-insensitive by design, so
+// "ConnectionStrings:DefaultConnection" and "CONNECTIONSTRINGS__DEFAULTCONNECTION" are the same
+// key — deliberately keeping C# lookups in the PascalCase that matches the bound POCO property
+// names (e.g. JwtOptions.Issuer below), rather than forcing ALL-CAPS C# to visually match the env
+// var spelling, which the "__"-to-":" translation would make misleading anyway.
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // JWT settings (Jwt:* / JWT__* env vars) used both to bind JwtOptions for DI and, immediately
-// below, to configure the JwtBearer handler's signing-key/issuer/audience validation.
+// below, to configure the JwtBearer handler's signing-key/issuer/audience validation. Same
+// case-insensitive "__"-to-":" mapping as the connection string above.
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtOptions>(jwtSection);
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
@@ -99,6 +108,25 @@ builder.Services
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.Key)),
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
+        };
+
+        // Without these, a missing/invalid/expired token or a failed role/policy check is handled
+        // directly by the JwtBearer/authorization middleware — never as a thrown exception — so it
+        // bypasses ExceptionHandlingMiddleware entirely and falls back to ASP.NET's bare,
+        // envelope-less default response instead of this project's standard error shape.
+        options.Events = new JwtBearerEvents
+        {
+            OnChallenge = context =>
+            {
+                // Suppresses the default response (which only sets a WWW-Authenticate header and
+                // an empty 401 body) so we can write the standard envelope in its place.
+                context.HandleResponse();
+                return WriteAuthErrorAsync(context.Response, StatusCodes.Status401Unauthorized, ErrorCode.UNAUTHORIZED,
+                    "Authentication is required, or the supplied token is missing, invalid, or expired.");
+            },
+            OnForbidden = context =>
+                WriteAuthErrorAsync(context.Response, StatusCodes.Status403Forbidden, ErrorCode.FORBIDDEN,
+                    "You do not have permission to perform this action.")
         };
     });
 
@@ -145,6 +173,30 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+/// <summary>
+/// Writes the standard <c>{ "error": { code, message } }</c> envelope directly to an in-flight
+/// authentication/authorization response — used by the <c>JwtBearerEvents</c> handlers above,
+/// which run outside <see cref="FreightLink.Api.Middleware.ExceptionHandlingMiddleware"/>'s
+/// exception-catching scope since no exception is thrown for a 401/403 auth failure.
+/// </summary>
+/// <param name="response">The in-flight HTTP response to write to.</param>
+/// <param name="statusCode">The HTTP status code to set.</param>
+/// <param name="code">The machine-readable error code.</param>
+/// <param name="message">The human-readable error message.</param>
+static async Task WriteAuthErrorAsync(HttpResponse response, int statusCode, ErrorCode code, string message)
+{
+    response.ContentType = "application/json";
+    response.StatusCode = statusCode;
+
+    var envelope = new ErrorEnvelopeDto(new ErrorDetailDto { Code = code.ToString(), Message = message });
+    var json = JsonSerializer.Serialize(envelope, new JsonSerializerOptions
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    });
+
+    await response.WriteAsync(json);
+}
 
 /// <summary>
 /// Marker partial class exposing this top-level-statement entry point to

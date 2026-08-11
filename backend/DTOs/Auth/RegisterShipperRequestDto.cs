@@ -18,9 +18,13 @@ public class RegisterShipperRequestDto
     [StringLength(256)]
     public string Email { get; set; } = string.Empty;
 
-    /// <summary>Account password; must satisfy <see cref="StrongPasswordAttribute"/>.</summary>
+    /// <summary>
+    /// Account password; must satisfy <see cref="StrongPasswordAttribute"/> and fit within
+    /// <see cref="PasswordPolicy.MaxBytes"/> (BCrypt would otherwise silently truncate it).
+    /// </summary>
     [Required]
     [StrongPassword]
+    [MaxUtf8Bytes(PasswordPolicy.MaxBytes)]
     public string Password { get; set; } = string.Empty;
 
     /// <summary>Full name of the person registering.</summary>

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.RegularExpressions;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -205,9 +206,29 @@ public class AuthService : IAuthService
     public async Task<TokenResponseDto> RefreshAsync(RefreshRequestDto request, string? userAgent, CancellationToken cancellationToken = default)
     {
         var refreshToken = await _tokenService.ValidateRefreshTokenAsync(request.RefreshToken, cancellationToken);
-        await _tokenService.RevokeRefreshTokenAsync(refreshToken, cancellationToken);
 
-        return await IssueTokenPairAsync(refreshToken.User, userAgent, cancellationToken);
+        // Mirrors the same check LoginAsync applies before issuing tokens — without it, a
+        // deactivated account could keep refreshing forever as long as it held a still-valid
+        // refresh token, even though /auth/login already rejects it outright. Checked before
+        // revoking so the token isn't burned as a side effect of a rejected attempt: if the
+        // account is later reactivated, the same (still unexpired) token keeps working.
+        if (!refreshToken.User.IsActive)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ACCOUNT_INACTIVE, "This account is inactive.");
+        }
+
+        // Atomic revoke-old + issue-successor (single transaction, concurrency-checked) — see
+        // ITokenService.RotateRefreshTokenAsync. Not routed through IssueTokenPairAsync/
+        // IssueRefreshTokenAsync, which each do their own independent SaveChangesAsync and would
+        // reopen the same non-atomic-rotation gap this method exists to close.
+        var newRawRefreshToken = await _tokenService.RotateRefreshTokenAsync(refreshToken, userAgent, cancellationToken);
+        var accessToken = _tokenService.GenerateAccessToken(refreshToken.User);
+
+        return new TokenResponseDto
+        {
+            AccessToken = accessToken,
+            RefreshToken = newRawRefreshToken
+        };
     }
 
     /// <inheritdoc />
@@ -253,6 +274,16 @@ public class AuthService : IAuthService
         if (!Regex.IsMatch(normalizedEmail, AuthPatterns.EmailPattern))
         {
             _logger.LogWarning("Admin seed skipped: ADMIN_USER_EMAIL '{Email}' is not a valid email address.", normalizedEmail);
+            return;
+        }
+
+        // This path has no DTO/model-validation pass, unlike registration/login — so the same
+        // byte-length limit the Password DTOs enforce via MaxUtf8BytesAttribute must be checked
+        // here explicitly, or a too-long ADMIN_USER_PASSWORD would be silently truncated by BCrypt
+        // rather than rejected (see PasswordPolicy.MaxBytes).
+        if (Encoding.UTF8.GetByteCount(_adminSeedOptions.Password) > PasswordPolicy.MaxBytes)
+        {
+            _logger.LogWarning("Admin seed skipped: ADMIN_USER_PASSWORD exceeds {MaxBytes} bytes and would be silently truncated by BCrypt.", PasswordPolicy.MaxBytes);
             return;
         }
 

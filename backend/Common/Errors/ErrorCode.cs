@@ -32,6 +32,20 @@ public enum ErrorCode
     /// <summary>The authenticated caller's user record could not be found.</summary>
     USER_NOT_FOUND,
 
+    /// <summary>
+    /// A protected endpoint was called with no access token, or one that's missing, malformed,
+    /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's
+    /// <c>OnChallenge</c> event (<c>Program.cs</c>), not thrown as an <c>ApiException</c>.
+    /// </summary>
+    UNAUTHORIZED,
+
+    /// <summary>
+    /// A valid, authenticated caller was denied by a role/policy check (e.g. a future
+    /// <c>[Authorize(Roles = ...)]</c> failure). Written by the JwtBearer handler's
+    /// <c>OnForbidden</c> event (<c>Program.cs</c>), not thrown as an <c>ApiException</c>.
+    /// </summary>
+    FORBIDDEN,
+
     /// <summary>An unhandled exception was caught by the global exception-handling middleware.</summary>
     INTERNAL_SERVER_ERROR
 }

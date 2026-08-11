@@ -6,6 +6,8 @@ namespace FreightLink.Api.Services.Interfaces;
 /// Issues, validates, and revokes JWT access tokens and hashed refresh tokens.
 /// Refresh tokens are single-use: <see cref="AuthService"/> revokes the old token and issues a
 /// new one on every <c>/auth/refresh</c> call (rotation), rather than reusing the same token.
+/// Rotation itself (<see cref="RotateRefreshTokenAsync"/>) is atomic and single-winner under
+/// concurrency — see its doc comment.
 /// </summary>
 public interface ITokenService
 {
@@ -32,4 +34,19 @@ public interface ITokenService
     /// <param name="refreshToken">The token to revoke.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task RevokeRefreshTokenAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Atomically revokes <paramref name="refreshToken"/> and issues its successor in a single
+    /// <c>SaveChangesAsync</c>/transaction, so a crash or failure between the two steps can never
+    /// leave the caller with a revoked token and no replacement. Concurrency-safe: if two requests
+    /// race to rotate the exact same token, the entity's Postgres <c>xmin</c> concurrency token
+    /// (configured in <c>RefreshTokenConfiguration</c>) guarantees only one wins — the loser gets a
+    /// clean <see cref="Common.Exceptions.ApiException"/> instead of both silently succeeding.
+    /// </summary>
+    /// <param name="refreshToken">The already-validated token to consume (from <see cref="ValidateRefreshTokenAsync"/>).</param>
+    /// <param name="userAgent">Optional client user-agent, recorded against the newly issued successor token.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The new raw (unhashed) refresh token.</returns>
+    /// <exception cref="Common.Exceptions.ApiException">401 if a concurrent request already consumed this token first.</exception>
+    Task<string> RotateRefreshTokenAsync(RefreshToken refreshToken, string? userAgent, CancellationToken cancellationToken = default);
 }
