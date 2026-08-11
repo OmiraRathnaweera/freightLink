@@ -284,6 +284,8 @@ Persist Agentic AI workflow state in PostgreSQL using four dedicated tables, eac
 | `ToolCall` | OpenRouteService call input/output, success/failure | Agent 3 (Matching/Pricing) |
 | `ApprovalDecision` | Decided-by, action taken, reason | Agent 4 computes the proposal; **Shipper** action, submitted via Component A's console, written through a role-guarded Component D endpoint (see ADR-016) |
 
+A fifth table, `MatchCandidate`, records one row per agency Agent 2 evaluated in a given run (rank, eligibility score, and rejection reason where ineligible). This was added so that Agent 2's ranked output — its entire individual contribution — is queryable relational data rather than a JSON field inside `AgentStep`, and so that the decline-exclusion rule in ADR-018 has an auditable basis.
+
 ### Consequences
 **Positive**
 - Directly satisfies the spec's shared-state persistence requirement with a clean, explainable relational structure.
@@ -310,11 +312,14 @@ The specification requires JWT authentication and role-based authorization acros
 ### Decision
 Use **JWT-based authentication** with a short-lived **access token (5 minutes)** and a longer-lived **refresh token (30 days)**, issued by the ASP.NET Core backend and consumed identically by both React and Flutter.
 
+Refresh tokens are persisted in a dedicated `RefreshToken` table (one user → many tokens, one per device/session). Only a **SHA-256 hash** of each token is stored, never the token itself, so a database disclosure cannot be replayed into live sessions. Revocation is recorded as a `RevokedAt` timestamp rather than a row deletion, consistent with ADR-019, which both preserves the session audit trail and makes server-enforced logout possible.
+
 ### Consequences
 **Positive**
 - Short-lived access tokens limit the exposure window if a token is compromised, satisfying the spec's security requirements (Section 5) with a well-understood, industry-standard pattern.
 - A 30-day refresh token keeps the mobile experience (Flutter — Driver/Agency Staff) usable without requiring very frequent re-logins, which matters for operational users in the field.
 - One shared identity/token scheme across both clients directly satisfies the mandatory integrated-system rule and gives a single, consistent security story to present in the viva.
+- Server-side token records make it possible to eject a suspended agency's staff and drivers immediately (mandatory edge case 1) rather than waiting up to 30 days for their tokens to expire naturally.
 
 **Negative**
 - Requires implementing and testing a full refresh-token flow (secure storage, rotation, revocation on both clients), which is additional implementation effort compared to a single long-lived token.
@@ -323,6 +328,7 @@ Use **JWT-based authentication** with a short-lived **access token (5 minutes)**
 ### Alternatives Considered
 - **Single long-lived JWT with no refresh token:** Rejected — weaker security posture, and directly contradicts the "secure configuration" and "protected endpoints" expectations in Section 5 of the spec.
 - **Session-based (cookie) authentication:** Rejected — less natural fit for a Flutter mobile client and for a stateless REST API consumed by two independent client types.
+- **Stateless refresh tokens with no server-side record:** Rejected — would make revocation impossible, leaving no way to enforce logout or to cut off a suspended agency's staff before their token expired.
 
 ---
 
@@ -339,6 +345,8 @@ Integrate **three** third-party services, all called exclusively from the ASP.NE
 1. **OpenRouteService** — distance and ETA calculation between an agency's yard and a load's pickup location; this call **doubles as the Agentic AI's allow-listed tool** (`get_route_and_eta`), used by Agent 3.
 2. **PayHere (sandbox/test mode)** — invoice payment on Component D: checkout session creation and webhook-driven payment confirmation.
 3. **Transactional email API** (e.g. Brevo or Resend, free tier) — shipper notifications on the decline/retry loop introduced in ADR-018 (agency declined, new match found, no auto-match found), sent via a shared `IEmailService` owned by Component A.
+
+Each integration has a dedicated audit trail in the database: `ToolCall` for OpenRouteService, `PaymentWebhookEvent` for inbound PayHere callbacks, and delivery-status fields on `Notification` for email. `PaymentWebhookEvent` deliberately carries **no foreign key** — an inbound callback whose MD5 signature has not yet been verified must be recorded before it is trusted or resolved to an invoice, so that rejected and replayed callbacks are auditable rather than silently discarded.
 
 ### Consequences
 **Positive**
@@ -497,6 +505,8 @@ The system does **not** run a competitive bidding process. The Agentic AI pipeli
 - `Assignment` state machine: `Proposed → Accepted` / `Declined`.
 - `Trip` (created only once `Assignment` is `Accepted`): `Assigned → PickedUp → InTransit → Delivered`.
 
+The agency's response is stored in a dedicated `AssignmentResponse` record (one per assignment, at most) capturing who responded, the decision, when, and — for a decline — a mandatory reason. Keeping this in its own table rather than as columns on `Assignment` means an unanswered proposal carries no half-empty response fields, and the decline reason is available to Agent 2 on the retry run (ADR-018).
+
 ### Consequences
 **Positive**
 - Removes an entire competitive-bidding subsystem from scope — no bid entity, no bid-ranking logic, no bid-expiry handling — reducing implementation risk within the 8-week timeline.
@@ -531,7 +541,7 @@ On decline, the system:
 4. Once a new recommendation is ready, **emails the shipper a second time** ("new match found, please review").
 5. This is **capped at 3 automatic attempts per load** (a tunable implementation constant, not an architectural constraint). Beyond the cap, the system stops auto-retrying, records a **safe failure**, flags the load for manual review, and sends a third email variant ("no automatic match found, please check the app").
 
-`AgentWorkflowRun` gains an **attempt number** field to implement the cap (see ADR-010). Email delivery uses the transactional email integration added in ADR-012, via a shared `IEmailService` owned by Component A and called cross-component from Component C's decline endpoint.
+`AgentWorkflowRun` gains an **attempt number** field to implement the cap (see ADR-010). The cap is additionally enforced at the database level by a unique constraint on `(LoadId, AttemptNo)` together with a check constraint bounding `AttemptNo`, so a fourth attempt cannot be recorded even if the retry logic were to miscount. Email delivery uses the transactional email integration added in ADR-012, via a shared `IEmailService` owned by Component A and called cross-component from Component C's decline endpoint.
 
 ### Consequences
 **Positive**
@@ -542,12 +552,106 @@ On decline, the system:
 **Negative**
 - Repeatedly declining a proposal during the live demo (e.g. to showcase the retry loop) will send multiple real emails unless a sandbox/logging fallback mode is used for `IEmailService` during the viva — documented as a demo-reliability mitigation in ADR-012, parallel to the Ollama LLM fallback in ADR-008.
 - The cross-component call from Component C's decline endpoint into Component A's `IEmailService` and retry-check logic must be documented explicitly in both students' individual reports, following the same pattern already used for the Shipper/Agency registration DTO overlap and the approval-endpoint contract.
-- The exact retry-cap number (3) is a judgement call rather than a derived constant; the team accepts this as a reasonable, adjustable default rather than treating it as load-bearing architecture.
+- The exact retry-cap number (3) is a judgement call rather than a derived constant; the team accepts this as a reasonable, adjustable default rather than treating it as load-bearing architecture. Because the cap is now also expressed as a database constraint, tuning it requires a migration rather than only a configuration change — an accepted trade-off for making the bound unbypassable.
 
 ### Alternatives Considered
 - **Manual re-trigger only (shipper or Admin must manually re-run matching after a decline):** This was the team's initial, more conservative default; superseded by this ADR once the team judged that bounded automatic retry was worth the added complexity for a materially better shipper experience.
 - **Unbounded automatic retry (no cap):** Rejected — risks an infinite loop if no agency will accept a given load, which is a live-demo reliability hazard and does not produce a clean, terminating "safe failure" outcome.
 - **No shipper notification during the retry process (silent retry):** Rejected — would leave the shipper unaware anything happened until they happened to check the app, undermining the point of having a responsive, human-in-the-loop system at all.
+
+---
+## ADR-019: No Hard Deletes — Entity Lifecycle Managed by Status Transitions
+
+**Status:** Accepted
+**Date:** August 2026
+
+### Context
+Every core FreightLink entity has a real-world "end of life": a shipper cancels a load, an Admin suspends an agency, an agency retires a vehicle, a driver leaves the company, an invoice is voided after a cancellation. The obvious implementation is a `DELETE` statement, and the equally common alternative is a generic `IsDeleted` boolean flag on every table.
+
+Both are a poor fit for this system for three specific reasons:
+
+1. **Audit obligations.** Section 4 of the project README and mandatory edge cases 1 and 2 require that status changes be *fully auditable*. The schema carries dedicated append-only history tables (`LoadStatusHistory`, `AgencyStatusHistory`, `TripEvent`) to satisfy this. A cascading delete of a parent row would silently destroy exactly the history those tables exist to preserve.
+2. **Financial and evidentiary integrity.** `Invoice` numbers form a gapless sequence, and `TripEvidence` rows are the Proof-of-Pickup / Proof-of-Delivery records that ADR-004 makes mandatory. These are the artefacts a dispute is adjudicated against months later, and neither may be destroyed as a side effect of an upstream deletion.
+3. **Enforcing the state machine.** If a delete path exists, developers will use it, because it is one statement instead of a status update plus a history insert plus a reason. Removing the shortcut is what guarantees that every lifecycle event produces an actor, a timestamp, and a reason.
+
+A separate `IsDeleted` flag was considered and rejected because every entity in this schema *already* carries its lifecycle state in a status column — `LoadStatus.Cancelled`, `AgencyStatus.Suspended`, `VehicleStatus.Retired`, `DriverStatus.Inactive`, `InvoiceStatus.Void`, `User.IsActive`. Adding a second flag alongside these creates two sources of truth and an undefined intersection (what does `Status = 'Active'` with `IsDeleted = true` mean?), and requires every query to filter on both — a correctness risk the first time one is forgotten.
+
+### Decision
+**No business entity in FreightLink is ever hard-deleted.** Lifecycle termination is expressed exclusively as a status transition on the entity's existing status enum, accompanied by a history row where the entity has a history table.
+
+This is enforced at three levels:
+
+1. **All business foreign keys use `ON DELETE RESTRICT`.** `DeleteBehavior.Restrict` is set explicitly in EF Core, overriding its default of `Cascade` for required relationships.
+2. **A `BEFORE DELETE` deny trigger** (raising `FL-DELETE-001`) is applied to `User`, `Agency`, `Vehicle`, `Driver`, `Load`, `Assignment`, `Trip`, `Invoice`, `Payment`, `Dispute`, `File`, and `ComplianceDoc`. This closes the gap that `RESTRICT` alone leaves open: `RESTRICT` blocks deletion only of a row that *has* dependent children, so a never-used vehicle or an unreferenced file would otherwise still be deletable.
+3. **Append-only tables** (`LoadStatusHistory`, `AgencyStatusHistory`, `TripEvent`, `TripEvidence`, `ToolCall`, `ApprovalDecision`, `PaymentWebhookEvent`) additionally carry a `BEFORE UPDATE OR DELETE` deny trigger (`FL-AUDIT-001`), making them immutable once written.
+
+**Two deliberate exceptions use `ON DELETE CASCADE`:**
+- `AgentWorkflowRun → AgentStep → ToolCall` — the agent execution trace is diagnostic telemetry with no meaning apart from its parent run; an orphaned `ToolCall` row is unreadable.
+- `RefreshToken → User` — session data carrying no audit value once the account itself is gone (ADR-011).
+
+**One deliberate non-exception:** `ApprovalDecision` hangs off `AgentWorkflowRun` alongside `AgentStep`, but uses `RESTRICT`, not `CASCADE`. An approval is the record of a named human accepting responsibility for a high-impact action (ADR-013, ADR-016) and must outlive any cleanup of the machine-generated trace around it.
+
+Three lifecycle gaps identified while making this decision are closed as part of it: `File` gains a `FileStatus` enum (`Active` / `Removed`) so an incorrectly attached document can be withdrawn; `Notification` gains a nullable `DismissedAt`; and `LoadStatus` gains `Discarded`, so an abandoned draft is distinguishable from a genuine `Cancelled` load in the shipper's history.
+
+### Consequences
+**Positive**
+- Mandatory edge cases 1 and 2 are satisfied structurally rather than by convention: a suspended agency's in-flight trips, and a cancelled load's assignment, trip, evidence, and invoice rows, all survive intact with the reason and actor recorded.
+- The deny trigger makes "how do you know your audit trail is complete?" answerable with a demonstrable database-level guarantee rather than an assurance about application code — a stronger viva answer than a code walkthrough, and one the evaluator can test live by attempting a `DELETE` directly in `psql`.
+- Referential integrity is unconditional: no query in the system needs to defend against a dangling foreign key, and no orphan-cleanup logic is required anywhere.
+- Avoids the dual-source-of-truth problem that a generic `IsDeleted` column would have introduced across all 28 tables.
+
+**Negative**
+- Data volume only grows. This is immaterial at academic scale but would require an archival strategy in a production deployment, and the team should say so if asked rather than claiming the design scales unchanged.
+- Every read query must filter on status (`WHERE Status = 'Active'`), and forgetting the filter surfaces retired or cancelled records. Partial indexes mitigate the performance cost; EF Core `HasQueryFilter` mitigates the correctness risk, with the caveat that query filters also apply to `Include()` navigation loads.
+- Genuine mistakes — a typo in a vehicle registration, a stray record created during development — cannot be removed through the application and require a direct database intervention with the trigger temporarily disabled. The team accepts this as the correct trade-off for an auditable system, and manages seed/test data through migrations rather than the UI.
+
+### Alternatives Considered
+- **`ON DELETE CASCADE` throughout:** Rejected outright — deleting a single `Agency` row would silently destroy its status history, fleet, drivers, compliance documents, and every assignment it had ever received, which directly contradicts the auditability requirement in edge case 1.
+- **Generic `IsDeleted` boolean on every table:** Rejected — duplicates lifecycle state the existing status enums already carry, creates undefined combinations, and doubles the filtering burden on every query. The status columns *are* the soft-delete mechanism; a second flag adds ambiguity, not safety.
+- **`ON DELETE RESTRICT` alone, without the deny trigger:** Rejected as incomplete. `RESTRICT` protects only rows that already have children, leaving childless rows — a newly registered vehicle, an unreferenced file — freely deletable, which would make the "nothing is ever deleted" claim untrue in exactly the cases nobody thinks to test.
+- **`ON DELETE SET NULL` on selected foreign keys:** Rejected — would require nullable foreign keys throughout, contradicting the schema's explicit design rule against them, and would leave history rows pointing at nothing rather than at the entity whose history they record.
+
+---
+
+## ADR-020: Enumerated Value Sets as Native Enum Types, Not Lookup Tables
+
+**Status:** Accepted
+**Date:** August 2026
+
+### Context
+The schema contains roughly two dozen closed value sets — user roles, the status chain of every major entity, evidence types, agent roles, approval decisions, notification categories. Two questions had to be settled together: how these are stored, and where their authoritative definition lives.
+
+The storage question surfaced first with `User.Role`. A `Role` lookup table with a foreign key from `User` is the conventional relational answer and was the schema's original design. On review the team found the usual justification for it does not hold here: a lookup table is required by Third Normal Form only if *role metadata* (display name, description, permission set) is stored, since that metadata depends on the role rather than on the user. FreightLink stores no such metadata — authorization is expressed through `[Authorize(Roles = ...)]` attributes in code, not database rows — so a single atomic value on `User` introduces no transitive dependency and the table earns nothing.
+
+The definition question surfaced separately: value sets were being invented ad hoc in C# as each component was built, with no single place to check them, which risks the four components drifting apart on spelling and on which terminal states exist.
+
+### Decision
+Every closed value set is stored as a **PostgreSQL native enum type** (or, where a project constraint prevents that, a `text` column with an equivalent `CHECK` constraint), mapped to a C# enum with `HasConversion<string>()` in EF Core so values remain human-readable in `psql` during the live demo. No lookup tables are created for value sets.
+
+The authoritative definition of every enum lives in a single **Enum Inventory** document (`docs/enum-inventory.md`), grouped by owning component. Adding or renaming a value is a change to that document first, then a migration.
+
+Two substantive points were settled while producing the inventory:
+
+- **`AgencyStatus` distinguishes `Verified` from `Active`.** `Verified` means the Admin has approved the agency's KYC/compliance documents; `Active` means verified *and* currently accepting jobs (at least one available vehicle, at least one active driver, availability switched on). `Verified ↔ Active` is the transition the Flutter availability-management screen writes, in both directions; movement into and out of `Suspended` is Admin-only. **Agent 2's eligibility query filters on `Active` only** — this is the reason the distinction had to be resolved rather than left implicit.
+- **Terminal states were missing from four documented chains.** `LoadStatus.Cancelled`, `AssignmentStatus.Cancelled`, `TripStatus.Cancelled`, and `InvoiceStatus.Void` are all produced by endpoints that already exist and are required by mandatory edge case 2, but none appeared in the status chains as originally written. All four are now part of their respective enums.
+
+### Consequences
+**Positive**
+- The database rejects an invalid value exactly as a foreign key would have, so dropping the lookup table costs nothing in integrity while removing a join from every user query.
+- Enum members and database values are the same strings, so `[Authorize(Roles = "AgencyStaff")]` lines up with what is stored, with no mapping layer in between and nothing to get out of sync.
+- A single inventory document gives the four component owners one place to check a value set before using it, and gives the viva a written artefact to point at — a value set that exists only in C# is one an evaluator cannot inspect.
+- Resolving `Verified` vs `Active` removes a genuine ambiguity in Agent 2's eligibility filter that would otherwise have been settled silently, and differently, by whoever implemented it first.
+
+**Negative**
+- Adding a value to a PostgreSQL enum type requires a migration (`ALTER TYPE ... ADD VALUE`) rather than an `INSERT`, so value sets are less convenient to extend at runtime than lookup-table rows. Judged appropriate here precisely because these sets should not change casually — each value implies branching logic in code.
+- The design assumes **exactly one role per user**. If a user ever needs two roles simultaneously (an owner-dispatcher who also drives), `User.Role` must be replaced by a `UserRole` junction table. This is recorded explicitly as a correctness boundary, not a preference, so that the constraint is a known one rather than a surprise.
+- Enum members and the inventory document can drift if the document is not updated alongside a migration; the team treats the document as the first step of any enum change rather than as documentation written afterwards.
+
+### Alternatives Considered
+- **`Role` lookup table with a foreign key from `User` (original design):** Rejected — required by 3NF only if role metadata is stored, which it is not; adds a table and a join without adding information.
+- **Plain `text`/`varchar` status columns with no constraint:** Rejected outright — permits `'shipper'`, `'Shipper '`, and `'SHIPPER'` to coexist as distinct values, which silently breaks every status filter and eligibility query in the system.
+- **Integer-backed enums (EF Core's default mapping):** Rejected — stores `2` where a human reading the table needs `Active`, which makes both debugging and live demonstration of data changes materially harder for no benefit.
+- **A single generic `Lookup` table holding all value sets:** Rejected — a polymorphic key/value table defeats type safety entirely and would require every join to filter on a category discriminator.
 
 ---
 
@@ -573,6 +677,8 @@ On decline, the system:
 | ADR-016 | Approval authority — Shipper, not Admin | Accepted |
 | ADR-017 | No competitive bidding — single AI-recommended agency, confirmed via job proposal | Accepted |
 | ADR-018 | Automatic retry with a capped attempt limit, and Shipper email notifications, on agency decline | Accepted |
+| ADR-019 | No hard deletes — entity lifecycle managed by status transitions | Accepted |
+| ADR-020 | Enumerated value sets as native enum types, not lookup tables | Accepted |
 
 ---
 
