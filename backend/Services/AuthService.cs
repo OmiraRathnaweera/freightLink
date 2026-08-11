@@ -1,7 +1,9 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Common.Options;
+using FreightLink.Api.Common.Validation;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.Entities;
@@ -9,6 +11,7 @@ using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace FreightLink.Api.Services;
 
@@ -46,6 +49,16 @@ public class AuthService : IAuthService
             throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
         }
 
+        // BusinessRegNo is optional for shippers (unlike Agency's required one), so this check must
+        // be skipped when null — `x.BusinessRegNo == null` would otherwise translate to
+        // `WHERE "BusinessRegNo" IS NULL` and false-positive against every other shipper who also
+        // omitted theirs, since EF applies C# null-comparison semantics to the translated SQL.
+        if (request.BusinessRegNo is not null
+            && await _dbContext.ShipperProfiles.AnyAsync(s => s.BusinessRegNo == request.BusinessRegNo, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "A shipper with this business registration number already exists.");
+        }
+
         var now = DateTimeOffset.UtcNow;
         var user = new User
         {
@@ -72,7 +85,18 @@ public class AuthService : IAuthService
 
         _dbContext.Users.Add(user);
         _dbContext.ShipperProfiles.Add(shipperProfile);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            // Races against the AnyAsync pre-checks above: two concurrent requests can both pass
+            // the pre-check and then collide here. Translate the raw unique-violation into the
+            // same ApiException the pre-check would have thrown, instead of an unhandled 500.
+            throw MapUniqueViolationToApiException(pg);
+        }
 
         return new RegisterResponseDto
         {
@@ -136,7 +160,18 @@ public class AuthService : IAuthService
         _dbContext.Users.Add(user);
         _dbContext.Agencies.Add(agency);
         _dbContext.AgencyStaff.Add(agencyStaff);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            // Races against the AnyAsync pre-checks above: two concurrent requests can both pass
+            // the pre-check and then collide here. Translate the raw unique-violation into the
+            // same ApiException the pre-check would have thrown, instead of an unhandled 500.
+            throw MapUniqueViolationToApiException(pg);
+        }
 
         return new RegisterResponseDto
         {
@@ -212,6 +247,15 @@ public class AuthService : IAuthService
 
         var normalizedEmail = NormalizeEmail(_adminSeedOptions.Email);
 
+        // Unlike the unset-var case above, an invalid-but-set email would otherwise reach the DB
+        // insert and fail the ck_user_email_format CHECK — an unhandled exception during this
+        // unconditional startup call would crash the whole app on boot. Log and skip instead.
+        if (!Regex.IsMatch(normalizedEmail, AuthPatterns.EmailPattern))
+        {
+            _logger.LogWarning("Admin seed skipped: ADMIN_USER_EMAIL '{Email}' is not a valid email address.", normalizedEmail);
+            return;
+        }
+
         if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
         {
             return;
@@ -263,4 +307,19 @@ public class AuthService : IAuthService
 
     /// <summary>Normalizes an email for case-insensitive storage/lookup.</summary>
     private static string NormalizeEmail(string email) => email.Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// Translates a Postgres unique-violation (23505) caught around a registration
+    /// <c>SaveChangesAsync</c> into the same <see cref="ApiException"/> the corresponding
+    /// <c>AnyAsync</c> pre-check would have thrown, keyed by the violated constraint's name.
+    /// </summary>
+    /// <param name="pg">The unique-violation exception raised by Npgsql.</param>
+    /// <returns>The domain-appropriate <see cref="ApiException"/> to throw.</returns>
+    private static ApiException MapUniqueViolationToApiException(PostgresException pg) => pg.ConstraintName switch
+    {
+        "uq_user_email" => new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists."),
+        "uq_shipperprofile_regno" => new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "A shipper with this business registration number already exists."),
+        "uq_agency_regno" => new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "An agency with this business registration number already exists."),
+        _ => throw new DbUpdateException("Unhandled unique-constraint violation.", pg)
+    };
 }

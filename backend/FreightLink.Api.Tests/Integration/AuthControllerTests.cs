@@ -135,6 +135,68 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
 
+    /// <summary>
+    /// A phone number missing the mandatory leading '+' is rejected with 400, not left to reach the
+    /// DB's ck_user_phone_e164 CHECK and fail as an unhandled 500.
+    /// </summary>
+    [Fact]
+    public async Task RegisterShipper_Returns400WithValidationErrorEnvelope_ForPhoneMissingPlusSign()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
+        {
+            Email = "phonenoplus@example.com",
+            Password = "Sup3r$ecret1",
+            FullName = "No Plus Sign",
+            PhoneE164 = "94771234567",
+            CompanyName = "Acme Freight",
+            BillingAddress = "123 Main Street, Colombo"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var raw = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(raw);
+        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    /// <summary>
+    /// An email with no TLD dot passes the loose [EmailAddress] check but must still be rejected
+    /// with 400 by the regex that mirrors the DB's ck_user_email_format CHECK.
+    /// </summary>
+    [Fact]
+    public async Task RegisterShipper_Returns400WithValidationErrorEnvelope_ForEmailMissingTld()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
+        {
+            Email = "user@localhost",
+            Password = "Sup3r$ecret1",
+            FullName = "No Tld",
+            CompanyName = "Acme Freight",
+            BillingAddress = "123 Main Street, Colombo"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var raw = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(raw);
+        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    /// <summary>A well-formed E.164 phone number (with leading '+') still registers successfully.</summary>
+    [Fact]
+    public async Task RegisterShipper_Succeeds_WithValidE164Phone()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
+        {
+            Email = $"validphone-{Guid.NewGuid():N}@example.com",
+            Password = "Sup3r$ecret1",
+            FullName = "Valid Phone",
+            PhoneE164 = "+14155552671",
+            CompanyName = "Acme Freight",
+            BillingAddress = "123 Main Street, Colombo"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
     /// <summary>Logging in with the wrong password returns 401 with the standard INVALID_CREDENTIALS error envelope.</summary>
     [Fact]
     public async Task Login_Returns401WithErrorEnvelope_ForWrongPassword()

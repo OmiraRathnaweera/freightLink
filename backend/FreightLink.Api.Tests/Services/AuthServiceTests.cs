@@ -50,13 +50,14 @@ public class AuthServiceTests
             NullLogger<AuthService>.Instance);
     }
 
-    /// <summary>A valid Shipper registration payload, with an overridable email for uniqueness tests.</summary>
-    private static RegisterShipperRequestDto ValidShipperRequest(string email = "shipper@example.com") => new()
+    /// <summary>A valid Shipper registration payload, with an overridable email/business reg no for uniqueness tests.</summary>
+    private static RegisterShipperRequestDto ValidShipperRequest(string email = "shipper@example.com", string? businessRegNo = null) => new()
     {
         Email = email,
         Password = "Sup3r$ecret1",
         FullName = "Jane Shipper",
         CompanyName = "Acme Freight",
+        BusinessRegNo = businessRegNo,
         BillingAddress = "123 Main Street, Colombo"
     };
 
@@ -121,6 +122,36 @@ public class AuthServiceTests
 
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterShipperAsync(ValidShipperRequest("dup@example.com")));
         Assert.Equal(ErrorCode.EMAIL_ALREADY_REGISTERED, exception.Code);
+    }
+
+    /// <summary>Registering a shipper with an already-used business reg no throws BUSINESS_REG_NO_ALREADY_REGISTERED
+    /// instead of letting the DB's uq_shipperprofile_regno violation surface as an unhandled 500.</summary>
+    [Fact]
+    public async Task RegisterShipperAsync_Throws_ForDuplicateBusinessRegNo()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await sut.RegisterShipperAsync(ValidShipperRequest("first@example.com", "BRN-0001"));
+
+        var exception = await Assert.ThrowsAsync<ApiException>(
+            () => sut.RegisterShipperAsync(ValidShipperRequest("second@example.com", "BRN-0001")));
+        Assert.Equal(ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, exception.Code);
+    }
+
+    /// <summary>Business reg no is optional: multiple shippers omitting it must all succeed. Regression test for
+    /// a null-semantics bug where a naive `x.BusinessRegNo == request.BusinessRegNo` pre-check would translate
+    /// to "BusinessRegNo IS NULL" against a relational provider and false-positive against any other shipper
+    /// who also omitted theirs.</summary>
+    [Fact]
+    public async Task RegisterShipperAsync_Succeeds_WhenBusinessRegNoOmitted_ForMultipleShippers()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+
+        await sut.RegisterShipperAsync(ValidShipperRequest("first@example.com"));
+        var result = await sut.RegisterShipperAsync(ValidShipperRequest("second@example.com"));
+
+        Assert.NotEqual(Guid.Empty, result.UserId);
     }
 
     /// <summary>The persisted password hash differs from the plain-text password and verifies via BCrypt.</summary>
@@ -317,5 +348,21 @@ public class AuthServiceTests
         var tokens = await sut.LoginAsync(new LoginRequestDto { Email = "admin@freightlink.test", Password = "Adm1n$trongPass!" }, null);
 
         Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
+    }
+
+    /// <summary>
+    /// A malformed ADMIN_USER_EMAIL (would fail the DB's ck_user_email_format CHECK) must be
+    /// rejected before the insert, not left to throw and crash startup — mirrors the existing
+    /// unset-var no-op via a log-and-skip instead of an unhandled exception.
+    /// </summary>
+    [Fact]
+    public async Task SeedAdminIfNotExistsAsync_SkipsSeed_WhenEmailIsMalformed()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext, new AdminSeedOptions { Email = "not-an-email", Password = "Adm1n$trongPass!" });
+
+        await sut.SeedAdminIfNotExistsAsync();
+
+        Assert.Empty(dbContext.Users);
     }
 }
