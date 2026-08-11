@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 3**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 4**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -13,6 +13,7 @@
 | 1 | 7 Aug 2026 | Initial Sprint 1 skeleton |
 | 2 | 9 Aug 2026 | Corrected against architecture review: fixed `Load`/`Assignment`/`Trip` status enums, added missing `Assignment` list/detail/decline endpoints (Component C), corrected all `/workflows/*` approval endpoints from `Admin` to `Shipper (own load)` per **ADR-016**, corrected the 409 conflict example (previously implied competitive bidding, contradicting **ADR-017**), flagged `disputes/resolve` role as provisional pending team decision, added explicit JSON casing + ownership-guard conventions |
 | 3 | 9 Aug 2026 | Auth layer implemented: resolved the Section 4.1 open design note by splitting `/auth/register` into `/auth/register/shipper` and `/auth/register/agency` (Driver is not publicly self-registered; Admin has no public registration and is seeded on startup instead); added the previously-missing `/auth/logout` row (`Any (authenticated)`, revokes the caller's own refresh token); clarified that `POST /auth/login` returns **only** `accessToken`/`refreshToken`, never a full user profile; added corresponding YAML skeleton paths |
+| 4 | 11 Aug 2026 | Component A Load Management (create/read-one/read-list/edit/cancel) implemented: `POST/GET /loads`, `GET/PUT /loads/{id}`, `POST /loads/{id}/cancel`. Cancellation is now `POST /loads/{id}/cancel`, not `DELETE /loads/{id}` — per **ADR-019** (no hard deletes; cancellation is a status transition recorded in `LoadStatusHistory`), and is **Shipper (own) only** — Admin is role-gated out of edit/cancel entirely, narrower than this doc's earlier "Shipper (own), Admin" assumption for the delete row. Added the `403 LOAD_NOT_OWNED` / `422 INVALID_LOAD_STATUS_TRANSITION` error codes and filled in the `Loads` request/response schemas (Section 5). `estimate`/`status-history`/`files` sub-resources remain unimplemented. |
 
 ---
 
@@ -111,6 +112,8 @@ Query parameters, applied consistently across all `GET` list endpoints:
 | `AgentWorkflowRun` | Planned by Agent 1 → runs Agents 2–4 → `PendingApproval` → `Approved` / `Rejected` / `Revise` |
 
 > **Corrected in Rev. 2:** `Load` was previously missing `ProposalSent` and `Assigned`. `Assignment` and `Trip` were previously merged into a single row, which hid the two-stage lifecycle ADR-017 requires — they are now separate entities with separate state machines, matching README Section 5 (Component A "CRUD + workflow" row and Component C "CRUD + workflow" row).
+>
+> **Note (Rev. 4):** now that Component A is implemented, the `Load` row above no longer matches the actual `LoadStatus` enum (`Entities/Enums/LoadStatus.cs`): `Draft → Posted → Matched → InTransit → Delivered → Closed`, with `Cancelled` as a side-branch reachable from `Draft`/`Posted`/`Matched` (enforced by `Common/Domain/LoadStatusTransitionRules.cs`) — it does not include `ProposalSent`/`Assigned` as `Load` statuses; those concepts live on `Assignment.Status` instead (Section 4.4/ADR-017). Per this project's `CLAUDE.md`, the C# enum is the source of truth for exact status values — this table is left as historical Sprint 1 intent rather than rewritten, since fully reconciling it against `Assignment`'s lifecycle is Component C's task, not part of this pass.
 
 ---
 
@@ -137,14 +140,18 @@ Query parameters, applied consistently across all `GET` list endpoints:
 | GET | `/loads` | Search/filter/sort/paginate loads | Shipper (own), Admin (all) |
 | GET | `/loads/{id}` | Load detail incl. status timeline and current `workflowRunId` (if any) | Shipper (own), Admin |
 | PUT | `/loads/{id}` | Edit a load (only while `Draft`/`Posted`) | Shipper (own) |
-| DELETE | `/loads/{id}` | Cancel a load | Shipper (own), Admin |
-| POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper |
-| GET | `/loads/{id}/status-history` | Full status timeline | Shipper (own), Admin |
-| POST | `/loads/{id}/files` | Upload a document/photo (`Manifest`, `Invoice`, `CargoPhoto`, `Other`) | Shipper (own) |
-| GET | `/loads/{id}/files` | List attached files | Shipper (own), Admin |
-| DELETE | `/loads/{id}/files/{fileId}` | Remove an attached file | Shipper (own) |
+| POST | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
+| POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper *(not yet implemented)* |
+| GET | `/loads/{id}/status-history` | Full status timeline | Shipper (own), Admin *(not yet implemented)* |
+| POST | `/loads/{id}/files` | Upload a document/photo (`Manifest`, `Invoice`, `CargoPhoto`, `Other`) | Shipper (own) *(not yet implemented)* |
+| GET | `/loads/{id}/files` | List attached files | Shipper (own), Admin *(not yet implemented)* |
+| DELETE | `/loads/{id}/files/{fileId}` | Remove an attached file | Shipper (own) *(not yet implemented)* |
 
-> **Improvement applied:** `GET /loads/{id}` now explicitly returns the current `workflowRunId` (when a match run exists for the load), so the Shipper's React approval console can navigate straight to `GET /workflows/{id}` without needing to already know the workflow ID out-of-band.
+> **Improvement applied:** `GET /loads/{id}` now explicitly returns the current `workflowRunId` (when a match run exists for the load), so the Shipper's React approval console can navigate straight to `GET /workflows/{id}` without needing to already know the workflow ID out-of-band. As of Rev. 4 the field exists on `LoadResponse` but is always `null` — populating it requires joining `AgentWorkflowRun`/`Assignment`, which lands with Section 4.6.
+>
+> **Implemented in Rev. 4:** the first five rows (`POST /loads`, `GET /loads`, `GET /loads/{id}`, `PUT /loads/{id}`, `POST /loads/{id}/cancel`) are live in `LoadsController`/`LoadService`. Two corrections against the earlier skeleton: (1) cancellation is `POST /loads/{id}/cancel`, not `DELETE /loads/{id}` — per **ADR-019**, every entity's lifecycle end is a status transition, not a `DELETE`; (2) cancellation is **Shipper (own) only** — Admin is role-gated out of both `PUT` and `POST .../cancel` (`403`, never reaches an ownership check), narrower than this table's earlier "Shipper (own), Admin" assumption on the old delete row.
+>
+> **Ownership/status errors:** a Shipper accessing a load they don't own gets `403 LOAD_NOT_OWNED` (not `404`) — existence and ownership are checked as separate steps. Editing/cancelling a load whose current status doesn't permit it returns `422 INVALID_LOAD_STATUS_TRANSITION`, not `409` — `409` stays reserved for a genuine double-submit/concurrency race, which no Load endpoint has yet (see Section 4.4's `assignments/accept`/`decline` for the one place that pattern is actually used today).
 
 ### 4.3 Component B — Agency & Fleet Management (Owner: D.B.A.H.W. Bandara)
 
@@ -238,7 +245,7 @@ info:
     FreightMatch LK — freight-matching platform API (SE3090 Assignment 1).
     Consumed identically by the React (Admin / Shipper) and Flutter
     (Shipper-lightweight, Agency Staff, Driver) clients.
-  version: 0.2.0-sprint1-skeleton-rev2
+  version: 0.4.0-sprint1-skeleton-rev4
 servers:
   - url: /api/v1
     description: Relative base path (host resolved per environment)
@@ -343,18 +350,39 @@ paths:
     post:
       tags: [Loads]
       summary: Create a load
+      x-allowed-roles: [Shipper]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLoadRequest'
       responses:
-        '201': { description: Created }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     get:
       tags: [Loads]
       summary: Search/filter/sort/paginate loads
+      x-allowed-roles: [Shipper, Admin]
+      x-ownership-note: "Shipper is always scoped to their own loads regardless of query filters; Admin sees every load"
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/Status'
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedLoadResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /loads/{id}:
     parameters:
@@ -362,20 +390,70 @@ paths:
     get:
       tags: [Loads]
       summary: Load detail incl. status timeline and current workflowRunId
+      x-allowed-roles: [Shipper, Admin]
+      x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED otherwise); Admin may fetch any load"
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Loads]
       summary: Edit a load (Draft/Posted only)
+      x-allowed-roles: [Shipper]
+      x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED); Admin is role-gated out entirely (403), never reaches an ownership check"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLoadRequest'
       responses:
-        '200': { description: OK }
-    delete:
-      tags: [Loads]
-      summary: Cancel a load
-      responses:
-        '204': { description: No Content }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
+  /loads/{id}/cancel:
+    post:
+      tags: [Loads]
+      summary: Cancel a load (status transition to Cancelled, never a hard delete — ADR-019)
+      x-allowed-roles: [Shipper]
+      x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED); Admin is role-gated out entirely (403), never reaches an ownership check"
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CancelLoadRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  # --- Not yet implemented (Component A, planned) ---
   /loads/{id}/estimate:
     post:
       tags: [Loads]
@@ -672,6 +750,11 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    UnprocessableEntity:
+      description: Semantically invalid state transition (e.g. editing/cancelling a load in a status that doesn't allow it)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
   schemas:
     ErrorEnvelope:
@@ -744,9 +827,112 @@ components:
         ratePerKm: { type: number, format: double }
         ratePerKg: { type: number, format: double }
 
+    CreateLoadRequest:
+      type: object
+      description: POST /loads body. Server-assigns shipperUserId (from the JWT), referenceCode, and status — none are client-supplied.
+      required: [cargoDescription, weightKg, volumeM3, pickupAddress, pickupLat, pickupLng, dropoffAddress, dropoffLat, dropoffLng, pickupWindowStart, pickupWindowEnd]
+      properties:
+        cargoDescription: { type: string, minLength: 3, maxLength: 1000 }
+        weightKg: { type: number, format: double, exclusiveMinimum: 0, description: "kilograms; must be > 0 (mirrors ck_load_weight)" }
+        volumeM3: { type: number, format: double, exclusiveMinimum: 0, description: "cubic meters; must be > 0 (mirrors ck_load_volume)" }
+        pickupAddress: { type: string, minLength: 5, maxLength: 500 }
+        pickupLat: { type: number, format: double, minimum: -90, maximum: 90 }
+        pickupLng: { type: number, format: double, minimum: -180, maximum: 180 }
+        dropoffAddress: { type: string, minLength: 5, maxLength: 500 }
+        dropoffLat: { type: number, format: double, minimum: -90, maximum: 90 }
+        dropoffLng: { type: number, format: double, minimum: -180, maximum: 180 }
+        pickupWindowStart: { type: string, format: date-time }
+        pickupWindowEnd: { type: string, format: date-time, description: "must be after pickupWindowStart (400 INVALID_PICKUP_WINDOW otherwise, mirrors ck_load_window)" }
+        postImmediately:
+          type: boolean
+          default: false
+          description: "true creates the load directly as Posted instead of Draft (the 'quick-post' flow). No backing column on Load itself."
+
+    UpdateLoadRequest:
+      type: object
+      description: >
+        PUT /loads/{id} body. Same content fields as CreateLoadRequest minus postImmediately — this
+        endpoint never changes status. Only accepted while the load is Draft or Posted (422
+        INVALID_LOAD_STATUS_TRANSITION otherwise).
+      required: [cargoDescription, weightKg, volumeM3, pickupAddress, pickupLat, pickupLng, dropoffAddress, dropoffLat, dropoffLng, pickupWindowStart, pickupWindowEnd]
+      properties:
+        cargoDescription: { type: string, minLength: 3, maxLength: 1000 }
+        weightKg: { type: number, format: double, exclusiveMinimum: 0 }
+        volumeM3: { type: number, format: double, exclusiveMinimum: 0 }
+        pickupAddress: { type: string, minLength: 5, maxLength: 500 }
+        pickupLat: { type: number, format: double, minimum: -90, maximum: 90 }
+        pickupLng: { type: number, format: double, minimum: -180, maximum: 180 }
+        dropoffAddress: { type: string, minLength: 5, maxLength: 500 }
+        dropoffLat: { type: number, format: double, minimum: -90, maximum: 90 }
+        dropoffLng: { type: number, format: double, minimum: -180, maximum: 180 }
+        pickupWindowStart: { type: string, format: date-time }
+        pickupWindowEnd: { type: string, format: date-time }
+
+    CancelLoadRequest:
+      type: object
+      description: >
+        POST /loads/{id}/cancel body. reason is optional at the schema level but enforced as
+        required by the service before it writes the LoadStatusHistory row (400
+        LOAD_CANCEL_REASON_REQUIRED if missing/blank) — mirrors LoadStatusHistory's own
+        ck_lsh_cancel_reason CHECK.
+      properties:
+        reason: { type: string, maxLength: 500, nullable: true }
+
+    LoadResponse:
+      type: object
+      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and POST /loads/{id}/cancel.
+      properties:
+        loadId: { type: string, format: uuid }
+        shipperUserId: { type: string, format: uuid }
+        referenceCode: { type: string, description: "Server-generated, unique (uq_load_reference)" }
+        cargoDescription: { type: string }
+        weightKg: { type: number, format: double }
+        volumeM3: { type: number, format: double }
+        pickupAddress: { type: string }
+        pickupLat: { type: number, format: double }
+        pickupLng: { type: number, format: double }
+        dropoffAddress: { type: string }
+        dropoffLat: { type: number, format: double }
+        dropoffLng: { type: number, format: double }
+        pickupWindowStart: { type: string, format: date-time }
+        pickupWindowEnd: { type: string, format: date-time }
+        estimatedPrice: { type: number, format: double, nullable: true, description: "Set only via the not-yet-implemented POST /loads/{id}/estimate" }
+        status: { type: string, description: "Draft | Posted | Matched | InTransit | Delivered | Closed | Cancelled" }
+        workflowRunId: { type: string, format: uuid, nullable: true, description: "Always null until Section 4.6's AgentWorkflowRun join is implemented" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    LoadListItem:
+      type: object
+      description: Lightweight row shape used inside PagedLoadResponse.items — omits lat/lng, volume, shipperUserId, and workflowRunId.
+      properties:
+        loadId: { type: string, format: uuid }
+        referenceCode: { type: string }
+        cargoDescription: { type: string }
+        weightKg: { type: number, format: double }
+        pickupAddress: { type: string }
+        dropoffAddress: { type: string }
+        pickupWindowStart: { type: string, format: date-time }
+        pickupWindowEnd: { type: string, format: date-time }
+        estimatedPrice: { type: number, format: double, nullable: true }
+        status: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    PagedLoadResponse:
+      type: object
+      description: GET /loads response — the generic Section 2.1 paging envelope, specialized to LoadListItem.
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/LoadListItem' }
+        page: { type: integer }
+        pageSize: { type: integer }
+        totalItems: { type: integer }
+        totalPages: { type: integer }
+
     # --- Skeleton only below this line ---
     # Each owner defines their entity schemas here as their controllers land:
-    #   Load, LoadStatusHistory, File            -> Dias H.N.P.K.       (Component A)
+    #   LoadStatusHistory, File                   -> Dias H.N.P.K.       (Component A — Load itself done in Rev. 4)
     #   Agency, Vehicle, Driver, ComplianceDoc    -> D.B.A.H.W. Bandara  (Component B)
     #   Assignment, Trip, TripEvent, TripEvidence -> Ratnaweera O.V.     (Component C)
     #   Invoice, Dispute                          -> Balasooriya B.K.N.N. (Component D)
@@ -758,7 +944,7 @@ components:
 
 | Section to complete | Owner | Target sprint |
 |---|---|---|
-| `Load`, `LoadStatusHistory`, `File` schemas + full request/response bodies | Dias H.N.P.K. | Sprint 2–3 (`Y3S01-25`–`44`) |
+| ~~`Load` schema + create/read-one/read-list/edit/cancel request/response bodies~~ — done Rev. 4 (`LoadsController`/`LoadService`); `LoadStatusHistory`, `File` schemas + `estimate`/`status-history`/`files` endpoints still open | Dias H.N.P.K. | Sprint 2–3 (`Y3S01-25`–`44`) |
 | `Agency`, `Vehicle`, `Driver`, `ComplianceDoc` schemas + confirm `Verified→Active` trigger | D.B.A.H.W. Bandara | Sprint 2–3 (`Y3S01-29`–`32`, `73`) |
 | `Assignment`, `Trip`, `TripEvent`, `TripEvidence` schemas + new list/detail/decline endpoints (Section 4.4) | Ratnaweera O.V. | Sprint 2–4 (`Y3S01-33`–`35`, `74`) |
 | `Invoice`, `Dispute` schemas + webhook payload; confirm `disputes/resolve` ownership (README §10 #9) | Balasooriya B.K.N.N. | Sprint 2–5 (`Y3S01-36`–`38`, `81`, `93`) |

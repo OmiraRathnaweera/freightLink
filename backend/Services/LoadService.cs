@@ -89,7 +89,7 @@ public class LoadService : ILoadService
     }
 
     /// <inheritdoc />
-    public async Task<LoadResponseDto> GetByIdAsync(Guid loadId, CancellationToken cancellationToken = default)
+    public async Task<LoadResponseDto> GetByIdAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
         var load = await _dbContext.Loads.AsNoTracking().FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
@@ -98,18 +98,28 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
+        if (currentUserRole != UserRole.Admin && load.ShipperUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
+        }
+
         return MapToResponse(load);
     }
 
     /// <inheritdoc />
-    public async Task<PagedLoadResponseDto> GetListAsync(LoadListQueryDto query, CancellationToken cancellationToken = default)
+    public async Task<PagedLoadResponseDto> GetListAsync(LoadListQueryDto query, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
+        // A non-Admin caller is always scoped to their own loads, regardless of what the query
+        // requested — this is what prevents one Shipper from reading another's loads by simply
+        // passing a different shipperUserId filter.
+        var effectiveShipperUserId = currentUserRole == UserRole.Admin ? query.ShipperUserId : currentUserId;
+
         var loads = _dbContext.Loads.AsNoTracking();
 
-        if (query.ShipperUserId is { } shipperUserId)
+        if (effectiveShipperUserId is { } shipperUserId)
         {
             loads = loads.Where(l => l.ShipperUserId == shipperUserId);
         }
@@ -159,13 +169,18 @@ public class LoadService : ILoadService
     }
 
     /// <inheritdoc />
-    public async Task<LoadResponseDto> UpdateAsync(Guid loadId, UpdateLoadDto request, CancellationToken cancellationToken = default)
+    public async Task<LoadResponseDto> UpdateAsync(Guid loadId, Guid currentUserId, UpdateLoadDto request, CancellationToken cancellationToken = default)
     {
         var load = await _dbContext.Loads.FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
         if (load is null)
         {
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
+        }
+
+        if (load.ShipperUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
         if (!LoadStatusTransitionRules.CanEdit(load.Status))
@@ -200,6 +215,11 @@ public class LoadService : ILoadService
         if (load is null)
         {
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
+        }
+
+        if (load.ShipperUserId != cancelledByUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
         if (!LoadStatusTransitionRules.CanCancel(load.Status))

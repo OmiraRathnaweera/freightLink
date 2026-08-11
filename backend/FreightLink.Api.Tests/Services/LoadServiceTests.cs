@@ -187,7 +187,7 @@ public class LoadServiceTests
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
 
-        var result = await sut.GetByIdAsync(created.LoadId);
+        var result = await sut.GetByIdAsync(created.LoadId, shipperUserId, UserRole.Shipper);
 
         Assert.Equal(created.LoadId, result.LoadId);
         Assert.Equal(created.CargoDescription, result.CargoDescription);
@@ -201,9 +201,38 @@ public class LoadServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
 
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetByIdAsync(Guid.NewGuid()));
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetByIdAsync(Guid.NewGuid(), Guid.NewGuid(), UserRole.Admin));
 
         Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
+    }
+
+    /// <summary>A Shipper who does not own the load is forbidden, even though it exists.</summary>
+    [Fact]
+    public async Task GetByIdAsync_Throws_ForNonOwner()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var ownerId = await SeedShipperUserAsync(dbContext);
+        var otherShipperId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetByIdAsync(load.LoadId, otherShipperId, UserRole.Shipper));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
+    }
+
+    /// <summary>An Admin can fetch any load, regardless of who owns it.</summary>
+    [Fact]
+    public async Task GetByIdAsync_Succeeds_ForAdmin_OnAnyLoad()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var ownerId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
+
+        var result = await sut.GetByIdAsync(load.LoadId, Guid.NewGuid(), UserRole.Admin);
+
+        Assert.Equal(load.LoadId, result.LoadId);
     }
 
     // --- Get list ---
@@ -220,8 +249,8 @@ public class LoadServiceTests
             await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
         }
 
-        var page1 = await sut.GetListAsync(new LoadListQueryDto { Page = 1, PageSize = 2 });
-        var page2 = await sut.GetListAsync(new LoadListQueryDto { Page = 2, PageSize = 2 });
+        var page1 = await sut.GetListAsync(new LoadListQueryDto { Page = 1, PageSize = 2 }, shipperUserId, UserRole.Shipper);
+        var page2 = await sut.GetListAsync(new LoadListQueryDto { Page = 2, PageSize = 2 }, shipperUserId, UserRole.Shipper);
 
         Assert.Equal(5, page1.TotalItems);
         Assert.Equal(3, page1.TotalPages);
@@ -241,7 +270,7 @@ public class LoadServiceTests
         await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
         var posted = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto(postImmediately: true));
 
-        var result = await sut.GetListAsync(new LoadListQueryDto { Status = LoadStatus.Posted });
+        var result = await sut.GetListAsync(new LoadListQueryDto { Status = LoadStatus.Posted }, shipperUserId, UserRole.Shipper);
 
         var item = Assert.Single(result.Items);
         Assert.Equal(posted.LoadId, item.LoadId);
@@ -259,10 +288,44 @@ public class LoadServiceTests
         var created = await sut.CreateAsync(shipperUserId, target);
         await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
 
-        var result = await sut.GetListAsync(new LoadListQueryDto { Search = "SEAFOOD" });
+        var result = await sut.GetListAsync(new LoadListQueryDto { Search = "SEAFOOD" }, shipperUserId, UserRole.Shipper);
 
         var item = Assert.Single(result.Items);
         Assert.Equal(created.LoadId, item.LoadId);
+    }
+
+    /// <summary>A Shipper only ever sees their own loads, even if they request a different shipperUserId filter.</summary>
+    [Fact]
+    public async Task GetListAsync_ScopesToOwnLoads_ForShipper()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperAId = await SeedShipperUserAsync(dbContext);
+        var shipperBId = await SeedShipperUserAsync(dbContext);
+        await sut.CreateAsync(shipperAId, ValidCreateLoadDto());
+        await sut.CreateAsync(shipperBId, ValidCreateLoadDto());
+
+        var result = await sut.GetListAsync(new LoadListQueryDto { ShipperUserId = shipperBId }, shipperAId, UserRole.Shipper);
+
+        var item = Assert.Single(result.Items);
+        var reloaded = await dbContext.Loads.SingleAsync(l => l.LoadId == item.LoadId);
+        Assert.Equal(shipperAId, reloaded.ShipperUserId);
+    }
+
+    /// <summary>An Admin sees loads across every shipper, with no forced scoping.</summary>
+    [Fact]
+    public async Task GetListAsync_ReturnsAllLoads_ForAdmin()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperAId = await SeedShipperUserAsync(dbContext);
+        var shipperBId = await SeedShipperUserAsync(dbContext);
+        await sut.CreateAsync(shipperAId, ValidCreateLoadDto());
+        await sut.CreateAsync(shipperBId, ValidCreateLoadDto());
+
+        var result = await sut.GetListAsync(new LoadListQueryDto(), Guid.NewGuid(), UserRole.Admin);
+
+        Assert.Equal(2, result.TotalItems);
     }
 
     // --- Edit ---
@@ -278,7 +341,7 @@ public class LoadServiceTests
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
 
-            var result = await sut.UpdateAsync(load.LoadId, ValidUpdateLoadDto());
+            var result = await sut.UpdateAsync(load.LoadId, shipperUserId, ValidUpdateLoadDto());
 
             Assert.Equal("Updated cargo description", result.CargoDescription);
             Assert.Equal(750m, result.WeightKg);
@@ -298,7 +361,7 @@ public class LoadServiceTests
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
 
-            var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, ValidUpdateLoadDto()));
+            var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, shipperUserId, ValidUpdateLoadDto()));
 
             Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
         }
@@ -311,9 +374,24 @@ public class LoadServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
 
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(Guid.NewGuid(), ValidUpdateLoadDto()));
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(Guid.NewGuid(), Guid.NewGuid(), ValidUpdateLoadDto()));
 
         Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
+    }
+
+    /// <summary>A Shipper who does not own the load is forbidden from editing it.</summary>
+    [Fact]
+    public async Task UpdateAsync_Throws_ForNonOwner()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var ownerId = await SeedShipperUserAsync(dbContext);
+        var otherShipperId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, otherShipperId, ValidUpdateLoadDto()));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
     }
 
     // --- Cancel ---
@@ -381,6 +459,22 @@ public class LoadServiceTests
             sut.CancelAsync(Guid.NewGuid(), Guid.NewGuid(), new CancelLoadDto { Reason = "N/A" }));
 
         Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
+    }
+
+    /// <summary>A Shipper who does not own the load is forbidden from cancelling it.</summary>
+    [Fact]
+    public async Task CancelAsync_Throws_ForNonOwner()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var ownerId = await SeedShipperUserAsync(dbContext);
+        var otherShipperId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CancelAsync(load.LoadId, otherShipperId, new CancelLoadDto { Reason = "Not my load" }));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
     }
 
     /// <summary>Cancelling records a LoadStatusHistory row capturing the prior status, reason, and actor.</summary>

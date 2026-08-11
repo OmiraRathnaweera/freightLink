@@ -47,6 +47,9 @@ public enum ErrorCode
     /// <summary>The server-generated load reference code collided with an existing one.</summary>
     LOAD_REFERENCE_CODE_CONFLICT,
 
+    /// <summary>The load exists but does not belong to the authenticated caller.</summary>
+    LOAD_NOT_OWNED,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's
