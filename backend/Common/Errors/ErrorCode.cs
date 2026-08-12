@@ -32,6 +32,21 @@ public enum ErrorCode
     /// <summary>The authenticated caller's user record could not be found.</summary>
     USER_NOT_FOUND,
 
+    /// <summary>A file upload/delete request was made with no file (or an empty file list) attached.</summary>
+    FILE_REQUIRED,
+
+    /// <summary>The uploaded file's extension is not an allowed image or PDF type.</summary>
+    BLOCKED_FILE_TYPE,
+
+    /// <summary>The uploaded file exceeds the maximum allowed size.</summary>
+    FILE_TOO_LARGE,
+
+    /// <summary>Cloudinary rejected or failed an upload (network/API failure, not a validation failure).</summary>
+    FILE_UPLOAD_FAILED,
+
+    /// <summary>Cloudinary rejected or failed a delete (network/API failure — a merely-missing publicId is not an error; see <see cref="FreightLink.Api.DTOs.Files.FileDeleteResultDto"/>).</summary>
+    FILE_DELETE_FAILED,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's
