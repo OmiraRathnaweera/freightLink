@@ -3,6 +3,7 @@ using System;
 using FreightLink.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FreightLink.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260812085403_MakeUploadedFileFormatNullable")]
+    partial class MakeUploadedFileFormatNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -757,8 +760,13 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<DateTimeOffset>("AttachedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("FileType")
                         .IsRequired()
@@ -767,18 +775,33 @@ namespace FreightLink.Api.Migrations
                     b.Property<Guid>("LoadId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("UploadedFileId")
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UploadedByUserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("FileId");
 
                     b.HasIndex("LoadId");
 
-                    b.HasIndex("UploadedFileId")
+                    b.HasIndex("StorageKey")
                         .IsUnique()
-                        .HasDatabaseName("uq_loadfile_uploadedfileid");
+                        .HasDatabaseName("uq_file_storagekey");
 
-                    b.ToTable("LoadFiles", (string)null);
+                    b.HasIndex("UploadedByUserId");
+
+                    b.ToTable("Files", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_file_size", "\"SizeBytes\" > 0 AND \"SizeBytes\" <= 10485760");
+                        });
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>
@@ -1326,10 +1349,6 @@ namespace FreightLink.Api.Migrations
                     b.Property<long>("Bytes")
                         .HasColumnType("bigint");
 
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Format")
                         .HasColumnType("text");
 
@@ -1703,15 +1722,15 @@ namespace FreightLink.Api.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("FreightLink.Api.Entities.UploadedFile", "UploadedFile")
+                    b.HasOne("FreightLink.Api.Entities.User", "UploadedByUser")
                         .WithMany()
-                        .HasForeignKey("UploadedFileId")
+                        .HasForeignKey("UploadedByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Load");
 
-                    b.Navigation("UploadedFile");
+                    b.Navigation("UploadedByUser");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>
