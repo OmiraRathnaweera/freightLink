@@ -9,6 +9,7 @@ using FreightLink.Api.Services;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -26,6 +27,7 @@ public class FileUploadServiceTests
     {
         public HashSet<string> FailingFileNames { get; } = new();
         public List<string> UploadedFileNames { get; } = new();
+        public List<string> DeletedPublicIds { get; } = new();
 
         public Task<FileUploadResultDto> UploadFileAsync(IFormFile file, string? folder, CancellationToken cancellationToken = default)
         {
@@ -51,6 +53,8 @@ public class FileUploadServiceTests
 
         public Task<FileDeleteResultDto> DeleteFileAsync(string publicId, CancellationToken cancellationToken = default)
         {
+            DeletedPublicIds.Add(publicId);
+
             if (publicId == "missing")
             {
                 return Task.FromResult(new FileDeleteResultDto { PublicId = publicId, Deleted = false, Detail = "not found" });
@@ -91,13 +95,32 @@ public class FileUploadServiceTests
         });
         dbContext.SaveChanges();
 
-        var sut = new FileUploadService(storage, dbContext, Options.Create(new CloudinaryOptions { Folder = folder }));
+        var sut = new FileUploadService(storage, dbContext, Options.Create(new CloudinaryOptions { Folder = folder }), NullLogger<FileUploadService>.Instance);
         return (sut, dbContext);
     }
 
+    /// <summary>Magic-number prefixes so <see cref="MakeFile"/> produces content that passes <see cref="FileUploadValidator"/>'s signature check for a given extension.</summary>
+    private static readonly Dictionary<string, byte[]> SignaturesByExtension = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".jpg"] = new byte[] { 0xFF, 0xD8, 0xFF },
+        [".jpeg"] = new byte[] { 0xFF, 0xD8, 0xFF },
+        [".png"] = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A },
+        [".gif"] = System.Text.Encoding.ASCII.GetBytes("GIF89a"),
+        [".bmp"] = System.Text.Encoding.ASCII.GetBytes("BM"),
+        [".pdf"] = System.Text.Encoding.ASCII.GetBytes("%PDF"),
+        [".tif"] = new byte[] { 0x49, 0x49, 0x2A, 0x00 },
+        [".tiff"] = new byte[] { 0x49, 0x49, 0x2A, 0x00 }
+    };
+
     private static IFormFile MakeFile(string fileName, long length = 1024)
     {
-        var stream = new MemoryStream(new byte[length]);
+        var bytes = new byte[length];
+        if (SignaturesByExtension.TryGetValue(Path.GetExtension(fileName), out var signature))
+        {
+            Array.Copy(signature, bytes, Math.Min(signature.Length, bytes.Length));
+        }
+
+        var stream = new MemoryStream(bytes);
         return new FormFile(stream, 0, length, "file", fileName)
         {
             Headers = new HeaderDictionary(),
@@ -141,6 +164,25 @@ public class FileUploadServiceTests
         var storage = new FakeFileStorageService();
         var (sut, _) = CreateSut(storage);
         var file = MakeFile("contract.docx");
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UploadSingleAsync(file, TestUserId));
+
+        Assert.Equal(ErrorCode.BLOCKED_FILE_TYPE, exception.Code);
+        Assert.Empty(storage.UploadedFileNames);
+    }
+
+    /// <summary>
+    /// A file whose content doesn't match its (allowed) extension is rejected — e.g. plain text
+    /// renamed to ".jpg" — proving the magic-byte sniff catches spoofed extensions, not just
+    /// disallowed ones.
+    /// </summary>
+    [Fact]
+    public async Task UploadSingleAsync_Throws_WhenContentDoesNotMatchExtension()
+    {
+        var storage = new FakeFileStorageService();
+        var (sut, _) = CreateSut(storage);
+        var stream = new MemoryStream(System.Text.Encoding.ASCII.GetBytes("not actually a jpeg"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "spoofed.jpg") { Headers = new HeaderDictionary(), ContentType = "image/jpeg" };
 
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UploadSingleAsync(file, TestUserId));
 
@@ -198,13 +240,13 @@ public class FileUploadServiceTests
 
     // --- Delete ---
 
-    /// <summary>Deleting an existing file returns Deleted = true.</summary>
+    /// <summary>Deleting an untracked publicId (no local metadata row) returns Deleted = true — no ownership check applies.</summary>
     [Fact]
     public async Task DeleteSingleAsync_ReturnsDeletedTrue_ForExistingFile()
     {
         var (sut, _) = CreateSut(new FakeFileStorageService());
 
-        var result = await sut.DeleteSingleAsync("some-file");
+        var result = await sut.DeleteSingleAsync("some-file", TestUserId);
 
         Assert.True(result.Deleted);
     }
@@ -215,7 +257,7 @@ public class FileUploadServiceTests
     {
         var (sut, _) = CreateSut(new FakeFileStorageService());
 
-        var result = await sut.DeleteSingleAsync("missing");
+        var result = await sut.DeleteSingleAsync("missing", TestUserId);
 
         Assert.False(result.Deleted);
         Assert.Equal("not found", result.Detail);
@@ -227,7 +269,7 @@ public class FileUploadServiceTests
     {
         var (sut, _) = CreateSut(new FakeFileStorageService());
 
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.DeleteSingleAsync("   "));
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.DeleteSingleAsync("   ", TestUserId));
 
         Assert.Equal(ErrorCode.VALIDATION_ERROR, exception.Code);
     }
@@ -241,8 +283,90 @@ public class FileUploadServiceTests
         var uploadResult = await sut.UploadSingleAsync(MakeFile("to-delete.png"), TestUserId);
         Assert.Single(dbContext.UploadedFiles);
 
-        await sut.DeleteSingleAsync(uploadResult.PublicId);
+        await sut.DeleteSingleAsync(uploadResult.PublicId, TestUserId);
 
         Assert.Empty(dbContext.UploadedFiles);
+    }
+
+    /// <summary>
+    /// A known file (one with a local metadata row) cannot be deleted by a user other than its
+    /// uploader — the fix for cross-user deletion via a known publicId.
+    /// </summary>
+    [Fact]
+    public async Task DeleteSingleAsync_Throws_WhenCallerIsNotTheUploader()
+    {
+        var storage = new FakeFileStorageService();
+        var (sut, dbContext) = CreateSut(storage);
+        var uploadResult = await sut.UploadSingleAsync(MakeFile("owned-by-uploader.jpg"), TestUserId);
+        var otherUserId = Guid.NewGuid();
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.DeleteSingleAsync(uploadResult.PublicId, otherUserId));
+
+        Assert.Equal(ErrorCode.FILE_NOT_OWNED, exception.Code);
+        Assert.Single(dbContext.UploadedFiles);
+        Assert.DoesNotContain(uploadResult.PublicId, storage.DeletedPublicIds);
+    }
+
+    /// <summary>A file still attached to a Load via <c>LoadFile</c> cannot be deleted directly.</summary>
+    [Fact]
+    public async Task DeleteSingleAsync_Throws_WhenFileIsAttachedToALoad()
+    {
+        var storage = new FakeFileStorageService();
+        var (sut, dbContext) = CreateSut(storage);
+        var uploadResult = await sut.UploadSingleAsync(MakeFile("attached.jpg"), TestUserId);
+        var uploadedFile = await dbContext.UploadedFiles.SingleAsync(f => f.PublicId == uploadResult.PublicId);
+
+        var load = new Load
+        {
+            LoadId = Guid.NewGuid(),
+            ShipperUserId = TestUserId,
+            ReferenceCode = $"REF-{Guid.NewGuid():N}",
+            CargoDescription = "test cargo",
+            WeightKg = 100,
+            VolumeM3 = 1,
+            PickupAddress = "A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "B",
+            DropoffLat = 7.0m,
+            DropoffLng = 80.0m,
+            PickupWindowStart = DateTimeOffset.UtcNow,
+            PickupWindowEnd = DateTimeOffset.UtcNow.AddDays(1),
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.Loads.Add(load);
+        dbContext.Files.Add(new LoadFile
+        {
+            FileId = Guid.NewGuid(),
+            LoadId = load.LoadId,
+            UploadedFileId = uploadedFile.FileId,
+            FileType = FileType.CargoPhoto,
+            AttachedAt = DateTimeOffset.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.DeleteSingleAsync(uploadResult.PublicId, TestUserId));
+
+        Assert.Equal(ErrorCode.FILE_IN_USE, exception.Code);
+        Assert.Single(dbContext.UploadedFiles);
+    }
+
+    /// <summary>
+    /// If persisting a successful upload's metadata fails, the just-uploaded Cloudinary asset is
+    /// deleted as a best-effort compensating action so it isn't left orphaned, and the original
+    /// failure still propagates to the caller.
+    /// </summary>
+    [Fact]
+    public async Task UploadSingleAsync_DeletesTheUploadedAsset_WhenPersistingMetadataFails()
+    {
+        var storage = new FakeFileStorageService();
+        var (sut, dbContext) = CreateSut(storage);
+        await dbContext.DisposeAsync();
+
+        await Assert.ThrowsAnyAsync<Exception>(() => sut.UploadSingleAsync(MakeFile("compensate.jpg"), TestUserId));
+
+        Assert.Contains("fake/compensate.jpg", storage.DeletedPublicIds);
     }
 }

@@ -47,6 +47,12 @@ public enum ErrorCode
     /// <summary>Cloudinary rejected or failed a delete (network/API failure — a merely-missing publicId is not an error; see <see cref="FreightLink.Api.DTOs.Files.FileDeleteResultDto"/>).</summary>
     FILE_DELETE_FAILED,
 
+    /// <summary>A delete was attempted on a file the authenticated caller did not upload.</summary>
+    FILE_NOT_OWNED,
+
+    /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
+    FILE_IN_USE,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's

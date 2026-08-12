@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using FreightLink.Api.Common.Validation;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.DTOs.Files;
@@ -84,10 +85,13 @@ public class FilesControllerTests : IClassFixture<CustomWebApplicationFactory>
         return tokens!.AccessToken;
     }
 
+    /// <summary>Valid JPEG magic bytes, so default-content uploads pass <see cref="FileUploadValidator"/>'s content-signature check.</summary>
+    private static readonly byte[] JpegSignature = { 0xFF, 0xD8, 0xFF };
+
     private static MultipartFormDataContent SingleFileContent(string fileName, byte[]? bytes = null)
     {
         var content = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(bytes ?? Encoding.UTF8.GetBytes("test content"));
+        var fileContent = new ByteArrayContent(bytes ?? JpegSignature.Concat(Encoding.ASCII.GetBytes("fake jpeg body")).ToArray());
         fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         content.Add(fileContent, "file", fileName);
         return content;
@@ -177,14 +181,18 @@ public class FilesControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("BLOCKED_FILE_TYPE", json.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
 
-    /// <summary>A file over the 10 MB limit is rejected with 400.</summary>
+    /// <summary>
+    /// A file over the business 10 MB limit, but still under the pipeline-level cap (see
+    /// <see cref="UploadSingle_Returns400_ForRequestExceedingPipelineSizeLimit"/>), reaches
+    /// FileUploadValidator and is rejected with FILE_TOO_LARGE.
+    /// </summary>
     [Fact]
     public async Task UploadSingle_Returns400_ForOversizedFile()
     {
         var token = await GetAccessTokenAsync();
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/files/single");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        request.Content = SingleFileContent("huge.jpg", new byte[11 * 1024 * 1024]);
+        request.Content = SingleFileContent("huge.jpg", new byte[FileUploadPolicy.MaxFileBytes + 500]);
 
         var response = await _client.SendAsync(request);
 
@@ -192,6 +200,24 @@ public class FilesControllerTests : IClassFixture<CustomWebApplicationFactory>
         var raw = await response.Content.ReadAsStringAsync();
         using var json = JsonDocument.Parse(raw);
         Assert.Equal("FILE_TOO_LARGE", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    /// <summary>
+    /// A request well beyond the pipeline-level cap set on UploadSingle is rejected by the server
+    /// pipeline itself (before FileUploadValidator ever runs) — the fix for oversized uploads being
+    /// fully received and buffered before the business size check.
+    /// </summary>
+    [Fact]
+    public async Task UploadSingle_Returns400_ForRequestExceedingPipelineSizeLimit()
+    {
+        var token = await GetAccessTokenAsync();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/files/single");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Content = SingleFileContent("way-too-huge.jpg", new byte[FileUploadPolicy.MaxFileBytes + 1024 * 1024]);
+
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     // --- Delete single ---
@@ -213,6 +239,36 @@ public class FilesControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<FileDeleteResultDto>();
         Assert.Equal("freightlink/nested/abc123", result!.PublicId);
+    }
+
+    /// <summary>
+    /// A caller who did not upload a file cannot delete it via its publicId — the fix for
+    /// cross-user deletion of a known file.
+    /// </summary>
+    [Fact]
+    public async Task DeleteSingle_Returns403_ForFileNotOwnedByCaller()
+    {
+        var uploaderToken = await GetAccessTokenAsync();
+        using var uploadRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/files/single");
+        uploadRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", uploaderToken);
+        uploadRequest.Content = SingleFileContent("not-yours.jpg");
+        var uploadResponse = await _client.SendAsync(uploadRequest);
+        var uploaded = await uploadResponse.Content.ReadFromJsonAsync<FileUploadResultDto>();
+
+        var otherUserToken = await GetAccessTokenAsync();
+        using var deleteRequest = new HttpRequestMessage(HttpMethod.Delete, $"/api/v1/files/{uploaded!.PublicId}");
+        deleteRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", otherUserToken);
+        var deleteResponse = await _client.SendAsync(deleteRequest);
+
+        Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
+        var raw = await deleteResponse.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(raw);
+        Assert.Equal("FILE_NOT_OWNED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+
+        using var scope = _factory.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var stillPersisted = await dbContext.UploadedFiles.FirstOrDefaultAsync(f => f.PublicId == uploaded.PublicId);
+        Assert.NotNull(stillPersisted);
     }
 
     /// <summary>Deleting a file through the API also removes its persisted <c>UploadedFiles</c> metadata row.</summary>
