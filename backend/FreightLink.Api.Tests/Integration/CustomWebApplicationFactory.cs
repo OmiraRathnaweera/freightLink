@@ -1,4 +1,5 @@
 using FreightLink.Api.Data;
+using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,16 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+
+            // Swap the real Cloudinary-backed storage for an in-memory fake so FilesController
+            // integration tests exercise routing/auth/validation without a real network call.
+            var fileStorageDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IFileStorageService));
+            if (fileStorageDescriptor is not null)
+            {
+                services.Remove(fileStorageDescriptor);
+            }
+
+            services.AddScoped<IFileStorageService, FakeFileStorageService>();
         });
     }
 }
