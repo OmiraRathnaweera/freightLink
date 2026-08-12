@@ -14,6 +14,7 @@
 | 2 | 9 Aug 2026 | Corrected against architecture review: fixed `Load`/`Assignment`/`Trip` status enums, added missing `Assignment` list/detail/decline endpoints (Component C), corrected all `/workflows/*` approval endpoints from `Admin` to `Shipper (own load)` per **ADR-016**, corrected the 409 conflict example (previously implied competitive bidding, contradicting **ADR-017**), flagged `disputes/resolve` role as provisional pending team decision, added explicit JSON casing + ownership-guard conventions |
 | 3 | 9 Aug 2026 | Auth layer implemented: resolved the Section 4.1 open design note by splitting `/auth/register` into `/auth/register/shipper` and `/auth/register/agency` (Driver is not publicly self-registered; Admin has no public registration and is seeded on startup instead); added the previously-missing `/auth/logout` row (`Any (authenticated)`, revokes the caller's own refresh token); clarified that `POST /auth/login` returns **only** `accessToken`/`refreshToken`, never a full user profile; added corresponding YAML skeleton paths |
 | 4 | 11 Aug 2026 | Component A Load Management (create/read-one/read-list/edit/cancel) implemented: `POST/GET /loads`, `GET/PUT /loads/{id}`, `POST /loads/{id}/cancel`. Cancellation is now `POST /loads/{id}/cancel`, not `DELETE /loads/{id}` — per **ADR-019** (no hard deletes; cancellation is a status transition recorded in `LoadStatusHistory`), and is **Shipper (own) only** — Admin is role-gated out of edit/cancel entirely, narrower than this doc's earlier "Shipper (own), Admin" assumption for the delete row. Added the `403 LOAD_NOT_OWNED` / `422 INVALID_LOAD_STATUS_TRANSITION` error codes and filled in the `Loads` request/response schemas (Section 5). `estimate`/`status-history`/`files` sub-resources remain unimplemented. |
+| 4 | 12 Aug 2026 | Shared File Upload/Delete implemented: added Section 4.7 (`/files/*`, backed by Cloudinary) — component-agnostic infrastructure for Component A (Load files) and Component C (TripEvidence) to build on, not tied to either yet. Scoped to `Shipper`, `AgencyStaff`, `Driver` only — **`Admin` explicitly excluded**, since uploading/deleting a file is an operational action taken by the party producing it, not an oversight action. Only image files (JPG/PNG/GIF/WEBP/BMP/HEIC/TIFF) and PDF are accepted, max 10 MB each. Added corresponding YAML skeleton paths and schemas. |
 
 ---
 
@@ -229,6 +230,19 @@ Query parameters, applied consistently across all `GET` list endpoints:
 >
 > `Admin` is retained on the two `GET` list/detail endpoints only, for system-wide analytics visibility (per README's narrowed Admin scope) — Admin still has **no** write access to `approve`/`reject`/`revise`.
 
+### 4.7 Files — Shared File Upload/Delete (shared infrastructure)
+
+**Status: Implemented (Rev. 4).** Component-agnostic upload/delete capability backed by Cloudinary, with its own controller at `/files` rather than being embedded in any one component's controller — Component A (`/loads/{id}/files`, Section 4.2) and Component C (`TripEvidence`, Section 4.4) are each expected to call this internally (storing the returned `publicId`) once their own attachment flows land, instead of each hand-rolling Cloudinary SDK calls. There is no per-resource ownership concept here, since this controller has no notion of which business entity a file belongs to — that link is made by whichever component persists the returned `publicId`.
+
+| Method | Path | Description | Roles |
+|---|---|---|---|
+| POST | `/files/single` | Upload a single file (multipart/form-data) | Shipper, AgencyStaff, Driver |
+| DELETE | `/files/{publicId}` | Delete a single file by its Cloudinary public id — idempotent, never 404 (`deleted: false` for an already-gone id) | Shipper, AgencyStaff, Driver |
+
+> **Role note:** `Admin` is deliberately excluded from every endpoint in this section — uploading or deleting a file is an operational action taken by whichever party is producing the evidence/document (Shipper cargo photos, AgencyStaff compliance docs, Driver delivery proof), not an Admin oversight action. This mirrors the ownership-guard philosophy in Section 2: a role alone isn't sufficient reason to grant access, and here it's insufficient reason even the other way — `Admin`'s broad system-wide role does **not** extend to this shared infrastructure.
+>
+> Only image files (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.heic`, `.heif`, `.tif`, `.tiff`) and `.pdf` are accepted (allowlist, not a blocklist), max 10 MB each — everything else is rejected with `400 BLOCKED_FILE_TYPE`.
+
 ---
 
 ## 5. OpenAPI 3.0 Skeleton
@@ -258,6 +272,7 @@ tags:
   - name: Trips             # Component C — Ratnaweera O.V.
   - name: Billing           # Component D — Balasooriya B.K.N.N.
   - name: Workflows         # Agentic AI — all four agents
+  - name: Files             # Shared infrastructure — Dias H.N.P.K.
 
 security:
   - bearerAuth: []
@@ -703,6 +718,49 @@ paths:
         '200': { description: OK }
         '403': { $ref: '#/components/responses/Unauthorized' }
 
+  /files/single:
+    post:
+      tags: [Files]
+      summary: Upload a single file (image or PDF, max 10 MB)
+      x-allowed-roles: [Shipper, AgencyStaff, Driver]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUploadResult'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+
+  /files/{publicId}:
+    delete:
+      tags: [Files]
+      summary: Delete a single file by public id (idempotent — never 404)
+      x-allowed-roles: [Shipper, AgencyStaff, Driver]
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          description: Cloudinary public id; may itself contain '/' characters
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileDeleteResult'
+        '403': { $ref: '#/components/responses/Unauthorized' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -929,6 +987,25 @@ components:
         pageSize: { type: integer }
         totalItems: { type: integer }
         totalPages: { type: integer }
+    FileUploadResult:
+      type: object
+      description: Returned by POST /files/single.
+      properties:
+        publicId: { type: string }
+        secureUrl: { type: string, format: uri }
+        format: { type: string, nullable: true, description: "Cloudinary does not always detect a format for raw-resource-type uploads" }
+        bytes: { type: integer, format: int64 }
+        resourceType: { type: string }
+        contentType: { type: string, description: "MIME type reported by the uploading client (e.g. image/jpeg, application/pdf)" }
+        originalFileName: { type: string, nullable: true }
+
+    FileDeleteResult:
+      type: object
+      description: Returned by DELETE /files/{publicId}. Deletion is idempotent — an already-gone publicId still returns 200 with deleted:false, never a 404.
+      properties:
+        publicId: { type: string }
+        deleted: { type: boolean }
+        detail: { type: string }
 
     # --- Skeleton only below this line ---
     # Each owner defines their entity schemas here as their controllers land:
@@ -951,6 +1028,7 @@ components:
 | `Workflows` request/response schemas (`AgentWorkflowRun`, `AgentStep`, `ApprovalDecision`); implement the `load.ShipperId == currentUserId` ownership guard on `approve`/`reject`/`revise` per ADR-016 | All four (agent owners) | Sprint 5 (`Y3S01-90`–`92`, `95`–`97`) |
 | Role-based authorization scheme wired to every endpoint above, including ownership guards flagged with `(own)` | Ratnaweera O.V. | Sprint 1 (`Y3S01-19`), enforced per-controller Sprint 2+ |
 | ~~Confirm `/auth/register` single-vs-split design~~ — resolved Rev. 3, split into `/auth/register/shipper` + `/auth/register/agency`; Auth layer (JWT issuance/rotation, admin seed) implemented | Dias H.N.P.K. (owns Auth foundation alongside Component A) | Done |
+| ~~Files: shared upload/delete infrastructure~~ — resolved Rev. 4, `/files/*` implemented (Cloudinary-backed, Shipper/AgencyStaff/Driver only). Component A and C still need to wire their own attachment flows on top of it (store the returned `publicId` on `LoadFile`/`TripEvidence`) | Dias H.N.P.K. (shared infra); consumed by Dias H.N.P.K. (Component A) and Ratnaweera O.V. (Component C) | Infra done; consumers Sprint 2–4 |
 | Publish live Swagger/OpenAPI UI from the ASP.NET Core project | Ratnaweera O.V. | Verified Sprint 7 (`Y3S01-123`) |
 
 This document is the Sprint 1 deliverable for `Y3S01-15`. Update it whenever an endpoint's path, method, or role requirement changes — it is the single source of truth both clients (React, Flutter) build against.

@@ -8,7 +8,7 @@ public class LoadFileConfiguration : IEntityTypeConfiguration<LoadFile>
 {
     public void Configure(EntityTypeBuilder<LoadFile> builder)
     {
-        builder.ToTable("Files");
+        builder.ToTable("LoadFiles");
 
         builder.HasKey(x => x.FileId);
         builder.Property(x => x.FileId).HasDefaultValueSql("gen_random_uuid()");
@@ -18,14 +18,11 @@ public class LoadFileConfiguration : IEntityTypeConfiguration<LoadFile>
             .HasForeignKey(x => x.LoadId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasOne(x => x.UploadedByUser)
+        builder.HasOne(x => x.UploadedFile)
             .WithMany()
-            .HasForeignKey(x => x.UploadedByUserId)
+            .HasForeignKey(x => x.UploadedFileId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(x => x.StorageKey).IsUnique().HasDatabaseName("uq_file_storagekey");
-
-        builder.ToTable(t => t.HasCheckConstraint("ck_file_size",
-            "\"SizeBytes\" > 0 AND \"SizeBytes\" <= 10485760"));
+        builder.HasIndex(x => x.UploadedFileId).IsUnique().HasDatabaseName("uq_loadfile_uploadedfileid");
     }
 }

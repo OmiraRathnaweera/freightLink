@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using CloudinaryDotNet;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Options;
@@ -11,7 +12,9 @@ using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 // Load .env into the process environment (if present) before the builder reads configuration,
 // since AddEnvironmentVariables() snapshots env vars at builder-creation time.
@@ -53,7 +56,31 @@ builder.Services.AddControllers()
     });
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    // Adds the "Authorize" button in Swagger UI so a bearer access token can be pasted once and
+    // sent automatically on every "Try it out" request, instead of setting an Authorization header
+    // by hand per-request.
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Paste only the raw access token (no \"Bearer \" prefix) — Swagger UI adds it for you."
+    });
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 // Connection string comes only from ConnectionStrings:DefaultConnection (env var
 // CONNECTIONSTRINGS__DEFAULTCONNECTION) — never hardcoded in appsettings.json. The mixed-case
@@ -92,6 +119,18 @@ builder.Services.Configure<AdminSeedOptions>(options =>
 {
     options.Email = builder.Configuration["ADMIN_USER_EMAIL"];
     options.Password = builder.Configuration["ADMIN_USER_PASSWORD"];
+});
+
+// Cloudinary settings (Cloudinary:* / CLOUDINARY__* env vars). Same case-insensitive "__"-to-":"
+// mapping as the other sections above.
+builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
+
+// The Cloudinary SDK client is stateless aside from its credentials, so it's built once as a
+// singleton rather than re-constructed per request/scope.
+builder.Services.AddSingleton(sp =>
+{
+    var cloudinaryOptions = sp.GetRequiredService<IOptions<CloudinaryOptions>>().Value;
+    return new Cloudinary(new Account(cloudinaryOptions.CloudName, cloudinaryOptions.ApiKey, cloudinaryOptions.ApiSecret));
 });
 
 builder.Services
@@ -136,6 +175,8 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ILoadService, LoadService>();
+builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
+builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 
 var app = builder.Build();
 

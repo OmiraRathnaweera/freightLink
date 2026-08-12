@@ -3,6 +3,7 @@ using System;
 using FreightLink.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FreightLink.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260812143242_AddContentTypeAndRestructureLoadFile")]
+    partial class AddContentTypeAndRestructureLoadFile
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -776,9 +779,9 @@ namespace FreightLink.Api.Migrations
 
                     b.HasIndex("UploadedFileId")
                         .IsUnique()
-                        .HasDatabaseName("uq_loadfile_uploadedfileid");
+                        .HasDatabaseName("uq_file_uploadedfileid");
 
-                    b.ToTable("LoadFiles", (string)null);
+                    b.ToTable("Files", (string)null);
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>

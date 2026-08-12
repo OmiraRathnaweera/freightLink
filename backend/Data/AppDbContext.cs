@@ -24,6 +24,7 @@ public class AppDbContext : DbContext
     public DbSet<Load> Loads => Set<Load>();
     public DbSet<LoadStatusHistory> LoadStatusHistories => Set<LoadStatusHistory>();
     public DbSet<LoadFile> Files => Set<LoadFile>();
+    public DbSet<UploadedFile> UploadedFiles => Set<UploadedFile>();
 
     public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<AssignmentResponse> AssignmentResponses => Set<AssignmentResponse>();
