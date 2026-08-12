@@ -350,7 +350,7 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var tokens = await RegisterAndLoginShipperAsync("cancel-own");
         var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
 
-        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken);
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken);
         request.Content = JsonContent.Create(new CancelLoadDto { Reason = "Shipper changed plans" });
         var response = await _client.SendAsync(request);
 
@@ -366,7 +366,7 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var ownerTokens = await RegisterAndLoginShipperAsync("cancel-admin-owner");
         var load = await CreateLoadAsShipperAsync(ownerTokens.AccessToken);
 
-        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/cancel", MintAdminToken());
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", MintAdminToken());
         request.Content = JsonContent.Create(new CancelLoadDto { Reason = "Admin attempted cancel" });
         var response = await _client.SendAsync(request);
 
@@ -383,13 +383,13 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         var tokens = await RegisterAndLoginShipperAsync("cancel-twice");
         var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
-        using (var firstCancel = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken))
+        using (var firstCancel = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken))
         {
             firstCancel.Content = JsonContent.Create(new CancelLoadDto { Reason = "First cancellation" });
             (await _client.SendAsync(firstCancel)).EnsureSuccessStatusCode();
         }
 
-        using var secondCancel = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken);
+        using var secondCancel = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken);
         secondCancel.Content = JsonContent.Create(new CancelLoadDto { Reason = "Second cancellation" });
         var response = await _client.SendAsync(secondCancel);
 

@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 4**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 5**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -15,6 +15,7 @@
 | 3 | 9 Aug 2026 | Auth layer implemented: resolved the Section 4.1 open design note by splitting `/auth/register` into `/auth/register/shipper` and `/auth/register/agency` (Driver is not publicly self-registered; Admin has no public registration and is seeded on startup instead); added the previously-missing `/auth/logout` row (`Any (authenticated)`, revokes the caller's own refresh token); clarified that `POST /auth/login` returns **only** `accessToken`/`refreshToken`, never a full user profile; added corresponding YAML skeleton paths |
 | 4 | 11 Aug 2026 | Component A Load Management (create/read-one/read-list/edit/cancel) implemented: `POST/GET /loads`, `GET/PUT /loads/{id}`, `POST /loads/{id}/cancel`. Cancellation is now `POST /loads/{id}/cancel`, not `DELETE /loads/{id}` — per **ADR-019** (no hard deletes; cancellation is a status transition recorded in `LoadStatusHistory`), and is **Shipper (own) only** — Admin is role-gated out of edit/cancel entirely, narrower than this doc's earlier "Shipper (own), Admin" assumption for the delete row. Added the `403 LOAD_NOT_OWNED` / `422 INVALID_LOAD_STATUS_TRANSITION` error codes and filled in the `Loads` request/response schemas (Section 5). `estimate`/`status-history`/`files` sub-resources remain unimplemented. |
 | 4 | 12 Aug 2026 | Shared File Upload/Delete implemented: added Section 4.7 (`/files/*`, backed by Cloudinary) — component-agnostic infrastructure for Component A (Load files) and Component C (TripEvidence) to build on, not tied to either yet. Scoped to `Shipper`, `AgencyStaff`, `Driver` only — **`Admin` explicitly excluded**, since uploading/deleting a file is an operational action taken by the party producing it, not an oversight action. Only image files (JPG/PNG/GIF/WEBP/BMP/HEIC/TIFF) and PDF are accepted, max 10 MB each. Added corresponding YAML skeleton paths and schemas. |
+| 5 | 13 Aug 2026 | Load cancellation changed from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial state-transition update), reserving `POST` for resource creation. No change to auth, ownership, or request/response shape. |
 
 ---
 
@@ -141,7 +142,7 @@ Query parameters, applied consistently across all `GET` list endpoints:
 | GET | `/loads` | Search/filter/sort/paginate loads | Shipper (own), Admin (all) |
 | GET | `/loads/{id}` | Load detail incl. status timeline and current `workflowRunId` (if any) | Shipper (own), Admin |
 | PUT | `/loads/{id}` | Edit a load (only while `Draft`/`Posted`) | Shipper (own) |
-| POST | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
+| PATCH | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
 | POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper *(not yet implemented)* |
 | GET | `/loads/{id}/status-history` | Full status timeline | Shipper (own), Admin *(not yet implemented)* |
 | POST | `/loads/{id}/files` | Upload a document/photo (`Manifest`, `Invoice`, `CargoPhoto`, `Other`) | Shipper (own) *(not yet implemented)* |
@@ -150,7 +151,9 @@ Query parameters, applied consistently across all `GET` list endpoints:
 
 > **Improvement applied:** `GET /loads/{id}` now explicitly returns the current `workflowRunId` (when a match run exists for the load), so the Shipper's React approval console can navigate straight to `GET /workflows/{id}` without needing to already know the workflow ID out-of-band. As of Rev. 4 the field exists on `LoadResponse` but is always `null` — populating it requires joining `AgentWorkflowRun`/`Assignment`, which lands with Section 4.6.
 >
-> **Implemented in Rev. 4:** the first five rows (`POST /loads`, `GET /loads`, `GET /loads/{id}`, `PUT /loads/{id}`, `POST /loads/{id}/cancel`) are live in `LoadsController`/`LoadService`. Two corrections against the earlier skeleton: (1) cancellation is `POST /loads/{id}/cancel`, not `DELETE /loads/{id}` — per **ADR-019**, every entity's lifecycle end is a status transition, not a `DELETE`; (2) cancellation is **Shipper (own) only** — Admin is role-gated out of both `PUT` and `POST .../cancel` (`403`, never reaches an ownership check), narrower than this table's earlier "Shipper (own), Admin" assumption on the old delete row.
+> **Implemented in Rev. 4:** the first five rows (`POST /loads`, `GET /loads`, `GET /loads/{id}`, `PUT /loads/{id}`, `PATCH /loads/{id}/cancel`) are live in `LoadsController`/`LoadService`. Two corrections against the earlier skeleton: (1) cancellation is a dedicated status-transition route, not `DELETE /loads/{id}` — per **ADR-019**, every entity's lifecycle end is a status transition, not a `DELETE`; (2) cancellation is **Shipper (own) only** — Admin is role-gated out of both `PUT` and `PATCH .../cancel` (`403`, never reaches an ownership check), narrower than this table's earlier "Shipper (own), Admin" assumption on the old delete row.
+>
+> **Resolved in Rev. 5:** cancellation moved from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial update to `status`/reason), reserving `POST` for resource creation.
 >
 > **Ownership/status errors:** a Shipper accessing a load they don't own gets `403 LOAD_NOT_OWNED` (not `404`) — existence and ownership are checked as separate steps. Editing/cancelling a load whose current status doesn't permit it returns `422 INVALID_LOAD_STATUS_TRANSITION`, not `409` — `409` stays reserved for a genuine double-submit/concurrency race, which no Load endpoint has yet (see Section 4.4's `assignments/accept`/`decline` for the one place that pattern is actually used today).
 
@@ -259,7 +262,7 @@ info:
     FreightMatch LK — freight-matching platform API (SE3090 Assignment 1).
     Consumed identically by the React (Admin / Shipper) and Flutter
     (Shipper-lightweight, Agency Staff, Driver) clients.
-  version: 0.4.0-sprint1-skeleton-rev4
+  version: 0.5.0-sprint1-skeleton-rev5
 servers:
   - url: /api/v1
     description: Relative base path (host resolved per environment)
@@ -442,7 +445,7 @@ paths:
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
   /loads/{id}/cancel:
-    post:
+    patch:
       tags: [Loads]
       summary: Cancel a load (status transition to Cancelled, never a hard delete — ADR-019)
       x-allowed-roles: [Shipper]
@@ -929,7 +932,7 @@ components:
     CancelLoadRequest:
       type: object
       description: >
-        POST /loads/{id}/cancel body. reason is optional at the schema level but enforced as
+        PATCH /loads/{id}/cancel body. reason is optional at the schema level but enforced as
         required by the service before it writes the LoadStatusHistory row (400
         LOAD_CANCEL_REASON_REQUIRED if missing/blank) — mirrors LoadStatusHistory's own
         ck_lsh_cancel_reason CHECK.
@@ -938,7 +941,7 @@ components:
 
     LoadResponse:
       type: object
-      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and POST /loads/{id}/cancel.
+      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and PATCH /loads/{id}/cancel.
       properties:
         loadId: { type: string, format: uuid }
         shipperUserId: { type: string, format: uuid }

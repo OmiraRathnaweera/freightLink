@@ -101,7 +101,7 @@ public class LoadsController : ControllerBase
     /// <param name="request">The cancellation reason.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the cancelled <see cref="LoadResponseDto"/>.</returns>
-    [HttpPost("{id:guid}/cancel")]
+    [HttpPatch("{id:guid}/cancel")]
     [Authorize(Roles = ShipperRole)]
     public async Task<ActionResult<LoadResponseDto>> Cancel(Guid id, [FromBody] CancelLoadDto request, CancellationToken cancellationToken)
     {
