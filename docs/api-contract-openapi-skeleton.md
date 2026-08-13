@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 5**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 6**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -16,6 +16,7 @@
 | 4 | 11 Aug 2026 | Component A Load Management (create/read-one/read-list/edit/cancel) implemented: `POST/GET /loads`, `GET/PUT /loads/{id}`, `POST /loads/{id}/cancel`. Cancellation is now `POST /loads/{id}/cancel`, not `DELETE /loads/{id}` — per **ADR-019** (no hard deletes; cancellation is a status transition recorded in `LoadStatusHistory`), and is **Shipper (own) only** — Admin is role-gated out of edit/cancel entirely, narrower than this doc's earlier "Shipper (own), Admin" assumption for the delete row. Added the `403 LOAD_NOT_OWNED` / `422 INVALID_LOAD_STATUS_TRANSITION` error codes and filled in the `Loads` request/response schemas (Section 5). `estimate`/`status-history`/`files` sub-resources remain unimplemented. |
 | 4 | 12 Aug 2026 | Shared File Upload/Delete implemented: added Section 4.7 (`/files/*`, backed by Cloudinary) — component-agnostic infrastructure for Component A (Load files) and Component C (TripEvidence) to build on, not tied to either yet. Scoped to `Shipper`, `AgencyStaff`, `Driver` only — **`Admin` explicitly excluded**, since uploading/deleting a file is an operational action taken by the party producing it, not an oversight action. Only image files (JPG/PNG/GIF/WEBP/BMP/HEIC/TIFF) and PDF are accepted, max 10 MB each. Added corresponding YAML skeleton paths and schemas. |
 | 5 | 13 Aug 2026 | Load cancellation changed from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial state-transition update), reserving `POST` for resource creation. No change to auth, ownership, or request/response shape. |
+| 6 | 13 Aug 2026 | Load Management hardening: `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now genuinely use `409 LOAD_CONCURRENCY_CONFLICT` (Postgres `xmin` optimistic concurrency), superseding the earlier claim that no Load endpoint used `409`; `POST /loads` retries internally on a `ReferenceCode` collision before returning `409 LOAD_REFERENCE_CODE_CONFLICT`; `POST /loads`/`PUT /loads/{id}` reject identical pickup/dropoff coordinates with `400 LOAD_PICKUP_DROPOFF_IDENTICAL`; `GET /loads` rejects an out-of-range `page`/`pageSize` combination with `400 LOAD_PAGE_OUT_OF_RANGE` and now paginates deterministically (ties broken by `loadId`) and case-insensitive `search` matching is index-backed (`pg_trgm`). No path, role, or response-shape changes. |
 
 ---
 
@@ -155,7 +156,9 @@ Query parameters, applied consistently across all `GET` list endpoints:
 >
 > **Resolved in Rev. 5:** cancellation moved from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial update to `status`/reason), reserving `POST` for resource creation.
 >
-> **Ownership/status errors:** a Shipper accessing a load they don't own gets `403 LOAD_NOT_OWNED` (not `404`) — existence and ownership are checked as separate steps. Editing/cancelling a load whose current status doesn't permit it returns `422 INVALID_LOAD_STATUS_TRANSITION`, not `409` — `409` stays reserved for a genuine double-submit/concurrency race, which no Load endpoint has yet (see Section 4.4's `assignments/accept`/`decline` for the one place that pattern is actually used today).
+> **Ownership/status errors:** a Shipper accessing a load they don't own gets `403 LOAD_NOT_OWNED` (not `404`) — existence and ownership are checked as separate steps. Editing/cancelling a load whose current status doesn't permit it returns `422 INVALID_LOAD_STATUS_TRANSITION`, not `409`.
+>
+> **Resolved in Rev. 6:** `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now do carry a genuine `409 LOAD_CONCURRENCY_CONFLICT` case — a lost-update race caught via `Load`'s Postgres `xmin` optimistic-concurrency token when two requests load the same row and both attempt to save. Superseded the earlier claim (Rev. 4/5) that no Load endpoint uses `409` yet. `POST /loads` also gained a bounded internal retry on the pre-existing `409 LOAD_REFERENCE_CODE_CONFLICT` case (a `ReferenceCode` collision) rather than failing the request on the first collision — the response shape is unchanged, just less likely to occur. `POST /loads` and `PUT /loads/{id}` also now reject pickup/dropoff coordinates that are identical with `400 LOAD_PICKUP_DROPOFF_IDENTICAL` (mirrors the DB's `ck_load_distinct_points` CHECK), and `GET /loads` rejects a `page`/`pageSize` combination whose offset would overflow with `400 LOAD_PAGE_OUT_OF_RANGE`.
 
 ### 4.3 Component B — Agency & Fleet Management (Owner: D.B.A.H.W. Bandara)
 
@@ -262,7 +265,7 @@ info:
     FreightMatch LK — freight-matching platform API (SE3090 Assignment 1).
     Consumed identically by the React (Admin / Shipper) and Flutter
     (Shipper-lightweight, Agency Staff, Driver) clients.
-  version: 0.5.0-sprint1-skeleton-rev5
+  version: 0.6.0-sprint1-skeleton-rev6
 servers:
   - url: /api/v1
     description: Relative base path (host resolved per environment)
@@ -384,6 +387,7 @@ paths:
                 $ref: '#/components/schemas/LoadResponse'
         '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
     get:
       tags: [Loads]
       summary: Search/filter/sort/paginate loads
@@ -400,6 +404,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PagedLoadResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   /loads/{id}:
@@ -442,6 +447,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
   /loads/{id}/cancel:
@@ -469,6 +475,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
   # --- Not yet implemented (Component A, planned) ---
@@ -901,7 +908,7 @@ components:
         pickupLng: { type: number, format: double, minimum: -180, maximum: 180 }
         dropoffAddress: { type: string, minLength: 5, maxLength: 500 }
         dropoffLat: { type: number, format: double, minimum: -90, maximum: 90 }
-        dropoffLng: { type: number, format: double, minimum: -180, maximum: 180 }
+        dropoffLng: { type: number, format: double, minimum: -180, maximum: 180, description: "pickup/dropoff coordinates must not be identical (400 LOAD_PICKUP_DROPOFF_IDENTICAL otherwise, mirrors ck_load_distinct_points)" }
         pickupWindowStart: { type: string, format: date-time }
         pickupWindowEnd: { type: string, format: date-time, description: "must be after pickupWindowStart (400 INVALID_PICKUP_WINDOW otherwise, mirrors ck_load_window)" }
         postImmediately:
@@ -925,7 +932,7 @@ components:
         pickupLng: { type: number, format: double, minimum: -180, maximum: 180 }
         dropoffAddress: { type: string, minLength: 5, maxLength: 500 }
         dropoffLat: { type: number, format: double, minimum: -90, maximum: 90 }
-        dropoffLng: { type: number, format: double, minimum: -180, maximum: 180 }
+        dropoffLng: { type: number, format: double, minimum: -180, maximum: 180, description: "pickup/dropoff coordinates must not be identical (400 LOAD_PICKUP_DROPOFF_IDENTICAL otherwise, mirrors ck_load_distinct_points)" }
         pickupWindowStart: { type: string, format: date-time }
         pickupWindowEnd: { type: string, format: date-time }
 
