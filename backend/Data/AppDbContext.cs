@@ -48,6 +48,11 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Backs the GIN trigram expression indexes on Loads' searched text columns (see
+        // AddLoadSearchTrigramIndexes / LoadConfiguration) that make LoadService.GetListAsync's
+        // case-insensitive substring search sargable instead of forcing a sequential scan.
+        modelBuilder.HasPostgresExtension("pg_trgm");
+
         // All enum-typed properties persist as their member name (readable in psql, safe to
         // reorder later) instead of EF's default int mapping. Applied once here instead of
         // repeating HasConversion<string>() in every IEntityTypeConfiguration<T>.
