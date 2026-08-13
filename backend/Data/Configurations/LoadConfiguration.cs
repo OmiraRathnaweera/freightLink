@@ -52,6 +52,15 @@ public class LoadConfiguration : IEntityTypeConfiguration<Load>
             .HasDatabaseName("ix_load_posted")
             .HasFilter("\"Status\" = 'Posted'");
 
+        // GIN trigram indexes on lower(CargoDescription/ReferenceCode/PickupAddress/DropoffAddress)
+        // — the four columns LoadService.GetListAsync's Search filter matches against with
+        // .ToLower().Contains(term) — are created via raw SQL in the AddLoadSearchTrigramIndexes
+        // migration, not here: EF's fluent index API has no way to express an index over an
+        // expression like lower(column) rather than a plain mapped property, only a real Postgres
+        // GIN/gin_trgm_ops index (via the pg_trgm extension, enabled in AppDbContext.OnModelCreating)
+        // can accelerate that kind of leading-wildcard substring match at all — a plain B-tree
+        // index, expression-based or not, cannot.
+
         builder.ToTable(t =>
         {
             t.HasCheckConstraint("ck_load_weight", "\"WeightKg\" > 0");
