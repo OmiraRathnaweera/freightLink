@@ -15,6 +15,9 @@ namespace FreightLink.Api.Services;
 /// <inheritdoc cref="ILoadService" />
 public class LoadService : ILoadService
 {
+    /// <summary>Bounded retry count for a <see cref="GenerateReferenceCode"/> collision on <c>uq_load_reference</c> before <see cref="CreateAsync"/> gives up.</summary>
+    private const int MaxReferenceCodeGenerationAttempts = 5;
+
     private readonly AppDbContext _dbContext;
 
     /// <summary>Creates the load service with its DB context.</summary>
@@ -27,6 +30,7 @@ public class LoadService : ILoadService
     public async Task<LoadResponseDto> CreateAsync(Guid shipperUserId, CreateLoadDto request, CancellationToken cancellationToken = default)
     {
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
+        ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
 
         var initialStatus = request.PostImmediately ? LoadStatus.Posted : LoadStatus.Draft;
         if (!LoadStatusTransitionRules.CanCreateAs(initialStatus))
@@ -47,11 +51,11 @@ public class LoadService : ILoadService
             WeightKg = request.WeightKg,
             VolumeM3 = request.VolumeM3,
             PickupAddress = request.PickupAddress,
-            PickupLat = request.PickupLat,
-            PickupLng = request.PickupLng,
+            PickupLat = request.PickupLat!.Value,
+            PickupLng = request.PickupLng!.Value,
             DropoffAddress = request.DropoffAddress,
-            DropoffLat = request.DropoffLat,
-            DropoffLng = request.DropoffLng,
+            DropoffLat = request.DropoffLat!.Value,
+            DropoffLng = request.DropoffLng!.Value,
             PickupWindowStart = request.PickupWindowStart,
             PickupWindowEnd = request.PickupWindowEnd,
             Status = initialStatus,
@@ -73,16 +77,27 @@ public class LoadService : ILoadService
         _dbContext.Loads.Add(load);
         _dbContext.LoadStatusHistories.Add(historyRow);
 
-        try
+        for (var attempt = 1; ; attempt++)
         {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_load_reference" })
-        {
-            // Defense-in-depth against the GUID-derived ReferenceCode colliding — astronomically
-            // unlikely, but mirrors AuthService's own unique-violation-race handling rather than
-            // letting it surface as an unhandled 500.
-            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LOAD_REFERENCE_CODE_CONFLICT, "Could not generate a unique load reference code; please retry.");
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                break;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_load_reference" })
+            {
+                // Defense-in-depth against the GUID-derived ReferenceCode colliding — astronomically
+                // unlikely given GenerateReferenceCode's full-GUID entropy, but retried a bounded
+                // number of times with a freshly generated code (the failed insert leaves `load`
+                // tracked as Added, so SaveChangesAsync can simply be retried) rather than failing an
+                // otherwise-valid create request on the first collision.
+                if (attempt >= MaxReferenceCodeGenerationAttempts)
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LOAD_REFERENCE_CODE_CONFLICT, "Could not generate a unique load reference code; please retry.");
+                }
+
+                load.ReferenceCode = GenerateReferenceCode();
+            }
         }
 
         return MapToResponse(load);
@@ -112,6 +127,18 @@ public class LoadService : ILoadService
         var page = Math.Max(1, query.Page);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
+        // Widened to long before multiplying: (page - 1) * pageSize as plain int arithmetic
+        // silently overflows and wraps negative for a large-but-otherwise-valid page (e.g.
+        // page = int.MaxValue), which Queryable.Skip(int) would then reject with an unhandled
+        // ArgumentOutOfRangeException (a 500) instead of this controlled 400. Skip's signature is
+        // int-only regardless of what PostgreSQL's own OFFSET could address, so int.MaxValue is the
+        // real ceiling here, not an arbitrary business limit.
+        var skip = (long)(page - 1) * pageSize;
+        if (skip > int.MaxValue)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_PAGE_OUT_OF_RANGE, "The requested page/pageSize combination is out of range.");
+        }
+
         // A non-Admin caller is always scoped to their own loads, regardless of what the query
         // requested — this is what prevents one Shipper from reading another's loads by simply
         // passing a different shipperUserId filter.
@@ -131,6 +158,13 @@ public class LoadService : ILoadService
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
+            // EF.Functions.ILike would be the more idiomatic Npgsql translation, but it throws at
+            // runtime under the InMemory provider this project's unit tests run against (it has no
+            // client-evaluation fallback, unlike EF.Functions.Like) — .ToLower().Contains() stays
+            // both InMemory-compatible and, on Postgres, an exact match for the
+            // ix_load_*_search_trgm expression indexes in AddLoadSearchTrigramIndexes (see
+            // LoadConfiguration), which are built on the same lower(column) expression this
+            // generates so the planner can actually use them instead of a sequential scan.
             var term = query.Search.Trim().ToLowerInvariant();
             loads = loads.Where(l =>
                 l.CargoDescription.ToLower().Contains(term) ||
@@ -154,7 +188,7 @@ public class LoadService : ILoadService
         var totalItems = await loads.CountAsync(cancellationToken);
 
         var pageOfLoads = await loads
-            .Skip((page - 1) * pageSize)
+            .Skip((int)skip)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
@@ -189,20 +223,21 @@ public class LoadService : ILoadService
         }
 
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
+        ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
 
         load.CargoDescription = request.CargoDescription;
         load.WeightKg = request.WeightKg;
         load.VolumeM3 = request.VolumeM3;
         load.PickupAddress = request.PickupAddress;
-        load.PickupLat = request.PickupLat;
-        load.PickupLng = request.PickupLng;
+        load.PickupLat = request.PickupLat!.Value;
+        load.PickupLng = request.PickupLng!.Value;
         load.DropoffAddress = request.DropoffAddress;
-        load.DropoffLat = request.DropoffLat;
-        load.DropoffLng = request.DropoffLng;
+        load.DropoffLat = request.DropoffLat!.Value;
+        load.DropoffLng = request.DropoffLng!.Value;
         load.PickupWindowStart = request.PickupWindowStart;
         load.PickupWindowEnd = request.PickupWindowEnd;
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
         return MapToResponse(load);
     }
@@ -250,9 +285,28 @@ public class LoadService : ILoadService
             ChangedAt = now
         });
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // A single SaveChangesAsync = a single transaction: the status change and its history row
+        // either both land or neither does.
+        await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
         return MapToResponse(load);
+    }
+
+    /// <summary>
+    /// Saves pending changes, translating a concurrent write caught by <c>Load</c>'s xmin
+    /// concurrency token (see <c>LoadConfiguration</c>) into a client-facing 409 instead of an
+    /// unhandled <see cref="DbUpdateConcurrencyException"/>.
+    /// </summary>
+    private async Task SaveChangesWithConcurrencyCheckAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LOAD_CONCURRENCY_CONFLICT, "This load was modified by another request. Please reload and try again.");
+        }
     }
 
     /// <summary>Throws if <paramref name="end"/> is not after <paramref name="start"/> (mirrors <c>ck_load_window</c>).</summary>
@@ -264,21 +318,52 @@ public class LoadService : ILoadService
         }
     }
 
-    /// <summary>Applies the requested sort, falling back to <c>createdAt desc</c> for an unrecognized <paramref name="sortBy"/>.</summary>
+    /// <summary>
+    /// Throws if the pickup and dropoff coordinates are identical (mirrors <c>ck_load_distinct_points</c>),
+    /// so this fails with a client-facing 400 instead of only surfacing as an unhandled DB CHECK
+    /// violation (500) on <c>SaveChangesAsync</c>.
+    /// </summary>
+    private static void ValidateDistinctPoints(decimal pickupLat, decimal pickupLng, decimal dropoffLat, decimal dropoffLng)
+    {
+        if (pickupLat == dropoffLat && pickupLng == dropoffLng)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_PICKUP_DROPOFF_IDENTICAL, "Pickup and dropoff coordinates must not be identical.");
+        }
+    }
+
+    /// <summary>
+    /// Applies the requested sort, falling back to <c>createdAt desc</c> for an unrecognized
+    /// <paramref name="sortBy"/>. Every branch appends <c>LoadId</c> as a secondary sort key, in the
+    /// same direction as the primary key, since none of the three primary keys are unique —
+    /// without a tiebreaker, rows sharing a primary-sort value could be ordered differently between
+    /// the count query and the page query (or between two pages of the same request), silently
+    /// duplicating or dropping rows at a page boundary.
+    /// </summary>
     private static IQueryable<Load> ApplySort(IQueryable<Load> loads, string? sortBy, string? sortDir)
     {
         var ascending = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
 
         return sortBy?.ToLowerInvariant() switch
         {
-            "pickupwindowstart" => ascending ? loads.OrderBy(l => l.PickupWindowStart) : loads.OrderByDescending(l => l.PickupWindowStart),
-            "weightkg" => ascending ? loads.OrderBy(l => l.WeightKg) : loads.OrderByDescending(l => l.WeightKg),
-            _ => ascending ? loads.OrderBy(l => l.CreatedAt) : loads.OrderByDescending(l => l.CreatedAt)
+            "pickupwindowstart" => ascending
+                ? loads.OrderBy(l => l.PickupWindowStart).ThenBy(l => l.LoadId)
+                : loads.OrderByDescending(l => l.PickupWindowStart).ThenByDescending(l => l.LoadId),
+            "weightkg" => ascending
+                ? loads.OrderBy(l => l.WeightKg).ThenBy(l => l.LoadId)
+                : loads.OrderByDescending(l => l.WeightKg).ThenByDescending(l => l.LoadId),
+            _ => ascending
+                ? loads.OrderBy(l => l.CreatedAt).ThenBy(l => l.LoadId)
+                : loads.OrderByDescending(l => l.CreatedAt).ThenByDescending(l => l.LoadId)
         };
     }
 
-    /// <summary>Generates a short, GUID-derived, human-scannable load reference code.</summary>
-    private static string GenerateReferenceCode() => $"LD-{Guid.NewGuid():N}"[..12].ToUpperInvariant();
+    /// <summary>
+    /// Generates a human-scannable load reference code: a fixed <c>LD-</c> prefix followed by a full
+    /// GUID's worth of hex digits (128 bits of entropy) rather than a truncated slice of one, so a
+    /// collision on <c>uq_load_reference</c> stays vanishingly unlikely even before
+    /// <see cref="MaxReferenceCodeGenerationAttempts"/>' retry budget is considered.
+    /// </summary>
+    private static string GenerateReferenceCode() => $"LD-{Guid.NewGuid():N}".ToUpperInvariant();
 
     /// <summary>Maps a <see cref="Load"/> entity to its full wire-facing representation.</summary>
     private static LoadResponseDto MapToResponse(Load load) => new()

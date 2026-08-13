@@ -13,6 +13,22 @@ public class LoadConfiguration : IEntityTypeConfiguration<Load>
 
         builder.HasIndex(x => x.ReferenceCode).IsUnique().HasDatabaseName("uq_load_reference");
 
+        // Optimistic concurrency via Postgres's built-in xmin system column, same pattern as
+        // RefreshTokenConfiguration: guarantees that if two concurrent requests both load the same
+        // Load (e.g. a racing Update and Cancel), only the first to SaveChanges commits — the second's
+        // UPDATE affects zero rows under the hood and EF raises DbUpdateConcurrencyException
+        // (translated to a 409 conflict by LoadService.UpdateAsync/CancelAsync) instead of both
+        // silently succeeding and one clobbering the other.
+        // NOTE: EF Core's provider-agnostic IsRowVersion() shadow-property pattern doesn't work here
+        // — Npgsql/EF treats a plain `.Property<uint>("xmin").IsRowVersion()` as a brand-new column to
+        // create via migration, which collides with Postgres's actual reserved system column of the
+        // same name. UseXminAsConcurrencyToken() is obsolete in this package version but is still the
+        // only API that correctly maps to the existing system column (read-only, no DDL) rather than
+        // creating a new one — kept deliberately.
+#pragma warning disable CS0618 // UseXminAsConcurrencyToken is obsolete; see note above for why the suggested replacement doesn't work for Postgres's real xmin column.
+        builder.UseXminAsConcurrencyToken();
+#pragma warning restore CS0618
+
         builder.Property(x => x.WeightKg).HasPrecision(10, 2);
         builder.Property(x => x.VolumeM3).HasPrecision(10, 3);
         builder.Property(x => x.PickupLat).HasPrecision(9, 6);

@@ -44,11 +44,24 @@ public enum ErrorCode
     /// <summary>A load cancellation was attempted without a reason.</summary>
     LOAD_CANCEL_REASON_REQUIRED,
 
+    /// <summary>A load's pickup and dropoff coordinates were identical.</summary>
+    LOAD_PICKUP_DROPOFF_IDENTICAL,
+
+    /// <summary>A list query's <c>page</c>/<c>pageSize</c> combination requests a row offset beyond what EF/PostgreSQL can address.</summary>
+    LOAD_PAGE_OUT_OF_RANGE,
+
     /// <summary>The server-generated load reference code collided with an existing one.</summary>
     LOAD_REFERENCE_CODE_CONFLICT,
 
     /// <summary>The load exists but does not belong to the authenticated caller.</summary>
     LOAD_NOT_OWNED,
+
+    /// <summary>
+    /// A concurrent write committed against this load between when it was loaded and when this
+    /// request's <c>SaveChangesAsync</c> ran (caught via the <c>Load</c> entity's xmin concurrency
+    /// token). The caller should re-fetch the load and retry.
+    /// </summary>
+    LOAD_CONCURRENCY_CONFLICT,
     /// <summary>A file upload/delete request was made with no file (or an empty file list) attached.</summary>
     FILE_REQUIRED,
 

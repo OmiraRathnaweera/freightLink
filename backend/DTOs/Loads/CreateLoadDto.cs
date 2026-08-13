@@ -32,30 +32,35 @@ public class CreateLoadDto
     [StringLength(500, MinimumLength = 5)]
     public string PickupAddress { get; set; } = string.Empty;
 
-    /// <summary>Pickup latitude, mirroring the DB's <c>ck_load_pickup_lat</c> CHECK.</summary>
+    /// <summary>
+    /// Pickup latitude, mirroring the DB's <c>ck_load_pickup_lat</c> CHECK. Nullable so
+    /// <see cref="RequiredAttribute"/> actually rejects an omitted JSON field instead of silently
+    /// binding it to <c>0</c> (a non-nullable <see cref="decimal"/> passes <c>[Required]</c>
+    /// unconditionally, since <c>0</c> is never treated as "missing" for a value type).
+    /// </summary>
     [Required]
     [Range(LoadRanges.MinLatitude, LoadRanges.MaxLatitude)]
-    public decimal PickupLat { get; set; }
+    public decimal? PickupLat { get; set; }
 
-    /// <summary>Pickup longitude, mirroring the DB's <c>ck_load_pickup_lng</c> CHECK.</summary>
+    /// <summary>Pickup longitude, mirroring the DB's <c>ck_load_pickup_lng</c> CHECK. See <see cref="PickupLat"/> for why this is nullable.</summary>
     [Required]
     [Range(LoadRanges.MinLongitude, LoadRanges.MaxLongitude)]
-    public decimal PickupLng { get; set; }
+    public decimal? PickupLng { get; set; }
 
     /// <summary>Human-readable dropoff address.</summary>
     [Required]
     [StringLength(500, MinimumLength = 5)]
     public string DropoffAddress { get; set; } = string.Empty;
 
-    /// <summary>Dropoff latitude, mirroring the DB's <c>ck_load_dropoff_lat</c> CHECK.</summary>
+    /// <summary>Dropoff latitude, mirroring the DB's <c>ck_load_dropoff_lat</c> CHECK. See <see cref="PickupLat"/> for why this is nullable.</summary>
     [Required]
     [Range(LoadRanges.MinLatitude, LoadRanges.MaxLatitude)]
-    public decimal DropoffLat { get; set; }
+    public decimal? DropoffLat { get; set; }
 
-    /// <summary>Dropoff longitude, mirroring the DB's <c>ck_load_dropoff_lng</c> CHECK.</summary>
+    /// <summary>Dropoff longitude, mirroring the DB's <c>ck_load_dropoff_lng</c> CHECK. See <see cref="PickupLat"/> for why this is nullable.</summary>
     [Required]
     [Range(LoadRanges.MinLongitude, LoadRanges.MaxLongitude)]
-    public decimal DropoffLng { get; set; }
+    public decimal? DropoffLng { get; set; }
 
     /// <summary>
     /// Start of the pickup window. Must be earlier than <see cref="PickupWindowEnd"/>, but that

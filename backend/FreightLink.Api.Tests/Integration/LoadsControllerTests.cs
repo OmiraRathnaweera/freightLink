@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.DTOs.Loads;
 using Microsoft.IdentityModel.Tokens;
@@ -163,6 +164,36 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>
+    /// Omitting a coordinate field entirely (not sending <c>0</c>, actually leaving it out of the
+    /// JSON body) is rejected as a 400 VALIDATION_ERROR rather than silently binding to <c>0</c> and
+    /// creating a load at Null Island. Proves the DTO's coordinate properties are nullable so
+    /// <c>[Required]</c> has something to actually check.
+    /// </summary>
+    [Theory]
+    [InlineData("pickupLat")]
+    [InlineData("pickupLng")]
+    [InlineData("dropoffLat")]
+    [InlineData("dropoffLng")]
+    public async Task Create_Returns400_WhenACoordinateFieldIsOmitted(string fieldToOmit)
+    {
+        var tokens = await RegisterAndLoginShipperAsync("missing-coord");
+        // Must serialize with the same camelCase policy the API's JSON pipeline uses — the default
+        // JsonSerializer.SerializeToNode() overload produces PascalCase property names, so
+        // fieldToOmit (e.g. "pickupLat") would never match a key and this test would create a
+        // perfectly valid load instead of omitting anything.
+        var jsonOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var body = JsonSerializer.SerializeToNode(ValidCreateLoadDto(), jsonOptions)!.AsObject();
+        body.Remove(fieldToOmit);
+
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/loads", tokens.AccessToken);
+        request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
     }
 
     // --- Get one (Shipper own, Admin any) ---

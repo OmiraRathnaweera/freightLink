@@ -19,10 +19,16 @@ namespace FreightLink.Api.Tests.Services;
 public class LoadServiceTests
 {
     /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test.</summary>
-    private static AppDbContext CreateContext()
+    private static AppDbContext CreateContext() => CreateContext(Guid.NewGuid().ToString());
+
+    /// <summary>
+    /// Creates an InMemory-backed <see cref="AppDbContext"/> against a caller-supplied database name,
+    /// so concurrency tests can open a second, independent context onto the same underlying data.
+    /// </summary>
+    private static AppDbContext CreateContext(string databaseName)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName)
             .Options;
         return new AppDbContext(options);
     }
@@ -130,6 +136,25 @@ public class LoadServiceTests
         Assert.False(string.IsNullOrWhiteSpace(result.ReferenceCode));
     }
 
+    /// <summary>
+    /// The generated reference code keeps its human-readable <c>LD-</c> prefix but carries a full
+    /// GUID's worth of hex digits (32, not the old 9-digit truncated slice), and two separately
+    /// created loads never collide.
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_GeneratesAHighEntropyUniqueReferenceCode()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+
+        var first = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+        var second = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+
+        Assert.Matches("^LD-[0-9A-F]{32}$", first.ReferenceCode);
+        Assert.NotEqual(first.ReferenceCode, second.ReferenceCode);
+    }
+
     /// <summary>PostImmediately=true creates the load directly as Posted.</summary>
     [Fact]
     public async Task CreateAsync_CreatesLoadAsPosted_WhenPostImmediatelyTrue()
@@ -156,6 +181,23 @@ public class LoadServiceTests
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, request));
 
         Assert.Equal(ErrorCode.INVALID_PICKUP_WINDOW, exception.Code);
+        Assert.Empty(dbContext.Loads);
+    }
+
+    /// <summary>Identical pickup and dropoff coordinates are rejected before any DB write, mirroring <c>ck_load_distinct_points</c>.</summary>
+    [Fact]
+    public async Task CreateAsync_Throws_WhenPickupAndDropoffCoordinatesAreIdentical()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var request = ValidCreateLoadDto();
+        request.DropoffLat = request.PickupLat;
+        request.DropoffLng = request.PickupLng;
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, request));
+
+        Assert.Equal(ErrorCode.LOAD_PICKUP_DROPOFF_IDENTICAL, exception.Code);
         Assert.Empty(dbContext.Loads);
     }
 
@@ -260,6 +302,24 @@ public class LoadServiceTests
         Assert.DoesNotContain(page2.Items, item => page1Ids.Contains(item.LoadId));
     }
 
+    /// <summary>
+    /// A page number large enough that <c>(page - 1) * pageSize</c> would overflow plain 32-bit
+    /// arithmetic is rejected with a 400 instead of surfacing as an unhandled overflow/negative-Skip
+    /// error.
+    /// </summary>
+    [Fact]
+    public async Task GetListAsync_Throws_WhenPageOffsetOverflows()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.GetListAsync(new LoadListQueryDto { Page = int.MaxValue, PageSize = 100 }, shipperUserId, UserRole.Shipper));
+
+        Assert.Equal(ErrorCode.LOAD_PAGE_OUT_OF_RANGE, exception.Code);
+    }
+
     /// <summary>The Status filter returns only loads in that exact status.</summary>
     [Fact]
     public async Task GetListAsync_FiltersByStatus()
@@ -292,6 +352,39 @@ public class LoadServiceTests
 
         var item = Assert.Single(result.Items);
         Assert.Equal(created.LoadId, item.LoadId);
+    }
+
+    /// <summary>
+    /// When every load shares the same primary sort value (here, CreatedAt), the LoadId tiebreaker
+    /// still yields a total, repeatable order — proving pagination can't duplicate or skip rows at a
+    /// page boundary just because several loads tie on the requested sort field.
+    /// </summary>
+    [Theory]
+    [InlineData("asc")]
+    [InlineData("desc")]
+    public async Task GetListAsync_OrdersDeterministically_WhenPrimarySortValuesAreTied(string sortDir)
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var tiedCreatedAt = DateTimeOffset.UtcNow;
+        var loadIds = new List<Guid>();
+        for (var i = 0; i < 4; i++)
+        {
+            var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+            load.CreatedAt = tiedCreatedAt;
+            await dbContext.SaveChangesAsync();
+            loadIds.Add(load.LoadId);
+        }
+
+        var ascending = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var expectedOrder = ascending ? loadIds.OrderBy(id => id).ToList() : loadIds.OrderByDescending(id => id).ToList();
+
+        var page1 = await sut.GetListAsync(new LoadListQueryDto { SortBy = "createdAt", SortDir = sortDir, Page = 1, PageSize = 2 }, shipperUserId, UserRole.Shipper);
+        var page2 = await sut.GetListAsync(new LoadListQueryDto { SortBy = "createdAt", SortDir = sortDir, Page = 2, PageSize = 2 }, shipperUserId, UserRole.Shipper);
+
+        var actualOrder = page1.Items.Concat(page2.Items).Select(i => i.LoadId).ToList();
+        Assert.Equal(expectedOrder, actualOrder);
     }
 
     /// <summary>A Shipper only ever sees their own loads, even if they request a different shipperUserId filter.</summary>
@@ -367,6 +460,23 @@ public class LoadServiceTests
         }
     }
 
+    /// <summary>Identical pickup and dropoff coordinates are rejected before any DB write, mirroring <c>ck_load_distinct_points</c>.</summary>
+    [Fact]
+    public async Task UpdateAsync_Throws_WhenPickupAndDropoffCoordinatesAreIdentical()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        var request = ValidUpdateLoadDto();
+        request.DropoffLat = request.PickupLat;
+        request.DropoffLng = request.PickupLng;
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, shipperUserId, request));
+
+        Assert.Equal(ErrorCode.LOAD_PICKUP_DROPOFF_IDENTICAL, exception.Code);
+    }
+
     /// <summary>Editing a nonexistent load throws a 404-shaped ApiException.</summary>
     [Fact]
     public async Task UpdateAsync_Throws_WhenNotFound()
@@ -392,6 +502,43 @@ public class LoadServiceTests
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, otherShipperId, ValidUpdateLoadDto()));
 
         Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
+    }
+
+    /// <summary>
+    /// If another request commits a change to this load between when this call's context loaded it
+    /// and when it saves, the xmin concurrency token (LoadConfiguration) catches the lost-update race
+    /// and this call gets a 409 instead of silently overwriting the concurrent change.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_Throws409_WhenLoadWasModifiedConcurrently()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        using var seedContext = CreateContext(databaseName);
+        var shipperUserId = await SeedShipperUserAsync(seedContext);
+        var load = await SeedLoadAsync(seedContext, shipperUserId, LoadStatus.Draft);
+
+        using var dbContext = CreateContext(databaseName);
+        var sut = CreateSut(dbContext);
+        // Pre-load the row into this test's own context so its tracked original xmin value goes
+        // stale the moment the "concurrent" write below commits — mirroring two requests racing on
+        // the same row, without needing two real concurrent threads.
+        _ = await dbContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
+
+        using (var concurrentContext = CreateContext(databaseName))
+        {
+            var concurrentlyLoadedRow = await concurrentContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
+            concurrentlyLoadedRow.CargoDescription = "Changed by a concurrent request";
+            // The InMemory provider (unlike real Postgres) never auto-advances a shadow "xmin"
+            // property on its own, so this stands in for the row-version bump a real UPDATE would
+            // cause — without it, the concurrency token never actually changes and the race this
+            // test targets could never be observed under InMemory.
+            concurrentContext.Entry(concurrentlyLoadedRow).Property<uint>("xmin").CurrentValue = 12345u;
+            await concurrentContext.SaveChangesAsync();
+        }
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, shipperUserId, ValidUpdateLoadDto()));
+
+        Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
     }
 
     // --- Cancel ---
@@ -493,5 +640,38 @@ public class LoadServiceTests
         Assert.Equal(LoadStatus.Cancelled, historyRow.ToStatus);
         Assert.Equal("No longer needed", historyRow.Reason);
         Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
+    }
+
+    /// <summary>
+    /// If another request commits a change to this load between when this call's context loaded it
+    /// and when it saves, the xmin concurrency token (LoadConfiguration) catches the lost-update race
+    /// and this call gets a 409 instead of silently cancelling over a since-changed row.
+    /// </summary>
+    [Fact]
+    public async Task CancelAsync_Throws409_WhenLoadWasModifiedConcurrently()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        using var seedContext = CreateContext(databaseName);
+        var shipperUserId = await SeedShipperUserAsync(seedContext);
+        var load = await SeedLoadAsync(seedContext, shipperUserId, LoadStatus.Draft);
+
+        using var dbContext = CreateContext(databaseName);
+        var sut = CreateSut(dbContext);
+        _ = await dbContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
+
+        using (var concurrentContext = CreateContext(databaseName))
+        {
+            var concurrentlyLoadedRow = await concurrentContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
+            concurrentlyLoadedRow.CargoDescription = "Changed by a concurrent request";
+            // See UpdateAsync_Throws409_WhenLoadWasModifiedConcurrently for why this manual bump is
+            // needed under the InMemory provider.
+            concurrentContext.Entry(concurrentlyLoadedRow).Property<uint>("xmin").CurrentValue = 12345u;
+            await concurrentContext.SaveChangesAsync();
+        }
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" }));
+
+        Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
     }
 }
