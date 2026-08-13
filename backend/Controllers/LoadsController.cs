@@ -131,7 +131,12 @@ public class LoadsController : ControllerBase
     {
         var roleClaim = User.FindFirstValue(ClaimTypes.Role);
 
-        if (!Enum.TryParse<UserRole>(roleClaim, out var role))
+        // Enum.TryParse alone accepts any string that looks like an underlying-type literal (e.g.
+        // "99") even when no UserRole member has that value — it only rejects strings that can't
+        // parse as *some* integer/name at all. Enum.IsDefined closes that gap so an
+        // out-of-range/malformed role claim is rejected here rather than reaching LoadService's
+        // Admin-vs-not-Admin authorization checks as a technically-valid-looking but meaningless role.
+        if (!Enum.TryParse<UserRole>(roleClaim, out var role) || !Enum.IsDefined(role))
         {
             throw new ApiException(HttpStatusCode.Unauthorized, ErrorCode.UNAUTHORIZED, "The access token does not contain a valid role.");
         }

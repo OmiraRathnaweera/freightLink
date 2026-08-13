@@ -79,6 +79,36 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    /// <summary>
+    /// Mints a validly-signed JWT carrying one <c>ClaimTypes.Role</c> claim per entry in
+    /// <paramref name="roles"/>, in that order — lets a test give the token multiple role claims,
+    /// which <c>[Authorize(Roles = ...)]</c>'s <c>User.IsInRole</c> matches against ANY of them,
+    /// while <c>LoadsController.GetCurrentUserRole</c>'s <c>FindFirstValue</c> only ever reads the
+    /// first.
+    /// </summary>
+    private static string MintTokenWithRoles(params string[] roles)
+    {
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("integration-test-signing-key-that-is-long-enough-1234567890"));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()),
+            new(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString())
+        };
+        claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+
+        var token = new JwtSecurityToken(
+            issuer: "FreightLinkApi",
+            audience: "FreightLinkClient",
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     /// <summary>A valid Create payload.</summary>
     private static CreateLoadDto ValidCreateLoadDto() => new()
     {
@@ -285,6 +315,26 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
         Assert.True(page!.TotalItems >= 2);
+    }
+
+    /// <summary>
+    /// A role claim with no corresponding <c>UserRole</c> member is rejected, even when a second,
+    /// valid role claim on the same token ("Admin") is enough to satisfy the coarser
+    /// <c>[Authorize(Roles = ...)]</c> pipeline check and let the request reach the action —
+    /// <c>Enum.TryParse</c> alone would accept a bare numeric string like <c>"99"</c> as a
+    /// technically-parseable but undefined <c>UserRole</c>, so this proves
+    /// <c>LoadsController.GetCurrentUserRole</c>'s <c>Enum.IsDefined</c> check is what actually
+    /// stops it from reaching <c>LoadService</c>.
+    /// </summary>
+    [Fact]
+    public async Task GetList_Returns401_WhenFirstRoleClaimHasNoDefinedEnumMember()
+    {
+        var token = MintTokenWithRoles("99", "Admin");
+
+        using var request = AuthedRequest(HttpMethod.Get, "/api/v1/loads", token);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     // --- Edit (Shipper own only) ---
