@@ -11,6 +11,8 @@ import { cx } from '../lib/cx.js'
 // rather than inventing a color outside the four semantic tones. Pass
 // `tone` directly to override the lookup for an unmapped status.
 const STATUS_TONE = {
+  Draft: 'neutral',
+  Posted: 'blue',
   Matched: 'blue',
   InTransit: 'amber',
   Pending: 'amber',
@@ -27,6 +29,9 @@ const TONE_CLASSES = {
   amber: 'bg-status-amber-bg text-status-amber-text',
   green: 'bg-status-green-bg text-status-green-text',
   red: 'bg-status-red-bg text-status-red-text',
+  // Not a DESIGN.md semantic status color — a neutral chip for states like
+  // "Draft" that aren't yet in any of the four workflow-status lanes.
+  neutral: 'bg-surface-container text-on-surface-variant',
 }
 
 // DESIGN.md > Shapes: badges get a 4px radius (rounded), except "Live" /
