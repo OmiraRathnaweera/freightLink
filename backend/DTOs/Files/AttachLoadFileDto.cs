@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
+using FreightLink.Api.Common.Validation;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.DTOs.Files;
@@ -20,9 +21,11 @@ public class AttachLoadFileDto
     /// Classification of why this file is attached to the load. Nullable so
     /// <see cref="RequiredAttribute"/> actually rejects an omitted JSON field instead of silently
     /// binding it to the enum's default member (mirrors why coordinate fields on
-    /// <c>CreateLoadDto</c>/<c>UpdateLoadDto</c> are nullable).
+    /// <c>CreateLoadDto</c>/<c>UpdateLoadDto</c> are nullable). Uses <see cref="FileTypeJsonConverter"/>
+    /// (not the plain <c>JsonStringEnumConverter</c>) so a numeric value — defined or not — is
+    /// rejected as a 400 rather than silently bound; only the member name string is accepted.
     /// </summary>
     [Required]
-    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [JsonConverter(typeof(FileTypeJsonConverter))]
     public FileType? FileType { get; set; }
 }

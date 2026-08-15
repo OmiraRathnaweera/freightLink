@@ -247,6 +247,30 @@ public class LoadFilesControllerTests : IClassFixture<CustomWebApplicationFactor
         Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
     }
 
+    /// <summary>
+    /// A raw numeric fileType (e.g. the JSON number 99, with no corresponding FileType member) must
+    /// be rejected the same as an invalid string — proves FileTypeJsonConverter's
+    /// allowIntegerValues:false actually takes effect over the wire, rather than the plain
+    /// JsonStringEnumConverter's default of silently binding any underlying integer, defined or not.
+    /// </summary>
+    [Fact]
+    public async Task Attach_NumericFileType_Returns400ValidationError()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("attach-numeric-type");
+        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
+        var uploaded = await UploadFileAsShipperAsync(tokens.AccessToken);
+
+        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/files", tokens.AccessToken);
+        request.Content = new StringContent(
+            $"{{\"publicId\":\"{uploaded.PublicId}\",\"fileType\":99}}",
+            Encoding.UTF8,
+            "application/json");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
+    }
+
     [Fact]
     public async Task Attach_Unauthenticated_Returns401()
     {
