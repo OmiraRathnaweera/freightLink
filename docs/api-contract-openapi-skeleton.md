@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 6**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 7**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -17,6 +17,7 @@
 | 4 | 12 Aug 2026 | Shared File Upload/Delete implemented: added Section 4.7 (`/files/*`, backed by Cloudinary) — component-agnostic infrastructure for Component A (Load files) and Component C (TripEvidence) to build on, not tied to either yet. Scoped to `Shipper`, `AgencyStaff`, `Driver` only — **`Admin` explicitly excluded**, since uploading/deleting a file is an operational action taken by the party producing it, not an oversight action. Only image files (JPG/PNG/GIF/WEBP/BMP/HEIC/TIFF) and PDF are accepted, max 10 MB each. Added corresponding YAML skeleton paths and schemas. |
 | 5 | 13 Aug 2026 | Load cancellation changed from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial state-transition update), reserving `POST` for resource creation. No change to auth, ownership, or request/response shape. |
 | 6 | 13 Aug 2026 | Load Management hardening: `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now genuinely use `409 LOAD_CONCURRENCY_CONFLICT` (Postgres `xmin` optimistic concurrency), superseding the earlier claim that no Load endpoint used `409`; `POST /loads` retries internally on a `ReferenceCode` collision before returning `409 LOAD_REFERENCE_CODE_CONFLICT`; `POST /loads`/`PUT /loads/{id}` reject identical pickup/dropoff coordinates with `400 LOAD_PICKUP_DROPOFF_IDENTICAL`; `GET /loads` rejects an out-of-range `page`/`pageSize` combination with `400 LOAD_PAGE_OUT_OF_RANGE` and now paginates deterministically (ties broken by `loadId`) and case-insensitive `search` matching is index-backed (`pg_trgm`). No path, role, or response-shape changes. |
+| 7 | 15 Aug 2026 | Component A file attachments implemented: `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` link an already-uploaded file (from `POST /files/single`) to a load — never re-implements Cloudinary upload/delete, only the `LoadFile` metadata linkage. Also closes a documentation gap (no functional change): `GET /loads` has always supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were documented until now — added the missing `components/parameters` entries and wired them into the path. |
 
 ---
 
@@ -146,9 +147,9 @@ Query parameters, applied consistently across all `GET` list endpoints:
 | PATCH | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
 | POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper *(not yet implemented)* |
 | GET | `/loads/{id}/status-history` | Full status timeline | Shipper (own), Admin *(not yet implemented)* |
-| POST | `/loads/{id}/files` | Upload a document/photo (`Manifest`, `Invoice`, `CargoPhoto`, `Other`) | Shipper (own) *(not yet implemented)* |
-| GET | `/loads/{id}/files` | List attached files | Shipper (own), Admin *(not yet implemented)* |
-| DELETE | `/loads/{id}/files/{fileId}` | Remove an attached file | Shipper (own) *(not yet implemented)* |
+| POST | `/loads/{id}/files` | Attach an already-uploaded file (`POST /files/single`) to a load, classified `Manifest`/`Invoice`/`CargoPhoto`/`Other` | Shipper (own) |
+| GET | `/loads/{id}/files` | List attached files | Shipper (own), Admin |
+| DELETE | `/loads/{id}/files/{fileId}` | Detach a file (removes only the `LoadFile` link; the underlying upload is untouched) | Shipper (own) |
 
 > **Improvement applied:** `GET /loads/{id}` now explicitly returns the current `workflowRunId` (when a match run exists for the load), so the Shipper's React approval console can navigate straight to `GET /workflows/{id}` without needing to already know the workflow ID out-of-band. As of Rev. 4 the field exists on `LoadResponse` but is always `null` — populating it requires joining `AgentWorkflowRun`/`Assignment`, which lands with Section 4.6.
 >
@@ -159,6 +160,10 @@ Query parameters, applied consistently across all `GET` list endpoints:
 > **Ownership/status errors:** a Shipper accessing a load they don't own gets `403 LOAD_NOT_OWNED` (not `404`) — existence and ownership are checked as separate steps. Editing/cancelling a load whose current status doesn't permit it returns `422 INVALID_LOAD_STATUS_TRANSITION`, not `409`.
 >
 > **Resolved in Rev. 6:** `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now do carry a genuine `409 LOAD_CONCURRENCY_CONFLICT` case — a lost-update race caught via `Load`'s Postgres `xmin` optimistic-concurrency token when two requests load the same row and both attempt to save. Superseded the earlier claim (Rev. 4/5) that no Load endpoint uses `409` yet. `POST /loads` also gained a bounded internal retry on the pre-existing `409 LOAD_REFERENCE_CODE_CONFLICT` case (a `ReferenceCode` collision) rather than failing the request on the first collision — the response shape is unchanged, just less likely to occur. `POST /loads` and `PUT /loads/{id}` also now reject pickup/dropoff coordinates that are identical with `400 LOAD_PICKUP_DROPOFF_IDENTICAL` (mirrors the DB's `ck_load_distinct_points` CHECK), and `GET /loads` rejects a `page`/`pageSize` combination whose offset would overflow with `400 LOAD_PAGE_OUT_OF_RANGE`.
+>
+> **Implemented in Rev. 7:** `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` are live in the new `LoadFilesController`/`LoadFileService`. Attach only ever references an already-uploaded file by its Cloudinary `publicId` (obtained from `POST /files/single` beforehand) plus a `fileType` classification — it never re-accepts url/size/contentType from the client, since those already live durably on the `UploadedFile` row created by that prior upload call. Attach can fail with `404 LOAD_NOT_FOUND` (load), `403 LOAD_NOT_OWNED` (not the load's Shipper), `404 LOAD_FILE_UPLOAD_NOT_FOUND` (unknown `publicId`), `403 FILE_NOT_OWNED` (the upload isn't the caller's), or `409 FILE_IN_USE` (the upload is already attached elsewhere — the same code `DELETE /files/{publicId}` already used the other direction). List is Shipper (own) or Admin (any); detach is Shipper (own) only, `404 LOAD_FILE_NOT_FOUND` if the attachment id doesn't exist under that load, `204` on success. Detach removes only the `LoadFile` link — the underlying upload stays deletable afterward via the existing `DELETE /files/{publicId}` once nothing attaches to it.
+>
+> **Documentation gap closed in Rev. 7 (no functional change):** `GET /loads` has supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were ever added to this doc's `components/parameters`/path — the other six are now documented too.
 
 ### 4.3 Component B — Agency & Fleet Management (Owner: D.B.A.H.W. Bandara)
 
@@ -265,7 +270,7 @@ info:
     FreightMatch LK — freight-matching platform API (SE3090 Assignment 1).
     Consumed identically by the React (Admin / Shipper) and Flutter
     (Shipper-lightweight, Agency Staff, Driver) clients.
-  version: 0.6.0-sprint1-skeleton-rev6
+  version: 0.7.0-sprint2-loadfiles-rev7
 servers:
   - url: /api/v1
     description: Relative base path (host resolved per environment)
@@ -397,6 +402,12 @@ paths:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
         - $ref: '#/components/parameters/Status'
+        - $ref: '#/components/parameters/Search'
+        - $ref: '#/components/parameters/SortBy'
+        - $ref: '#/components/parameters/SortDir'
+        - $ref: '#/components/parameters/ShipperUserId'
+        - $ref: '#/components/parameters/CreatedFrom'
+        - $ref: '#/components/parameters/CreatedTo'
       responses:
         '200':
           description: OK
@@ -493,19 +504,68 @@ paths:
               schema:
                 $ref: '#/components/schemas/PriceEstimate'
 
+  # --- Implemented Rev. 7 (Component A) ---
   /loads/{id}/files:
     parameters:
       - $ref: '#/components/parameters/IdPathParam'
     post:
       tags: [Loads]
-      summary: Upload a load document/photo
+      summary: Attach an already-uploaded file (see POST /files/single) to this load
+      x-allowed-roles: [Shipper]
+      x-ownership-note: "Requires load.ShipperId == currentUserId (403 LOAD_NOT_OWNED otherwise)"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttachLoadFileRequest'
       responses:
-        '201': { description: Created }
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoadFileResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
     get:
       tags: [Loads]
-      summary: List attached files
+      summary: List a load's attached files
+      x-allowed-roles: [Shipper, Admin]
+      x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED otherwise); Admin may list any load's files"
       responses:
-        '200': { description: OK }
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/LoadFileResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /loads/{id}/files/{fileId}:
+    delete:
+      tags: [Loads]
+      summary: Detach a file from this load (removes only the LoadFile link, not the underlying upload)
+      x-allowed-roles: [Shipper]
+      x-ownership-note: "Requires load.ShipperId == currentUserId (403 LOAD_NOT_OWNED otherwise)"
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+        - name: fileId
+          in: path
+          required: true
+          description: The LoadFile attachment's own id (not the underlying upload's id)
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: No Content }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /agencies:
     post:
@@ -796,6 +856,35 @@ components:
       name: status
       in: query
       schema: { type: string }
+    Search:
+      name: search
+      in: query
+      schema: { type: string }
+      description: Case-insensitive substring match against cargoDescription, referenceCode, pickupAddress, dropoffAddress.
+    SortBy:
+      name: sortBy
+      in: query
+      schema: { type: string, enum: [createdAt, pickupWindowStart, weightKg], default: createdAt }
+      description: Unrecognized values fall back to createdAt.
+    SortDir:
+      name: sortDir
+      in: query
+      schema: { type: string, enum: [asc, desc], default: desc }
+    ShipperUserId:
+      name: shipperUserId
+      in: query
+      schema: { type: string, format: uuid }
+      description: Admin-only narrowing filter; ignored for a non-Admin caller, who is always scoped to their own loads regardless of this value.
+    CreatedFrom:
+      name: createdFrom
+      in: query
+      schema: { type: string, format: date-time }
+      description: Inclusive lower bound on createdAt.
+    CreatedTo:
+      name: createdTo
+      in: query
+      schema: { type: string, format: date-time }
+      description: Inclusive upper bound on createdAt.
 
   responses:
     NotFound:
@@ -997,6 +1086,33 @@ components:
         pageSize: { type: integer }
         totalItems: { type: integer }
         totalPages: { type: integer }
+
+    AttachLoadFileRequest:
+      type: object
+      description: >
+        POST /loads/{id}/files body. References an already-uploaded file by its Cloudinary publicId
+        (from POST /files/single) — never re-accepts url/size/contentType, since those are already
+        durably stored on the UploadedFile row created by that prior upload call.
+      required: [publicId, fileType]
+      properties:
+        publicId: { type: string, description: "Cloudinary public id, as returned by POST /files/single" }
+        fileType: { type: string, enum: [Manifest, Invoice, CargoPhoto, Other] }
+
+    LoadFileResponse:
+      type: object
+      description: Returned by POST /loads/{id}/files and as an item of GET /loads/{id}/files. Combines the LoadFile link with its joined UploadedFile storage details.
+      properties:
+        fileId: { type: string, format: uuid, description: "The LoadFile link's own id (used as the {fileId} path param for DELETE)" }
+        loadId: { type: string, format: uuid }
+        fileType: { type: string, enum: [Manifest, Invoice, CargoPhoto, Other] }
+        attachedAt: { type: string, format: date-time }
+        publicId: { type: string }
+        secureUrl: { type: string, format: uri }
+        format: { type: string, nullable: true }
+        bytes: { type: integer, format: int64 }
+        contentType: { type: string }
+        originalFileName: { type: string, nullable: true }
+
     FileUploadResult:
       type: object
       description: Returned by POST /files/single.
@@ -1019,7 +1135,7 @@ components:
 
     # --- Skeleton only below this line ---
     # Each owner defines their entity schemas here as their controllers land:
-    #   LoadStatusHistory, File                   -> Dias H.N.P.K.       (Component A — Load itself done in Rev. 4)
+    #   LoadStatusHistory                         -> Dias H.N.P.K.       (Component A — Load itself done in Rev. 4; LoadFile attachment done in Rev. 7)
     #   Agency, Vehicle, Driver, ComplianceDoc    -> D.B.A.H.W. Bandara  (Component B)
     #   Assignment, Trip, TripEvent, TripEvidence -> Ratnaweera O.V.     (Component C)
     #   Invoice, Dispute                          -> Balasooriya B.K.N.N. (Component D)
@@ -1031,14 +1147,14 @@ components:
 
 | Section to complete | Owner | Target sprint |
 |---|---|---|
-| ~~`Load` schema + create/read-one/read-list/edit/cancel request/response bodies~~ — done Rev. 4 (`LoadsController`/`LoadService`); `LoadStatusHistory`, `File` schemas + `estimate`/`status-history`/`files` endpoints still open | Dias H.N.P.K. | Sprint 2–3 (`Y3S01-25`–`44`) |
+| ~~`Load` schema + create/read-one/read-list/edit/cancel request/response bodies~~ — done Rev. 4 (`LoadsController`/`LoadService`); ~~`files` endpoints~~ — done Rev. 7 (`LoadFilesController`/`LoadFileService`). `LoadStatusHistory` schema + `estimate`/`status-history` endpoints still open | Dias H.N.P.K. | Sprint 2–3 (`Y3S01-25`–`44`) |
 | `Agency`, `Vehicle`, `Driver`, `ComplianceDoc` schemas + confirm `Verified→Active` trigger | D.B.A.H.W. Bandara | Sprint 2–3 (`Y3S01-29`–`32`, `73`) |
 | `Assignment`, `Trip`, `TripEvent`, `TripEvidence` schemas + new list/detail/decline endpoints (Section 4.4) | Ratnaweera O.V. | Sprint 2–4 (`Y3S01-33`–`35`, `74`) |
 | `Invoice`, `Dispute` schemas + webhook payload; confirm `disputes/resolve` ownership (README §10 #9) | Balasooriya B.K.N.N. | Sprint 2–5 (`Y3S01-36`–`38`, `81`, `93`) |
 | `Workflows` request/response schemas (`AgentWorkflowRun`, `AgentStep`, `ApprovalDecision`); implement the `load.ShipperId == currentUserId` ownership guard on `approve`/`reject`/`revise` per ADR-016 | All four (agent owners) | Sprint 5 (`Y3S01-90`–`92`, `95`–`97`) |
 | Role-based authorization scheme wired to every endpoint above, including ownership guards flagged with `(own)` | Ratnaweera O.V. | Sprint 1 (`Y3S01-19`), enforced per-controller Sprint 2+ |
 | ~~Confirm `/auth/register` single-vs-split design~~ — resolved Rev. 3, split into `/auth/register/shipper` + `/auth/register/agency`; Auth layer (JWT issuance/rotation, admin seed) implemented | Dias H.N.P.K. (owns Auth foundation alongside Component A) | Done |
-| ~~Files: shared upload/delete infrastructure~~ — resolved Rev. 4, `/files/*` implemented (Cloudinary-backed, Shipper/AgencyStaff/Driver only). Component A and C still need to wire their own attachment flows on top of it (store the returned `publicId` on `LoadFile`/`TripEvidence`) | Dias H.N.P.K. (shared infra); consumed by Dias H.N.P.K. (Component A) and Ratnaweera O.V. (Component C) | Infra done; consumers Sprint 2–4 |
+| ~~Files: shared upload/delete infrastructure~~ — resolved Rev. 4, `/files/*` implemented (Cloudinary-backed, Shipper/AgencyStaff/Driver only). ~~Component A attachment flow~~ — resolved Rev. 7, `/loads/{id}/files*` implemented on top of it. Component C (`TripEvidence`) still needs to wire its own attachment flow | Dias H.N.P.K. (shared infra + Component A); Ratnaweera O.V. (Component C, still open) | Infra + Component A done; Component C Sprint 2–4 |
 | Publish live Swagger/OpenAPI UI from the ASP.NET Core project | Ratnaweera O.V. | Verified Sprint 7 (`Y3S01-123`) |
 
 This document is the Sprint 1 deliverable for `Y3S01-15`. Update it whenever an endpoint's path, method, or role requirement changes — it is the single source of truth both clients (React, Flutter) build against.
