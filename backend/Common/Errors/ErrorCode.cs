@@ -83,6 +83,12 @@ public enum ErrorCode
     /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
     FILE_IN_USE,
 
+    /// <summary>An attach was attempted referencing an UploadedFile publicId that does not exist.</summary>
+    LOAD_FILE_UPLOAD_NOT_FOUND,
+
+    /// <summary>A detach was attempted on a LoadFile attachment that does not exist under the given load.</summary>
+    LOAD_FILE_NOT_FOUND,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's

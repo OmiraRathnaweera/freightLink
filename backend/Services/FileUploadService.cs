@@ -11,6 +11,7 @@ using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Npgsql;
 
 namespace FreightLink.Api.Services;
 
@@ -84,24 +85,25 @@ public class FileUploadService : IFileUploadService
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FILE_NOT_OWNED, "You do not have permission to delete this file.");
             }
 
-            // Deleting the Cloudinary asset while a LoadFile still points at it would leave that
-            // LoadFile referencing a dead asset, and removing this row afterward would violate its
-            // Restrict FK anyway — reject up front with a clear error instead of either outcome.
+            // Fast-path check — avoids attempting (and failing) the removal below in the common
+            // non-race case. Not itself the authoritative guard: a load can be attached to this file
+            // concurrently right after this check passes, which is why the DB removal below still
+            // runs and can still fail on the Restrict FK.
             var isAttachedToLoad = await _dbContext.Files.AnyAsync(lf => lf.UploadedFileId == existing.FileId, cancellationToken);
             if (isAttachedToLoad)
             {
                 throw new ApiException(HttpStatusCode.Conflict, ErrorCode.FILE_IN_USE, "This file is attached to a load and cannot be deleted directly.");
             }
-        }
 
-        var result = await _fileStorageService.DeleteFileAsync(publicId, cancellationToken);
-
-        if (existing is not null)
-        {
+            // Remove the DB record BEFORE the storage delete below, not after: the FK from
+            // LoadFiles.UploadedFileId is Restrict, so if a load was attached to this file
+            // concurrently (after the check above), this fails here with 409 FILE_IN_USE — before the
+            // real Cloudinary asset is ever touched. Deleting storage first would make that same race
+            // irreversible, since the asset would already be gone by the time the DB caught it.
             await RemoveUploadMetadataAsync(existing, cancellationToken);
         }
 
-        return result;
+        return await _fileStorageService.DeleteFileAsync(publicId, cancellationToken);
     }
 
     /// <summary>Records a successfully-uploaded file's metadata so it's queryable outside of Cloudinary.</summary>
@@ -124,10 +126,11 @@ public class FileUploadService : IFileUploadService
     }
 
     /// <summary>
-    /// Removes a deleted file's already-loaded metadata row. The Cloudinary asset has already been
-    /// deleted by the time this runs, so a failure here is logged clearly rather than left to
-    /// surface as an unhandled exception — the row may end up stale (pointing at a now-deleted
-    /// asset), which is diagnosable from the log but not silently swallowed.
+    /// Removes an uploaded file's metadata row, run BEFORE the real Cloudinary asset is deleted (see
+    /// <see cref="DeleteSingleAsync"/>) so the irreversible storage delete never runs ahead of a DB
+    /// state transition that can still fail. The Restrict FK from LoadFiles.UploadedFileId means this
+    /// fails atomically if a load was attached to the file concurrently, which is translated to the
+    /// documented 409 instead of an unhandled 500.
     /// </summary>
     private async Task RemoveUploadMetadataAsync(UploadedFile existing, CancellationToken cancellationToken)
     {
@@ -137,10 +140,12 @@ public class FileUploadService : IFileUploadService
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (Exception ex)
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503", ConstraintName: "FK_LoadFiles_UploadedFiles_UploadedFileId" })
         {
-            _logger.LogError(ex, "Deleted the Cloudinary asset for {PublicId} but failed to remove its UploadedFiles row — this row is now stale.", existing.PublicId);
-            throw new ApiException(HttpStatusCode.InternalServerError, ErrorCode.FILE_DELETE_FAILED, "The file was deleted from storage, but its record could not be removed. Please retry.");
+            // A load was attached to this file (POST /loads/{id}/files) between the fast-path check
+            // in DeleteSingleAsync and this removal. Caught here, before any storage call has been
+            // made, so the real asset is never deleted out from under the new attachment.
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.FILE_IN_USE, "This file is attached to a load and cannot be deleted directly.");
         }
     }
 }

@@ -354,6 +354,97 @@ public class LoadServiceTests
         Assert.Equal(created.LoadId, item.LoadId);
     }
 
+    /// <summary>CreatedFrom alone returns only loads created on or after the given instant (inclusive lower bound).</summary>
+    [Fact]
+    public async Task GetListAsync_CreatedFromOnly_ReturnsLoadsCreatedOnOrAfter()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var baseTime = DateTimeOffset.UtcNow;
+        var older = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        older.CreatedAt = baseTime.AddDays(-2);
+        var boundary = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        boundary.CreatedAt = baseTime;
+        var newer = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        newer.CreatedAt = baseTime.AddDays(2);
+        await dbContext.SaveChangesAsync();
+
+        var result = await sut.GetListAsync(new LoadListQueryDto { CreatedFrom = baseTime }, shipperUserId, UserRole.Shipper);
+
+        var resultIds = result.Items.Select(i => i.LoadId).ToHashSet();
+        Assert.Equal(2, result.TotalItems);
+        Assert.Contains(boundary.LoadId, resultIds);
+        Assert.Contains(newer.LoadId, resultIds);
+        Assert.DoesNotContain(older.LoadId, resultIds);
+    }
+
+    /// <summary>CreatedTo alone returns only loads created on or before the given instant (inclusive upper bound).</summary>
+    [Fact]
+    public async Task GetListAsync_CreatedToOnly_ReturnsLoadsCreatedOnOrBefore()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var baseTime = DateTimeOffset.UtcNow;
+        var older = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        older.CreatedAt = baseTime.AddDays(-2);
+        var boundary = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        boundary.CreatedAt = baseTime;
+        var newer = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        newer.CreatedAt = baseTime.AddDays(2);
+        await dbContext.SaveChangesAsync();
+
+        var result = await sut.GetListAsync(new LoadListQueryDto { CreatedTo = baseTime }, shipperUserId, UserRole.Shipper);
+
+        var resultIds = result.Items.Select(i => i.LoadId).ToHashSet();
+        Assert.Equal(2, result.TotalItems);
+        Assert.Contains(older.LoadId, resultIds);
+        Assert.Contains(boundary.LoadId, resultIds);
+        Assert.DoesNotContain(newer.LoadId, resultIds);
+    }
+
+    /// <summary>CreatedFrom and CreatedTo together (AND) return only loads within that inclusive window.</summary>
+    [Fact]
+    public async Task GetListAsync_CreatedFromAndCreatedToTogether_ReturnsLoadsWithinRange()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var baseTime = DateTimeOffset.UtcNow;
+        var beforeRange = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        beforeRange.CreatedAt = baseTime.AddDays(-2);
+        var inRange = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        inRange.CreatedAt = baseTime;
+        var afterRange = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        afterRange.CreatedAt = baseTime.AddDays(2);
+        await dbContext.SaveChangesAsync();
+
+        var result = await sut.GetListAsync(
+            new LoadListQueryDto { CreatedFrom = baseTime.AddDays(-1), CreatedTo = baseTime.AddDays(1) },
+            shipperUserId,
+            UserRole.Shipper);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(inRange.LoadId, item.LoadId);
+    }
+
+    /// <summary>A date range that matches no loads returns an empty page, not an error.</summary>
+    [Fact]
+    public async Task GetListAsync_CreatedRangeExcludingAllLoads_ReturnsEmptyPage()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+        var futureFrom = DateTimeOffset.UtcNow.AddYears(1);
+
+        var result = await sut.GetListAsync(new LoadListQueryDto { CreatedFrom = futureFrom }, shipperUserId, UserRole.Shipper);
+
+        Assert.Equal(0, result.TotalItems);
+        Assert.Empty(result.Items);
+    }
+
     /// <summary>
     /// When every load shares the same primary sort value (here, CreatedAt), the LoadId tiebreaker
     /// still yields a total, repeatable order — proving pagination can't duplicate or skip rows at a
