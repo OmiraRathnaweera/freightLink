@@ -30,3 +30,4 @@ CLAUDE.md
 .claude/
 .agents/
 skills-lock.json
+.mcp.json
