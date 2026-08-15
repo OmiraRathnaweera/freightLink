@@ -7,6 +7,7 @@ using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FreightLink.Api.Services;
 
@@ -48,8 +49,10 @@ public class LoadFileService : ILoadFileService
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FILE_NOT_OWNED, "You do not have permission to attach this file.");
         }
 
-        // Backstopped by the DB's uq_loadfile_uploadedfileid unique index — checked proactively here
-        // so a duplicate attach fails with a clear 409 instead of an unhandled DbUpdateException.
+        // Fast-path check — avoids attempting (and failing) an insert in the common non-race case.
+        // Not itself the authoritative guard: two concurrent attaches of the same UploadedFile can
+        // both pass this check before either commits, so the actual race is closed by catching the
+        // DB's uq_loadfile_uploadedfileid unique-index violation below.
         var alreadyAttached = await _dbContext.Files.AnyAsync(lf => lf.UploadedFileId == uploadedFile.FileId, cancellationToken);
         if (alreadyAttached)
         {
@@ -66,7 +69,25 @@ public class LoadFileService : ILoadFileService
         };
 
         _dbContext.Files.Add(loadFile);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_loadfile_uploadedfileid" })
+        {
+            // Two concurrent attaches of the same UploadedFile both passed the fast-path check above;
+            // the unique index is what actually stops the second one — translated to the same
+            // documented 409 rather than surfacing as an unhandled 500.
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.FILE_IN_USE, "This file is already attached to a load.");
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503", ConstraintName: "FK_LoadFiles_UploadedFiles_UploadedFileId" })
+        {
+            // The referenced UploadedFile was deleted (DELETE /files/{publicId}) between the read
+            // above and this insert. From the caller's perspective it no longer exists to attach to —
+            // the same 404 as if it had never been found in the first place.
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_FILE_UPLOAD_NOT_FOUND, "The referenced uploaded file could not be found.");
+        }
 
         return MapToResponse(loadFile, uploadedFile);
     }
