@@ -22,12 +22,24 @@ const STATUS_CLASSES = {
   red: 'border border-status-red-text bg-status-red-text text-white hover:opacity-90',
 }
 
-function Button({ variant = 'primary', status, type = 'button', className, children, ...props }) {
+// `as` lets the same visual button render as a different element — e.g.
+// `<Button as={Link} to="/login">` for a nav CTA that must be a router
+// link, not a native <button>. Defaults to 'button' so existing callers are
+// unaffected; `type` only applies to the native button element.
+function Button({
+  as: Component = 'button',
+  variant = 'primary',
+  status,
+  type = 'button',
+  className,
+  children,
+  ...props
+}) {
   const variantClasses = variant === 'status' ? STATUS_CLASSES[status] : VARIANT_CLASSES[variant]
 
   return (
-    <button
-      type={type}
+    <Component
+      type={Component === 'button' ? type : undefined}
       className={cx(
         'inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors',
         'disabled:cursor-not-allowed disabled:opacity-50',
@@ -37,7 +49,7 @@ function Button({ variant = 'primary', status, type = 'button', className, child
       {...props}
     >
       {children}
-    </button>
+    </Component>
   )
 }
 

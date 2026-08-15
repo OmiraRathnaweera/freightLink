@@ -87,6 +87,11 @@
   /* --- Shadow: the one soft elevation shadow DESIGN.md defines --- */
   --shadow-soft: 0 2px 4px rgba(30, 41, 59, 0.05);
 
+  /* --- Motion: not in DESIGN.md — added for the trust-strip logo marquee.
+     Keep this the only animation token; DESIGN.md's brief explicitly favors
+     flat, low-motion "Functional Brutalism" over visual flair. --- */
+  --animate-marquee: marquee 32s linear infinite;
+
   /* --- Spacing: named aliases from DESIGN.md's `spacing` table --- */
   /* `spacing.base` (4px) is NOT redefined here — it's already exactly
      Tailwind's default --spacing multiplier, so p-1/gap-2/etc. already
@@ -113,6 +118,24 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Backs --animate-marquee above. The track renders its content twice back
+   to back (see TrustStrip.jsx) and this shifts it exactly one copy's width
+   (-50%), so the loop point is seamless. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
   }
 }
 

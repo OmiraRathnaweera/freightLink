@@ -1,6 +1,7 @@
-import { createBrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, Route } from 'react-router-dom'
 import DashboardLayout from '../layouts/DashboardLayout.jsx'
 
+import LandingPage from '../features/marketing/pages/LandingPage.jsx'
 import LoginPage from '../features/auth/pages/LoginPage.jsx'
 import RegisterPage from '../features/auth/pages/RegisterPage.jsx'
 import LoadsPage from '../features/loads/pages/LoadsPage.jsx'
@@ -18,9 +19,9 @@ import AgentWorkflowConsolePage from '../features/agent-workflows/pages/AgentWor
 // routes in <Route element={<ProtectedRoute allowedRoles={[...]} />}> once
 // login is real and route access needs to be enforced again.
 const router = createBrowserRouter(
-  
-    <Routes>
-      <Route path="/" element={<Navigate to="/login" replace />} />
+  createRoutesFromElements(
+    <>
+      <Route path="/" element={<LandingPage />} />
 
       {/* --- Public routes --- */}
       <Route path="/login" element={<LoginPage />} />
@@ -34,8 +35,8 @@ const router = createBrowserRouter(
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/agent-workflows" element={<AgentWorkflowConsolePage />} />
       </Route>
-    </Routes>
-  
+    </>,
+  ),
 )
 
 export default router
