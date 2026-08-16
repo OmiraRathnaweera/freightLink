@@ -22,12 +22,12 @@ const initialState = {
 // credentials: { email, password }
 // resolves: { user, accessToken, refreshToken, role }
 export const login = createAsyncThunk('auth/login', async (credentials) => {
-  // TODO: return apiClient.post('/auth/login', credentials)
+  // TODO: return api.post('/auth/login', credentials) — see src/features/auth/api/authApi.js's login()
   throw new Error(`login thunk not implemented yet: ${JSON.stringify(credentials)}`)
 })
 
 export const logout = createAsyncThunk('auth/logout', async () => {
-  // TODO: apiClient.post('/auth/logout'); clear persisted tokens from storage
+  // TODO: api.post('/auth/logout'); clear persisted tokens from storage
 })
 
 // resolves: { accessToken, refreshToken }
@@ -35,7 +35,7 @@ export const refreshAccessToken = createAsyncThunk(
   'auth/refreshAccessToken',
   async (_, { getState }) => {
     const { refreshToken } = getState().auth
-    // TODO: return apiClient.post('/auth/refresh', { refreshToken })
+    // TODO: return api.post('/auth/refresh', { refreshToken })
     throw new Error(`refreshAccessToken thunk not implemented yet: ${refreshToken}`)
   },
 )

@@ -1,8 +1,8 @@
 import { LoadStatus } from '../../lib/enums.js'
 
-// Placeholder data for the Loads feature — there's no backend wiring yet
-// (src/lib/apiClient.js is empty, no loadsSlice exists), so these pages
-// render against this instead of a real API. Reuses the sample data from
+// Placeholder data for the Loads feature — no page wires up the real
+// src/features/loads/api/loadsApi.js yet, so these pages render against
+// this instead. Reuses the sample data from
 // the Stitch "My Loads — Dashboard" screen, with one fix: that screen's
 // export had two different rows both labeled "FM-7935" — renamed the
 // second to FM-7934 here rather than treating it as trustworthy sample
