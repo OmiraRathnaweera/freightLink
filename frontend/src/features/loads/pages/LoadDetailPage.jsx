@@ -13,8 +13,7 @@ import ActivityLog from '../components/ActivityLog.jsx'
 import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
 import RouteMapCard from '../components/RouteMapCard.jsx'
 
-// Load Detail — cloned from the Stitch "Load Detail — Matched State"
-// screen. Real route (/loads/:loadId).
+
 const TIMELINE_STEPS = ['Load Created', 'Posted', 'Matched', 'Proposal Sent', 'In Transit', 'Delivered']
 
 function LoadDetailPage() {

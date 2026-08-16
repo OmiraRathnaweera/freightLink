@@ -8,13 +8,7 @@ import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
 import FormField from '../components/FormField.jsx'
 import { MOCK_LIVE_ESTIMATE } from '../mockData.js' // TODO: replace with real data
 
-// Post a Load — cloned from the Stitch "Post a Load — Initial Form" screen.
-// Real route (/loads/new). Fields are uncontrolled (no useState) — none of
-// them need live reactivity yet, and form validation/submission is
-// explicitly out of scope for now (.claude/rules/frontend-design.md #3).
-// The Post Load button is intentionally decorative for the same reason —
-// no backend/apiClient exists yet to actually submit against, matching
-// this project's existing placeholder-page convention.
+
 function PostLoadPage() {
   return (
     <div className="space-y-6">

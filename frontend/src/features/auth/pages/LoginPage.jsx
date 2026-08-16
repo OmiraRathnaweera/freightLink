@@ -2,12 +2,6 @@ import { Formik, Form } from 'formik'
 import { FormikTextField, FormikPasswordField, FormikSubmitButton } from '../../../components/form/index.js'
 import { loginSchema } from '../lib/validationSchemas.js'
 
-// Cloned from the Stitch "Login — FreightLink LK" screen. Public route, no
-// auth required. Uses the shared Formik field kit (src/components/form/)
-// and the existing loginSchema (src/features/auth/lib/validationSchemas.js)
-// for real client-side validation — the login() thunk itself still throws
-// "not implemented yet" (src/features/auth/store/authSlice.js), so submit
-// stays a placeholder rather than dispatching a call that's known to fail.
 function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

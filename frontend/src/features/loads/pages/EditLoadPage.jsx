@@ -9,11 +9,6 @@ import { getLoadById } from '../mockData.js' // TODO: replace with real data
 import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
 import FormField from '../components/FormField.jsx'
 
-// Edit Load — cloned from Stitch screen 8 ("Edit Load — FM-7942"). Real
-// route (/loads/:loadId/edit). Fields are uncontrolled (defaultValue, no
-// useState) — none of them need live reactivity yet, and form
-// validation/submission is explicitly out of scope for now
-// (.claude/rules/frontend-design.md #3).
 function EditLoadPage() {
   const { loadId } = useParams()
   const load = getLoadById(loadId)
