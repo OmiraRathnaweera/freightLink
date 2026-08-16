@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { MapPin, Upload } from 'lucide-react'
 import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
@@ -7,18 +6,16 @@ import Textarea from '../../../components/Textarea.jsx'
 import Button from '../../../components/Button.jsx'
 import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
 import FormField from '../components/FormField.jsx'
+import { MOCK_LIVE_ESTIMATE } from '../mockData.js' // TODO: replace with real data
 
 // Post a Load — cloned from the Stitch "Post a Load — Initial Form" screen.
-// Real route (/loads/new). The Post Load button is intentionally
-// decorative — no backend/apiClient exists yet to actually submit against,
-// matching this project's existing placeholder-page convention.
+// Real route (/loads/new). Fields are uncontrolled (no useState) — none of
+// them need live reactivity yet, and form validation/submission is
+// explicitly out of scope for now (.claude/rules/frontend-design.md #3).
+// The Post Load button is intentionally decorative for the same reason —
+// no backend/apiClient exists yet to actually submit against, matching
+// this project's existing placeholder-page convention.
 function PostLoadPage() {
-  const [origin, setOrigin] = useState('')
-  const [destination, setDestination] = useState('Kandy Central')
-  const [cargoDescription, setCargoDescription] = useState('')
-  const [weight, setWeight] = useState('')
-  const [pickupWindow, setPickupWindow] = useState('')
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -36,12 +33,7 @@ function PostLoadPage() {
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
                   strokeWidth={1.5}
                 />
-                <Input
-                  value={origin}
-                  onChange={(event) => setOrigin(event.target.value)}
-                  placeholder="e.g. Colombo Yard"
-                  className="pl-9"
-                />
+                <Input placeholder="e.g. Colombo Yard" className="pl-9" />
               </div>
             </FormField>
             <FormField label="Dropoff location">
@@ -50,30 +42,21 @@ function PostLoadPage() {
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
                   strokeWidth={1.5}
                 />
-                <Input value={destination} onChange={(event) => setDestination(event.target.value)} className="pl-9" />
+                <Input defaultValue="Kandy Central" className="pl-9" />
               </div>
             </FormField>
           </div>
 
           <FormField label="Cargo Description">
-            <Textarea
-              value={cargoDescription}
-              onChange={(event) => setCargoDescription(event.target.value)}
-              rows={3}
-              placeholder="Describe the cargo — type, packaging, handling notes"
-            />
+            <Textarea rows={3} placeholder="Describe the cargo — type, packaging, handling notes" />
           </FormField>
 
           <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
             <FormField label="Total Weight (kg)">
-              <Input mono type="number" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="15000" />
+              <Input mono type="number" placeholder="15000" />
             </FormField>
             <FormField label="Pickup Window">
-              <Input
-                value={pickupWindow}
-                onChange={(event) => setPickupWindow(event.target.value)}
-                placeholder="14 Aug 2026, 08:00–18:00"
-              />
+              <Input placeholder="14 Aug 2026, 08:00–18:00" />
             </FormField>
           </div>
 
@@ -91,12 +74,9 @@ function PostLoadPage() {
 
         <RateBreakdownCard
           title="Live Estimate"
-          distanceKm={124.2}
-          lineItems={[
-            { label: 'Base Rate', amount: 32000 },
-            { label: 'Fuel Surcharge', amount: 6000 },
-          ]}
-          total={38000}
+          distanceKm={MOCK_LIVE_ESTIMATE.distanceKm}
+          lineItems={MOCK_LIVE_ESTIMATE.lineItems}
+          total={MOCK_LIVE_ESTIMATE.total}
           note="Final rate is confirmed once an agency accepts this load."
         />
       </div>

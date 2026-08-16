@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
 import Card from '../../../components/Card.jsx'
@@ -6,24 +5,18 @@ import Input from '../../../components/Input.jsx'
 import Textarea from '../../../components/Textarea.jsx'
 import Button from '../../../components/Button.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
-import { getLoadById } from '../data/mockLoads.js'
+import { getLoadById } from '../mockData.js' // TODO: replace with real data
 import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
 import FormField from '../components/FormField.jsx'
 
 // Edit Load — cloned from Stitch screen 8 ("Edit Load — FM-7942"). Real
-// route (/loads/:loadId/edit). Only one designed state, so no preview
-// switcher here (see CLAUDE.md > Cloning Stitch screens — switchers are
-// only added where Stitch actually specified multiple states).
+// route (/loads/:loadId/edit). Fields are uncontrolled (defaultValue, no
+// useState) — none of them need live reactivity yet, and form
+// validation/submission is explicitly out of scope for now
+// (.claude/rules/frontend-design.md #3).
 function EditLoadPage() {
   const { loadId } = useParams()
   const load = getLoadById(loadId)
-
-  const [origin, setOrigin] = useState(load?.origin ?? '')
-  const [destination, setDestination] = useState(load?.destination ?? '')
-  const [pickupWindow, setPickupWindow] = useState(load?.pickupWindow ?? '')
-  const [cargoDescription, setCargoDescription] = useState(load?.cargoDescription ?? '')
-  const [weight, setWeight] = useState(load?.weightKg ?? '')
-  const [volume, setVolume] = useState(load?.volumeM3 ?? '')
 
   if (!load) {
     return (
@@ -56,7 +49,7 @@ function EditLoadPage() {
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
                   strokeWidth={1.5}
                 />
-                <Input value={origin} onChange={(event) => setOrigin(event.target.value)} className="pl-9" />
+                <Input defaultValue={load.origin} className="pl-9" />
               </div>
             </FormField>
             <FormField label="Dropoff location">
@@ -65,25 +58,25 @@ function EditLoadPage() {
                   className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
                   strokeWidth={1.5}
                 />
-                <Input value={destination} onChange={(event) => setDestination(event.target.value)} className="pl-9" />
+                <Input defaultValue={load.destination} className="pl-9" />
               </div>
             </FormField>
           </div>
 
           <FormField label="Pickup Window">
-            <Input value={pickupWindow} onChange={(event) => setPickupWindow(event.target.value)} />
+            <Input defaultValue={load.pickupWindow} />
           </FormField>
 
           <FormField label="Cargo Description">
-            <Textarea value={cargoDescription} onChange={(event) => setCargoDescription(event.target.value)} rows={3} />
+            <Textarea defaultValue={load.cargoDescription} rows={3} />
           </FormField>
 
           <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
             <FormField label="Total Weight (kg)">
-              <Input mono type="number" value={weight} onChange={(event) => setWeight(event.target.value)} />
+              <Input mono type="number" defaultValue={load.weightKg} />
             </FormField>
             <FormField label="Volume (m³)">
-              <Input mono type="number" value={volume} onChange={(event) => setVolume(event.target.value)} />
+              <Input mono type="number" defaultValue={load.volumeM3} />
             </FormField>
           </div>
         </Card>

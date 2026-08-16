@@ -1,11 +1,12 @@
-import { LoadStatus } from '../../../lib/enums.js'
+import { LoadStatus } from '../../lib/enums.js'
 
-// Static mock data — there's no backend wiring yet (src/lib/apiClient.js is
-// empty, no loadsSlice exists), so these pages render against this instead
-// of a real API. Reuses the sample data from the Stitch "My Loads —
-// Dashboard" screen (screen 12), with one fix: that screen's export had two
-// different rows both labeled "FM-7935" — renamed the second to FM-7934
-// here rather than treating it as trustworthy sample data.
+// Placeholder data for the Loads feature — there's no backend wiring yet
+// (src/lib/apiClient.js is empty, no loadsSlice exists), so these pages
+// render against this instead of a real API. Reuses the sample data from
+// the Stitch "My Loads — Dashboard" screen, with one fix: that screen's
+// export had two different rows both labeled "FM-7935" — renamed the
+// second to FM-7934 here rather than treating it as trustworthy sample
+// data. TODO: replace with real data once the Loads API exists.
 //
 // Every load gets a full detail payload (not just FM-7942, the one Stitch
 // carried across its Detail screens) so any dashboard row leads to a real,
@@ -108,4 +109,16 @@ export const MOCK_LOADS = [
 
 export function getLoadById(loadId) {
   return MOCK_LOADS.find((load) => load.id === loadId)
+}
+
+// Placeholder "live estimate" for Post a Load — a real pricing service
+// would compute this from the form's route/weight once one exists.
+// TODO: replace with a real rate-estimate API call.
+export const MOCK_LIVE_ESTIMATE = {
+  distanceKm: 124.2,
+  lineItems: [
+    { label: 'Base Rate', amount: 32000 },
+    { label: 'Fuel Surcharge', amount: 6000 },
+  ],
+  total: 38000,
 }

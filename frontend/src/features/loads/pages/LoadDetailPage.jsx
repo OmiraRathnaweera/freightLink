@@ -4,7 +4,9 @@ import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
-import { getLoadById } from '../data/mockLoads.js'
+import { LoadStatus } from '../../../lib/enums.js'
+import { getLoadById } from '../mockData.js' // TODO: replace with real data
+import { getLoadStatusTone } from '../lib/statusTone.js'
 import { formatWeight } from '../lib/format.js'
 import WorkflowTimeline from '../components/WorkflowTimeline.jsx'
 import ActivityLog from '../components/ActivityLog.jsx'
@@ -41,7 +43,7 @@ function LoadDetailPage() {
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-headline-lg text-on-surface">Load {load.id}</h1>
-            <StatusBadge status="Matched" />
+            <StatusBadge tone={getLoadStatusTone(LoadStatus.MATCHED)}>Matched</StatusBadge>
           </div>
           <p className="mt-1 text-body-md text-on-surface-variant">
             {load.origin} → {load.destination}
