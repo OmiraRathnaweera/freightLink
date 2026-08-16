@@ -83,6 +83,36 @@ public enum ErrorCode
     /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
     FILE_IN_USE,
 
+    /// <summary>The requested trip could not be found.</summary>
+    TRIP_NOT_FOUND,
+
+    /// <summary>The requested invoice could not be found.</summary>
+    INVOICE_NOT_FOUND,
+
+    /// <summary>The invoice exists but does not belong to the caller's organization/role.</summary>
+    INVOICE_NOT_OWNED,
+
+    /// <summary>An invoice already exists for this trip (1-to-1 relationship enforced).</summary>
+    INVOICE_ALREADY_EXISTS_FOR_TRIP,
+
+    /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_INVOICE_STATUS_TRANSITION,
+
+    /// <summary>An invalid invoice amount was supplied.</summary>
+    INVALID_INVOICE_AMOUNT,
+
+    /// <summary>The requested dispute could not be found.</summary>
+    DISPUTE_NOT_FOUND,
+
+    /// <summary>The dispute exists but does not belong to the authenticated caller.</summary>
+    DISPUTE_NOT_OWNED,
+
+    /// <summary>A dispute mutation or resolution was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_DISPUTE_STATUS_TRANSITION,
+
+    /// <summary>The dispute has already been resolved or rejected.</summary>
+    DISPUTE_ALREADY_RESOLVED,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's
@@ -100,3 +130,4 @@ public enum ErrorCode
     /// <summary>An unhandled exception was caught by the global exception-handling middleware.</summary>
     INTERNAL_SERVER_ERROR
 }
+
