@@ -169,6 +169,23 @@ builder.Services
         };
     });
 
+// Comma-separated CORS_ORIGINS (e.g. "http://localhost:5173,http://localhost:3000") is the only
+// source for allowed origins — no wildcard fallback, so an empty/unset value denies all cross-origin
+// requests rather than silently allowing everything.
+const string corsPolicyName = "ConfiguredOrigins";
+var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicyName, policy =>
+    {
+        policy.WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -209,6 +226,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors(corsPolicyName);
 
 app.UseAuthentication();
 app.UseAuthorization();
