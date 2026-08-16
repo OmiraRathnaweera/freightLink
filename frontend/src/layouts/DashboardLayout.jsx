@@ -1,8 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Building2, Menu, Package, Receipt, Route as RouteIcon, Truck, Workflow, X } from 'lucide-react'
+import { Building2, LogOut, Menu, Package, Receipt, Route as RouteIcon, Truck, Workflow, X } from 'lucide-react'
 import { SidebarProvider } from './SidebarContext.jsx'
 import { useSidebar } from '../hooks/useSidebar.js'
 import { useEscapeKey } from '../hooks/useEscapeKey.js'
+import { useAppDispatch } from '../hooks/useAppDispatch.js'
+import { useAppSelector } from '../hooks/useAppSelector.js'
+import { logout } from '../features/auth/store/authSlice.js'
+import { isRouteAllowedForRole } from '../features/auth/lib/roleAccess.js'
 import { cx } from '../lib/cx.js'
 
 // This is a layout route (see src/routes/AppRoutes.jsx): react-router
@@ -27,7 +31,12 @@ import { cx } from '../lib/cx.js'
 //
 // Nav items map to this app's real 5 feature routes, not either of the
 // Stitch Loads-screens' own nav lists (both reference pages that don't
-// exist in this app).
+// exist in this app). Visibility is filtered per role via
+// isRouteAllowedForRole below, reading the same centralized
+// src/features/auth/lib/roleAccess.js map ProtectedRoute uses — so the
+// sidebar can never link to a section the signed-in role would just get
+// bounced from, and there's one place (not two) to update when a role
+// gains access to a route.
 const NAV_ITEMS = [
   { to: '/loads', label: 'Loads', icon: Package },
   { to: '/agencies', label: 'Agencies', icon: Building2 },
@@ -46,8 +55,12 @@ function DashboardLayout() {
 
 function DashboardLayoutContent() {
   const { isOpen, toggleSidebar, closeSidebar } = useSidebar()
+  const dispatch = useAppDispatch()
+  const { user, role } = useAppSelector((state) => state.auth)
 
   useEscapeKey(isOpen, closeSidebar)
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => isRouteAllowedForRole(role, item.to))
 
   return (
     <div className="flex min-h-screen bg-background text-on-background lg:flex-row">
@@ -82,7 +95,7 @@ function DashboardLayoutContent() {
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -101,6 +114,17 @@ function DashboardLayoutContent() {
             </NavLink>
           ))}
         </nav>
+        <div className="flex items-center justify-between gap-2 border-t border-primary-container px-4 py-3">
+          <span className="truncate text-body-md text-on-primary/70">{user?.email}</span>
+          <button
+            type="button"
+            onClick={() => dispatch(logout())}
+            aria-label="Log out"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-on-primary/70 hover:bg-primary-container hover:text-on-primary"
+          >
+            <LogOut className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

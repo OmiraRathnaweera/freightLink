@@ -1,6 +1,5 @@
 import axios from 'axios'
-import { store } from '../../store/index.js'
-import { refreshAccessToken, logout } from '../../features/auth/store/authSlice.js'
+import { clearPersistedRefreshToken } from '../../features/auth/lib/tokenStorage.js'
 
 /**
  * Configured Axios instance for every API call in the app. `baseURL` must
@@ -31,7 +30,28 @@ function normalizeError(error) {
   return normalized
 }
 
-axiosClient.interceptors.request.use((config) => {
+// store/index.js and authSlice.js both transitively import this file
+// (authSlice.js -> authApi.js -> api.js -> axiosClient.js), so importing
+// them statically here creates a real circular dependency. Depending on
+// which module the app happens to touch first elsewhere, that cycle can
+// resolve in an order where store/index.js reads authSlice's default
+// export before authSlice.js has finished initializing it — exactly the
+// "Cannot access 'authReducer' before initialization" crash this file
+// used to cause once DashboardLayout.jsx started importing `logout` from
+// authSlice.js (which made authSlice.js the first-touched module instead
+// of store/index.js). Dynamic import() defers resolution past the
+// synchronous module-init phase entirely, sidestepping the cycle
+// regardless of import order elsewhere in the app.
+async function getAuthModules() {
+  const [{ store }, authSlice] = await Promise.all([
+    import('../../store/index.js'),
+    import('../../features/auth/store/authSlice.js'),
+  ])
+  return { store, refreshAccessToken: authSlice.refreshAccessToken, clearAuth: authSlice.clearAuth }
+}
+
+axiosClient.interceptors.request.use(async (config) => {
+  const { store } = await getAuthModules()
   const { accessToken } = store.getState().auth
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`
@@ -39,19 +59,42 @@ axiosClient.interceptors.request.use((config) => {
   return config
 })
 
+// /auth/login and /auth/refresh are excluded from the refresh-retry branch
+// below — a 401 from either of those IS the failure (wrong credentials, or
+// a truly-dead refresh token), not a stale-access-token case that a
+// refresh could fix. Without this check, a failed login would trigger a
+// pointless extra /auth/refresh call before failing anyway.
+function isAuthEndpoint(url) {
+  return typeof url === 'string' && (url.includes('/auth/login') || url.includes('/auth/refresh'))
+}
+
 axiosClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
 
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !isAuthEndpoint(originalRequest.url)
+    ) {
       originalRequest._retry = true
+      const { store, refreshAccessToken, clearAuth } = await getAuthModules()
       try {
         const { accessToken } = await store.dispatch(refreshAccessToken()).unwrap()
         originalRequest.headers.Authorization = `Bearer ${accessToken}`
         return axiosClient(originalRequest)
       } catch {
-        store.dispatch(logout())
+        // Dispatch the synchronous clearAuth reducer, not the async logout
+        // thunk — logout() would call authApi.logout() through this same
+        // axios instance with an already-dead token, 401-ing again and
+        // re-entering this interceptor on a fresh (non-_retry) request,
+        // looping. Any mounted ProtectedRoute reacts to isAuthenticated
+        // flipping false and redirects to /login on its own — no
+        // imperative navigation needed here.
+        store.dispatch(clearAuth())
+        clearPersistedRefreshToken()
       }
     }
 

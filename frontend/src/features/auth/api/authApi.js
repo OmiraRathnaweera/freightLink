@@ -24,6 +24,19 @@ export async function getCurrentUser() {
 }
 
 /**
+ * POST /auth/refresh — exchanges a refresh token for a new access +
+ * refresh token pair (rotates the old one).
+ */
+export async function refresh(refreshToken) {
+  return api.post('/auth/refresh', { refreshToken })
+}
+
+/** POST /auth/logout — revokes the caller's refresh token. */
+export async function logout() {
+  return api.post('/auth/logout')
+}
+
+/**
  * Example login mutation. Deliberately does not dispatch into
  * `authSlice.js` — `POST /auth/login` only returns tokens, so writing a
  * full session (user/role) into Redux needs a follow-up `getCurrentUser()`
