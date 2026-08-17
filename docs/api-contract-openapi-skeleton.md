@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 7**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 8**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -18,6 +18,7 @@
 | 5 | 13 Aug 2026 | Load cancellation changed from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial state-transition update), reserving `POST` for resource creation. No change to auth, ownership, or request/response shape. |
 | 6 | 13 Aug 2026 | Load Management hardening: `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now genuinely use `409 LOAD_CONCURRENCY_CONFLICT` (Postgres `xmin` optimistic concurrency), superseding the earlier claim that no Load endpoint used `409`; `POST /loads` retries internally on a `ReferenceCode` collision before returning `409 LOAD_REFERENCE_CODE_CONFLICT`; `POST /loads`/`PUT /loads/{id}` reject identical pickup/dropoff coordinates with `400 LOAD_PICKUP_DROPOFF_IDENTICAL`; `GET /loads` rejects an out-of-range `page`/`pageSize` combination with `400 LOAD_PAGE_OUT_OF_RANGE` and now paginates deterministically (ties broken by `loadId`) and case-insensitive `search` matching is index-backed (`pg_trgm`). No path, role, or response-shape changes. |
 | 7 | 15 Aug 2026 | Component A file attachments implemented: `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` link an already-uploaded file (from `POST /files/single`) to a load — never re-implements Cloudinary upload/delete, only the `LoadFile` metadata linkage. Also closes a documentation gap (no functional change): `GET /loads` has always supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were documented until now — added the missing `components/parameters` entries and wired them into the path. |
+| 8 | 17 Aug 2026 | `LoadResponse`/`LoadListItem` enriched with `shipperName` (server-resolved from `User.FullName`, joined via the existing `Load.ShipperUser` navigation — no new `/users/{id}` endpoint was added or is planned) so Admin views of loads owned by other Shippers can show a display name instead of only a raw `shipperUserId`. `GET /loads/{id}` also now returns the load's full `LoadStatusHistory` audit trail as `statusHistory` (newest first) directly on the response — this **supersedes** the `GET /loads/{id}/status-history` row below, which will not be built as a separate endpoint. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` responses leave `statusHistory` as an empty array (the caller already knows the single transition it just made). Also documents the frontend side for the first time: the React app's Load Management screens (`frontend/src/features/loads`) and full auth flow (`frontend/src/features/auth`) are now wired against the real backend — `POST/GET /loads`, `GET/PUT /loads/{id}`, `PATCH /loads/{id}/cancel`, the `/loads/{id}/files` attach flow, and all of Section 4.1 (`/auth/*`) — via TanStack Query + Axios (see `frontend/docs/load-management-api.md`). No frontend work exists yet against Sections 4.3–4.6 (Agencies, Assignments/Trips, Billing, Workflows), which also remain unimplemented on the backend. |
 
 ---
 
@@ -142,11 +143,11 @@ Query parameters, applied consistently across all `GET` list endpoints:
 |---|---|---|---|
 | POST | `/loads` | Create a load (full form — React; quick-post — Flutter) | Shipper |
 | GET | `/loads` | Search/filter/sort/paginate loads | Shipper (own), Admin (all) |
-| GET | `/loads/{id}` | Load detail incl. status timeline and current `workflowRunId` (if any) | Shipper (own), Admin |
+| GET | `/loads/{id}` | Load detail incl. full status-change history (`statusHistory`, newest first) and current `workflowRunId` (if any) | Shipper (own), Admin |
 | PUT | `/loads/{id}` | Edit a load (only while `Draft`/`Posted`) | Shipper (own) |
 | PATCH | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
 | POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper *(not yet implemented)* |
-| GET | `/loads/{id}/status-history` | Full status timeline | Shipper (own), Admin *(not yet implemented)* |
+| ~~GET~~ | ~~`/loads/{id}/status-history`~~ | **Superseded, Rev. 8** — never built as a separate endpoint; the full timeline now rides along on `GET /loads/{id}`'s `statusHistory` field instead | — |
 | POST | `/loads/{id}/files` | Attach an already-uploaded file (`POST /files/single`) to a load, classified `Manifest`/`Invoice`/`CargoPhoto`/`Other` | Shipper (own) |
 | GET | `/loads/{id}/files` | List attached files | Shipper (own), Admin |
 | DELETE | `/loads/{id}/files/{fileId}` | Detach a file (removes only the `LoadFile` link; the underlying upload is untouched) | Shipper (own) |
@@ -164,6 +165,8 @@ Query parameters, applied consistently across all `GET` list endpoints:
 > **Implemented in Rev. 7:** `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` are live in the new `LoadFilesController`/`LoadFileService`. Attach only ever references an already-uploaded file by its Cloudinary `publicId` (obtained from `POST /files/single` beforehand) plus a `fileType` classification — it never re-accepts url/size/contentType from the client, since those already live durably on the `UploadedFile` row created by that prior upload call. Attach can fail with `404 LOAD_NOT_FOUND` (load), `403 LOAD_NOT_OWNED` (not the load's Shipper), `404 LOAD_FILE_UPLOAD_NOT_FOUND` (unknown `publicId`), `403 FILE_NOT_OWNED` (the upload isn't the caller's), or `409 FILE_IN_USE` (the upload is already attached elsewhere — the same code `DELETE /files/{publicId}` already used the other direction). List is Shipper (own) or Admin (any); detach is Shipper (own) only, `404 LOAD_FILE_NOT_FOUND` if the attachment id doesn't exist under that load, `204` on success. Detach removes only the `LoadFile` link — the underlying upload stays deletable afterward via the existing `DELETE /files/{publicId}` once nothing attaches to it.
 >
 > **Documentation gap closed in Rev. 7 (no functional change):** `GET /loads` has supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were ever added to this doc's `components/parameters`/path — the other six are now documented too.
+>
+> **Implemented in Rev. 8:** `LoadResponse` and `LoadListItem` both gained `shipperName` — resolved server-side from `User.FullName` via the existing `Load.ShipperUser` navigation (an `Include` on the single-row fetches, a JOIN on the list query — no N+1), so an Admin viewing loads across multiple Shippers sees a display name rather than only a raw `shipperUserId`. Falls back to `"Unknown"` if the owning user row can't be resolved. This is a **read-side enrichment only** — no `/users/{id}` lookup endpoint or general user-directory API was added, matching the smallest-change decision recorded for this feature. Separately, `GET /loads/{id}` now also returns `statusHistory` (the load's full `LoadStatusHistory` trail, newest first, via a second `Include` on the same query) — this fulfills the `status-history` row above, which is retired as a would-be separate endpoint rather than built. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` all still return `LoadResponse`, but leave `statusHistory` as `[]`, since a caller of those three already knows the one transition it just triggered.
 
 ### 4.3 Component B — Agency & Fleet Management (Owner: D.B.A.H.W. Bandara)
 
@@ -270,7 +273,7 @@ info:
     FreightMatch LK — freight-matching platform API (SE3090 Assignment 1).
     Consumed identically by the React (Admin / Shipper) and Flutter
     (Shipper-lightweight, Agency Staff, Driver) clients.
-  version: 0.7.0-sprint2-loadfiles-rev7
+  version: 0.8.0-sprint2-loadstatushistory-rev8
 servers:
   - url: /api/v1
     description: Relative base path (host resolved per environment)
@@ -423,7 +426,7 @@ paths:
       - $ref: '#/components/parameters/IdPathParam'
     get:
       tags: [Loads]
-      summary: Load detail incl. status timeline and current workflowRunId
+      summary: Load detail incl. full statusHistory (newest first) and current workflowRunId
       x-allowed-roles: [Shipper, Admin]
       x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED otherwise); Admin may fetch any load"
       responses:
