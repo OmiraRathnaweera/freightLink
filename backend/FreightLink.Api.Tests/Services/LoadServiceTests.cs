@@ -248,6 +248,49 @@ public class LoadServiceTests
         Assert.Equal(created.CargoDescription, result.CargoDescription);
         Assert.Equal(created.ReferenceCode, result.ReferenceCode);
         Assert.Equal("Jane Shipper", result.ShipperName);
+        var historyRow = Assert.Single(result.StatusHistory);
+        Assert.Null(historyRow.FromStatus);
+        Assert.Equal("Draft", historyRow.ToStatus);
+        Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
+    }
+
+    /// <summary>
+    /// Every recorded status transition is included, newest first — proving the single-load fetch
+    /// surfaces the load's full audit trail, not just its most recent row.
+    /// </summary>
+    [Fact]
+    public async Task GetByIdAsync_ReturnsStatusHistory_NewestFirst()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+        await sut.CancelAsync(created.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" });
+
+        var result = await sut.GetByIdAsync(created.LoadId, shipperUserId, UserRole.Shipper);
+
+        Assert.Equal(2, result.StatusHistory.Count);
+        Assert.Equal("Cancelled", result.StatusHistory[0].ToStatus);
+        Assert.Equal("Draft", result.StatusHistory[0].FromStatus);
+        Assert.Equal("Shipper changed plans", result.StatusHistory[0].Reason);
+        Assert.Null(result.StatusHistory[1].FromStatus);
+        Assert.Equal("Draft", result.StatusHistory[1].ToStatus);
+    }
+
+    /// <summary>
+    /// Create/Update/Cancel responses leave StatusHistory empty — only the single-load fetch populates
+    /// the full audit trail (see <see cref="LoadResponseDto.StatusHistory"/>).
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_ReturnsEmptyStatusHistory()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+
+        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+
+        Assert.Empty(result.StatusHistory);
     }
 
     /// <summary>Fetching a nonexistent load throws a 404-shaped ApiException.</summary>

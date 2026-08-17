@@ -69,4 +69,11 @@ public class LoadResponseDto
 
     /// <summary>When the load was last updated.</summary>
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// The load's full status-change audit trail, newest first. Only populated by
+    /// <c>GET /api/v1/loads/{id}</c> — <c>POST</c>/<c>PUT</c>/<c>PATCH .../cancel</c> responses leave
+    /// this as an empty list, since the caller already knows the single transition it just made.
+    /// </summary>
+    public List<LoadStatusHistoryResponseDto> StatusHistory { get; set; } = new();
 }

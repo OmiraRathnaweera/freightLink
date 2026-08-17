@@ -241,6 +241,9 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
         Assert.Equal("Integration Tester", body!.ShipperName);
+        var historyRow = Assert.Single(body.StatusHistory);
+        Assert.Equal("Draft", historyRow.ToStatus);
+        Assert.Null(historyRow.FromStatus);
     }
 
     /// <summary>A Shipper cannot fetch another Shipper's load — 403, not 404, per the contract's ownership-vs-not-found distinction.</summary>

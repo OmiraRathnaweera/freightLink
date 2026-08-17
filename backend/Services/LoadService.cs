@@ -116,6 +116,7 @@ public class LoadService : ILoadService
     {
         var load = await _dbContext.Loads.AsNoTracking()
             .Include(l => l.ShipperUser)
+            .Include(l => l.StatusHistory)
             .FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
         if (load is null)
@@ -128,7 +129,12 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
-        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName));
+        var statusHistory = load.StatusHistory
+            .OrderByDescending(h => h.ChangedAt)
+            .Select(MapToStatusHistoryResponse)
+            .ToList();
+
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory);
     }
 
     /// <inheritdoc />
@@ -389,7 +395,11 @@ public class LoadService : ILoadService
     /// <summary>Maps a <see cref="Load"/> entity to its full wire-facing representation.</summary>
     /// <param name="load">The load entity.</param>
     /// <param name="shipperName">The resolved display name of the load's owning Shipper.</param>
-    private static LoadResponseDto MapToResponse(Load load, string shipperName) => new()
+    /// <param name="statusHistory">
+    /// The load's status-change audit trail, newest first — only supplied by <see cref="GetByIdAsync"/>;
+    /// every other caller leaves this as an empty list (see <see cref="LoadResponseDto.StatusHistory"/>).
+    /// </param>
+    private static LoadResponseDto MapToResponse(Load load, string shipperName, List<LoadStatusHistoryResponseDto>? statusHistory = null) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -412,7 +422,19 @@ public class LoadService : ILoadService
         // component (Component D) — left null here rather than implemented out of scope.
         WorkflowRunId = null,
         CreatedAt = load.CreatedAt,
-        UpdatedAt = load.UpdatedAt
+        UpdatedAt = load.UpdatedAt,
+        StatusHistory = statusHistory ?? new List<LoadStatusHistoryResponseDto>()
+    };
+
+    /// <summary>Maps a <see cref="LoadStatusHistory"/> entity to its wire-facing representation.</summary>
+    private static LoadStatusHistoryResponseDto MapToStatusHistoryResponse(LoadStatusHistory history) => new()
+    {
+        LoadStatusHistoryId = history.LoadStatusHistoryId,
+        FromStatus = history.FromStatus?.ToString(),
+        ToStatus = history.ToStatus.ToString(),
+        Reason = history.Reason,
+        ChangedByUserId = history.ChangedByUserId,
+        ChangedAt = history.ChangedAt
     };
 
     /// <summary>Maps a <see cref="Load"/> entity to its lightweight list-row representation.</summary>
