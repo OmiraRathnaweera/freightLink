@@ -44,6 +44,9 @@ public class AppDbContext : DbContext
     public DbSet<ToolCall> ToolCalls => Set<ToolCall>();
     public DbSet<ApprovalDecision> ApprovalDecisions => Set<ApprovalDecision>();
 
+    public DbSet<FuelPriceRate> FuelPriceRates => Set<FuelPriceRate>();
+    public DbSet<VehicleClassEfficiency> VehicleClassEfficiencies => Set<VehicleClassEfficiency>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
