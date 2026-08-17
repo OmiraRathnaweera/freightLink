@@ -1,111 +1,202 @@
-:root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+@import 'tailwindcss';
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+/*
+ * Design tokens sourced from DESIGN.md (FreightLink LK design system).
+ * Every value below is copied verbatim from either the DESIGN.md front-matter
+ * table (colors/typography/rounded/spacing) or its prose (a few extra
+ * neutrals the prose names by hex but the front-matter table doesn't list —
+ * marked below). Do not hand-tune these; edit DESIGN.md and re-sync instead.
+ */
+@theme {
+  /* --- Colors: 1:1 copy of DESIGN.md front-matter `colors` --- */
+  --color-surface: #f7f9fb;
+  --color-surface-dim: #d8dadc;
+  --color-surface-bright: #f7f9fb;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f2f4f6;
+  --color-surface-container: #eceef0;
+  --color-surface-container-high: #e6e8ea;
+  --color-surface-container-highest: #e0e3e5;
+  --color-on-surface: #191c1e;
+  --color-on-surface-variant: #45474c;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eff1f3;
+  --color-outline: #75777d;
+  --color-outline-variant: #c5c6cd;
+  --color-surface-tint: #545f73;
+  --color-primary: #091426;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #1e293b;
+  --color-on-primary-container: #8590a6;
+  --color-inverse-primary: #bcc7de;
+  --color-secondary: #515f74;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #d5e3fd;
+  --color-on-secondary-container: #57657b;
+  --color-tertiary: #1e1200;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #35260c;
+  --color-on-tertiary-container: #a38c6a;
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+  --color-primary-fixed: #d8e3fb;
+  --color-primary-fixed-dim: #bcc7de;
+  --color-on-primary-fixed: #111c2d;
+  --color-on-primary-fixed-variant: #3c475a;
+  --color-secondary-fixed: #d5e3fd;
+  --color-secondary-fixed-dim: #b9c7e0;
+  --color-on-secondary-fixed: #0d1c2f;
+  --color-on-secondary-fixed-variant: #3a485c;
+  --color-tertiary-fixed: #fadfb8;
+  --color-tertiary-fixed-dim: #ddc39d;
+  --color-on-tertiary-fixed: #271902;
+  --color-on-tertiary-fixed-variant: #564427;
+  --color-background: #f7f9fb;
+  --color-on-background: #191c1e;
+  --color-surface-variant: #e0e3e5;
+  --color-status-blue-bg: #eff6ff;
+  --color-status-blue-text: #1d4ed8;
+  --color-status-amber-bg: #fffbeb;
+  --color-status-amber-text: #b45309;
+  --color-status-green-bg: #f0fdf4;
+  --color-status-green-text: #15803d;
+  --color-status-red-bg: #fef2f2;
+  --color-status-red-text: #b91c1c;
+  --color-slate-border: #e2e8f0; /* = Slate-200, per "Elevation & Depth" */
+  --color-slate-text-muted: #64748b;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Extra neutrals named by hex in DESIGN.md's prose (Elevation & Depth /
+     Input Fields / Buttons) but not present in the front-matter color
+     table. Kept as their literal Tailwind-slate names since that's how the
+     prose refers to them. */
+  --color-slate-50: #f8fafc; /* row striping / prose "background" reference */
+  --color-slate-100: #f1f5f9; /* row/button hover background */
+  --color-slate-300: #cbd5e1; /* input border + secondary button border */
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  /* --- Fonts: DESIGN.md's tri-font strategy --- */
+  /* Overrides Tailwind's default `font-sans` (body/UI workhorse) and
+     `font-mono` (hard data: IDs, LKR, km/kg, timestamps) so the existing
+     utilities carry the right family everywhere with no new class names. */
+  --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  /* New: `font-heading` utility for Archivo (page titles, nav, table headers). */
+  --font-heading: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+
+  /* --- Shadow: the one soft elevation shadow DESIGN.md defines --- */
+  --shadow-soft: 0 2px 4px rgba(30, 41, 59, 0.05);
+
+  /* --- Motion: not in DESIGN.md — added for the trust-strip logo marquee.
+     Keep this the only animation token; DESIGN.md's brief explicitly favors
+     flat, low-motion "Functional Brutalism" over visual flair. --- */
+  --animate-marquee: marquee 32s linear infinite;
+
+  /* --- Spacing: named aliases from DESIGN.md's `spacing` table --- */
+  /* `spacing.base` (4px) is NOT redefined here — it's already exactly
+     Tailwind's default --spacing multiplier, so p-1/gap-2/etc. already
+     match the 4px grid. These are the *named* tokens layered on top. */
+  --spacing-gutter: 1rem; /* 16px grid gutter */
+  --spacing-container-margin: 1.5rem; /* 24px outer container margin */
+  --spacing-table-cell-py: 0.75rem; /* 12px */
+  --spacing-table-cell-px: 1rem; /* 16px */
+  --spacing-form-gap: 1.25rem; /* 20px */
+
+  /* --- Radius: intentionally NOT overridden --- */
+  /* DESIGN.md's `rounded` scale (sm 2px / DEFAULT 4px / md 6px / lg 8px /
+     xl 12px / full) is byte-for-byte Tailwind v4's default radius scale.
+     Use the built-in rounded-sm / rounded / rounded-md / rounded-lg /
+     rounded-xl / rounded-full utilities directly — see the component-level
+     radius mapping in CLAUDE.md / the primitives themselves. */
+}
+
+@layer base {
+  body {
+    margin: 0;
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+/* Backs --animate-marquee above. The track renders its content twice back
+   to back (see TrustStrip.jsx) and this shifts it exactly one copy's width
+   (-50%), so the loop point is seamless. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
   }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  to {
+    transform: translateX(-50%);
   }
 }
 
-body {
-  margin: 0;
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
 }
 
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+/*
+ * Named typography styles from DESIGN.md's `typography` table. Tailwind's
+ * built-in text-size utilities don't bundle family + weight + leading +
+ * tracking together, so each named style becomes its own utility class via
+ * Tailwind v4's `@utility` — usable directly as e.g. className="text-headline-lg".
+ */
+@utility text-headline-lg {
+  font-family: var(--font-heading);
+  font-size: 1.875rem; /* 30px */
+  font-weight: 700;
+  line-height: 2.25rem; /* 36px */
+  letter-spacing: -0.02em;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
+@utility text-headline-md {
+  font-family: var(--font-heading);
+  font-size: 1.5rem; /* 24px */
+  font-weight: 600;
+  line-height: 2rem; /* 32px */
+  letter-spacing: -0.01em;
+}
+
+@utility text-body-lg {
+  font-family: var(--font-sans);
+  font-size: 1rem; /* 16px */
+  font-weight: 400;
+  line-height: 1.5rem; /* 24px */
+}
+
+@utility text-body-md {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 400;
+  line-height: 1.375rem; /* 22px */
+}
+
+@utility text-data-mono {
+  font-family: var(--font-mono);
+  font-size: 0.875rem; /* 14px */
   font-weight: 500;
-  color: var(--text-h);
+  line-height: 1.25rem; /* 20px */
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
+/* Archivo, bold, uppercase, tracked — matches both the `label-caps` token
+   and the Data Tables spec ("Headers use Archivo at 12px, Uppercase, with
+   0.05em tracking"). */
+@utility text-label-caps {
+  font-family: var(--font-heading);
+  font-size: 0.75rem; /* 12px */
+  font-weight: 700;
+  line-height: 1rem; /* 16px */
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
+@utility text-status-badge {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem; /* 13px */
+  font-weight: 600;
+  line-height: 1.125rem; /* 18px */
 }

@@ -239,6 +239,11 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
+        Assert.Equal("Integration Tester", body!.ShipperName);
+        var historyRow = Assert.Single(body.StatusHistory);
+        Assert.Equal("Draft", historyRow.ToStatus);
+        Assert.Null(historyRow.FromStatus);
     }
 
     /// <summary>A Shipper cannot fetch another Shipper's load — 403, not 404, per the contract's ownership-vs-not-found distinction.</summary>
@@ -315,6 +320,7 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
         Assert.True(page!.TotalItems >= 2);
+        Assert.All(page.Items, item => Assert.False(string.IsNullOrWhiteSpace(item.ShipperName)));
     }
 
     /// <summary>
@@ -397,6 +403,8 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
+        Assert.Equal("Integration Tester", updated!.ShipperName);
     }
 
     /// <summary>A Shipper cannot edit another Shipper's load — 403.</summary>
@@ -471,6 +479,7 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var cancelled = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
         Assert.Equal("Cancelled", cancelled!.Status);
+        Assert.Equal("Integration Tester", cancelled.ShipperName);
     }
 
     /// <summary>An Admin is blocked from cancelling a Shipper's load — role gating, never reaches the service.</summary>
