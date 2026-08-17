@@ -1,15 +1,21 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Eye, MoreVertical, Pencil } from 'lucide-react'
+import { Ban, Eye, MoreVertical, Pencil } from 'lucide-react'
 import { useClickOutside } from '../../../hooks/useClickOutside.js'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
+import { isLoadCancellable, isLoadEditable } from '../lib/loadPermissions.js'
+import CancelLoadDialog from './CancelLoadDialog.jsx'
 
-// My Loads dashboard row actions — a feature component since the menu
-// items (View/Edit) and their routes are specific to the Loads domain
-// (.claude/rules/frontend-design.md #1). The triple-dot button opens a
-// small popup menu rather than acting as a disguised single Edit link.
-function RowActionsMenu({ loadId }) {
+// Load Control row actions — a feature component since the menu items
+// (View/Edit/Cancel), their routes, and their status-gating are specific
+// to the Loads domain (.claude/rules/frontend-design.md #1). Edit/Cancel
+// are only rendered when the load's current status allows them
+// (isLoadEditable/isLoadCancellable — see docs/load-management-api.md
+// Section 2), not just disabled, since a stale/cached status could still
+// get a 422 from the backend regardless.
+function RowActionsMenu({ loadId, status }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isCancelOpen, setIsCancelOpen] = useState(false)
   const containerRef = useRef(null)
 
   const close = () => setIsOpen(false)
@@ -42,17 +48,34 @@ function RowActionsMenu({ loadId }) {
             <Eye className="h-4 w-4" strokeWidth={1.5} />
             View
           </Link>
-          <Link
-            to={`/loads/${loadId}/edit`}
-            role="menuitem"
-            onClick={close}
-            className="flex items-center gap-2 px-3 py-2 text-body-md text-on-surface hover:bg-slate-100"
-          >
-            <Pencil className="h-4 w-4" strokeWidth={1.5} />
-            Edit
-          </Link>
+          {isLoadEditable(status) && (
+            <Link
+              to={`/loads/${loadId}/edit`}
+              role="menuitem"
+              onClick={close}
+              className="flex items-center gap-2 px-3 py-2 text-body-md text-on-surface hover:bg-slate-100"
+            >
+              <Pencil className="h-4 w-4" strokeWidth={1.5} />
+              Edit
+            </Link>
+          )}
+          {isLoadCancellable(status) && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close()
+                setIsCancelOpen(true)
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-md text-status-red-text hover:bg-slate-100"
+            >
+              <Ban className="h-4 w-4" strokeWidth={1.5} />
+              Cancel
+            </button>
+          )}
         </div>
       )}
+      {isCancelOpen && <CancelLoadDialog loadId={loadId} onClose={() => setIsCancelOpen(false)} />}
     </div>
   )
 }

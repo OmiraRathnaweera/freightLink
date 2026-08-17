@@ -19,12 +19,12 @@ function RouteMapCard({ origin, destination, distanceKm, remainingKm }) {
           <span className="text-label-caps text-on-surface-variant">{destination}</span>
         </div>
       </div>
-      <div className="flex items-center justify-between border-t border-slate-border px-4 py-3">
+      <Card.Footer className="flex items-center justify-between">
         <span className="text-body-md text-on-surface-variant">Distance</span>
         <span className="text-data-mono text-on-surface">
           {distanceKm} km{remainingKm != null ? ` · ${remainingKm} km remaining` : ''}
         </span>
-      </div>
+      </Card.Footer>
     </Card>
   )
 }

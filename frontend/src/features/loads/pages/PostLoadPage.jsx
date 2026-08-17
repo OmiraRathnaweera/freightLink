@@ -1,79 +1,125 @@
-import { MapPin, Upload } from 'lucide-react'
+import { Formik, Form } from 'formik'
+import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
-import Input from '../../../components/Input.jsx'
-import Textarea from '../../../components/Textarea.jsx'
-import Button from '../../../components/Button.jsx'
-import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
-import FormField from '../components/FormField.jsx'
-import { MOCK_LIVE_ESTIMATE } from '../mockData.js' // TODO: replace with real data
+import {
+  FormikCheckbox,
+  FormikDateTimeField,
+  FormikNumberField,
+  FormikSubmitButton,
+  FormikTextArea,
+  FormikTextField,
+} from '../../../components/form/index.js'
+import { useCreateLoadMutation } from '../api/loadsApi.js'
+import { createLoadSchema } from '../lib/validationSchemas.js'
+import { getLoadErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
+import { fromDateTimeLocalInput } from '../lib/format.js'
+import { LoadStatus } from '../../../lib/enums.js'
 
+const INITIAL_VALUES = {
+  cargoDescription: '',
+  weightKg: '',
+  volumeM3: '',
+  pickupAddress: '',
+  pickupLat: '',
+  pickupLng: '',
+  dropoffAddress: '',
+  dropoffLat: '',
+  dropoffLng: '',
+  pickupWindowStart: '',
+  pickupWindowEnd: '',
+  postImmediately: false,
+}
 
+// Post a Load — POST /api/v1/loads (docs/load-management-api.md Section
+// 3.1). Cloned from the Stitch "Post a Load" screen, rebuilt as a real
+// Formik form against createLoadSchema (mirrors the backend's exact field
+// constraints) instead of the previous uncontrolled placeholder inputs.
 function PostLoadPage() {
+  const navigate = useNavigate()
+  const createMutation = useCreateLoadMutation()
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="LOADS"
-        title="Post a Load"
-        description="Give agencies the details they need to bid on your shipment."
-      />
+      <PageHeader eyebrow="LOADS" title="Post a Load" description="Give agencies the details they need to bid on your shipment." />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="space-y-form-gap lg:col-span-2">
-          <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-            <FormField label="Pickup location">
-              <div className="relative">
-                <MapPin
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
-                  strokeWidth={1.5}
-                />
-                <Input placeholder="e.g. Colombo Yard" className="pl-9" />
+      <Formik
+        initialValues={INITIAL_VALUES}
+        validationSchema={createLoadSchema}
+        onSubmit={async (values, { setErrors, setStatus }) => {
+          setStatus(undefined)
+          try {
+            const payload = {
+              ...values,
+              pickupWindowStart: fromDateTimeLocalInput(values.pickupWindowStart),
+              pickupWindowEnd: fromDateTimeLocalInput(values.pickupWindowEnd),
+            }
+            const created = await createMutation.mutateAsync(payload)
+            toast.success(created.status === LoadStatus.POSTED ? 'Load posted' : 'Load saved as draft')
+            navigate(`/loads/${created.loadId}`)
+          } catch (error) {
+            if (error.code === 'VALIDATION_ERROR') {
+              setErrors(mapValidationDetailsToFormik(error.details))
+            } else {
+              setStatus(getLoadErrorMessage(error))
+            }
+          }
+        }}
+      >
+        {({ status }) => (
+          <Form>
+            <Card className="space-y-form-gap">
+              {status && (
+                <div className="rounded-md border border-status-red-text bg-status-red-bg px-3 py-2 text-body-md text-status-red-text">
+                  {status}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
+                <FormikTextField name="pickupAddress" label="Pickup Address" placeholder="123 Galle Rd, Colombo 03" />
+                <FormikTextField name="dropoffAddress" label="Dropoff Address" placeholder="45 Kandy Rd, Kandy" />
               </div>
-            </FormField>
-            <FormField label="Dropoff location">
-              <div className="relative">
-                <MapPin
-                  className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
-                  strokeWidth={1.5}
-                />
-                <Input defaultValue="Kandy Central" className="pl-9" />
+
+              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
+                <FormikNumberField name="pickupLat" label="Pickup Latitude" mono placeholder="6.9271" />
+                <FormikNumberField name="pickupLng" label="Pickup Longitude" mono placeholder="79.8612" />
               </div>
-            </FormField>
-          </div>
+              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
+                <FormikNumberField name="dropoffLat" label="Dropoff Latitude" mono placeholder="7.2906" />
+                <FormikNumberField name="dropoffLng" label="Dropoff Longitude" mono placeholder="80.6337" />
+              </div>
 
-          <FormField label="Cargo Description">
-            <Textarea rows={3} placeholder="Describe the cargo — type, packaging, handling notes" />
-          </FormField>
+              <FormikTextArea
+                name="cargoDescription"
+                label="Cargo Description"
+                placeholder="Describe the cargo — type, packaging, handling notes"
+                rows={3}
+              />
 
-          <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-            <FormField label="Total Weight (kg)">
-              <Input mono type="number" placeholder="15000" />
-            </FormField>
-            <FormField label="Pickup Window">
-              <Input placeholder="14 Aug 2026, 08:00–18:00" />
-            </FormField>
-          </div>
+              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
+                <FormikNumberField name="weightKg" label="Weight (kg)" mono placeholder="1200.5" />
+                <FormikNumberField name="volumeM3" label="Volume (m³)" mono placeholder="8.25" />
+              </div>
 
-          <FormField label="Load Documents">
-            <div className="flex flex-col items-center justify-center gap-2 rounded-md border-2 border-dashed border-slate-300 px-6 py-8 text-center">
-              <Upload className="h-6 w-6 text-on-surface-variant" strokeWidth={1.5} />
-              <p className="text-body-md text-on-surface-variant">Drag and drop files, or click to browse</p>
-            </div>
-          </FormField>
+              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
+                <FormikDateTimeField name="pickupWindowStart" label="Pickup Window Start" />
+                <FormikDateTimeField name="pickupWindowEnd" label="Pickup Window End" />
+              </div>
 
-          <div className="flex justify-end pt-2">
-            <Button variant="primary">Post Load</Button>
-          </div>
-        </Card>
+              <FormikCheckbox
+                name="postImmediately"
+                label="Post immediately (skip Draft)"
+                helperText="Leave unchecked to save as a Draft you can edit later."
+              />
 
-        <RateBreakdownCard
-          title="Live Estimate"
-          distanceKm={MOCK_LIVE_ESTIMATE.distanceKm}
-          lineItems={MOCK_LIVE_ESTIMATE.lineItems}
-          total={MOCK_LIVE_ESTIMATE.total}
-          note="Final rate is confirmed once an agency accepts this load."
-        />
-      </div>
+              <div className="flex justify-end pt-2">
+                <FormikSubmitButton>Save Load</FormikSubmitButton>
+              </div>
+            </Card>
+          </Form>
+        )}
+      </Formik>
     </div>
   )
 }

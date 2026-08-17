@@ -1,37 +1,59 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Paperclip } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
-import EmptyState from '../../../components/EmptyState.jsx'
-import { LoadStatus } from '../../../lib/enums.js'
-import { getLoadById } from '../mockData.js' // TODO: replace with real data
+import ErrorState from '../../../components/ErrorState.jsx'
+import Skeleton from '../../../components/Skeleton.jsx'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
+import { useLoadDetailQuery } from '../api/loadsApi.js'
 import { getLoadStatusTone } from '../lib/statusTone.js'
-import { formatWeight } from '../lib/format.js'
-import WorkflowTimeline from '../components/WorkflowTimeline.jsx'
-import ActivityLog from '../components/ActivityLog.jsx'
-import RateBreakdownCard from '../components/RateBreakdownCard.jsx'
+import { formatCurrency, formatDateTime, formatWeight } from '../lib/format.js'
+import { getLoadErrorMessage } from '../lib/errorMessages.js'
+import { isLoadCancellable, isLoadEditable } from '../lib/loadPermissions.js'
 import RouteMapCard from '../components/RouteMapCard.jsx'
+import LoadFilesSection from '../components/LoadFilesSection.jsx'
+import LoadStatusHistoryCard from '../components/LoadStatusHistoryCard.jsx'
+import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
 
-
-const TIMELINE_STEPS = ['Load Created', 'Posted', 'Matched', 'Proposal Sent', 'In Transit', 'Delivered']
-
+// Load detail — GET /api/v1/loads/{id}, full LoadResponseDto
+// (docs/load-management-api.md Section 3.6). RateBreakdownCard/
+// WorkflowTimeline/ActivityLog from the earlier Stitch-cloned version were
+// removed: the real API has no data to back them yet (estimatedPrice is a
+// single nullable field, workflowRunId is always null pre-Component D) and
+// the project rule is "no fake mock API once backend wiring is in place."
+// RouteMapCard is kept — it's an acknowledged schematic placeholder, not
+// fake data — fed real pickup/dropoff addresses.
 function LoadDetailPage() {
   const { loadId } = useParams()
-  const load = getLoadById(loadId)
+  const [isCancelOpen, setIsCancelOpen] = useState(false)
+  const loadQuery = useLoadDetailQuery(loadId)
+  const authUser = useAppSelector((state) => state.auth.user)
 
-  if (!load) {
+  if (loadQuery.isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    )
+  }
+
+  if (loadQuery.isError) {
     return (
       <div className="space-y-6">
         <Link to="/loads" className="inline-flex items-center gap-1 text-body-md text-secondary hover:text-primary">
           <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Back to My Loads
         </Link>
         <Card>
-          <EmptyState title={`No load found for "${loadId}"`} description="Check the load ID and try again." />
+          <ErrorState description={getLoadErrorMessage(loadQuery.error)} onRetry={loadQuery.refetch} />
         </Card>
       </div>
     )
   }
+
+  const load = loadQuery.data
 
   return (
     <div className="space-y-6">
@@ -41,34 +63,28 @@ function LoadDetailPage() {
             <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Back to My Loads
           </Link>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-headline-lg text-on-surface">Load {load.id}</h1>
-            <StatusBadge tone={getLoadStatusTone(LoadStatus.MATCHED)}>Matched</StatusBadge>
+            <h1 className="text-headline-lg text-on-surface">{load.referenceCode}</h1>
+            <StatusBadge tone={getLoadStatusTone(load.status)}>{load.status}</StatusBadge>
           </div>
           <p className="mt-1 text-body-md text-on-surface-variant">
-            {load.origin} → {load.destination}
+            {load.pickupAddress} → {load.dropoffAddress}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button as={Link} to={`/loads/${load.id}/edit`} variant="secondary">
-            Edit Details
-          </Button>
-          <Button variant="primary">Review AI recommendation</Button>
+          {isLoadEditable(load.status) && (
+            <Button as={Link} to={`/loads/${load.loadId}/edit`} variant="secondary">
+              Edit Details
+            </Button>
+          )}
+          {isLoadCancellable(load.status) && (
+            <Button variant="status" status="red" onClick={() => setIsCancelOpen(true)}>
+              Cancel Load
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-1">
-          <Card>
-            <h3 className="mb-4 text-headline-md text-primary">Workflow Status</h3>
-            <WorkflowTimeline steps={TIMELINE_STEPS} currentIndex={2} />
-          </Card>
-
-          <Card>
-            <h3 className="mb-4 text-headline-md text-primary">System Activity</h3>
-            <ActivityLog entries={load.activityLog} />
-          </Card>
-        </div>
-
         <div className="space-y-6 lg:col-span-2">
           <Card>
             <h3 className="mb-4 text-headline-md text-primary">Cargo Specifications</h3>
@@ -85,41 +101,98 @@ function LoadDetailPage() {
                 <dt className="text-label-caps text-on-surface-variant">Description</dt>
                 <dd className="text-body-md text-on-surface">{load.cargoDescription}</dd>
               </div>
-              <div className="sm:col-span-2">
+              <div>
                 <dt className="text-label-caps text-on-surface-variant">Pickup Window</dt>
-                <dd className="text-data-mono text-on-surface">{load.pickupWindow}</dd>
+                <dd className="text-data-mono text-on-surface">
+                  {formatDateTime(load.pickupWindowStart)} – {formatDateTime(load.pickupWindowEnd)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Estimated Price</dt>
+                <dd className="text-data-mono text-on-surface">{formatCurrency(load.estimatedPrice)}</dd>
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Created</dt>
+                <dd className="text-data-mono text-on-surface">{formatDateTime(load.createdAt)}</dd>
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Last Updated</dt>
+                <dd className="text-data-mono text-on-surface">{formatDateTime(load.updatedAt)}</dd>
               </div>
             </dl>
           </Card>
 
-          <RateBreakdownCard
-            title="Proposed Rate"
-            lineItems={[
-              { label: 'Base Rate', amount: load.rate.baseRate },
-              { label: 'Fuel Surcharge', amount: load.rate.fuelSurcharge },
-            ]}
-            total={load.rate.total}
-          />
+          <RouteMapCard origin={load.pickupAddress} destination={load.dropoffAddress} />
 
-          <RouteMapCard origin={load.origin} destination={load.destination} distanceKm={load.distanceKm} />
+          <LoadFilesSection loadId={load.loadId} />
+        </div>
+
+        <div className="space-y-6 lg:col-span-1">
+          <LoadStatusHistoryCard loadId={load.loadId} />
 
           <Card>
-            <h3 className="mb-4 text-headline-md text-primary">Attached Documents</h3>
-            {load.documents.length > 0 ? (
-              <ul className="space-y-2">
-                {load.documents.map((doc) => (
-                  <li key={doc.name} className="flex items-center gap-2 text-body-md text-primary">
-                    <Paperclip className="h-4 w-4 text-on-surface-variant" strokeWidth={1.5} />
-                    {doc.name}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-body-md text-on-surface-variant">No documents attached yet.</p>
-            )}
+            <h3 className="mb-4 text-headline-md text-primary">Pickup</h3>
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Address</dt>
+                <dd className="text-body-md text-on-surface">{load.pickupAddress}</dd>
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Coordinates</dt>
+                <dd className="text-data-mono text-on-surface">
+                  {load.pickupLat}, {load.pickupLng}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+
+          <Card>
+            <h3 className="mb-4 text-headline-md text-primary">Dropoff</h3>
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Address</dt>
+                <dd className="text-body-md text-on-surface">{load.dropoffAddress}</dd>
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Coordinates</dt>
+                <dd className="text-data-mono text-on-surface">
+                  {load.dropoffLat}, {load.dropoffLng}
+                </dd>
+              </div>
+            </dl>
+          </Card>
+
+          <Card>
+            <h3 className="mb-4 text-headline-md text-primary">Record</h3>
+            <dl className="space-y-3">
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Load ID</dt>
+                <dd className="break-all text-data-mono text-on-surface">{load.loadId}</dd>
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Shipper</dt>
+                {authUser?.userId === load.shipperUserId ? (
+                  <dd className="text-body-md text-on-surface">{authUser.fullName}</dd>
+                ) : (
+                  <>
+                    {/* No backend endpoint resolves an arbitrary shipperUserId to a name yet
+                        (only GET /auth/me returns fullName, for the caller's own account) — falls
+                        back to the raw id for an Admin viewing someone else's load. */}
+                    <dd className="break-all text-data-mono text-on-surface">{load.shipperUserId}</dd>
+                    <p className="mt-1 text-body-md text-on-surface-variant">Name isn't available for other shippers yet.</p>
+                  </>
+                )}
+              </div>
+              <div>
+                <dt className="text-label-caps text-on-surface-variant">Workflow Run</dt>
+                <dd className="text-data-mono text-on-surface">{load.workflowRunId ?? 'Not yet assigned'}</dd>
+              </div>
+            </dl>
           </Card>
         </div>
       </div>
+
+      {isCancelOpen && <CancelLoadDialog loadId={load.loadId} onClose={() => setIsCancelOpen(false)} />}
     </div>
   )
 }
