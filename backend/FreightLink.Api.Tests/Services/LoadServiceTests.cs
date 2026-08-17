@@ -590,6 +590,26 @@ public class LoadServiceTests
         Assert.Contains("Bob Shipper", namesByShipper.Keys);
     }
 
+    /// <summary>
+    /// Each list row also carries its owner's raw id, not just the resolved display name — the
+    /// frontend's id-based fallback label (formatShipperName) needs it when ShipperName can't be
+    /// resolved, the same way the single-load response already does.
+    /// </summary>
+    [Fact]
+    public async Task GetListAsync_ItemsIncludeShipperUserId()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+
+        var result = await sut.GetListAsync(new LoadListQueryDto(), shipperUserId, UserRole.Shipper);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(created.LoadId, item.LoadId);
+        Assert.Equal(shipperUserId, item.ShipperUserId);
+    }
+
     // --- Edit ---
 
     /// <summary>A load in Draft or Posted can have its content edited; Status is unaffected.</summary>

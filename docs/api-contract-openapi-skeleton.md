@@ -18,7 +18,7 @@
 | 5 | 13 Aug 2026 | Load cancellation changed from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial state-transition update), reserving `POST` for resource creation. No change to auth, ownership, or request/response shape. |
 | 6 | 13 Aug 2026 | Load Management hardening: `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now genuinely use `409 LOAD_CONCURRENCY_CONFLICT` (Postgres `xmin` optimistic concurrency), superseding the earlier claim that no Load endpoint used `409`; `POST /loads` retries internally on a `ReferenceCode` collision before returning `409 LOAD_REFERENCE_CODE_CONFLICT`; `POST /loads`/`PUT /loads/{id}` reject identical pickup/dropoff coordinates with `400 LOAD_PICKUP_DROPOFF_IDENTICAL`; `GET /loads` rejects an out-of-range `page`/`pageSize` combination with `400 LOAD_PAGE_OUT_OF_RANGE` and now paginates deterministically (ties broken by `loadId`) and case-insensitive `search` matching is index-backed (`pg_trgm`). No path, role, or response-shape changes. |
 | 7 | 15 Aug 2026 | Component A file attachments implemented: `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` link an already-uploaded file (from `POST /files/single`) to a load — never re-implements Cloudinary upload/delete, only the `LoadFile` metadata linkage. Also closes a documentation gap (no functional change): `GET /loads` has always supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were documented until now — added the missing `components/parameters` entries and wired them into the path. |
-| 8 | 17 Aug 2026 | `LoadResponse`/`LoadListItem` enriched with `shipperName` (server-resolved from `User.FullName`, joined via the existing `Load.ShipperUser` navigation — no new `/users/{id}` endpoint was added or is planned) so Admin views of loads owned by other Shippers can show a display name instead of only a raw `shipperUserId`. `GET /loads/{id}` also now returns the load's full `LoadStatusHistory` audit trail as `statusHistory` (newest first) directly on the response — this **supersedes** the `GET /loads/{id}/status-history` row below, which will not be built as a separate endpoint. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` responses leave `statusHistory` as an empty array (the caller already knows the single transition it just made). Also documents the frontend side for the first time: the React app's Load Management screens (`frontend/src/features/loads`) and full auth flow (`frontend/src/features/auth`) are now wired against the real backend — `POST/GET /loads`, `GET/PUT /loads/{id}`, `PATCH /loads/{id}/cancel`, the `/loads/{id}/files` attach flow, and all of Section 4.1 (`/auth/*`) — via TanStack Query + Axios (see `frontend/docs/load-management-api.md`). No frontend work exists yet against Sections 4.3–4.6 (Agencies, Assignments/Trips, Billing, Workflows), which also remain unimplemented on the backend. |
+| 8 | 17 Aug 2026 | `LoadResponse`/`LoadListItem` enriched with `shipperName` (server-resolved from `User.FullName`, joined via the existing `Load.ShipperUser` navigation — no new `/users/{id}` endpoint was added or is planned) so Admin views of loads owned by other Shippers can show a display name instead of only a raw `shipperUserId`. `LoadListItem` also gained `shipperUserId` itself (previously detail-only on `LoadResponse`) so the frontend's id-based fallback label works on list rows too, not just the single-load view. `GET /loads/{id}` also now returns the load's full `LoadStatusHistory` audit trail as `statusHistory` (newest first) directly on the response — this **supersedes** the `GET /loads/{id}/status-history` row below, which will not be built as a separate endpoint. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` responses leave `statusHistory` as an empty array (the caller already knows the single transition it just made). Also documents the frontend side for the first time: the React app's Load Management screens (`frontend/src/features/loads`) and full auth flow (`frontend/src/features/auth`) are now wired against the real backend — `POST/GET /loads`, `GET/PUT /loads/{id}`, `PATCH /loads/{id}/cancel`, the `/loads/{id}/files` attach flow, and all of Section 4.1 (`/auth/*`) — via TanStack Query + Axios (see `frontend/docs/load-management-api.md`). No frontend work exists yet against Sections 4.3–4.6 (Agencies, Assignments/Trips, Billing, Workflows), which also remain unimplemented on the backend. |
 
 ---
 
@@ -166,7 +166,7 @@ Query parameters, applied consistently across all `GET` list endpoints:
 >
 > **Documentation gap closed in Rev. 7 (no functional change):** `GET /loads` has supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were ever added to this doc's `components/parameters`/path — the other six are now documented too.
 >
-> **Implemented in Rev. 8:** `LoadResponse` and `LoadListItem` both gained `shipperName` — resolved server-side from `User.FullName` via the existing `Load.ShipperUser` navigation (an `Include` on the single-row fetches, a JOIN on the list query — no N+1), so an Admin viewing loads across multiple Shippers sees a display name rather than only a raw `shipperUserId`. Falls back to `"Unknown"` if the owning user row can't be resolved. This is a **read-side enrichment only** — no `/users/{id}` lookup endpoint or general user-directory API was added, matching the smallest-change decision recorded for this feature. Separately, `GET /loads/{id}` now also returns `statusHistory` (the load's full `LoadStatusHistory` trail, newest first, via a second `Include` on the same query) — this fulfills the `status-history` row above, which is retired as a would-be separate endpoint rather than built. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` all still return `LoadResponse`, but leave `statusHistory` as `[]`, since a caller of those three already knows the one transition it just triggered.
+> **Implemented in Rev. 8:** `LoadResponse` and `LoadListItem` both gained `shipperName` — resolved server-side from `User.FullName` via the existing `Load.ShipperUser` navigation (an `Include` on the single-row fetches, a JOIN on the list query — no N+1), so an Admin viewing loads across multiple Shippers sees a display name rather than only a raw `shipperUserId`. Falls back to `"Unknown"` if the owning user row can't be resolved. This is a **read-side enrichment only** — no `/users/{id}` lookup endpoint or general user-directory API was added, matching the smallest-change decision recorded for this feature. `LoadListItem` also carries `shipperUserId` alongside `shipperName` (it was previously detail-only, on `LoadResponse`) — the frontend's shared `formatShipperName(shipperName, shipperUserId)` fallback needs both on the same row to render an id-based label when a name can't be resolved, and that fallback was dead code on the list view until this field existed there too. Separately, `GET /loads/{id}` now also returns `statusHistory` (the load's full `LoadStatusHistory` trail, newest first, via a second `Include` on the same query) — this fulfills the `status-history` row above, which is retired as a would-be separate endpoint rather than built. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` all still return `LoadResponse`, but leave `statusHistory` as `[]`, since a caller of those three already knows the one transition it just triggered.
 
 ### 4.3 Component B — Agency & Fleet Management (Owner: D.B.A.H.W. Bandara)
 
@@ -1044,6 +1044,7 @@ components:
       properties:
         loadId: { type: string, format: uuid }
         shipperUserId: { type: string, format: uuid }
+        shipperName: { type: string, description: "Resolved server-side from User.FullName; falls back to \"Unknown\" if the owning user can't be resolved. No /users/{id} endpoint exists — this is the only way either client learns a load owner's display name." }
         referenceCode: { type: string, description: "Server-generated, unique (uq_load_reference)" }
         cargoDescription: { type: string }
         weightKg: { type: number, format: double }
@@ -1061,12 +1062,32 @@ components:
         workflowRunId: { type: string, format: uuid, nullable: true, description: "Always null until Section 4.6's AgentWorkflowRun join is implemented" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        statusHistory:
+          type: array
+          description: >
+            Full LoadStatusHistory audit trail, newest first. Only populated by GET /loads/{id} — the
+            POST/PUT/PATCH .../cancel responses that also return LoadResponse leave this as an empty
+            array, since the caller already knows the single transition it just made.
+          items: { $ref: '#/components/schemas/LoadStatusHistoryResponse' }
+
+    LoadStatusHistoryResponse:
+      type: object
+      description: One recorded LoadStatus transition, as included in LoadResponse.statusHistory.
+      properties:
+        loadStatusHistoryId: { type: string, format: uuid }
+        fromStatus: { type: string, nullable: true, description: "Null only for the load's very first status row" }
+        toStatus: { type: string }
+        reason: { type: string, nullable: true, description: "Set only for transitions that require one (e.g. cancellation)" }
+        changedByUserId: { type: string, format: uuid }
+        changedAt: { type: string, format: date-time }
 
     LoadListItem:
       type: object
-      description: Lightweight row shape used inside PagedLoadResponse.items — omits lat/lng, volume, shipperUserId, and workflowRunId.
+      description: Lightweight row shape used inside PagedLoadResponse.items — omits lat/lng, volume, and workflowRunId (present on LoadResponse only).
       properties:
         loadId: { type: string, format: uuid }
+        shipperUserId: { type: string, format: uuid, description: "Kept on the list row (not detail-only) so a client-side fallback label can identify the owner by id when shipperName falls back to \"Unknown\"" }
+        shipperName: { type: string, description: "Resolved server-side from User.FullName; falls back to \"Unknown\" if the owning user can't be resolved" }
         referenceCode: { type: string }
         cargoDescription: { type: string }
         weightKg: { type: number, format: double }
@@ -1138,7 +1159,6 @@ components:
 
     # --- Skeleton only below this line ---
     # Each owner defines their entity schemas here as their controllers land:
-    #   LoadStatusHistory                         -> Dias H.N.P.K.       (Component A — Load itself done in Rev. 4; LoadFile attachment done in Rev. 7)
     #   Agency, Vehicle, Driver, ComplianceDoc    -> D.B.A.H.W. Bandara  (Component B)
     #   Assignment, Trip, TripEvent, TripEvidence -> Ratnaweera O.V.     (Component C)
     #   Invoice, Dispute                          -> Balasooriya B.K.N.N. (Component D)

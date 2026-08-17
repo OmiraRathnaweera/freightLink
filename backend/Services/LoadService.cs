@@ -443,6 +443,7 @@ public class LoadService : ILoadService
     private static LoadListItemDto MapToListItem(Load load, string shipperName) => new()
     {
         LoadId = load.LoadId,
+        ShipperUserId = load.ShipperUserId,
         ShipperName = shipperName,
         ReferenceCode = load.ReferenceCode,
         CargoDescription = load.CargoDescription,

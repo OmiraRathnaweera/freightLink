@@ -2,13 +2,21 @@ namespace FreightLink.Api.DTOs.Loads;
 
 /// <summary>
 /// Lightweight row shape for <c>GET /api/v1/loads</c> list results. Omits fields not needed for a
-/// list view (lat/lng, volume, owner id, workflow run id) — see <see cref="LoadResponseDto"/> for the
-/// full detail shape.
+/// list view (lat/lng, volume, workflow run id) — see <see cref="LoadResponseDto"/> for the full
+/// detail shape.
 /// </summary>
 public class LoadListItemDto
 {
     /// <summary>The load's unique id.</summary>
     public Guid LoadId { get; set; }
+
+    /// <summary>
+    /// The id of the Shipper user who owns this load. Kept alongside <see cref="ShipperName"/> (not
+    /// omitted as detail-only) so a client-side fallback label can still identify the owner by id when
+    /// <see cref="ShipperName"/> falls back to <c>"Unknown"</c> — see
+    /// <see cref="LoadResponseDto.ShipperUserId"/> for the equivalent on the single-load response.
+    /// </summary>
+    public Guid ShipperUserId { get; set; }
 
     /// <summary>
     /// Display name (<see cref="Entities.User.FullName"/>) of the Shipper user who owns this load, for
