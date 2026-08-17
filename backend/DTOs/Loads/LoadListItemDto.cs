@@ -10,6 +10,13 @@ public class LoadListItemDto
     /// <summary>The load's unique id.</summary>
     public Guid LoadId { get; set; }
 
+    /// <summary>
+    /// Display name (<see cref="Entities.User.FullName"/>) of the Shipper user who owns this load, for
+    /// Admin views that list loads across multiple shippers. Falls back to <c>"Unknown"</c> if the
+    /// owning user record could not be resolved.
+    /// </summary>
+    public string ShipperName { get; set; } = string.Empty;
+
     /// <summary>Server-generated, unique reference code for this load.</summary>
     public string ReferenceCode { get; set; } = string.Empty;
 

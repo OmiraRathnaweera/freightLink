@@ -37,7 +37,7 @@ public class LoadServiceTests
     private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext);
 
     /// <summary>Seeds a minimal Shipper user row for <c>Load.ShipperUserId</c> to reference.</summary>
-    private static async Task<Guid> SeedShipperUserAsync(AppDbContext dbContext)
+    private static async Task<Guid> SeedShipperUserAsync(AppDbContext dbContext, string fullName = "Jane Shipper")
     {
         var now = DateTimeOffset.UtcNow;
         var user = new User
@@ -46,7 +46,7 @@ public class LoadServiceTests
             Role = UserRole.Shipper,
             Email = $"shipper-{Guid.NewGuid():N}@example.com",
             PasswordHash = "unused-hash",
-            FullName = "Jane Shipper",
+            FullName = fullName,
             IsActive = true,
             CreatedAt = now,
             UpdatedAt = now
@@ -218,6 +218,19 @@ public class LoadServiceTests
         Assert.Null(historyRow.Reason);
     }
 
+    /// <summary>The created load's response is enriched with the owning Shipper's display name.</summary>
+    [Fact]
+    public async Task CreateAsync_ReturnsShipperName()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+
+        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+
+        Assert.Equal("Jane Shipper", result.ShipperName);
+    }
+
     // --- Get one ---
 
     /// <summary>Fetching an existing load returns its full detail.</summary>
@@ -234,6 +247,7 @@ public class LoadServiceTests
         Assert.Equal(created.LoadId, result.LoadId);
         Assert.Equal(created.CargoDescription, result.CargoDescription);
         Assert.Equal(created.ReferenceCode, result.ReferenceCode);
+        Assert.Equal("Jane Shipper", result.ShipperName);
     }
 
     /// <summary>Fetching a nonexistent load throws a 404-shaped ApiException.</summary>
@@ -512,6 +526,27 @@ public class LoadServiceTests
         Assert.Equal(2, result.TotalItems);
     }
 
+    /// <summary>
+    /// Each list row is enriched with its own owning Shipper's display name — the main scenario this
+    /// exists for, since an Admin's list view spans loads from multiple different shippers.
+    /// </summary>
+    [Fact]
+    public async Task GetListAsync_ItemsIncludeEachOwnersShipperName()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var shipperAId = await SeedShipperUserAsync(dbContext);
+        var shipperBId = await SeedShipperUserAsync(dbContext, fullName: "Bob Shipper");
+        await sut.CreateAsync(shipperAId, ValidCreateLoadDto());
+        await sut.CreateAsync(shipperBId, ValidCreateLoadDto());
+
+        var result = await sut.GetListAsync(new LoadListQueryDto(), Guid.NewGuid(), UserRole.Admin);
+
+        var namesByShipper = result.Items.ToDictionary(i => i.ShipperName);
+        Assert.Contains("Jane Shipper", namesByShipper.Keys);
+        Assert.Contains("Bob Shipper", namesByShipper.Keys);
+    }
+
     // --- Edit ---
 
     /// <summary>A load in Draft or Posted can have its content edited; Status is unaffected.</summary>
@@ -530,6 +565,7 @@ public class LoadServiceTests
             Assert.Equal("Updated cargo description", result.CargoDescription);
             Assert.Equal(750m, result.WeightKg);
             Assert.Equal(status.ToString(), result.Status);
+            Assert.Equal("Jane Shipper", result.ShipperName);
         }
     }
 
@@ -649,6 +685,7 @@ public class LoadServiceTests
             var result = await sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" });
 
             Assert.Equal("Cancelled", result.Status);
+            Assert.Equal("Jane Shipper", result.ShipperName);
         }
     }
 
