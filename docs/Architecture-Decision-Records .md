@@ -22,7 +22,7 @@ An Architecture Decision Record (ADR) captures the context, the decision made, a
 
 Each ADR below records one decision the FreightLink team made while designing and building the platform. These records will be referenced directly during the viva — every team member should be able to explain the context, the decision, and the trade-offs of any ADR related to their owned component.
 
-All decisions recorded here reflect the current, agreed state of the project as described in the project README. No new or speculative decisions have been introduced in this document.
+All decisions recorded here reflect the current, agreed state of the project as described in the project README. No new or speculative decisions have been introduced in this document beyond ADR-019, which the team has agreed and is recording here for the first time.
 
 ---
 
@@ -284,8 +284,6 @@ Persist Agentic AI workflow state in PostgreSQL using four dedicated tables, eac
 | `ToolCall` | OpenRouteService call input/output, success/failure | Agent 3 (Matching/Pricing) |
 | `ApprovalDecision` | Decided-by, action taken, reason | Agent 4 computes the proposal; **Shipper** action, submitted via Component A's console, written through a role-guarded Component D endpoint (see ADR-016) |
 
-A fifth table, `MatchCandidate`, records one row per agency Agent 2 evaluated in a given run (rank, eligibility score, and rejection reason where ineligible). This was added so that Agent 2's ranked output — its entire individual contribution — is queryable relational data rather than a JSON field inside `AgentStep`, and so that the decline-exclusion rule in ADR-018 has an auditable basis.
-
 ### Consequences
 **Positive**
 - Directly satisfies the spec's shared-state persistence requirement with a clean, explainable relational structure.
@@ -312,14 +310,11 @@ The specification requires JWT authentication and role-based authorization acros
 ### Decision
 Use **JWT-based authentication** with a short-lived **access token (5 minutes)** and a longer-lived **refresh token (30 days)**, issued by the ASP.NET Core backend and consumed identically by both React and Flutter.
 
-Refresh tokens are persisted in a dedicated `RefreshToken` table (one user → many tokens, one per device/session). Only a **SHA-256 hash** of each token is stored, never the token itself, so a database disclosure cannot be replayed into live sessions. Revocation is recorded as a `RevokedAt` timestamp rather than a row deletion, consistent with ADR-019, which both preserves the session audit trail and makes server-enforced logout possible.
-
 ### Consequences
 **Positive**
 - Short-lived access tokens limit the exposure window if a token is compromised, satisfying the spec's security requirements (Section 5) with a well-understood, industry-standard pattern.
 - A 30-day refresh token keeps the mobile experience (Flutter — Driver/Agency Staff) usable without requiring very frequent re-logins, which matters for operational users in the field.
 - One shared identity/token scheme across both clients directly satisfies the mandatory integrated-system rule and gives a single, consistent security story to present in the viva.
-- Server-side token records make it possible to eject a suspended agency's staff and drivers immediately (mandatory edge case 1) rather than waiting up to 30 days for their tokens to expire naturally.
 
 **Negative**
 - Requires implementing and testing a full refresh-token flow (secure storage, rotation, revocation on both clients), which is additional implementation effort compared to a single long-lived token.
@@ -328,7 +323,6 @@ Refresh tokens are persisted in a dedicated `RefreshToken` table (one user → m
 ### Alternatives Considered
 - **Single long-lived JWT with no refresh token:** Rejected — weaker security posture, and directly contradicts the "secure configuration" and "protected endpoints" expectations in Section 5 of the spec.
 - **Session-based (cookie) authentication:** Rejected — less natural fit for a Flutter mobile client and for a stateless REST API consumed by two independent client types.
-- **Stateless refresh tokens with no server-side record:** Rejected — would make revocation impossible, leaving no way to enforce logout or to cut off a suspended agency's staff before their token expired.
 
 ---
 
@@ -345,8 +339,6 @@ Integrate **three** third-party services, all called exclusively from the ASP.NE
 1. **OpenRouteService** — distance and ETA calculation between an agency's yard and a load's pickup location; this call **doubles as the Agentic AI's allow-listed tool** (`get_route_and_eta`), used by Agent 3.
 2. **PayHere (sandbox/test mode)** — invoice payment on Component D: checkout session creation and webhook-driven payment confirmation.
 3. **Transactional email API** (e.g. Brevo or Resend, free tier) — shipper notifications on the decline/retry loop introduced in ADR-018 (agency declined, new match found, no auto-match found), sent via a shared `IEmailService` owned by Component A.
-
-Each integration has a dedicated audit trail in the database: `ToolCall` for OpenRouteService, `PaymentWebhookEvent` for inbound PayHere callbacks, and delivery-status fields on `Notification` for email. `PaymentWebhookEvent` deliberately carries **no foreign key** — an inbound callback whose MD5 signature has not yet been verified must be recorded before it is trusted or resolved to an invoice, so that rejected and replayed callbacks are auditable rather than silently discarded.
 
 ### Consequences
 **Positive**
@@ -443,7 +435,7 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 
 - Component A's estimate uses a straight-line (haversine) `distanceKm`, computed internally with no external API call, appropriate for a rough, pre-matching estimate.
 - Agent 3's pricing uses the real, ORS-routed `distanceKm` (from the `get_route_and_eta` tool call), giving a more accurate figure once an actual candidate agency and route are known.
-- `baseFare`, `ratePerKm`, and `ratePerKg` are shared configuration constants (application settings), not a separate database entity, reused by both calculations so that the two prices remain consistent and genuinely comparable.
+- `baseFare`, `ratePerKm`, and `ratePerKg` were originally scoped as shared configuration constants (application settings), not a separate database entity, reused by both calculations so that the two prices remain consistent and genuinely comparable. **This was subsequently refined by ADR-019**, which moves the sourcing and storage of these constants (and introduces weight-tiered `ratePerKm` variation) into two Admin-managed reference tables, without changing the formula itself or the requirement that both calculations stay consistent.
 
 ### Consequences
 **Positive**
@@ -453,7 +445,7 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 
 **Negative**
 - A linear formula based on distance and weight is a simplification of real-world freight pricing (which can depend on vehicle type, cargo type, fuel prices, seasonal demand, etc.); this is an accepted, documented simplification appropriate to the academic scope.
-- Exact constant values (`baseFare`, `ratePerKm`, `ratePerKg`) are treated as an implementation/tuning detail for Weeks 2–3, not an architectural decision, and may be adjusted without requiring a new ADR.
+- Exact constant values (`baseFare`, `ratePerKm`, `ratePerKg`) are treated as an implementation/tuning detail, not an architectural decision, and may be adjusted without requiring a new ADR — see ADR-019 for how these values are now sourced, stored, and kept auditable.
 
 ### Alternatives Considered
 - **Two separate, unrelated pricing formulas for the estimate vs. the agent's proposal:** Rejected — would make Agent 4's price-deviation validation meaningless, since it would be comparing two structurally different calculations rather than the same formula applied to better or worse distance data.
@@ -470,7 +462,7 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 The original design (see the "Admin" wording still present in early drafts of ADR-007, ADR-010, and ADR-013 before this ADR) had the Admin reviewing and approving the AI's recommended agency match, mirroring a generic "platform overseer approves everything" pattern. On review, the team reconsidered who actually has the standing to make this call: it is the shipper's cargo and the shipper's money at stake in each match, not the platform operator's.
 
 ### Decision
-The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignment and approves, rejects, or requests revision. This happens on the Shipper's own React console (Component A), which displays the recommended agency, ETA, price, and the price-deviation percentage as decision-support context. The **Admin's** role is narrowed to two functions only: **agency KYC/compliance verification** (Component B) and **system-wide analytics**. Admin has no involvement in per-load matching decisions.
+The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignment and approves, rejects, or requests revision. This happens on the Shipper's own React console (Component A), which displays the recommended agency, ETA, price, and the price-deviation percentage as decision-support context. The **Admin's** role is narrowed to two functions only: **agency KYC/compliance verification** (Component B) and **system-wide analytics**. Admin has no involvement in per-load matching decisions. *(ADR-019 subsequently adds a third, narrow Admin function — maintaining the pricing-configuration reference data — which does not involve per-load matching decisions and is consistent with this ADR's separation-of-concerns intent; see ADR-019 for the reasoning.)*
 
 ### Consequences
 **Positive**
@@ -504,8 +496,6 @@ An earlier version of the matching design considered a competitive-bidding model
 The system does **not** run a competitive bidding process. The Agentic AI pipeline is triggered **immediately** when the shipper posts a load. Agent 2 evaluates **all** eligible agencies directly (compliance, fleet capacity, proximity) and Agent 3 computes price/ETA for the single best-fit candidate — the AI recommends **one** agency, not a ranked pool for the shipper to pick from. Once the shipper approves (ADR-016), the backend creates an `Assignment` in a `Proposed` state and sends it to the recommended agency as a **job proposal**. The agency then independently **accepts or declines** the proposal (Flutter, Component C) before anything is finalized:
 - `Assignment` state machine: `Proposed → Accepted` / `Declined`.
 - `Trip` (created only once `Assignment` is `Accepted`): `Assigned → PickedUp → InTransit → Delivered`.
-
-The agency's response is stored in a dedicated `AssignmentResponse` record (one per assignment, at most) capturing who responded, the decision, when, and — for a decline — a mandatory reason. Keeping this in its own table rather than as columns on `Assignment` means an unanswered proposal carries no half-empty response fields, and the decline reason is available to Agent 2 on the retry run (ADR-018).
 
 ### Consequences
 **Positive**
@@ -541,7 +531,7 @@ On decline, the system:
 4. Once a new recommendation is ready, **emails the shipper a second time** ("new match found, please review").
 5. This is **capped at 3 automatic attempts per load** (a tunable implementation constant, not an architectural constraint). Beyond the cap, the system stops auto-retrying, records a **safe failure**, flags the load for manual review, and sends a third email variant ("no automatic match found, please check the app").
 
-`AgentWorkflowRun` gains an **attempt number** field to implement the cap (see ADR-010). The cap is additionally enforced at the database level by a unique constraint on `(LoadId, AttemptNo)` together with a check constraint bounding `AttemptNo`, so a fourth attempt cannot be recorded even if the retry logic were to miscount. Email delivery uses the transactional email integration added in ADR-012, via a shared `IEmailService` owned by Component A and called cross-component from Component C's decline endpoint.
+`AgentWorkflowRun` gains an **attempt number** field to implement the cap (see ADR-010). Email delivery uses the transactional email integration added in ADR-012, via a shared `IEmailService` owned by Component A and called cross-component from Component C's decline endpoint.
 
 ### Consequences
 **Positive**
@@ -552,7 +542,7 @@ On decline, the system:
 **Negative**
 - Repeatedly declining a proposal during the live demo (e.g. to showcase the retry loop) will send multiple real emails unless a sandbox/logging fallback mode is used for `IEmailService` during the viva — documented as a demo-reliability mitigation in ADR-012, parallel to the Ollama LLM fallback in ADR-008.
 - The cross-component call from Component C's decline endpoint into Component A's `IEmailService` and retry-check logic must be documented explicitly in both students' individual reports, following the same pattern already used for the Shipper/Agency registration DTO overlap and the approval-endpoint contract.
-- The exact retry-cap number (3) is a judgement call rather than a derived constant; the team accepts this as a reasonable, adjustable default rather than treating it as load-bearing architecture. Because the cap is now also expressed as a database constraint, tuning it requires a migration rather than only a configuration change — an accepted trade-off for making the bound unbypassable.
+- The exact retry-cap number (3) is a judgement call rather than a derived constant; the team accepts this as a reasonable, adjustable default rather than treating it as load-bearing architecture.
 
 ### Alternatives Considered
 - **Manual re-trigger only (shipper or Admin must manually re-run matching after a decline):** This was the team's initial, more conservative default; superseded by this ADR once the team judged that bounded automatic retry was worth the added complexity for a materially better shipper experience.
@@ -560,98 +550,57 @@ On decline, the system:
 - **No shipper notification during the retry process (silent retry):** Rejected — would leave the shipper unaware anything happened until they happened to check the app, undermining the point of having a responsive, human-in-the-loop system at all.
 
 ---
-## ADR-019: No Hard Deletes — Entity Lifecycle Managed by Status Transitions
+
+## ADR-019: Admin-Managed Pricing Configuration — Fuel Price & Vehicle-Class Efficiency Reference Tables
 
 **Status:** Accepted
 **Date:** August 2026
 
 ### Context
-Every core FreightLink entity has a real-world "end of life": a shipper cancels a load, an Admin suspends an agency, an agency retires a vehicle, a driver leaves the company, an invoice is voided after a cancellation. The obvious implementation is a `DELETE` statement, and the equally common alternative is a generic `IsDeleted` boolean flag on every table.
+ADR-015 established the shared pricing formula and deliberately left `baseFare`, `ratePerKm`, and `ratePerKg` as tunable configuration constants, "not an architectural decision." In preparing to defend these constants at the project review board, the team recognised two gaps this left open:
 
-Both are a poor fit for this system for three specific reasons:
+1. **No sourced, citable answer to "where did these numbers come from."** Unlike Uber Freight — which predicts price using a machine-learning model trained on years of proprietary shipment data — this project has no equivalent training data, and reproducing that approach was judged infeasible and inappropriate for the academic scope. A plain hardcoded constant, however, gives an equally weak answer under questioning: there was no way to show a reviewer *where the number came from* or *when it was last verified*.
+2. **A single flat `ratePerKm` misprices different vehicle classes.** Research into general trucking fuel-efficiency data showed a roughly 3–4× difference in fuel consumption between a mini truck (~11 km/L) and a container/trailer truck (~2.6–3.3 km/L). A flat rate would significantly under-price container-truck jobs and over-price mini-truck jobs.
 
-1. **Audit obligations.** Section 4 of the project README and mandatory edge cases 1 and 2 require that status changes be *fully auditable*. The schema carries dedicated append-only history tables (`LoadStatusHistory`, `AgencyStatusHistory`, `TripEvent`) to satisfy this. A cascading delete of a parent row would silently destroy exactly the history those tables exist to preserve.
-2. **Financial and evidentiary integrity.** `Invoice` numbers form a gapless sequence, and `TripEvidence` rows are the Proof-of-Pickup / Proof-of-Delivery records that ADR-004 makes mandatory. These are the artefacts a dispute is adjudicated against months later, and neither may be destroyed as a side effect of an upstream deletion.
-3. **Enforcing the state machine.** If a delete path exists, developers will use it, because it is one statement instead of a status update plus a history insert plus a reason. Removing the shortcut is what guarantees that every lifecycle event produces an actor, a timestamp, and a reason.
-
-A separate `IsDeleted` flag was considered and rejected because every entity in this schema *already* carries its lifecycle state in a status column — `LoadStatus.Cancelled`, `AgencyStatus.Suspended`, `VehicleStatus.Retired`, `DriverStatus.Inactive`, `InvoiceStatus.Void`, `User.IsActive`. Adding a second flag alongside these creates two sources of truth and an undefined intersection (what does `Status = 'Active'` with `IsDeleted = true` mean?), and requires every query to filter on both — a correctness risk the first time one is forgotten.
+The team also checked directly for a free API to source live Sri Lankan diesel/petrol prices or freight rates. **None exists**: Sri Lanka's Ceylon Petroleum Corporation (CPC) publishes prices only as static HTML with no API; the one commercial fuel-price API found covering Sri Lanka (GlobalPetrolPrices.com) is a paid product; and freight/lorry-hire pricing in Sri Lanka is market-negotiated per job with no published rate card at all, unlike the regulated, published tuk-tuk/taxi fare structure. A live external fetch was also judged undesirable even if one existed, for the same demo-reliability reasons already documented for the LLM (ADR-008) and email (ADR-012) fallbacks: CPC prices change only monthly at most, so a live fetch buys negligible accuracy over a periodically-updated, cited constant, while introducing a real live-demo failure point.
 
 ### Decision
-**No business entity in FreightLink is ever hard-deleted.** Lifecycle termination is expressed exclusively as a status transition on the entity's existing status enum, accompanied by a history row where the entity has a history table.
+Introduce two new, Admin-only-managed reference tables to hold the pricing input data, while keeping the ADR-015 formula itself unchanged:
 
-This is enforced at three levels:
+| Table | Purpose |
+|---|---|
+| `FuelPriceRate` | Current and historical `PricePerLitre` by `FuelType`, each row citing its `Source` (e.g. "CPC official announcement, dated") |
+| `VehicleClassEfficiency` | Fuel consumption (`FuelConsumptionLPer100Km`) and a `Load.WeightKg`/`VolumeM3` payload band (`MinPayloadKg`–`MaxPayloadKg`) per `VehicleClass` tier, used to derive a weight-tiered `ratePerKm` instead of one flat value |
 
-1. **All business foreign keys use `ON DELETE RESTRICT`.** `DeleteBehavior.Restrict` is set explicitly in EF Core, overriding its default of `Cascade` for required relationships.
-2. **A `BEFORE DELETE` deny trigger** (raising `FL-DELETE-001`) is applied to `User`, `Agency`, `Vehicle`, `Driver`, `Load`, `Assignment`, `Trip`, `Invoice`, `Payment`, `Dispute`, `File`, and `ComplianceDoc`. This closes the gap that `RESTRICT` alone leaves open: `RESTRICT` blocks deletion only of a row that *has* dependent children, so a never-used vehicle or an unreferenced file would otherwise still be deletable.
-3. **Append-only tables** (`LoadStatusHistory`, `AgencyStatusHistory`, `TripEvent`, `TripEvidence`, `ToolCall`, `ApprovalDecision`, `PaymentWebhookEvent`) additionally carry a `BEFORE UPDATE OR DELETE` deny trigger (`FL-AUDIT-001`), making them immutable once written.
-
-**Two deliberate exceptions use `ON DELETE CASCADE`:**
-- `AgentWorkflowRun → AgentStep → ToolCall` — the agent execution trace is diagnostic telemetry with no meaning apart from its parent run; an orphaned `ToolCall` row is unreadable.
-- `RefreshToken → User` — session data carrying no audit value once the account itself is gone (ADR-011).
-
-**One deliberate non-exception:** `ApprovalDecision` hangs off `AgentWorkflowRun` alongside `AgentStep`, but uses `RESTRICT`, not `CASCADE`. An approval is the record of a named human accepting responsibility for a high-impact action (ADR-013, ADR-016) and must outlive any cleanup of the machine-generated trace around it.
-
-Three lifecycle gaps identified while making this decision are closed as part of it: `File` gains a `FileStatus` enum (`Active` / `Removed`) so an incorrectly attached document can be withdrawn; `Notification` gains a nullable `DismissedAt`; and `LoadStatus` gains `Discarded`, so an abandoned draft is distinguishable from a genuine `Cancelled` load in the shipper's history.
+Design details:
+- **`FuelType` and `VehicleClass` are native Postgres enums**, not lookup tables — consistent with the existing `UserRole`/`LoadStatus` convention (small, closed, structural sets). Only the genuinely tunable numeric market data (price, payload bounds, consumption figures) lives in a table, since enums cannot hold editable numeric values.
+- **Versioning is append-only**: editing a rate means inserting a new row with a later `EffectiveFrom`; the prior row is left untouched and becomes historical. The "current" value is the latest `EffectiveFrom` row that has not been soft-deleted.
+- **Soft delete, not hard delete**: a `BEFORE DELETE` trigger intercepts any `DELETE` and instead sets `DeletedAt` / `DeletedByUserId`, consistent with the project's existing no-hard-delete rule (enforced elsewhere via `BEFORE DELETE` triggers and `ON DELETE RESTRICT`). Unlike other status-bearing entities, no separate `*StatusHistory` table is introduced for these two tables, since reference data of this kind has no meaningful multi-stage lifecycle to log beyond "current vs. superseded vs. deleted."
+- **`VehicleClassEfficiency` is deliberately decoupled from `Vehicle.VehicleType`** (Component B). The actual `Vehicle` used for a load is not selected until `Trip` creation, which happens after `Assignment` is `Accepted` — by which point Agent 3 has already computed the proposed price. `Load.WeightKg`/`VolumeM3` are used instead as the earliest available proxy for the vehicle class the job will likely need.
+- **Auditability without new coupling to the agentic tables**: Agent 3's pricing service snapshots the actual `PricePerLitre` and `FuelConsumptionLPer100Km` values it used into `AgentStep.InputJson` (already `jsonb`, per ADR-010) at calculation time. This preserves a full point-in-time audit trail for any historical run even after the underlying config row is later superseded or soft-deleted, without adding any new foreign key onto the Agentic AI tables.
+- **Admin-only CRUD**, extending ADR-016's narrowed Admin scope (KYC verification, system-wide analytics) with a third, similarly non-matching-related function: maintaining system pricing-configuration reference data.
+- **Initial data sourcing methodology**: a documented, cost-based derivation (CPC's official cited diesel price ÷ a fuel-efficiency figure per vehicle class, plus driver/maintenance/margin allowances) cross-checked against real market quotes obtained directly from comparable local operators (e.g. PickMe Truck, independent lorry-hire services), rather than any single external pricing API.
 
 ### Consequences
 **Positive**
-- Mandatory edge cases 1 and 2 are satisfied structurally rather than by convention: a suspended agency's in-flight trips, and a cancelled load's assignment, trip, evidence, and invoice rows, all survive intact with the reason and actor recorded.
-- The deny trigger makes "how do you know your audit trail is complete?" answerable with a demonstrable database-level guarantee rather than an assurance about application code — a stronger viva answer than a code walkthrough, and one the evaluator can test live by attempting a `DELETE` directly in `psql`.
-- Referential integrity is unconditional: no query in the system needs to defend against a dangling foreign key, and no orphan-cleanup logic is required anywhere.
-- Avoids the dual-source-of-truth problem that a generic `IsDeleted` column would have introduced across all 28 tables.
+- Gives the team a directly defensible, citable, dated, and auditable answer to "where did `baseFare`/`ratePerKm`/`ratePerKg` come from" under review-board questioning, rather than an unexplained hardcoded number.
+- Lets `ratePerKm` vary realistically by load-weight tier, reflecting genuine fuel-efficiency differences between vehicle classes, without requiring a machine-learning pricing model or any training data the team does not have.
+- Admin can update these values through the application as CPC revises fuel prices, with no code redeploy required — a genuine, demonstrable operational-maturity story for the viva.
+- Fully consistent with existing project conventions rather than introducing arbitrary new patterns: the enum-vs-table split follows the same reasoning already established for `UserRole`; the soft-delete trigger follows the same no-hard-delete principle used everywhere else in the schema; and the `AgentStep.InputJson` snapshot reuses an existing audit mechanism instead of adding new schema coupling.
+- Avoids the live-demo fragility of fetching pricing data from an external service at request time, matching the same reliability reasoning already applied to the LLM and email integrations.
 
 **Negative**
-- Data volume only grows. This is immaterial at academic scale but would require an archival strategy in a production deployment, and the team should say so if asked rather than claiming the design scales unchanged.
-- Every read query must filter on status (`WHERE Status = 'Active'`), and forgetting the filter surfaces retired or cancelled records. Partial indexes mitigate the performance cost; EF Core `HasQueryFilter` mitigates the correctness risk, with the caveat that query filters also apply to `Include()` navigation loads.
-- Genuine mistakes — a typo in a vehicle registration, a stray record created during development — cannot be removed through the application and require a direct database intervention with the trigger temporarily disabled. The team accepts this as the correct trade-off for an auditable system, and manages seed/test data through migrations rather than the UI.
+- Two new tables, an Admin CRUD endpoint pair, and role-guard tests are additive scope not in the original sprint plan; the team has deliberately timed this to avoid displacing the higher-priority Sprint 3 Agentic AI catch-up work, rather than treating it as urgent.
+- Expands Admin's role beyond ADR-016's original "KYC + analytics only" wording with a third function; this must be explained consistently as a deliberate, narrow addition (system configuration, not matching authority) if raised in the viva, rather than left as unexplained scope creep.
+- No authoritative Sri Lanka fuel-price or freight-rate API exists (confirmed by direct search); the initial `FuelPriceRate` and `VehicleClassEfficiency` values are therefore a cost-based derivation and manually-collected market quotes, dated to when they were gathered, requiring periodic manual re-verification by Admin rather than automatic refresh. This is accepted as a reasonable, documented limitation rather than a gap the team failed to investigate.
+- Introduces a `DeletedAt`/`DeletedByUserId` soft-delete pattern not used elsewhere in the schema (other entities use Status enums plus a separate `*StatusHistory` table instead); justified specifically for this case because the reference data has no meaningful multi-stage lifecycle that would warrant a full history table.
 
 ### Alternatives Considered
-- **`ON DELETE CASCADE` throughout:** Rejected outright — deleting a single `Agency` row would silently destroy its status history, fleet, drivers, compliance documents, and every assignment it had ever received, which directly contradicts the auditability requirement in edge case 1.
-- **Generic `IsDeleted` boolean on every table:** Rejected — duplicates lifecycle state the existing status enums already carry, creates undefined combinations, and doubles the filtering burden on every query. The status columns *are* the soft-delete mechanism; a second flag adds ambiguity, not safety.
-- **`ON DELETE RESTRICT` alone, without the deny trigger:** Rejected as incomplete. `RESTRICT` protects only rows that already have children, leaving childless rows — a newly registered vehicle, an unreferenced file — freely deletable, which would make the "nothing is ever deleted" claim untrue in exactly the cases nobody thinks to test.
-- **`ON DELETE SET NULL` on selected foreign keys:** Rejected — would require nullable foreign keys throughout, contradicting the schema's explicit design rule against them, and would leave history rows pointing at nothing rather than at the entity whose history they record.
-
----
-
-## ADR-020: Enumerated Value Sets as Native Enum Types, Not Lookup Tables
-
-**Status:** Accepted
-**Date:** August 2026
-
-### Context
-The schema contains roughly two dozen closed value sets — user roles, the status chain of every major entity, evidence types, agent roles, approval decisions, notification categories. Two questions had to be settled together: how these are stored, and where their authoritative definition lives.
-
-The storage question surfaced first with `User.Role`. A `Role` lookup table with a foreign key from `User` is the conventional relational answer and was the schema's original design. On review the team found the usual justification for it does not hold here: a lookup table is required by Third Normal Form only if *role metadata* (display name, description, permission set) is stored, since that metadata depends on the role rather than on the user. FreightLink stores no such metadata — authorization is expressed through `[Authorize(Roles = ...)]` attributes in code, not database rows — so a single atomic value on `User` introduces no transitive dependency and the table earns nothing.
-
-The definition question surfaced separately: value sets were being invented ad hoc in C# as each component was built, with no single place to check them, which risks the four components drifting apart on spelling and on which terminal states exist.
-
-### Decision
-Every closed value set is stored as a **PostgreSQL native enum type** (or, where a project constraint prevents that, a `text` column with an equivalent `CHECK` constraint), mapped to a C# enum with `HasConversion<string>()` in EF Core so values remain human-readable in `psql` during the live demo. No lookup tables are created for value sets.
-
-The authoritative definition of every enum lives in a single **Enum Inventory** document (`docs/enum-inventory.md`), grouped by owning component. Adding or renaming a value is a change to that document first, then a migration.
-
-Two substantive points were settled while producing the inventory:
-
-- **`AgencyStatus` distinguishes `Verified` from `Active`.** `Verified` means the Admin has approved the agency's KYC/compliance documents; `Active` means verified *and* currently accepting jobs (at least one available vehicle, at least one active driver, availability switched on). `Verified ↔ Active` is the transition the Flutter availability-management screen writes, in both directions; movement into and out of `Suspended` is Admin-only. **Agent 2's eligibility query filters on `Active` only** — this is the reason the distinction had to be resolved rather than left implicit.
-- **Terminal states were missing from four documented chains.** `LoadStatus.Cancelled`, `AssignmentStatus.Cancelled`, `TripStatus.Cancelled`, and `InvoiceStatus.Void` are all produced by endpoints that already exist and are required by mandatory edge case 2, but none appeared in the status chains as originally written. All four are now part of their respective enums.
-
-### Consequences
-**Positive**
-- The database rejects an invalid value exactly as a foreign key would have, so dropping the lookup table costs nothing in integrity while removing a join from every user query.
-- Enum members and database values are the same strings, so `[Authorize(Roles = "AgencyStaff")]` lines up with what is stored, with no mapping layer in between and nothing to get out of sync.
-- A single inventory document gives the four component owners one place to check a value set before using it, and gives the viva a written artefact to point at — a value set that exists only in C# is one an evaluator cannot inspect.
-- Resolving `Verified` vs `Active` removes a genuine ambiguity in Agent 2's eligibility filter that would otherwise have been settled silently, and differently, by whoever implemented it first.
-
-**Negative**
-- Adding a value to a PostgreSQL enum type requires a migration (`ALTER TYPE ... ADD VALUE`) rather than an `INSERT`, so value sets are less convenient to extend at runtime than lookup-table rows. Judged appropriate here precisely because these sets should not change casually — each value implies branching logic in code.
-- The design assumes **exactly one role per user**. If a user ever needs two roles simultaneously (an owner-dispatcher who also drives), `User.Role` must be replaced by a `UserRole` junction table. This is recorded explicitly as a correctness boundary, not a preference, so that the constraint is a known one rather than a surprise.
-- Enum members and the inventory document can drift if the document is not updated alongside a migration; the team treats the document as the first step of any enum change rather than as documentation written afterwards.
-
-### Alternatives Considered
-- **`Role` lookup table with a foreign key from `User` (original design):** Rejected — required by 3NF only if role metadata is stored, which it is not; adds a table and a join without adding information.
-- **Plain `text`/`varchar` status columns with no constraint:** Rejected outright — permits `'shipper'`, `'Shipper '`, and `'SHIPPER'` to coexist as distinct values, which silently breaks every status filter and eligibility query in the system.
-- **Integer-backed enums (EF Core's default mapping):** Rejected — stores `2` where a human reading the table needs `Active`, which makes both debugging and live demonstration of data changes materially harder for no benefit.
-- **A single generic `Lookup` table holding all value sets:** Rejected — a polymorphic key/value table defeats type safety entirely and would require every join to filter on a category discriminator.
+- **Leave `baseFare`/`ratePerKm`/`ratePerKg` as plain hardcoded application-config constants (original ADR-015 scope, unchanged):** Rejected as insufficient on its own — gives no admin editability without a redeploy, and no queryable, timestamped, sourced answer to "where did this number come from" under review-board questioning.
+- **Fetch fuel price and/or freight pricing live from a third-party API at calculation time:** Rejected — no free, official Sri Lanka fuel-price API exists (confirmed by direct search), and even a paid or unofficial one would introduce a live external dependency that could fail during the live demo, for the same reliability reasons already documented in ADR-008 and ADR-012.
+- **Free-text `VehicleType`/`FuelType` columns instead of enums:** Rejected for consistency — the project already established native Postgres enums over lookup tables for exactly this kind of small, closed categorical set (see `UserRole`, `LoadStatus`).
+- **Key pricing tiers directly off `Vehicle.VehicleType`:** Rejected — the actual `Vehicle` is not selected until `Trip` creation, which happens after `Assignment` is `Accepted` and after Agent 3 has already computed the proposed price; `Load.WeightKg`/`VolumeM3` bands are used instead as the earliest available proxy.
+- **A full `*StatusHistory` table mirroring `AgencyStatusHistory`/`LoadStatusHistory`:** Rejected as unnecessary for this case — these two tables are pure reference data with no multi-stage business lifecycle; the simpler `EffectiveFrom` versioning plus `DeletedAt` soft-delete satisfies the no-hard-delete rule without the added complexity of a parallel history table.
 
 ---
 
@@ -677,8 +626,7 @@ Two substantive points were settled while producing the inventory:
 | ADR-016 | Approval authority — Shipper, not Admin | Accepted |
 | ADR-017 | No competitive bidding — single AI-recommended agency, confirmed via job proposal | Accepted |
 | ADR-018 | Automatic retry with a capped attempt limit, and Shipper email notifications, on agency decline | Accepted |
-| ADR-019 | No hard deletes — entity lifecycle managed by status transitions | Accepted |
-| ADR-020 | Enumerated value sets as native enum types, not lookup tables | Accepted |
+| ADR-019 | Admin-managed pricing configuration — fuel price & vehicle-class efficiency reference tables | Accepted |
 
 ---
 
