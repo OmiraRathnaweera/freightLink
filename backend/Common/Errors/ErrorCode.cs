@@ -112,6 +112,11 @@ public enum ErrorCode
 
     /// <summary>The dispute has already been resolved or rejected.</summary>
     DISPUTE_ALREADY_RESOLVED,
+    /// <summary>An attach was attempted referencing an UploadedFile publicId that does not exist.</summary>
+    LOAD_FILE_UPLOAD_NOT_FOUND,
+
+    /// <summary>A detach was attempted on a LoadFile attachment that does not exist under the given load.</summary>
+    LOAD_FILE_NOT_FOUND,
 
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,

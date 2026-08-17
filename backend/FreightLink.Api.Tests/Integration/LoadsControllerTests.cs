@@ -337,6 +337,39 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    /// <summary>createdFrom/createdTo query params filter the list to the requested inclusive date range.</summary>
+    [Fact]
+    public async Task GetList_WithCreatedFromAndCreatedTo_FiltersByDateRange()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("list-daterange");
+        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
+        var from = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(-1).ToString("O"));
+        var to = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"));
+
+        using var request = AuthedRequest(HttpMethod.Get, $"/api/v1/loads?createdFrom={from}&createdTo={to}", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
+        Assert.Contains(page!.Items, item => item.LoadId == load.LoadId);
+    }
+
+    /// <summary>A createdFrom in the future excludes every load, returning an empty page rather than an error.</summary>
+    [Fact]
+    public async Task GetList_WithCreatedFromExcludingAllLoads_ReturnsEmptyItems()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("list-daterange-empty");
+        await CreateLoadAsShipperAsync(tokens.AccessToken);
+        var futureFrom = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddYears(1).ToString("O"));
+
+        using var request = AuthedRequest(HttpMethod.Get, $"/api/v1/loads?createdFrom={futureFrom}", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
+        Assert.Empty(page!.Items);
+    }
+
     // --- Edit (Shipper own only) ---
 
     /// <summary>A Shipper can edit a Draft load they own.</summary>
