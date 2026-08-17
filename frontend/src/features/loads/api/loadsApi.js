@@ -13,19 +13,54 @@ export const loadKeys = {
   details: () => [...loadKeys.all, 'detail'],
   detail: (id) => [...loadKeys.details(), id],
   files: (loadId) => [...loadKeys.detail(loadId), 'files'],
-  statusHistory: (id) => [...loadKeys.detail(id), 'status-history'],
 }
+
+/**
+ * @typedef {object} LoadListItem
+ * @property {string} loadId
+ * @property {string} referenceCode
+ * @property {string} shipperUserId
+ * @property {string} shipperName - Owner's display name; resolved server-side, never fetched separately (no /users/{id} endpoint exists).
+ * @property {string} cargoDescription
+ * @property {number} weightKg
+ * @property {string} pickupAddress
+ * @property {string} dropoffAddress
+ * @property {string} pickupWindowStart
+ * @property {string} pickupWindowEnd
+ * @property {number|null} estimatedPrice
+ * @property {string} status
+ * @property {string} createdAt
+ */
 
 /**
  * GET /loads — paginated/filterable list (Section 3.3).
  * @param {{ page?: number, pageSize?: number, status?: string, search?: string, sortBy?: string, sortDir?: 'asc'|'desc', createdFrom?: string, createdTo?: string }} [params]
- * @returns {Promise<{ items: object[], page: number, pageSize: number, totalItems: number, totalPages: number }>}
+ * @returns {Promise<{ items: LoadListItem[], page: number, pageSize: number, totalItems: number, totalPages: number }>}
  */
 export async function listLoads(params) {
   return api.get('/loads', { params })
 }
 
-/** GET /loads/{id} — full LoadResponseDto (Section 3.6). */
+/**
+ * @typedef {object} LoadStatusHistoryEntry
+ * @property {string} loadStatusHistoryId
+ * @property {string|null} fromStatus - null only for the load's very first status row.
+ * @property {string} toStatus
+ * @property {string|null} reason - only ever set for transitions that require one (e.g. cancellation).
+ * @property {string} changedByUserId
+ * @property {string} changedAt
+ */
+
+/**
+ * GET /loads/{id} — full LoadResponseDto (Section 3.6), extends
+ * LoadListItem with shipperUserId/shipperName (both present here too) plus
+ * volumeM3, lat/lng, workflowRunId, updatedAt, and statusHistory. There is
+ * no separate status-history endpoint — the full transition timeline
+ * (newest first) rides along on this response only; POST/PUT/PATCH
+ * .../cancel responses leave statusHistory as an empty array, since the
+ * caller already knows the single transition it just made.
+ * @returns {Promise<LoadListItem & { volumeM3: number, pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, workflowRunId: string|null, updatedAt: string, statusHistory: LoadStatusHistoryEntry[] }>}
+ */
 export async function getLoad(id) {
   return api.get(`/loads/${id}`)
 }
@@ -43,23 +78,6 @@ export async function updateLoad(id, data) {
 /** PATCH /loads/{id}/cancel — cancel a load (Section 3.5). */
 export async function cancelLoad(id, { reason }) {
   return api.patch(`/loads/${id}/cancel`, { reason })
-}
-
-/**
- * GET /loads/{id}/status-history — full status transition timeline. NOT
- * YET IMPLEMENTED on the backend as of this writing (confirmed directly
- * against backend/Controllers/LoadsController.cs — no matching route —
- * and docs/api-contract-openapi-skeleton.md:149, which marks it "not yet
- * implemented"). The LoadStatusHistory table exists and is written to on
- * every transition (ADR-019); there's just no route serving it yet, so
- * this call 404s today. The shape below is inferred from
- * backend/Entities/LoadStatusHistory.cs's fields under this project's
- * camelCase convention — verify against the real response once the
- * endpoint ships, field names aren't contract-guaranteed yet.
- * @returns {Promise<{ loadStatusHistoryId: string, loadId: string, changedByUserId: string, fromStatus: string|null, toStatus: string, reason: string|null, changedAt: string }[]>}
- */
-export async function getLoadStatusHistory(id) {
-  return api.get(`/loads/${id}/status-history`)
 }
 
 /**
@@ -141,17 +159,6 @@ export function useCancelLoadMutation(id, options) {
       queryClient.invalidateQueries({ queryKey: loadKeys.detail(id) })
       options?.onSuccess?.(data, variables, context)
     },
-    ...options,
-  })
-}
-
-/** Status-history query — see getLoadStatusHistory's comment: 404s until the backend endpoint ships. */
-export function useLoadStatusHistoryQuery(id, options) {
-  return useQuery({
-    queryKey: loadKeys.statusHistory(id),
-    queryFn: () => getLoadStatusHistory(id),
-    enabled: Boolean(id),
-    retry: false, // the route doesn't exist yet — no point retrying a 404
     ...options,
   })
 }

@@ -7,6 +7,8 @@ import Card from '../../../components/Card.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
+import { UserRole } from '../../../lib/enums.js'
 import { useLoadsQuery } from '../api/loadsApi.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
 import LoadFilterBar from '../components/LoadFilterBar.jsx'
@@ -21,6 +23,7 @@ const DEFAULT_PAGE_SIZE = 20
 // bookmarkable/shareable and survives a refresh.
 function LoadsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const role = useAppSelector((state) => state.auth.role)
 
   const page = Number(searchParams.get('page') ?? '1')
   const pageSize = Number(searchParams.get('pageSize') ?? String(DEFAULT_PAGE_SIZE))
@@ -93,7 +96,13 @@ function LoadsPage() {
           <ErrorState description={getLoadErrorMessage(loadsQuery.error)} onRetry={loadsQuery.refetch} />
         ) : loadsQuery.data.items.length > 0 ? (
           <>
-            <LoadsTable loads={loadsQuery.data.items} sortBy={sortBy} sortDir={sortDir} onSortChange={handleSortChange} />
+            <LoadsTable
+              loads={loadsQuery.data.items}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSortChange={handleSortChange}
+              showShipperColumn={role === UserRole.ADMIN}
+            />
             <Pagination
               page={loadsQuery.data.page}
               pageSize={loadsQuery.data.pageSize}

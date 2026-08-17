@@ -6,10 +6,9 @@ import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
-import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { useLoadDetailQuery } from '../api/loadsApi.js'
 import { getLoadStatusTone } from '../lib/statusTone.js'
-import { formatCurrency, formatDateTime, formatWeight } from '../lib/format.js'
+import { formatCurrency, formatDateTime, formatShipperName, formatWeight } from '../lib/format.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
 import { isLoadCancellable, isLoadEditable } from '../lib/loadPermissions.js'
 import RouteMapCard from '../components/RouteMapCard.jsx'
@@ -29,7 +28,6 @@ function LoadDetailPage() {
   const { loadId } = useParams()
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const loadQuery = useLoadDetailQuery(loadId)
-  const authUser = useAppSelector((state) => state.auth.user)
 
   if (loadQuery.isLoading) {
     return (
@@ -128,7 +126,7 @@ function LoadDetailPage() {
         </div>
 
         <div className="space-y-6 lg:col-span-1">
-          <LoadStatusHistoryCard loadId={load.loadId} />
+          <LoadStatusHistoryCard history={load.statusHistory} />
 
           <Card>
             <h3 className="mb-4 text-headline-md text-primary">Pickup</h3>
@@ -171,17 +169,7 @@ function LoadDetailPage() {
               </div>
               <div>
                 <dt className="text-label-caps text-on-surface-variant">Shipper</dt>
-                {authUser?.userId === load.shipperUserId ? (
-                  <dd className="text-body-md text-on-surface">{authUser.fullName}</dd>
-                ) : (
-                  <>
-                    {/* No backend endpoint resolves an arbitrary shipperUserId to a name yet
-                        (only GET /auth/me returns fullName, for the caller's own account) — falls
-                        back to the raw id for an Admin viewing someone else's load. */}
-                    <dd className="break-all text-data-mono text-on-surface">{load.shipperUserId}</dd>
-                    <p className="mt-1 text-body-md text-on-surface-variant">Name isn't available for other shippers yet.</p>
-                  </>
-                )}
+                <dd className="text-body-md text-on-surface">{formatShipperName(load.shipperName, load.shipperUserId)}</dd>
               </div>
               <div>
                 <dt className="text-label-caps text-on-surface-variant">Workflow Run</dt>

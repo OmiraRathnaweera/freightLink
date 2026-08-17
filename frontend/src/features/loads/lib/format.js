@@ -55,3 +55,13 @@ export function formatFileSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
+
+// Single place the shipperName fallback lives, so the loads table and the
+// detail page can never drift apart. There's no /users/{id} endpoint to
+// resolve a name from — shipperName is either present on the Load response
+// or it isn't, never fetched separately.
+export function formatShipperName(shipperName, shipperUserId) {
+  if (shipperName && shipperName.trim()) return shipperName
+  if (shipperUserId) return `Unknown (${shipperUserId.slice(0, 8)}…)`
+  return 'Unknown'
+}

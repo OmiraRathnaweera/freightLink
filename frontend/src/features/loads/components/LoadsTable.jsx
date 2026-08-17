@@ -3,7 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import { cx } from '../../../lib/cx.js'
 import { getLoadStatusTone } from '../lib/statusTone.js'
-import { formatCurrency, formatDateTime, formatWeight } from '../lib/format.js'
+import { formatCurrency, formatDateTime, formatShipperName, formatWeight } from '../lib/format.js'
 import RowActionsMenu from './RowActionsMenu.jsx'
 
 // Header cell for the three columns the backend can sort on
@@ -35,13 +35,14 @@ function SortableHeader({ column, label, sortBy, sortDir, onSortChange }) {
 // (LoadListItemDto, docs/load-management-api.md Section 3.3) and
 // StatusBadge-tone mapping are specific to the Loads domain
 // (.claude/rules/frontend-design.md #1).
-function LoadsTable({ loads, sortBy, sortDir, onSortChange }) {
+function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = false }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-body-md">
         <thead>
           <tr className="text-label-caps text-on-surface-variant">
             <th className="py-table-cell-py pr-table-cell-px font-normal">Reference</th>
+            {showShipperColumn && <th className="py-table-cell-py pr-table-cell-px font-normal">Shipper</th>}
             <th className="py-table-cell-py pr-table-cell-px font-normal">Cargo</th>
             <th className="py-table-cell-py pr-table-cell-px font-normal">Route</th>
             <SortableHeader column="weightKg" label="Weight" sortBy={sortBy} sortDir={sortDir} onSortChange={onSortChange} />
@@ -66,6 +67,11 @@ function LoadsTable({ loads, sortBy, sortDir, onSortChange }) {
                   {load.referenceCode}
                 </Link>
               </td>
+              {showShipperColumn && (
+                <td className="py-table-cell-py pr-table-cell-px text-on-surface">
+                  {formatShipperName(load.shipperName, load.shipperUserId)}
+                </td>
+              )}
               <td className="max-w-xs truncate py-table-cell-py pr-table-cell-px text-on-surface" title={load.cargoDescription}>
                 {load.cargoDescription}
               </td>
