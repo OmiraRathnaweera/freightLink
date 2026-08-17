@@ -31,9 +31,9 @@ export async function refresh(refreshToken) {
   return api.post('/auth/refresh', { refreshToken })
 }
 
-/** POST /auth/logout — revokes the caller's refresh token. */
-export async function logout() {
-  return api.post('/auth/logout')
+/** POST /auth/logout — revokes the given refresh token. */
+export async function logout(refreshToken) {
+  return api.post('/auth/logout', { refreshToken })
 }
 
 /**

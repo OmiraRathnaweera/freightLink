@@ -7,10 +7,10 @@ import { cancelLoadSchema } from '../lib/validationSchemas.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
 
 // Confirm dialog for PATCH /loads/{id}/cancel (docs/load-management-api.md
-// Section 3.5) — only ever rendered for a load in Draft/Posted/Matched
-// (isLoadCancellable), by RowActionsMenu (table row) or LoadDetailPage
-// (detail action bar), each owning their own open/close state and passing
-// loadId + onClose.
+// Section 3.5) — only ever rendered for a Shipper-owned load in
+// Draft/Posted/Matched (canCancelLoad — loadPermissions.js), by
+// RowActionsMenu (table row) or LoadDetailPage (detail action bar), each
+// owning their own open/close state and passing loadId + onClose.
 function CancelLoadDialog({ loadId, onClose }) {
   const cancelMutation = useCancelLoadMutation(loadId)
 

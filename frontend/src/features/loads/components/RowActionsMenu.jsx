@@ -3,17 +3,18 @@ import { Link } from 'react-router-dom'
 import { Ban, Eye, MoreVertical, Pencil } from 'lucide-react'
 import { useClickOutside } from '../../../hooks/useClickOutside.js'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
-import { isLoadCancellable, isLoadEditable } from '../lib/loadPermissions.js'
+import { canCancelLoad, canEditLoad } from '../lib/loadPermissions.js'
 import CancelLoadDialog from './CancelLoadDialog.jsx'
 
 // Load Control row actions — a feature component since the menu items
-// (View/Edit/Cancel), their routes, and their status-gating are specific
-// to the Loads domain (.claude/rules/frontend-design.md #1). Edit/Cancel
-// are only rendered when the load's current status allows them
-// (isLoadEditable/isLoadCancellable — see docs/load-management-api.md
-// Section 2), not just disabled, since a stale/cached status could still
-// get a 422 from the backend regardless.
-function RowActionsMenu({ loadId, status }) {
+// (View/Edit/Cancel), their routes, and their role/status-gating are
+// specific to the Loads domain (.claude/rules/frontend-design.md #1).
+// Edit/Cancel are only rendered when both the caller's role and the
+// load's current status allow them (canEditLoad/canCancelLoad —
+// loadPermissions.js), not just disabled — Load mutations are Shipper
+// (owner) only, and a stale/cached role or status could still get a
+// 403/422 from the backend regardless of what the UI shows.
+function RowActionsMenu({ loadId, status, role }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const containerRef = useRef(null)
@@ -48,7 +49,7 @@ function RowActionsMenu({ loadId, status }) {
             <Eye className="h-4 w-4" strokeWidth={1.5} />
             View
           </Link>
-          {isLoadEditable(status) && (
+          {canEditLoad(role, status) && (
             <Link
               to={`/loads/${loadId}/edit`}
               role="menuitem"
@@ -59,7 +60,7 @@ function RowActionsMenu({ loadId, status }) {
               Edit
             </Link>
           )}
-          {isLoadCancellable(status) && (
+          {canCancelLoad(role, status) && (
             <button
               type="button"
               role="menuitem"

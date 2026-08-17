@@ -11,6 +11,7 @@ import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
 import { useLoadsQuery } from '../api/loadsApi.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
+import { canCreateLoad } from '../lib/loadPermissions.js'
 import LoadFilterBar from '../components/LoadFilterBar.jsx'
 import LoadsTable from '../components/LoadsTable.jsx'
 import Pagination from '../components/Pagination.jsx'
@@ -45,8 +46,14 @@ function LoadsPage() {
       sortDir,
       search,
       status,
-      createdFrom: createdFrom ? `${createdFrom}T00:00:00Z` : undefined,
-      createdTo: createdTo ? `${createdTo}T23:59:59Z` : undefined,
+      createdFrom: createdFrom ? `${createdFrom}T00:00:00.000Z` : undefined,
+      // .999 (milliseconds) is the maximum precision a JS Date/ISO string
+      // can express — plain "T23:59:59Z" implies :00 of that second,
+      // silently excluding anything created in the last 999ms of the
+      // selected day. This keeps the API's documented inclusive-upper-bound
+      // contract unchanged (no cross-client contract break) while closing
+      // that gap as tightly as the frontend is able to.
+      createdTo: createdTo ? `${createdTo}T23:59:59.999Z` : undefined,
     }),
     [page, pageSize, sortBy, sortDir, search, status, createdFrom, createdTo],
   )
@@ -77,9 +84,11 @@ function LoadsPage() {
         title="My Loads"
         description="Track every load you've posted, from draft to delivery."
         actions={
-          <Button as={Link} to="/loads/new" variant="primary">
-            Post a Load
-          </Button>
+          canCreateLoad(role) && (
+            <Button as={Link} to="/loads/new" variant="primary">
+              Post a Load
+            </Button>
+          )
         }
       />
 
@@ -102,6 +111,7 @@ function LoadsPage() {
               sortDir={sortDir}
               onSortChange={handleSortChange}
               showShipperColumn={role === UserRole.ADMIN}
+              role={role}
             />
             <Pagination
               page={loadsQuery.data.page}
@@ -118,9 +128,11 @@ function LoadsPage() {
             title="No loads found"
             description="Try different filters, or post a new load."
             action={
-              <Button as={Link} to="/loads/new" variant="primary">
-                Post a Load
-              </Button>
+              canCreateLoad(role) && (
+                <Button as={Link} to="/loads/new" variant="primary">
+                  Post a Load
+                </Button>
+              )
             }
           />
         )}

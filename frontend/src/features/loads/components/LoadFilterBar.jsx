@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search } from 'lucide-react'
 import Input from '../../../components/Input.jsx'
 import { LoadStatus } from '../../../lib/enums.js'
@@ -15,9 +15,16 @@ const STATUS_OPTIONS = Object.values(LoadStatus)
 function LoadFilterBar({ search, status, createdFrom, createdTo, onChange }) {
   const [searchInput, setSearchInput] = useState(search ?? '')
   const debouncedSearch = useDebouncedValue(searchInput, 400)
+  // Tracks the last value *this component* pushed to the URL via onChange,
+  // so the sync effect below can tell "search changed because our own
+  // debounce just committed" (skip — searchInput already reflects it) apart
+  // from "search changed for some other reason, e.g. browser back/forward,
+  // a filter reset elsewhere" (sync local state to match).
+  const lastEmittedRef = useRef(search ?? '')
 
   useEffect(() => {
     if (debouncedSearch !== (search ?? '')) {
+      lastEmittedRef.current = debouncedSearch
       onChange({ search: debouncedSearch || undefined })
     }
     // Only re-run when the debounced value itself changes — `search` and
@@ -25,6 +32,17 @@ function LoadFilterBar({ search, status, createdFrom, createdTo, onChange }) {
     // including them would create a feedback loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch])
+
+  // Re-syncs local state when `search` changes for a reason other than the
+  // debounce commit above (e.g. browser back/forward navigating the URL,
+  // or another control resetting filters) — guarded by lastEmittedRef so it
+  // never clobbers text the user is still mid-typing/mid-debounce.
+  useEffect(() => {
+    if ((search ?? '') !== lastEmittedRef.current) {
+      lastEmittedRef.current = search ?? ''
+      setSearchInput(search ?? '')
+    }
+  }, [search])
 
   return (
     <div className="flex flex-wrap items-end gap-3">

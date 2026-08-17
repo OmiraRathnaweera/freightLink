@@ -35,7 +35,7 @@ function SortableHeader({ column, label, sortBy, sortDir, onSortChange }) {
 // (LoadListItemDto, docs/load-management-api.md Section 3.3) and
 // StatusBadge-tone mapping are specific to the Loads domain
 // (.claude/rules/frontend-design.md #1).
-function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = false }) {
+function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = false, role }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-body-md">
@@ -90,7 +90,7 @@ function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = 
               </td>
               <td className="py-table-cell-py pr-table-cell-px text-on-surface-variant">{formatDateTime(load.createdAt)}</td>
               <td className="py-table-cell-py text-right">
-                <RowActionsMenu loadId={load.loadId} status={load.status} />
+                <RowActionsMenu loadId={load.loadId} status={load.status} role={role} />
               </td>
             </tr>
           ))}

@@ -6,11 +6,12 @@ import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { useLoadDetailQuery } from '../api/loadsApi.js'
 import { getLoadStatusTone } from '../lib/statusTone.js'
 import { formatCurrency, formatDateTime, formatShipperName, formatWeight } from '../lib/format.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
-import { isLoadCancellable, isLoadEditable } from '../lib/loadPermissions.js'
+import { canCancelLoad, canEditLoad } from '../lib/loadPermissions.js'
 import RouteMapCard from '../components/RouteMapCard.jsx'
 import LoadFilesSection from '../components/LoadFilesSection.jsx'
 import LoadStatusHistoryCard from '../components/LoadStatusHistoryCard.jsx'
@@ -28,6 +29,7 @@ function LoadDetailPage() {
   const { loadId } = useParams()
   const [isCancelOpen, setIsCancelOpen] = useState(false)
   const loadQuery = useLoadDetailQuery(loadId)
+  const role = useAppSelector((state) => state.auth.role)
 
   if (loadQuery.isLoading) {
     return (
@@ -69,12 +71,12 @@ function LoadDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isLoadEditable(load.status) && (
+          {canEditLoad(role, load.status) && (
             <Button as={Link} to={`/loads/${load.loadId}/edit`} variant="secondary">
               Edit Details
             </Button>
           )}
-          {isLoadCancellable(load.status) && (
+          {canCancelLoad(role, load.status) && (
             <Button variant="status" status="red" onClick={() => setIsCancelOpen(true)}>
               Cancel Load
             </Button>
@@ -122,7 +124,7 @@ function LoadDetailPage() {
 
           <RouteMapCard origin={load.pickupAddress} destination={load.dropoffAddress} />
 
-          <LoadFilesSection loadId={load.loadId} />
+          <LoadFilesSection loadId={load.loadId} role={role} />
         </div>
 
         <div className="space-y-6 lg:col-span-1">

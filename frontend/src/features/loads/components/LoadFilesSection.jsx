@@ -5,18 +5,23 @@ import Card from '../../../components/Card.jsx'
 import { useDetachLoadFileMutation, useLoadFilesQuery } from '../api/loadsApi.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
 import { formatFileSize } from '../lib/format.js'
+import { canManageLoadFiles } from '../lib/loadPermissions.js'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
 
-// Read-only attached-documents list (docs/load-management-api.md Section
-// 4.2/4.3) — upload/attach is not offered from the detail page; files here
-// are only viewed (via the embedded FilePreviewPanel, not a new browser
-// tab/window) or detached. GET /loads/{loadId}/files and
-// DELETE /loads/{loadId}/files/{fileId} only — the two-step upload+attach
-// mutations still live in loadsApi.js for reuse elsewhere, just unused here.
-function LoadFilesSection({ loadId }) {
+// Attached-documents list (docs/load-management-api.md Section 4.2/4.3) —
+// upload/attach is not offered from the detail page; files here are only
+// viewed (via the embedded FilePreviewPanel, not a new browser tab/window)
+// or detached, and detaching (like every Load file mutation) is Shipper
+// (owner) only — an Admin viewing someone else's load can preview files
+// but never sees the detach control (canManageLoadFiles — loadPermissions.js).
+// GET /loads/{loadId}/files and DELETE /loads/{loadId}/files/{fileId} only —
+// the two-step upload+attach mutations still live in loadsApi.js for reuse
+// elsewhere, just unused here.
+function LoadFilesSection({ loadId, role }) {
   const [previewFile, setPreviewFile] = useState(null)
   const filesQuery = useLoadFilesQuery(loadId)
   const detachMutation = useDetachLoadFileMutation(loadId)
+  const canManage = canManageLoadFiles(role)
 
   async function handleDetach(fileId) {
     try {
@@ -43,7 +48,7 @@ function LoadFilesSection({ loadId }) {
               key={file.fileId}
               file={file}
               onOpen={() => setPreviewFile(file)}
-              onDetach={() => handleDetach(file.fileId)}
+              onDetach={canManage ? () => handleDetach(file.fileId) : undefined}
               isDetaching={detachMutation.isPending}
             />
           ))}
@@ -85,15 +90,17 @@ function FileCard({ file, onOpen, onDetach, isDetaching }) {
           <p className="text-label-caps text-on-surface-variant">{file.fileType}</p>
         </div>
       </button>
-      <button
-        type="button"
-        onClick={onDetach}
-        disabled={isDetaching}
-        aria-label={`Detach ${file.originalFileName ?? file.publicId}`}
-        className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant opacity-0 shadow-soft transition-opacity hover:text-status-red-text focus-visible:opacity-100 group-hover:opacity-100"
-      >
-        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-      </button>
+      {onDetach && (
+        <button
+          type="button"
+          onClick={onDetach}
+          disabled={isDetaching}
+          aria-label={`Detach ${file.originalFileName ?? file.publicId}`}
+          className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-surface-container-lowest text-on-surface-variant opacity-0 shadow-soft transition-opacity hover:text-status-red-text focus-visible:opacity-100 group-hover:opacity-100"
+        >
+          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+        </button>
+      )}
     </div>
   )
 }

@@ -35,9 +35,15 @@ export const login = createAsyncThunk('auth/login', async (credentials, { dispat
   return { ...tokens, user }
 })
 
-export const logout = createAsyncThunk('auth/logout', async () => {
+export const logout = createAsyncThunk('auth/logout', async (_, { getState }) => {
+  // Captured before any client state is cleared — /auth/logout requires
+  // the refresh token being revoked in its body; the endpoint has no way
+  // to identify which token to revoke otherwise.
+  const { refreshToken } = getState().auth
   try {
-    await authApi.logout()
+    if (refreshToken) {
+      await authApi.logout(refreshToken)
+    }
   } catch {
     // Best-effort — the session is ending client-side regardless.
   }

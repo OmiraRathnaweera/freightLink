@@ -19,12 +19,14 @@ function RouteMapCard({ origin, destination, distanceKm, remainingKm }) {
           <span className="text-label-caps text-on-surface-variant">{destination}</span>
         </div>
       </div>
-      <Card.Footer className="flex items-center justify-between">
-        <span className="text-body-md text-on-surface-variant">Distance</span>
-        <span className="text-data-mono text-on-surface">
-          {distanceKm} km{remainingKm != null ? ` · ${remainingKm} km remaining` : ''}
-        </span>
-      </Card.Footer>
+      {distanceKm != null && (
+        <Card.Footer className="flex items-center justify-between">
+          <span className="text-body-md text-on-surface-variant">Distance</span>
+          <span className="text-data-mono text-on-surface">
+            {distanceKm} km{remainingKm != null ? ` · ${remainingKm} km remaining` : ''}
+          </span>
+        </Card.Footer>
+      )}
     </Card>
   )
 }
