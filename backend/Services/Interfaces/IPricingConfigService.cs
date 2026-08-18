@@ -68,15 +68,23 @@ public interface IPricingConfigService
     /// </exception>
     Task<VehicleClassEfficiencyResponseDto> CreateVehicleClassEfficiency(CreateVehicleClassEfficiencyDto request, Guid actingUserId, CancellationToken cancellationToken = default);
 
-    /// <summary>Soft-deletes a <see cref="Entities.FuelPriceRate"/> row via an ordinary <c>UPDATE</c> (never a raw <c>DELETE</c>).</summary>
+    /// <summary>
+    /// Soft-deletes a <see cref="Entities.FuelPriceRate"/> row via an ordinary <c>UPDATE</c> (never a
+    /// raw <c>DELETE</c>). Returns a plain success confirmation, not the soft-deleted row — fetch
+    /// <see cref="GetFuelPriceHistory"/> if the deleted values are still needed.
+    /// </summary>
     /// <param name="fuelPriceRateId">The row's id.</param>
     /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>DeletedByUserId</c>.</param>
     /// <exception cref="Common.Exceptions.ApiException">404 if no such row exists; 422 if it is already soft-deleted.</exception>
-    Task<FuelPriceRateResponseDto> SoftDeleteFuelPriceRate(Guid fuelPriceRateId, Guid actingUserId, CancellationToken cancellationToken = default);
+    Task<PricingConfigDeleteResponseDto> SoftDeleteFuelPriceRate(Guid fuelPriceRateId, Guid actingUserId, CancellationToken cancellationToken = default);
 
-    /// <summary>Soft-deletes a <see cref="Entities.VehicleClassEfficiency"/> row via an ordinary <c>UPDATE</c> (never a raw <c>DELETE</c>).</summary>
+    /// <summary>
+    /// Soft-deletes a <see cref="Entities.VehicleClassEfficiency"/> row via an ordinary <c>UPDATE</c>
+    /// (never a raw <c>DELETE</c>). Returns a plain success confirmation, not the soft-deleted row —
+    /// fetch <see cref="GetVehicleClassEfficiencyHistory"/> if the deleted values are still needed.
+    /// </summary>
     /// <param name="vehicleClassEfficiencyId">The row's id.</param>
     /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>DeletedByUserId</c>.</param>
     /// <exception cref="Common.Exceptions.ApiException">404 if no such row exists; 422 if it is already soft-deleted.</exception>
-    Task<VehicleClassEfficiencyResponseDto> SoftDeleteVehicleClassEfficiency(Guid vehicleClassEfficiencyId, Guid actingUserId, CancellationToken cancellationToken = default);
+    Task<PricingConfigDeleteResponseDto> SoftDeleteVehicleClassEfficiency(Guid vehicleClassEfficiencyId, Guid actingUserId, CancellationToken cancellationToken = default);
 }

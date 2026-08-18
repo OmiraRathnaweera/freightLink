@@ -255,9 +255,9 @@ public class AdminPricingControllerTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// <summary>Soft-deleting a fuel rate returns 200 with DeletedAt/DeletedByUserId populated, not 204.</summary>
+    /// <summary>Soft-deleting a fuel rate returns 200 with a success message, not the deleted row, and not 204.</summary>
     [Fact]
-    public async Task DeleteFuelRate_Returns200WithDeletedFields_ForAdmin()
+    public async Task DeleteFuelRate_Returns200WithSuccessMessage_ForAdmin()
     {
         using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -275,9 +275,9 @@ public class AdminPricingControllerTests
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var deleted = await response.Content.ReadFromJsonAsync<FuelPriceRateResponseDto>();
-        Assert.NotNull(deleted!.DeletedAt);
-        Assert.NotNull(deleted.DeletedByUserId);
+        var result = await response.Content.ReadFromJsonAsync<PricingConfigDeleteResponseDto>();
+        Assert.Equal(created.FuelPriceRateId, result!.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
     }
 
     /// <summary>Soft-deleting an already-soft-deleted fuel rate is a 422, not a silent no-op.</summary>
@@ -419,9 +419,9 @@ public class AdminPricingControllerTests
         Assert.Contains(figures!, f => f.ClassLabel == VehicleClass.MiniTruck);
     }
 
-    /// <summary>Soft-deleting a vehicle-class efficiency figure returns 200 with DeletedAt/DeletedByUserId populated, not 204.</summary>
+    /// <summary>Soft-deleting a vehicle-class efficiency figure returns 200 with a success message, not the deleted row, and not 204.</summary>
     [Fact]
-    public async Task DeleteVehicleEfficiency_Returns200WithDeletedFields_ForAdmin()
+    public async Task DeleteVehicleEfficiency_Returns200WithSuccessMessage_ForAdmin()
     {
         using var factory = new CustomWebApplicationFactory();
         using var client = factory.CreateClient();
@@ -439,8 +439,9 @@ public class AdminPricingControllerTests
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var deleted = await response.Content.ReadFromJsonAsync<VehicleClassEfficiencyResponseDto>();
-        Assert.NotNull(deleted!.DeletedAt);
+        var result = await response.Content.ReadFromJsonAsync<PricingConfigDeleteResponseDto>();
+        Assert.Equal(created.VehicleClassEfficiencyId, result!.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
     }
 
     /// <summary>Deleting a nonexistent vehicle-class efficiency id is 404.</summary>

@@ -176,7 +176,7 @@ public class PricingConfigServiceTests
     }
 
     [Fact]
-    public async Task SoftDeleteFuelPriceRate_SetsDeletedFields()
+    public async Task SoftDeleteFuelPriceRate_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
     {
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
@@ -185,8 +185,12 @@ public class PricingConfigServiceTests
 
         var result = await sut.SoftDeleteFuelPriceRate(created.FuelPriceRateId, adminId);
 
-        Assert.NotNull(result.DeletedAt);
-        Assert.Equal(adminId, result.DeletedByUserId);
+        Assert.Equal(created.FuelPriceRateId, result.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
+
+        var row = await dbContext.FuelPriceRates.AsNoTracking().SingleAsync(x => x.FuelPriceRateId == created.FuelPriceRateId);
+        Assert.NotNull(row.DeletedAt);
+        Assert.Equal(adminId, row.DeletedByUserId);
     }
 
     [Fact]
@@ -332,7 +336,7 @@ public class PricingConfigServiceTests
     }
 
     [Fact]
-    public async Task SoftDeleteVehicleClassEfficiency_SetsDeletedFields()
+    public async Task SoftDeleteVehicleClassEfficiency_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
     {
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
@@ -341,8 +345,12 @@ public class PricingConfigServiceTests
 
         var result = await sut.SoftDeleteVehicleClassEfficiency(created.VehicleClassEfficiencyId, adminId);
 
-        Assert.NotNull(result.DeletedAt);
-        Assert.Equal(adminId, result.DeletedByUserId);
+        Assert.Equal(created.VehicleClassEfficiencyId, result.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
+
+        var row = await dbContext.VehicleClassEfficiencies.AsNoTracking().SingleAsync(x => x.VehicleClassEfficiencyId == created.VehicleClassEfficiencyId);
+        Assert.NotNull(row.DeletedAt);
+        Assert.Equal(adminId, row.DeletedByUserId);
     }
 
     [Fact]

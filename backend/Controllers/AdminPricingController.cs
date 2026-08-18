@@ -75,10 +75,10 @@ public class AdminPricingController : ControllerBase
     /// <summary>Soft-deletes a fuel price rate (sets <c>DeletedAt</c>/<c>DeletedByUserId</c>). Never issues a hard delete.</summary>
     /// <param name="id">The rate's id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 with the soft-deleted <see cref="FuelPriceRateResponseDto"/>.</returns>
+    /// <returns>200 with a success message.</returns>
     [HttpDelete("fuel-rates/{id:guid}")]
     [Authorize(Roles = AdminRole)]
-    public async Task<ActionResult<FuelPriceRateResponseDto>> DeleteFuelRate(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PricingConfigDeleteResponseDto>> DeleteFuelRate(Guid id, CancellationToken cancellationToken)
     {
         var result = await _pricingConfigService.SoftDeleteFuelPriceRate(id, GetCurrentUserId(), cancellationToken);
         return Ok(result);
@@ -126,10 +126,10 @@ public class AdminPricingController : ControllerBase
     /// <summary>Soft-deletes a vehicle-class efficiency figure (sets <c>DeletedAt</c>/<c>DeletedByUserId</c>). Never issues a hard delete.</summary>
     /// <param name="id">The figure's id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 with the soft-deleted <see cref="VehicleClassEfficiencyResponseDto"/>.</returns>
+    /// <returns>200 with a success message.</returns>
     [HttpDelete("vehicle-efficiency/{id:guid}")]
     [Authorize(Roles = AdminRole)]
-    public async Task<ActionResult<VehicleClassEfficiencyResponseDto>> DeleteVehicleEfficiency(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<PricingConfigDeleteResponseDto>> DeleteVehicleEfficiency(Guid id, CancellationToken cancellationToken)
     {
         var result = await _pricingConfigService.SoftDeleteVehicleClassEfficiency(id, GetCurrentUserId(), cancellationToken);
         return Ok(result);

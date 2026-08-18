@@ -194,10 +194,9 @@ public class PricingConfigService : IPricingConfigService
     }
 
     /// <inheritdoc />
-    public async Task<FuelPriceRateResponseDto> SoftDeleteFuelPriceRate(Guid fuelPriceRateId, Guid actingUserId, CancellationToken cancellationToken = default)
+    public async Task<PricingConfigDeleteResponseDto> SoftDeleteFuelPriceRate(Guid fuelPriceRateId, Guid actingUserId, CancellationToken cancellationToken = default)
     {
         var rate = await _dbContext.FuelPriceRates
-            .Include(x => x.SetByUser)
             .FirstOrDefaultAsync(x => x.FuelPriceRateId == fuelPriceRateId, cancellationToken);
 
         if (rate is null)
@@ -214,14 +213,13 @@ public class PricingConfigService : IPricingConfigService
         rate.DeletedByUserId = actingUserId;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return MapToResponse(rate, ResolveUserName(rate.SetByUser?.FullName));
+        return new PricingConfigDeleteResponseDto { Message = "Fuel price rate deleted successfully.", Id = rate.FuelPriceRateId };
     }
 
     /// <inheritdoc />
-    public async Task<VehicleClassEfficiencyResponseDto> SoftDeleteVehicleClassEfficiency(Guid vehicleClassEfficiencyId, Guid actingUserId, CancellationToken cancellationToken = default)
+    public async Task<PricingConfigDeleteResponseDto> SoftDeleteVehicleClassEfficiency(Guid vehicleClassEfficiencyId, Guid actingUserId, CancellationToken cancellationToken = default)
     {
         var efficiency = await _dbContext.VehicleClassEfficiencies
-            .Include(x => x.SetByUser)
             .FirstOrDefaultAsync(x => x.VehicleClassEfficiencyId == vehicleClassEfficiencyId, cancellationToken);
 
         if (efficiency is null)
@@ -238,7 +236,7 @@ public class PricingConfigService : IPricingConfigService
         efficiency.DeletedByUserId = actingUserId;
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return MapToResponse(efficiency, ResolveUserName(efficiency.SetByUser?.FullName));
+        return new PricingConfigDeleteResponseDto { Message = "Vehicle-class efficiency figure deleted successfully.", Id = efficiency.VehicleClassEfficiencyId };
     }
 
     /// <summary>
