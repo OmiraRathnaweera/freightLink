@@ -1,9 +1,12 @@
 using FreightLink.Api.Data;
+using FreightLink.Api.Entities;
+using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace FreightLink.Api.Tests.Integration;
 
@@ -62,5 +65,68 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
             services.AddScoped<IFileStorageService, FakeFileStorageService>();
         });
+    }
+
+    /// <summary>
+    /// Seeds default pricing config (one current <see cref="FuelPriceRate"/>, one wide-open
+    /// <see cref="VehicleClassEfficiency"/> tier) into the InMemory database right after the host is
+    /// built, so every integration test that creates/edits a Load — which now computes
+    /// <c>estimatedPrice</c> via <c>PricingConfigService</c> — keeps working without seeding it itself.
+    /// Mirrors <c>LoadServiceTests.SeedDefaultPricingConfigAsync</c>'s unit-test equivalent.
+    /// </summary>
+    protected override IHost CreateHost(IHostBuilder builder)
+    {
+        var host = base.CreateHost(builder);
+
+        using var scope = host.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var now = DateTimeOffset.UtcNow;
+        var pricingSeedUserId = Guid.NewGuid();
+
+        dbContext.Users.Add(new User
+        {
+            UserId = pricingSeedUserId,
+            Role = UserRole.Admin,
+            Email = $"pricing-seed-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "unused-hash",
+            FullName = "Pricing Seed Admin",
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.FuelPriceRates.Add(new FuelPriceRate
+        {
+            FuelPriceRateId = Guid.NewGuid(),
+            FuelType = FuelType.AutoDiesel,
+            PricePerLitre = 350m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = pricingSeedUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+        {
+            VehicleClassEfficiencyId = Guid.NewGuid(),
+            ClassLabel = VehicleClass.MiniTruck,
+            MinPayloadKg = 0m,
+            // Finite, not open-ended: AdminPricingControllerTests adds further classes/bands starting
+            // at this ceiling in its own per-test isolated database, which would otherwise be
+            // impossible against an open-ended (null) top tier — a band can never legally follow one.
+            MaxPayloadKg = 100_000m,
+            FuelConsumptionLPer100Km = 15m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = pricingSeedUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.SaveChanges();
+
+        return host;
     }
 }

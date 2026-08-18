@@ -89,6 +89,34 @@ public enum ErrorCode
     /// <summary>A detach was attempted on a LoadFile attachment that does not exist under the given load.</summary>
     LOAD_FILE_NOT_FOUND,
 
+    /// <summary>No <c>FuelPriceRate</c> exists with the requested id.</summary>
+    FUEL_PRICE_RATE_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>FuelPriceRate</c> row that is already soft-deleted.</summary>
+    FUEL_PRICE_RATE_ALREADY_DELETED,
+
+    /// <summary>No <c>VehicleClassEfficiency</c> exists with the requested id.</summary>
+    VEHICLE_CLASS_EFFICIENCY_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>VehicleClassEfficiency</c> row that is already soft-deleted.</summary>
+    VEHICLE_CLASS_EFFICIENCY_ALREADY_DELETED,
+
+    /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxPayloadKg</c> was not strictly greater than its <c>MinPayloadKg</c> (mirrors <c>ck_vce_payload_bounds</c>).</summary>
+    VEHICLE_CLASS_EFFICIENCY_INVALID_PAYLOAD_BAND,
+
+    /// <summary>A new <c>VehicleClassEfficiency</c> row's payload band overlaps another class's current band.</summary>
+    VEHICLE_CLASS_EFFICIENCY_BAND_OVERLAP,
+
+    /// <summary>A new <c>VehicleClassEfficiency</c> row's payload band would leave a gap in weight-space coverage.</summary>
+    VEHICLE_CLASS_EFFICIENCY_BAND_GAP,
+
+    /// <summary>
+    /// No current <c>FuelPriceRate</c> or no matching <c>VehicleClassEfficiency</c> tier exists to
+    /// compute a load's <c>estimatedPrice</c>. An Admin must configure pricing data before loads can
+    /// be created or edited.
+    /// </summary>
+    PRICING_CONFIG_MISSING,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's

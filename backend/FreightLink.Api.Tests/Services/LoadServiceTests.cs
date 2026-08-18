@@ -18,23 +18,74 @@ namespace FreightLink.Api.Tests.Services;
 /// </summary>
 public class LoadServiceTests
 {
-    /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test.</summary>
-    private static AppDbContext CreateContext() => CreateContext(Guid.NewGuid().ToString());
+    /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test, seeded with default pricing config (see <see cref="SeedDefaultPricingConfigAsync"/>).</summary>
+    private static async Task<AppDbContext> CreateContextAsync(bool seedPricing = true) => await CreateContextAsync(Guid.NewGuid().ToString(), seedPricing);
 
     /// <summary>
     /// Creates an InMemory-backed <see cref="AppDbContext"/> against a caller-supplied database name,
     /// so concurrency tests can open a second, independent context onto the same underlying data.
+    /// Seeds default pricing config unless <paramref name="seedPricing"/> is <c>false</c> — every test
+    /// exercising <see cref="LoadService.CreateAsync"/>/<see cref="LoadService.UpdateAsync"/> now needs
+    /// pricing config to exist (see <see cref="LoadService.CalculateEstimatedPriceAsync"/>), so this
+    /// seeds by default rather than requiring every existing test to opt in individually.
     /// </summary>
-    private static AppDbContext CreateContext(string databaseName)
+    private static async Task<AppDbContext> CreateContextAsync(string databaseName, bool seedPricing = true)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
-        return new AppDbContext(options);
+        var dbContext = new AppDbContext(options);
+
+        if (seedPricing)
+        {
+            await SeedDefaultPricingConfigAsync(dbContext);
+        }
+
+        return dbContext;
+    }
+
+    /// <summary>
+    /// Seeds one current <see cref="FuelPriceRate"/> (AutoDiesel) and one wide-open
+    /// <see cref="VehicleClassEfficiency"/> tier (<c>MinPayloadKg = 0</c>, <c>MaxPayloadKg = null</c>)
+    /// — deliberately a single all-covering tier, not the three real ADR-019 tiers, so every
+    /// weight-based test keeps passing without per-test changes.
+    /// </summary>
+    private static async Task SeedDefaultPricingConfigAsync(AppDbContext dbContext)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var setByUserId = await SeedShipperUserAsync(dbContext, fullName: "Pricing Admin");
+
+        dbContext.FuelPriceRates.Add(new FuelPriceRate
+        {
+            FuelPriceRateId = Guid.NewGuid(),
+            FuelType = FuelType.AutoDiesel,
+            PricePerLitre = 350m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = setByUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+        {
+            VehicleClassEfficiencyId = Guid.NewGuid(),
+            ClassLabel = VehicleClass.MiniTruck,
+            MinPayloadKg = 0m,
+            MaxPayloadKg = null,
+            FuelConsumptionLPer100Km = 15m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = setByUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        await dbContext.SaveChangesAsync();
     }
 
     /// <summary>Builds a real <see cref="LoadService"/> wired to the given DB context.</summary>
-    private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext);
+    private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext, new PricingConfigService(dbContext));
 
     /// <summary>Seeds a minimal Shipper user row for <c>Load.ShipperUserId</c> to reference.</summary>
     private static async Task<Guid> SeedShipperUserAsync(AppDbContext dbContext, string fullName = "Jane Shipper")
@@ -124,7 +175,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_CreatesLoadAsDraft_ByDefault()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -144,7 +195,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_GeneratesAHighEntropyUniqueReferenceCode()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -159,7 +210,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_CreatesLoadAsPosted_WhenPostImmediatelyTrue()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -168,11 +219,112 @@ public class LoadServiceTests
         Assert.Equal("Posted", result.Status);
     }
 
+    /// <summary>
+    /// EstimatedPrice is computed automatically on create per ADR-015/ADR-019:
+    /// baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg), with ratePerKm derived from the
+    /// seeded fuel price and vehicle-class efficiency (see <see cref="SeedDefaultPricingConfigAsync"/>).
+    /// </summary>
+    [Fact]
+    public async Task CreateAsync_ComputesEstimatedPrice()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var request = ValidCreateLoadDto();
+
+        var result = await sut.CreateAsync(shipperUserId, request);
+
+        Assert.NotNull(result.EstimatedPrice);
+
+        var distanceKm = HaversineDistanceKm(
+            (double)request.PickupLat!.Value, (double)request.PickupLng!.Value,
+            (double)request.DropoffLat!.Value, (double)request.DropoffLng!.Value);
+        // 350m/15m are SeedDefaultPricingConfigAsync's PricePerLitre/FuelConsumptionLPer100Km;
+        // 500m/10m/50m mirror PricingConstants.BaseFare/RatePerKg/DriverMaintenanceMarginAllowancePerKm.
+        var ratePerKm = 350m / 100m * 15m + 50m;
+        var expected = 500m + (decimal)distanceKm * ratePerKm + request.WeightKg * 10m;
+
+        Assert.Equal(expected, result.EstimatedPrice!.Value, 2);
+    }
+
+    /// <summary>Create is blocked (not silently priced null) if no current fuel price is configured for any matching tier.</summary>
+    [Fact]
+    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoFuelPriceConfigured()
+    {
+        using var dbContext = await CreateContextAsync(seedPricing: false);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+        {
+            VehicleClassEfficiencyId = Guid.NewGuid(),
+            ClassLabel = VehicleClass.MiniTruck,
+            MinPayloadKg = 0m,
+            MaxPayloadKg = null,
+            FuelConsumptionLPer100Km = 15m,
+            Source = "test",
+            EffectiveFrom = now,
+            SetByUserId = shipperUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await dbContext.SaveChangesAsync();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
+
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+        Assert.Empty(dbContext.Loads);
+    }
+
+    /// <summary>Create is blocked (not silently priced null) if no vehicle-class tier covers the load's weight.</summary>
+    [Fact]
+    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoMatchingTier()
+    {
+        using var dbContext = await CreateContextAsync(seedPricing: false);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+        dbContext.FuelPriceRates.Add(new FuelPriceRate
+        {
+            FuelPriceRateId = Guid.NewGuid(),
+            FuelType = FuelType.AutoDiesel,
+            PricePerLitre = 350m,
+            Source = "test",
+            EffectiveFrom = now,
+            SetByUserId = shipperUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await dbContext.SaveChangesAsync();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
+
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+        Assert.Empty(dbContext.Loads);
+    }
+
+    /// <summary>Duplicates <c>LoadService.CalculateHaversineDistanceKm</c> for test-side expected-value computation.</summary>
+    private static double HaversineDistanceKm(double lat1, double lng1, double lat2, double lng2)
+    {
+        const double earthRadiusKm = 6371.0;
+        var lat1Rad = lat1 * Math.PI / 180.0;
+        var lat2Rad = lat2 * Math.PI / 180.0;
+        var deltaLatRad = (lat2 - lat1) * Math.PI / 180.0;
+        var deltaLngRad = (lng2 - lng1) * Math.PI / 180.0;
+
+        var a = Math.Sin(deltaLatRad / 2) * Math.Sin(deltaLatRad / 2) +
+                Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
+                Math.Sin(deltaLngRad / 2) * Math.Sin(deltaLngRad / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+        return earthRadiusKm * c;
+    }
+
     /// <summary>A pickup window where End is not after Start is rejected before any DB write.</summary>
     [Fact]
     public async Task CreateAsync_Throws_ForInvalidPickupWindow()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var request = ValidCreateLoadDto();
@@ -188,7 +340,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_Throws_WhenPickupAndDropoffCoordinatesAreIdentical()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var request = ValidCreateLoadDto();
@@ -205,7 +357,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_WritesInitialLoadStatusHistoryRow()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -222,7 +374,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_ReturnsShipperName()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -237,7 +389,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetByIdAsync_ReturnsLoad_WhenExists()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
@@ -261,7 +413,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetByIdAsync_ReturnsStatusHistory_NewestFirst()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
@@ -284,7 +436,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CreateAsync_ReturnsEmptyStatusHistory()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -297,7 +449,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetByIdAsync_Throws_WhenNotFound()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
 
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetByIdAsync(Guid.NewGuid(), Guid.NewGuid(), UserRole.Admin));
@@ -309,7 +461,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetByIdAsync_Throws_ForNonOwner()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var ownerId = await SeedShipperUserAsync(dbContext);
         var otherShipperId = await SeedShipperUserAsync(dbContext);
@@ -324,7 +476,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetByIdAsync_Succeeds_ForAdmin_OnAnyLoad()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var ownerId = await SeedShipperUserAsync(dbContext);
         var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
@@ -340,7 +492,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_PaginatesResults()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         for (var i = 0; i < 5; i++)
@@ -367,7 +519,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_Throws_WhenPageOffsetOverflows()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
 
@@ -381,7 +533,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_FiltersByStatus()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
@@ -397,7 +549,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_FiltersBySearchTerm()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var target = ValidCreateLoadDto();
@@ -415,7 +567,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_CreatedFromOnly_ReturnsLoadsCreatedOnOrAfter()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var baseTime = DateTimeOffset.UtcNow;
@@ -440,7 +592,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_CreatedToOnly_ReturnsLoadsCreatedOnOrBefore()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var baseTime = DateTimeOffset.UtcNow;
@@ -465,7 +617,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_CreatedFromAndCreatedToTogether_ReturnsLoadsWithinRange()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var baseTime = DateTimeOffset.UtcNow;
@@ -490,7 +642,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_CreatedRangeExcludingAllLoads_ReturnsEmptyPage()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
@@ -512,7 +664,7 @@ public class LoadServiceTests
     [InlineData("desc")]
     public async Task GetListAsync_OrdersDeterministically_WhenPrimarySortValuesAreTied(string sortDir)
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var tiedCreatedAt = DateTimeOffset.UtcNow;
@@ -539,7 +691,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_ScopesToOwnLoads_ForShipper()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperAId = await SeedShipperUserAsync(dbContext);
         var shipperBId = await SeedShipperUserAsync(dbContext);
@@ -557,7 +709,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_ReturnsAllLoads_ForAdmin()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperAId = await SeedShipperUserAsync(dbContext);
         var shipperBId = await SeedShipperUserAsync(dbContext);
@@ -576,7 +728,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_ItemsIncludeEachOwnersShipperName()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperAId = await SeedShipperUserAsync(dbContext);
         var shipperBId = await SeedShipperUserAsync(dbContext, fullName: "Bob Shipper");
@@ -598,7 +750,7 @@ public class LoadServiceTests
     [Fact]
     public async Task GetListAsync_ItemsIncludeShipperUserId()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
@@ -618,7 +770,7 @@ public class LoadServiceTests
     {
         foreach (var status in new[] { LoadStatus.Draft, LoadStatus.Posted })
         {
-            using var dbContext = CreateContext();
+            using var dbContext = await CreateContextAsync();
             var sut = CreateSut(dbContext);
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
@@ -632,6 +784,24 @@ public class LoadServiceTests
         }
     }
 
+    /// <summary>Editing a load's weight recomputes EstimatedPrice rather than leaving the stale value from create.</summary>
+    [Fact]
+    public async Task UpdateAsync_RecomputesEstimatedPrice_WhenWeightChanges()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.WeightKg = created.WeightKg + 1000m;
+
+        var result = await sut.UpdateAsync(created.LoadId, shipperUserId, updateRequest);
+
+        Assert.NotNull(result.EstimatedPrice);
+        Assert.NotEqual(created.EstimatedPrice, result.EstimatedPrice);
+    }
+
     /// <summary>A load past Posted (Matched or later, including terminal states) cannot be edited.</summary>
     [Fact]
     public async Task UpdateAsync_Throws_WhenStatusIsMatchedOrLater()
@@ -639,7 +809,7 @@ public class LoadServiceTests
         var lockedStatuses = new[] { LoadStatus.Matched, LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
         foreach (var status in lockedStatuses)
         {
-            using var dbContext = CreateContext();
+            using var dbContext = await CreateContextAsync();
             var sut = CreateSut(dbContext);
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
@@ -654,7 +824,7 @@ public class LoadServiceTests
     [Fact]
     public async Task UpdateAsync_Throws_WhenPickupAndDropoffCoordinatesAreIdentical()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
@@ -671,7 +841,7 @@ public class LoadServiceTests
     [Fact]
     public async Task UpdateAsync_Throws_WhenNotFound()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
 
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(Guid.NewGuid(), Guid.NewGuid(), ValidUpdateLoadDto()));
@@ -683,7 +853,7 @@ public class LoadServiceTests
     [Fact]
     public async Task UpdateAsync_Throws_ForNonOwner()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var ownerId = await SeedShipperUserAsync(dbContext);
         var otherShipperId = await SeedShipperUserAsync(dbContext);
@@ -703,18 +873,18 @@ public class LoadServiceTests
     public async Task UpdateAsync_Throws409_WhenLoadWasModifiedConcurrently()
     {
         var databaseName = Guid.NewGuid().ToString();
-        using var seedContext = CreateContext(databaseName);
+        using var seedContext = await CreateContextAsync(databaseName);
         var shipperUserId = await SeedShipperUserAsync(seedContext);
         var load = await SeedLoadAsync(seedContext, shipperUserId, LoadStatus.Draft);
 
-        using var dbContext = CreateContext(databaseName);
+        using var dbContext = await CreateContextAsync(databaseName);
         var sut = CreateSut(dbContext);
         // Pre-load the row into this test's own context so its tracked original xmin value goes
         // stale the moment the "concurrent" write below commits — mirroring two requests racing on
         // the same row, without needing two real concurrent threads.
         _ = await dbContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
 
-        using (var concurrentContext = CreateContext(databaseName))
+        using (var concurrentContext = await CreateContextAsync(databaseName))
         {
             var concurrentlyLoadedRow = await concurrentContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
             concurrentlyLoadedRow.CargoDescription = "Changed by a concurrent request";
@@ -740,7 +910,7 @@ public class LoadServiceTests
         var cancellableStatuses = new[] { LoadStatus.Draft, LoadStatus.Posted, LoadStatus.Matched };
         foreach (var status in cancellableStatuses)
         {
-            using var dbContext = CreateContext();
+            using var dbContext = await CreateContextAsync();
             var sut = CreateSut(dbContext);
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
@@ -759,7 +929,7 @@ public class LoadServiceTests
         var nonCancellableStatuses = new[] { LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
         foreach (var status in nonCancellableStatuses)
         {
-            using var dbContext = CreateContext();
+            using var dbContext = await CreateContextAsync();
             var sut = CreateSut(dbContext);
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
@@ -775,7 +945,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CancelAsync_Throws_WhenReasonMissing()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
@@ -790,7 +960,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CancelAsync_Throws_WhenNotFound()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
 
         var exception = await Assert.ThrowsAsync<ApiException>(() =>
@@ -803,7 +973,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CancelAsync_Throws_ForNonOwner()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var ownerId = await SeedShipperUserAsync(dbContext);
         var otherShipperId = await SeedShipperUserAsync(dbContext);
@@ -819,7 +989,7 @@ public class LoadServiceTests
     [Fact]
     public async Task CancelAsync_WritesLoadStatusHistoryRow()
     {
-        using var dbContext = CreateContext();
+        using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Posted);
@@ -842,15 +1012,15 @@ public class LoadServiceTests
     public async Task CancelAsync_Throws409_WhenLoadWasModifiedConcurrently()
     {
         var databaseName = Guid.NewGuid().ToString();
-        using var seedContext = CreateContext(databaseName);
+        using var seedContext = await CreateContextAsync(databaseName);
         var shipperUserId = await SeedShipperUserAsync(seedContext);
         var load = await SeedLoadAsync(seedContext, shipperUserId, LoadStatus.Draft);
 
-        using var dbContext = CreateContext(databaseName);
+        using var dbContext = await CreateContextAsync(databaseName);
         var sut = CreateSut(dbContext);
         _ = await dbContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
 
-        using (var concurrentContext = CreateContext(databaseName))
+        using (var concurrentContext = await CreateContextAsync(databaseName))
         {
             var concurrentlyLoadedRow = await concurrentContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
             concurrentlyLoadedRow.CargoDescription = "Changed by a concurrent request";
