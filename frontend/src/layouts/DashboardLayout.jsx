@@ -1,5 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Building2, LogOut, Menu, Package, Receipt, Route as RouteIcon, Truck, Workflow, X } from 'lucide-react'
+import {
+  Building2,
+  CircleDollarSign,
+  LogOut,
+  Menu,
+  Package,
+  Receipt,
+  Route as RouteIcon,
+  Truck,
+  Workflow,
+  X,
+} from 'lucide-react'
 import { SidebarProvider } from './SidebarContext.jsx'
 import { useSidebar } from '../hooks/useSidebar.js'
 import { useEscapeKey } from '../hooks/useEscapeKey.js'
@@ -43,6 +54,15 @@ const NAV_ITEMS = [
   { to: '/trips', label: 'Trips', icon: RouteIcon },
   { to: '/billing', label: 'Billing', icon: Receipt },
   { to: '/agent-workflows', label: 'Agent Workflows', icon: Workflow },
+  {
+    to: '/pricing-config',
+    label: 'Pricing Config',
+    icon: CircleDollarSign,
+    children: [
+      { to: '/pricing-config/fuel-rates', label: 'Fuel Prices' },
+      { to: '/pricing-config/vehicle-efficiency', label: 'Vehicle Class Efficiency' },
+    ],
+  },
 ]
 
 function DashboardLayout() {
@@ -95,24 +115,52 @@ function DashboardLayoutContent() {
           </button>
         </div>
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-          {visibleNavItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={closeSidebar}
-              className={({ isActive }) =>
-                cx(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-body-md transition-colors',
-                  isActive
-                    ? 'bg-primary-container text-on-primary'
-                    : 'text-on-primary/70 hover:bg-primary-container hover:text-on-primary',
-                )
-              }
-            >
-              <Icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
-              {label}
-            </NavLink>
-          ))}
+          {visibleNavItems.map((item) =>
+            item.children ? (
+              <div key={item.to} className="flex flex-col gap-1">
+                <div className="flex items-center gap-3 px-3 py-2 text-body-md text-on-primary/70">
+                  <item.icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+                  {item.label}
+                </div>
+                <div className="flex flex-col gap-1 pl-8">
+                  {item.children.map((child) => (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      onClick={closeSidebar}
+                      className={({ isActive }) =>
+                        cx(
+                          'rounded-md px-3 py-1.5 text-body-md transition-colors',
+                          isActive
+                            ? 'bg-primary-container text-on-primary'
+                            : 'text-on-primary/70 hover:bg-primary-container hover:text-on-primary',
+                        )
+                      }
+                    >
+                      {child.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={closeSidebar}
+                className={({ isActive }) =>
+                  cx(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-body-md transition-colors',
+                    isActive
+                      ? 'bg-primary-container text-on-primary'
+                      : 'text-on-primary/70 hover:bg-primary-container hover:text-on-primary',
+                  )
+                }
+              >
+                <item.icon className="h-5 w-5 shrink-0" strokeWidth={1.5} />
+                {item.label}
+              </NavLink>
+            ),
+          )}
         </nav>
         <div className="flex items-center justify-between gap-2 border-t border-primary-container px-4 py-3">
           <span className="truncate text-body-md text-on-primary/70">{user?.email}</span>

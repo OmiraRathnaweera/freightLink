@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.DTOs.PricingConfig;
@@ -9,6 +10,7 @@ public class FuelPriceRateResponseDto
     public Guid FuelPriceRateId { get; set; }
 
     /// <summary>The fuel grade this rate prices.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public FuelType FuelType { get; set; }
 
     /// <summary>Price per litre, in the project's base currency.</summary>

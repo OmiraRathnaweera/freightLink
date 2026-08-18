@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.DTOs.PricingConfig;
@@ -9,6 +10,7 @@ public class VehicleClassEfficiencyResponseDto
     public Guid VehicleClassEfficiencyId { get; set; }
 
     /// <summary>The vehicle-class tier this row prices.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public VehicleClass ClassLabel { get; set; }
 
     /// <summary>Lower bound (inclusive) of the payload band, in kilograms.</summary>
