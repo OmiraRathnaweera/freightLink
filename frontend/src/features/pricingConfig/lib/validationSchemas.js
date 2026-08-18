@@ -31,6 +31,12 @@ export const vehicleEfficiencySchema = Yup.object({
     .transform((value, originalValue) => (originalValue === '' ? undefined : value))
     .typeError('Max payload must be a number')
     .min(0, 'Max payload must be at least 0')
+    .test('greater-than-min', 'Max payload must be greater than min payload', function test(value) {
+      if (value === undefined) return true
+      const { minPayloadKg } = this.parent
+      if (minPayloadKg === undefined || minPayloadKg === '') return true
+      return value > minPayloadKg
+    })
     .optional(),
   fuelConsumptionLPer100Km: numberField({ label: 'Fuel consumption', min: 0.01 }),
   source: Yup.string().trim().max(500, 'Source must be 500 characters or fewer').required('Source is required'),
