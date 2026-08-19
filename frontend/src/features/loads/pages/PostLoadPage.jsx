@@ -1,8 +1,10 @@
 import { Formik, Form } from 'formik'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
+import Button from '../../../components/Button.jsx'
+import EmptyState from '../../../components/EmptyState.jsx'
 import {
   FormikCheckbox,
   FormikDateTimeField,
@@ -11,9 +13,11 @@ import {
   FormikSubmitButton,
   FormikTextArea,
 } from '../../../components/form/index.js'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { useCreateLoadMutation } from '../api/loadsApi.js'
 import { createLoadSchema } from '../lib/validationSchemas.js'
 import { getLoadErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
+import { canCreateLoad } from '../lib/loadPermissions.js'
 import { fromDateTimeLocalInput } from '../lib/format.js'
 import { LoadStatus } from '../../../lib/enums.js'
 
@@ -38,7 +42,26 @@ const INITIAL_VALUES = {
 // constraints) instead of the previous uncontrolled placeholder inputs.
 function PostLoadPage() {
   const navigate = useNavigate()
+  const role = useAppSelector((state) => state.auth.role)
   const createMutation = useCreateLoadMutation()
+
+  if (!canCreateLoad(role)) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <EmptyState
+            title="You can't post a load"
+            description="Only Shippers can create loads."
+            action={
+              <Button as={Link} to="/loads" variant="secondary">
+                Back to Loads
+              </Button>
+            }
+          />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

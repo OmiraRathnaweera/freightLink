@@ -12,8 +12,9 @@ import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { useLoadDetailQuery, useUpdateLoadMutation } from '../api/loadsApi.js'
 import { editLoadSchema } from '../lib/validationSchemas.js'
 import { getLoadErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
-import { canPublishLoad, isLoadEditable } from '../lib/loadPermissions.js'
+import { canEditLoad, canPublishLoad } from '../lib/loadPermissions.js'
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from '../lib/format.js'
+import { UserRole } from '../../../lib/enums.js'
 import PublishLoadDialog from '../components/PublishLoadDialog.jsx'
 
 // Edit Load — PUT /api/v1/loads/{id}, only while Draft/Posted
@@ -47,13 +48,17 @@ function EditLoadPage() {
 
   const load = loadQuery.data
 
-  if (!isLoadEditable(load.status)) {
+  if (!canEditLoad(role, load.status)) {
     return (
       <div className="space-y-6">
         <Card>
           <EmptyState
             title="This load can no longer be edited"
-            description={`Loads in "${load.status}" status cannot be changed.`}
+            description={
+              role !== UserRole.SHIPPER
+                ? 'Only the Shipper who owns this load can edit it.'
+                : `Loads in "${load.status}" status cannot be changed.`
+            }
             action={
               <Button as={Link} to={`/loads/${load.loadId}`} variant="secondary">
                 Back to load
