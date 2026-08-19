@@ -281,7 +281,7 @@ public class LoadServiceTests
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-        await sut.CancelAsync(created.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" });
+        await sut.ChangeStatusAsync(created.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" });
 
         var result = await sut.GetByIdAsync(created.LoadId, shipperUserId, UserRole.Shipper);
 
@@ -764,11 +764,11 @@ public class LoadServiceTests
         Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
     }
 
-    // --- Cancel ---
+    // --- ChangeStatus: cancel ---
 
     /// <summary>A load in Draft, Posted, or Matched can be cancelled.</summary>
     [Fact]
-    public async Task CancelAsync_Succeeds_FromValidStatuses()
+    public async Task ChangeStatusAsync_Cancel_Succeeds_FromValidStatuses()
     {
         var cancellableStatuses = new[] { LoadStatus.Draft, LoadStatus.Posted, LoadStatus.Matched };
         foreach (var status in cancellableStatuses)
@@ -778,7 +778,7 @@ public class LoadServiceTests
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
 
-            var result = await sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" });
+            var result = await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" });
 
             Assert.Equal("Cancelled", result.Status);
             Assert.Equal("Jane Shipper", result.ShipperName);
@@ -787,7 +787,7 @@ public class LoadServiceTests
 
     /// <summary>A load already InTransit or in a terminal status cannot be cancelled through this method.</summary>
     [Fact]
-    public async Task CancelAsync_Throws_FromInvalidStatuses()
+    public async Task ChangeStatusAsync_Cancel_Throws_FromInvalidStatuses()
     {
         var nonCancellableStatuses = new[] { LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
         foreach (var status in nonCancellableStatuses)
@@ -798,7 +798,7 @@ public class LoadServiceTests
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
 
             var exception = await Assert.ThrowsAsync<ApiException>(() =>
-                sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" }));
+                sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" }));
 
             Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
         }
@@ -806,7 +806,7 @@ public class LoadServiceTests
 
     /// <summary>Cancelling without a reason is rejected before the DB's own cancel-reason CHECK would ever see it.</summary>
     [Fact]
-    public async Task CancelAsync_Throws_WhenReasonMissing()
+    public async Task ChangeStatusAsync_Cancel_Throws_WhenReasonMissing()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
@@ -814,50 +814,21 @@ public class LoadServiceTests
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
 
         var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = null }));
+            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = null }));
 
         Assert.Equal(ErrorCode.LOAD_CANCEL_REASON_REQUIRED, exception.Code);
     }
 
-    /// <summary>Cancelling a nonexistent load throws a 404-shaped ApiException.</summary>
-    [Fact]
-    public async Task CancelAsync_Throws_WhenNotFound()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(Guid.NewGuid(), Guid.NewGuid(), new CancelLoadDto { Reason = "N/A" }));
-
-        Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
-    }
-
-    /// <summary>A Shipper who does not own the load is forbidden from cancelling it.</summary>
-    [Fact]
-    public async Task CancelAsync_Throws_ForNonOwner()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var ownerId = await SeedShipperUserAsync(dbContext);
-        var otherShipperId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(load.LoadId, otherShipperId, new CancelLoadDto { Reason = "Not my load" }));
-
-        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
-    }
-
     /// <summary>Cancelling records a LoadStatusHistory row capturing the prior status, reason, and actor.</summary>
     [Fact]
-    public async Task CancelAsync_WritesLoadStatusHistoryRow()
+    public async Task ChangeStatusAsync_Cancel_WritesLoadStatusHistoryRow()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Posted);
 
-        await sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "No longer needed" });
+        await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "No longer needed" });
 
         var historyRow = await dbContext.LoadStatusHistories.SingleAsync(h => h.LoadId == load.LoadId);
         Assert.Equal(LoadStatus.Posted, historyRow.FromStatus);
@@ -872,7 +843,7 @@ public class LoadServiceTests
     /// and this call gets a 409 instead of silently cancelling over a since-changed row.
     /// </summary>
     [Fact]
-    public async Task CancelAsync_Throws409_WhenLoadWasModifiedConcurrently()
+    public async Task ChangeStatusAsync_Cancel_Throws409_WhenLoadWasModifiedConcurrently()
     {
         var databaseName = Guid.NewGuid().ToString();
         using var seedContext = await CreateContextAsync(databaseName);
@@ -894,8 +865,111 @@ public class LoadServiceTests
         }
 
         var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" }));
+            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" }));
 
         Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
+    }
+
+    // --- ChangeStatus: publish ---
+
+    /// <summary>A Draft load can be published, transitioning it to Posted.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Publish_Succeeds_FromDraft()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+
+        var result = await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+
+        Assert.Equal("Posted", result.Status);
+        Assert.Equal("Jane Shipper", result.ShipperName);
+    }
+
+    /// <summary>A load that is not Draft (already Posted, or any later/terminal status) cannot be published.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Publish_Throws_FromNonDraftStatuses()
+    {
+        var nonDraftStatuses = new[] { LoadStatus.Posted, LoadStatus.Matched, LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
+        foreach (var status in nonDraftStatuses)
+        {
+            using var dbContext = await CreateContextAsync();
+            var sut = CreateSut(dbContext);
+            var shipperUserId = await SeedShipperUserAsync(dbContext);
+            var load = await SeedLoadAsync(dbContext, shipperUserId, status);
+
+            var exception = await Assert.ThrowsAsync<ApiException>(() =>
+                sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
+
+            Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
+        }
+    }
+
+    /// <summary>Publishing records a LoadStatusHistory row capturing the prior status and actor, with no reason.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Publish_WritesLoadStatusHistoryRow()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+
+        await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+
+        var historyRow = await dbContext.LoadStatusHistories.SingleAsync(h => h.LoadId == load.LoadId);
+        Assert.Equal(LoadStatus.Draft, historyRow.FromStatus);
+        Assert.Equal(LoadStatus.Posted, historyRow.ToStatus);
+        Assert.Null(historyRow.Reason);
+        Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
+    }
+
+    // --- ChangeStatus: shared guards ---
+
+    /// <summary>Changing the status of a nonexistent load throws a 404-shaped ApiException.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Throws_WhenNotFound()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ChangeStatusAsync(Guid.NewGuid(), Guid.NewGuid(), new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
+    }
+
+    /// <summary>A Shipper who does not own the load is forbidden from changing its status.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Throws_ForNonOwner()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var ownerId = await SeedShipperUserAsync(dbContext);
+        var otherShipperId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ChangeStatusAsync(load.LoadId, otherShipperId, new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
+    }
+
+    /// <summary>
+    /// A target status other than Posted/Cancelled is rejected outright — Matched and beyond are
+    /// reached only by internal processes, never by this Shipper-facing endpoint.
+    /// </summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Throws_WhenTargetStatusIsNotPublishOrCancel()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Posted);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Matched }));
+
+        Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
     }
 }

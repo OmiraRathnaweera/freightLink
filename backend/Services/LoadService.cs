@@ -263,7 +263,7 @@ public class LoadService : ILoadService
     }
 
     /// <inheritdoc />
-    public async Task<LoadResponseDto> CancelAsync(Guid loadId, Guid cancelledByUserId, CancelLoadDto request, CancellationToken cancellationToken = default)
+    public async Task<LoadResponseDto> ChangeStatusAsync(Guid loadId, Guid actingUserId, ChangeLoadStatusDto request, CancellationToken cancellationToken = default)
     {
         var load = await _dbContext.Loads.Include(l => l.ShipperUser).FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
@@ -272,36 +272,58 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
-        if (load.ShipperUserId != cancelledByUserId)
+        if (load.ShipperUserId != actingUserId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
-        if (!LoadStatusTransitionRules.CanCancel(load.Status))
-        {
-            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be cancelled.");
-        }
+        var targetStatus = request.Status!.Value;
+        string? reason;
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
+        switch (targetStatus)
         {
-            // Proactively enforces LoadStatusHistory's ck_lsh_cancel_reason CHECK, which the
-            // InMemory test provider doesn't evaluate — without this, a missing reason would only
-            // ever be caught against a real Postgres database.
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_CANCEL_REASON_REQUIRED, "A reason is required when cancelling a load.");
+            case LoadStatus.Posted:
+                if (!LoadStatusTransitionRules.CanPublish(load.Status))
+                {
+                    throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be published.");
+                }
+                reason = null;
+                break;
+
+            case LoadStatus.Cancelled:
+                if (!LoadStatusTransitionRules.CanCancel(load.Status))
+                {
+                    throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be cancelled.");
+                }
+                if (string.IsNullOrWhiteSpace(request.Reason))
+                {
+                    // Proactively enforces LoadStatusHistory's ck_lsh_cancel_reason CHECK, which the
+                    // InMemory test provider doesn't evaluate — without this, a missing reason would
+                    // only ever be caught against a real Postgres database.
+                    throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_CANCEL_REASON_REQUIRED, "A reason is required when cancelling a load.");
+                }
+                reason = request.Reason;
+                break;
+
+            default:
+                // Every other status (Matched and beyond) is reached only by internal processes (the
+                // AI matching workflow, trip events) — never accepted from this Shipper-facing endpoint,
+                // regardless of what LoadStatusTransitionRules' transition graph otherwise permits.
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"'{targetStatus}' cannot be set via this endpoint.");
         }
 
         var fromStatus = load.Status;
         var now = DateTimeOffset.UtcNow;
-        load.Status = LoadStatus.Cancelled;
+        load.Status = targetStatus;
 
         _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
         {
             LoadStatusHistoryId = Guid.NewGuid(),
             LoadId = load.LoadId,
-            ChangedByUserId = cancelledByUserId,
+            ChangedByUserId = actingUserId,
             FromStatus = fromStatus,
-            ToStatus = LoadStatus.Cancelled,
-            Reason = request.Reason,
+            ToStatus = targetStatus,
+            Reason = reason,
             ChangedAt = now
         });
 
