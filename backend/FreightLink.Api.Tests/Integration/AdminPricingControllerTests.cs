@@ -125,12 +125,24 @@ public class AdminPricingControllerTests
         EffectiveFrom = DateTimeOffset.UtcNow
     };
 
+    /// <summary>Volume band mirrors the payload band's numbers by default (same reasoning as the seeded MiniTruck tier), so these tests stay focused on the weight dimension without tripping the new volume-overlap/gap check.</summary>
     private static CreateVehicleClassEfficiencyDto ValidVehicleClassEfficiencyDto(VehicleClass classLabel = VehicleClass.MiniTruck, decimal minPayloadKg = 0m, decimal? maxPayloadKg = null) => new()
     {
         ClassLabel = classLabel,
         MinPayloadKg = minPayloadKg,
         MaxPayloadKg = maxPayloadKg,
+        MinVolumeM3 = minPayloadKg,
+        MaxVolumeM3 = maxPayloadKg,
         FuelConsumptionLPer100Km = 15m,
+        Source = "integration-test",
+        EffectiveFrom = DateTimeOffset.UtcNow
+    };
+
+    private static CreatePricingFormulaConfigDto ValidPricingFormulaConfigDto() => new()
+    {
+        BaseFare = 500m,
+        RatePerKg = 10m,
+        DriverMaintenanceMarginAllowancePerKm = 50m,
         Source = "integration-test",
         EffectiveFrom = DateTimeOffset.UtcNow
     };
@@ -456,5 +468,137 @@ public class AdminPricingControllerTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("VEHICLE_CLASS_EFFICIENCY_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    // --- Pricing formula config ---
+
+    /// <summary>An Admin can record a new formula-constant configuration; the response is 201 with the created resource.</summary>
+    [Fact]
+    public async Task CreateFormulaConfig_Returns201_ForAdmin()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory));
+        request.Content = JsonContent.Create(ValidPricingFormulaConfigDto());
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var created = await response.Content.ReadFromJsonAsync<PricingFormulaConfigResponseDto>();
+        Assert.Equal(500m, created!.BaseFare);
+    }
+
+    /// <summary>A Shipper cannot record a formula-constant configuration.</summary>
+    [Fact]
+    public async Task CreateFormulaConfig_Returns403_ForShipper()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+        var tokens = await RegisterAndLoginShipperAsync(client, "formula-config-shipper");
+
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", tokens.AccessToken);
+        request.Content = JsonContent.Create(ValidPricingFormulaConfigDto());
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>An omitted BaseFare fails DataAnnotations validation automatically — 400 VALIDATION_ERROR, no hand-rolled check.</summary>
+    [Fact]
+    public async Task CreateFormulaConfig_Returns400_WhenBaseFareMissing()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory));
+        request.Content = JsonContent.Create(new { ratePerKg = 10m, driverMaintenanceMarginAllowancePerKm = 50m, source = "test", effectiveFrom = DateTimeOffset.UtcNow });
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
+    }
+
+    /// <summary>GET /admin/pricing/formula-config returns the single current configuration.</summary>
+    [Fact]
+    public async Task GetCurrentFormulaConfig_Returns200_ForAdmin()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using (var create = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory)))
+        {
+            create.Content = JsonContent.Create(ValidPricingFormulaConfigDto());
+            (await client.SendAsync(create)).EnsureSuccessStatusCode();
+        }
+
+        using var request = AuthedRequest(HttpMethod.Get, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var current = await response.Content.ReadFromJsonAsync<PricingFormulaConfigResponseDto>();
+        Assert.Equal(500m, current!.BaseFare);
+    }
+
+    /// <summary>GET /admin/pricing/formula-config/history returns every row ever recorded, newest first.</summary>
+    [Fact]
+    public async Task GetFormulaConfigHistory_Returns200_ForAdmin()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        PricingFormulaConfigResponseDto created;
+        using (var create = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory)))
+        {
+            create.Content = JsonContent.Create(ValidPricingFormulaConfigDto());
+            var createResponse = await client.SendAsync(create);
+            createResponse.EnsureSuccessStatusCode();
+            created = (await createResponse.Content.ReadFromJsonAsync<PricingFormulaConfigResponseDto>())!;
+        }
+
+        using var request = AuthedRequest(HttpMethod.Get, "/api/v1/admin/pricing/formula-config/history", await SeedAndMintAdminTokenAsync(factory));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var history = await response.Content.ReadFromJsonAsync<List<PricingFormulaConfigResponseDto>>();
+        Assert.Contains(history!, r => r.PricingFormulaConfigId == created.PricingFormulaConfigId);
+    }
+
+    /// <summary>Soft-deleting a formula configuration returns 200 with a success message, not the deleted row, and not 204.</summary>
+    [Fact]
+    public async Task DeleteFormulaConfig_Returns200WithSuccessMessage_ForAdmin()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        PricingFormulaConfigResponseDto created;
+        using (var create = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory)))
+        {
+            create.Content = JsonContent.Create(ValidPricingFormulaConfigDto());
+            var createResponse = await client.SendAsync(create);
+            createResponse.EnsureSuccessStatusCode();
+            created = (await createResponse.Content.ReadFromJsonAsync<PricingFormulaConfigResponseDto>())!;
+        }
+
+        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/admin/pricing/formula-config/{created.PricingFormulaConfigId}", await SeedAndMintAdminTokenAsync(factory));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<PricingConfigDeleteResponseDto>();
+        Assert.Equal(created.PricingFormulaConfigId, result!.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
+    }
+
+    /// <summary>Deleting a nonexistent formula-config id is 404.</summary>
+    [Fact]
+    public async Task DeleteFormulaConfig_Returns404_WhenNotFound()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/admin/pricing/formula-config/{Guid.NewGuid()}", await SeedAndMintAdminTokenAsync(factory));
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("PRICING_FORMULA_CONFIG_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 }

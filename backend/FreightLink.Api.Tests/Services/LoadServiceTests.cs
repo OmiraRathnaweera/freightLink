@@ -45,10 +45,12 @@ public class LoadServiceTests
     }
 
     /// <summary>
-    /// Seeds one current <see cref="FuelPriceRate"/> (AutoDiesel) and one wide-open
-    /// <see cref="VehicleClassEfficiency"/> tier (<c>MinPayloadKg = 0</c>, <c>MaxPayloadKg = null</c>)
-    /// — deliberately a single all-covering tier, not the three real ADR-019 tiers, so every
-    /// weight-based test keeps passing without per-test changes.
+    /// Seeds one current <see cref="FuelPriceRate"/> (AutoDiesel), one wide-open
+    /// <see cref="VehicleClassEfficiency"/> tier (<c>MinPayloadKg = 0</c>, <c>MaxPayloadKg = null</c>,
+    /// and likewise wide-open on volume) — deliberately a single all-covering tier, not the three real
+    /// ADR-019 tiers, so every weight/volume-based test keeps passing without per-test changes — and one
+    /// current <see cref="PricingFormulaConfig"/> (the exact old <c>PricingConstants</c> placeholder
+    /// values, so existing price-formula assertions keep passing unchanged).
     /// </summary>
     private static async Task SeedDefaultPricingConfigAsync(AppDbContext dbContext)
     {
@@ -73,7 +75,22 @@ public class LoadServiceTests
             ClassLabel = VehicleClass.MiniTruck,
             MinPayloadKg = 0m,
             MaxPayloadKg = null,
+            MinVolumeM3 = 0m,
+            MaxVolumeM3 = null,
             FuelConsumptionLPer100Km = 15m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = setByUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
+        {
+            PricingFormulaConfigId = Guid.NewGuid(),
+            BaseFare = 500m,
+            RatePerKg = 10m,
+            DriverMaintenanceMarginAllowancePerKm = 50m,
             Source = "test-seed",
             EffectiveFrom = now,
             SetByUserId = setByUserId,
@@ -288,6 +305,48 @@ public class LoadServiceTests
             FuelPriceRateId = Guid.NewGuid(),
             FuelType = FuelType.AutoDiesel,
             PricePerLitre = 350m,
+            Source = "test",
+            EffectiveFrom = now,
+            SetByUserId = shipperUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        await dbContext.SaveChangesAsync();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
+
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+        Assert.Empty(dbContext.Loads);
+    }
+
+    /// <summary>Create is blocked if a fuel price and a matching tier both exist but no <see cref="PricingFormulaConfig"/> does — the formula's base fare/rate constants are Admin-managed too, per ADR-019, not a hardcoded fallback.</summary>
+    [Fact]
+    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoFormulaConfigured()
+    {
+        using var dbContext = await CreateContextAsync(seedPricing: false);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+        dbContext.FuelPriceRates.Add(new FuelPriceRate
+        {
+            FuelPriceRateId = Guid.NewGuid(),
+            FuelType = FuelType.AutoDiesel,
+            PricePerLitre = 350m,
+            Source = "test",
+            EffectiveFrom = now,
+            SetByUserId = shipperUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+        {
+            VehicleClassEfficiencyId = Guid.NewGuid(),
+            ClassLabel = VehicleClass.MiniTruck,
+            MinPayloadKg = 0m,
+            MaxPayloadKg = null,
+            MinVolumeM3 = 0m,
+            MaxVolumeM3 = null,
+            FuelConsumptionLPer100Km = 15m,
             Source = "test",
             EffectiveFrom = now,
             SetByUserId = shipperUserId,

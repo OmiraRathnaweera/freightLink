@@ -69,7 +69,8 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     /// <summary>
     /// Seeds default pricing config (one current <see cref="FuelPriceRate"/>, one wide-open
-    /// <see cref="VehicleClassEfficiency"/> tier) into the InMemory database right after the host is
+    /// <see cref="VehicleClassEfficiency"/> tier — wide-open on both payload and volume — and one
+    /// current <see cref="PricingFormulaConfig"/>) into the InMemory database right after the host is
     /// built, so every integration test that creates/edits a Load — which now computes
     /// <c>estimatedPrice</c> via <c>PricingConfigService</c> — keeps working without seeding it itself.
     /// Mirrors <c>LoadServiceTests.SeedDefaultPricingConfigAsync</c>'s unit-test equivalent.
@@ -117,7 +118,24 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             // at this ceiling in its own per-test isolated database, which would otherwise be
             // impossible against an open-ended (null) top tier — a band can never legally follow one.
             MaxPayloadKg = 100_000m,
+            // Volume band mirrors the payload band's numbers (same reasoning: leaves room for further
+            // classes to be appended contiguously in per-test databases).
+            MinVolumeM3 = 0m,
+            MaxVolumeM3 = 100_000m,
             FuelConsumptionLPer100Km = 15m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = pricingSeedUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
+        {
+            PricingFormulaConfigId = Guid.NewGuid(),
+            BaseFare = 500m,
+            RatePerKg = 10m,
+            DriverMaintenanceMarginAllowancePerKm = 50m,
             Source = "test-seed",
             EffectiveFrom = now,
             SetByUserId = pricingSeedUserId,

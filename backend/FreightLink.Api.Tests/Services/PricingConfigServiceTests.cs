@@ -19,10 +19,16 @@ namespace FreightLink.Api.Tests.Services;
 public class PricingConfigServiceTests
 {
     /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test.</summary>
-    private static AppDbContext CreateContext()
+    private static AppDbContext CreateContext() => CreateContext(Guid.NewGuid().ToString());
+
+    /// <summary>
+    /// Creates an InMemory-backed <see cref="AppDbContext"/> against a caller-supplied database name, so
+    /// concurrency tests can open a second, independent context onto the same underlying data.
+    /// </summary>
+    private static AppDbContext CreateContext(string databaseName)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .UseInMemoryDatabase(databaseName)
             .Options;
         return new AppDbContext(options);
     }
@@ -58,14 +64,33 @@ public class PricingConfigServiceTests
         EffectiveFrom = effectiveFrom ?? DateTimeOffset.UtcNow
     };
 
+    /// <summary>
+    /// Builds a valid create payload. <paramref name="minVolumeM3"/>/<paramref name="maxVolumeM3"/>
+    /// default to mirroring <paramref name="minPayloadKg"/>/<paramref name="maxPayloadKg"/> (same
+    /// numbers, different unit) so tests that only care about the weight dimension get an
+    /// automatically-contiguous volume band too, without needing to pass volume bounds explicitly.
+    /// </summary>
     private static CreateVehicleClassEfficiencyDto ValidVehicleClassEfficiencyDto(
         VehicleClass classLabel = VehicleClass.MiniTruck, decimal minPayloadKg = 0m, decimal? maxPayloadKg = null,
-        decimal fuelConsumption = 15m, DateTimeOffset? effectiveFrom = null) => new()
+        decimal fuelConsumption = 15m, DateTimeOffset? effectiveFrom = null,
+        decimal? minVolumeM3 = null, decimal? maxVolumeM3 = null) => new()
     {
         ClassLabel = classLabel,
         MinPayloadKg = minPayloadKg,
         MaxPayloadKg = maxPayloadKg,
+        MinVolumeM3 = minVolumeM3 ?? minPayloadKg,
+        MaxVolumeM3 = maxVolumeM3 ?? maxPayloadKg,
         FuelConsumptionLPer100Km = fuelConsumption,
+        Source = "test",
+        EffectiveFrom = effectiveFrom ?? DateTimeOffset.UtcNow
+    };
+
+    private static CreatePricingFormulaConfigDto ValidPricingFormulaConfigDto(
+        decimal baseFare = 500m, decimal ratePerKg = 10m, decimal maintenanceAllowance = 50m, DateTimeOffset? effectiveFrom = null) => new()
+    {
+        BaseFare = baseFare,
+        RatePerKg = ratePerKg,
+        DriverMaintenanceMarginAllowancePerKm = maintenanceAllowance,
         Source = "test",
         EffectiveFrom = effectiveFrom ?? DateTimeOffset.UtcNow
     };
@@ -311,7 +336,7 @@ public class PricingConfigServiceTests
     }
 
     [Fact]
-    public async Task GetTierForWeight_ReturnsMatchingTier()
+    public async Task GetTierForWeightAndVolume_ReturnsMatchingTier()
     {
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
@@ -319,20 +344,255 @@ public class PricingConfigServiceTests
         await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, 1000m), adminId);
         await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MediumLorry, 1000m, null), adminId);
 
-        var result = await sut.GetTierForWeight(1500m);
+        var result = await sut.GetTierForWeightAndVolume(1500m, 1500m);
 
         Assert.Equal(VehicleClass.MediumLorry, result.ClassLabel);
     }
 
     [Fact]
-    public async Task GetTierForWeight_ThrowsPricingConfigMissing_WhenNoTierMatches()
+    public async Task GetTierForWeightAndVolume_ThrowsPricingConfigMissing_WhenNoTierMatches()
     {
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
 
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetTierForWeight(500m));
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetTierForWeightAndVolume(500m, 5m));
 
         Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+    }
+
+    /// <summary>
+    /// A light-but-bulky load must be upsized to the tier its volume demands, even though its weight
+    /// alone would match a smaller tier — the fix for the "bulky loads get an inappropriate weight-only
+    /// tier" bug. MiniTruck's payload band [0, 1000) covers 200kg easily, but its volume band [0, 5)
+    /// does not cover 15 m³; MediumLorry's volume band [5, null) does.
+    /// </summary>
+    [Fact]
+    public async Task GetTierForWeightAndVolume_UpsizesToLargerTier_WhenVolumeDemandsABiggerClassThanWeight()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, 1000m, minVolumeM3: 0m, maxVolumeM3: 5m), adminId);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MediumLorry, 1000m, null, minVolumeM3: 5m, maxVolumeM3: null), adminId);
+
+        var result = await sut.GetTierForWeightAndVolume(200m, 15m);
+
+        Assert.Equal(VehicleClass.MediumLorry, result.ClassLabel);
+    }
+
+    /// <summary>The mirror image: a heavy-but-compact load is upsized by weight even though its volume alone would fit the smaller tier.</summary>
+    [Fact]
+    public async Task GetTierForWeightAndVolume_UpsizesToLargerTier_WhenWeightDemandsABiggerClassThanVolume()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, 1000m, minVolumeM3: 0m, maxVolumeM3: 5m), adminId);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MediumLorry, 1000m, null, minVolumeM3: 5m, maxVolumeM3: null), adminId);
+
+        var result = await sut.GetTierForWeightAndVolume(1500m, 2m);
+
+        Assert.Equal(VehicleClass.MediumLorry, result.ClassLabel);
+    }
+
+    /// <summary>A row whose EffectiveFrom is in the future must not become "current" the moment it's inserted.</summary>
+    [Fact]
+    public async Task GetCurrentFuelPrice_IgnoresFutureDatedRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 300m, effectiveFrom: now.AddDays(-1)), adminId);
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 999m, effectiveFrom: now.AddDays(30)), adminId);
+
+        var result = await sut.GetCurrentFuelPrice(FuelType.AutoDiesel);
+
+        Assert.Equal(300m, result.PricePerLitre);
+    }
+
+    /// <summary>Two rows sharing the exact same EffectiveFrom resolve "current" deterministically (by CreatedAt, the later insert wins), not arbitrarily.</summary>
+    [Fact]
+    public async Task GetCurrentFuelPrice_BreaksTieOnSharedEffectiveFrom_ByCreatedAtDescending()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var sharedEffectiveFrom = DateTimeOffset.UtcNow.AddDays(-1);
+
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 300m, effectiveFrom: sharedEffectiveFrom), adminId);
+        var second = await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 310m, effectiveFrom: sharedEffectiveFrom), adminId);
+
+        var result = await sut.GetCurrentFuelPrice(FuelType.AutoDiesel);
+
+        Assert.Equal(second.FuelPriceRateId, result.FuelPriceRateId);
+        Assert.Equal(310m, result.PricePerLitre);
+    }
+
+    /// <summary>
+    /// Two concurrent CreateVehicleClassEfficiency calls, both claiming the full open [0,∞) band for two
+    /// different classes on an empty table, must not both succeed — the static in-process lock
+    /// serializes them, so the second call re-validates against the first's now-committed state and
+    /// deterministically loses with a band-overlap error, instead of both racing the same stale
+    /// (empty) snapshot and both committing an overlapping "current" band.
+    /// </summary>
+    [Fact]
+    public async Task CreateVehicleClassEfficiency_ConcurrentCreatesForDifferentClasses_OnlyOneSucceeds()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        using var dbContext1 = CreateContext(databaseName);
+        using var dbContext2 = CreateContext(databaseName);
+        var sut1 = CreateSut(dbContext1);
+        var sut2 = CreateSut(dbContext2);
+        var adminId = await SeedAdminUserAsync(dbContext1);
+
+        var task1 = sut1.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, null), adminId);
+        var task2 = sut2.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MediumLorry, 0m, null), adminId);
+
+        var results = await Task.WhenAll(task1.ContinueWith(TranslateOutcome), task2.ContinueWith(TranslateOutcome));
+
+        Assert.Single(results, r => r.Succeeded);
+        Assert.Single(results, r => !r.Succeeded && r.ErrorCode == ErrorCode.VEHICLE_CLASS_EFFICIENCY_BAND_OVERLAP);
+    }
+
+    /// <summary>
+    /// Same lock also serializes soft-deletes: two concurrent soft-deletes of the same row resolve
+    /// deterministically (the second sees the first's committed DeletedAt and gets the existing 422
+    /// ALREADY_DELETED), instead of the second silently overwriting the first's DeletedByUserId.
+    /// </summary>
+    [Fact]
+    public async Task SoftDeleteFuelPriceRate_ConcurrentDeletesOfSameRow_SecondGetsAlreadyDeleted()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        using var dbContext1 = CreateContext(databaseName);
+        using var dbContext2 = CreateContext(databaseName);
+        var sut1 = CreateSut(dbContext1);
+        var sut2 = CreateSut(dbContext2);
+        var adminId = await SeedAdminUserAsync(dbContext1);
+        var created = await sut1.CreateFuelPriceRate(ValidFuelPriceRateDto(), adminId);
+        var otherAdminId = await SeedAdminUserAsync(dbContext2, "Second Admin");
+
+        var task1 = sut1.SoftDeleteFuelPriceRate(created.FuelPriceRateId, adminId);
+        var task2 = sut2.SoftDeleteFuelPriceRate(created.FuelPriceRateId, otherAdminId);
+
+        var results = await Task.WhenAll(task1.ContinueWith(TranslateDeleteOutcome), task2.ContinueWith(TranslateDeleteOutcome));
+
+        Assert.Single(results, r => r.Succeeded);
+        Assert.Single(results, r => !r.Succeeded && r.ErrorCode == ErrorCode.FUEL_PRICE_RATE_ALREADY_DELETED);
+    }
+
+    private static (bool Succeeded, ErrorCode? ErrorCode) TranslateOutcome(Task<VehicleClassEfficiencyResponseDto> task)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            return (true, null);
+        }
+
+        var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
+        return (false, exception.Code);
+    }
+
+    private static (bool Succeeded, ErrorCode? ErrorCode) TranslateDeleteOutcome(Task<PricingConfigDeleteResponseDto> task)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            return (true, null);
+        }
+
+        var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
+        return (false, exception.Code);
+    }
+
+    // --- PricingFormulaConfig ---
+
+    [Fact]
+    public async Task CreatePricingFormulaConfig_InsertsNewRow_AndReturnsSetByUserName()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+
+        var result = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
+
+        Assert.NotEqual(Guid.Empty, result.PricingFormulaConfigId);
+        Assert.Equal(500m, result.BaseFare);
+        Assert.Equal(adminId, result.SetByUserId);
+        Assert.Equal("Pricing Admin", result.SetByUserName);
+    }
+
+    [Fact]
+    public async Task GetCurrentPricingFormulaConfig_ReturnsLatestNonDeletedRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 400m, effectiveFrom: now.AddDays(-2)), adminId);
+        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 600m, effectiveFrom: now.AddDays(-1)), adminId);
+
+        var result = await sut.GetCurrentPricingFormulaConfig();
+
+        Assert.Equal(600m, result.BaseFare);
+    }
+
+    [Fact]
+    public async Task GetCurrentPricingFormulaConfig_ThrowsPricingConfigMissing_WhenNoneExist()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetCurrentPricingFormulaConfig());
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+    }
+
+    [Fact]
+    public async Task SoftDeletePricingFormulaConfig_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
+
+        var result = await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
+
+        Assert.Equal(created.PricingFormulaConfigId, result.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
+
+        var row = await dbContext.PricingFormulaConfigs.AsNoTracking().SingleAsync(x => x.PricingFormulaConfigId == created.PricingFormulaConfigId);
+        Assert.NotNull(row.DeletedAt);
+    }
+
+    [Fact]
+    public async Task SoftDeletePricingFormulaConfig_Throws_WhenNotFound()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeletePricingFormulaConfig(Guid.NewGuid(), adminId));
+
+        Assert.Equal(ErrorCode.PRICING_FORMULA_CONFIG_NOT_FOUND, exception.Code);
+    }
+
+    // --- GetPricingSnapshotForEstimate ---
+
+    [Fact]
+    public async Task GetPricingSnapshotForEstimate_ReturnsAllThreePiecesTogether()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 350m), adminId);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, null), adminId);
+        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 500m), adminId);
+
+        var snapshot = await sut.GetPricingSnapshotForEstimate(200m, 2m);
+
+        Assert.Equal(VehicleClass.MiniTruck, snapshot.Tier.ClassLabel);
+        Assert.Equal(350m, snapshot.FuelPrice.PricePerLitre);
+        Assert.Equal(500m, snapshot.FormulaConfig.BaseFare);
     }
 
     [Fact]
