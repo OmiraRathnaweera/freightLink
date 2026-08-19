@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Formik, Form } from 'formik'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -6,12 +7,14 @@ import Button from '../../../components/Button.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
-import { FormikDateTimeField, FormikNumberField, FormikSubmitButton, FormikTextArea, FormikTextField } from '../../../components/form/index.js'
+import { FormikDateTimeField, FormikDualLocationField, FormikNumberField, FormikSubmitButton, FormikTextArea } from '../../../components/form/index.js'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { useLoadDetailQuery, useUpdateLoadMutation } from '../api/loadsApi.js'
 import { editLoadSchema } from '../lib/validationSchemas.js'
 import { getLoadErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
-import { isLoadEditable } from '../lib/loadPermissions.js'
+import { canPublishLoad, isLoadEditable } from '../lib/loadPermissions.js'
 import { fromDateTimeLocalInput, toDateTimeLocalInput } from '../lib/format.js'
+import PublishLoadDialog from '../components/PublishLoadDialog.jsx'
 
 // Edit Load — PUT /api/v1/loads/{id}, only while Draft/Posted
 // (docs/load-management-api.md Section 3.4). Same field set as Post a
@@ -20,6 +23,8 @@ import { fromDateTimeLocalInput, toDateTimeLocalInput } from '../lib/format.js'
 function EditLoadPage() {
   const { loadId } = useParams()
   const navigate = useNavigate()
+  const [isPublishOpen, setIsPublishOpen] = useState(false)
+  const role = useAppSelector((state) => state.auth.role)
   const loadQuery = useLoadDetailQuery(loadId)
   const updateMutation = useUpdateLoadMutation(loadId)
 
@@ -78,9 +83,16 @@ function EditLoadPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-headline-lg text-on-surface">Edit Load {load.referenceCode}</h1>
-        <Button as={Link} to={`/loads/${load.loadId}`} variant="secondary">
-          Discard
-        </Button>
+        <div className="flex items-center gap-2">
+          {canPublishLoad(role, load.status) && (
+            <Button variant="status" status="blue" onClick={() => setIsPublishOpen(true)}>
+              Publish
+            </Button>
+          )}
+          <Button as={Link} to={`/loads/${load.loadId}`} variant="secondary">
+            Discard
+          </Button>
+        </div>
       </div>
 
       <Formik
@@ -118,18 +130,14 @@ function EditLoadPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikTextField name="pickupAddress" label="Pickup Address" />
-                <FormikTextField name="dropoffAddress" label="Dropoff Address" />
-              </div>
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikNumberField name="pickupLat" label="Pickup Latitude" mono />
-                <FormikNumberField name="pickupLng" label="Pickup Longitude" mono />
-              </div>
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikNumberField name="dropoffLat" label="Dropoff Latitude" mono />
-                <FormikNumberField name="dropoffLng" label="Dropoff Longitude" mono />
-              </div>
+              <FormikDualLocationField
+                pickupAddressName="pickupAddress"
+                pickupLatName="pickupLat"
+                pickupLngName="pickupLng"
+                dropoffAddressName="dropoffAddress"
+                dropoffLatName="dropoffLat"
+                dropoffLngName="dropoffLng"
+              />
 
               <FormikTextArea name="cargoDescription" label="Cargo Description" rows={3} />
 
@@ -153,6 +161,8 @@ function EditLoadPage() {
           </Form>
         )}
       </Formik>
+
+      {isPublishOpen && <PublishLoadDialog loadId={load.loadId} onClose={() => setIsPublishOpen(false)} />}
     </div>
   )
 }

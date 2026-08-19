@@ -23,8 +23,8 @@ import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
 // removed: the real API has no data to back them yet (estimatedPrice is a
 // single nullable field, workflowRunId is always null pre-Component D) and
 // the project rule is "no fake mock API once backend wiring is in place."
-// RouteMapCard is kept — it's an acknowledged schematic placeholder, not
-// fake data — fed real pickup/dropoff addresses.
+// RouteMapCard renders a real OSM/Leaflet map (fed real pickup/dropoff
+// coordinates) — no longer the static schematic placeholder it used to be.
 function LoadDetailPage() {
   const { loadId } = useParams()
   const [isCancelOpen, setIsCancelOpen] = useState(false)
@@ -122,7 +122,14 @@ function LoadDetailPage() {
             </dl>
           </Card>
 
-          <RouteMapCard origin={load.pickupAddress} destination={load.dropoffAddress} />
+          <RouteMapCard
+            origin={load.pickupAddress}
+            destination={load.dropoffAddress}
+            originLat={load.pickupLat}
+            originLng={load.pickupLng}
+            destinationLat={load.dropoffLat}
+            destinationLng={load.dropoffLng}
+          />
 
           <LoadFilesSection loadId={load.loadId} role={role} />
         </div>

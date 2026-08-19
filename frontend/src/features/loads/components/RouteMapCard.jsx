@@ -1,23 +1,61 @@
-import { MapPin } from 'lucide-react'
+import { useEffect } from 'react'
+import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import '../../../components/map/leafletIconFix.js'
+import { dropoffIcon, pickupIcon } from '../../../components/map/routePinIcons.js'
 import Card from '../../../components/Card.jsx'
 
-// Static, schematic origin→destination diagram — this project has no maps
-// API key configured (CLAUDE.md: never fabricate env values), so this is
-// an illustrative placeholder standing in for Stitch's embedded live map,
-// not a real map integration.
-function RouteMapCard({ origin, destination, distanceKm, remainingKm }) {
+// Real OSM/Leaflet map showing pickup and dropoff together (superseding the
+// old static schematic — that placeholder existed only because this project
+// had no maps API key configured; OSM/Leaflet needs none, see
+// src/components/map/DualLocationPicker.jsx for the same stack used on the
+// Post/Edit Load forms).
+
+// MapContainer only honors `center`/`zoom` on first mount — this fits both
+// pins in view whenever the coordinates are known, without remounting.
+function FitRouteBounds({ pickupLat, pickupLng, dropoffLat, dropoffLng }) {
+  const map = useMap()
+
+  useEffect(() => {
+    map.fitBounds(
+      [
+        [pickupLat, pickupLng],
+        [dropoffLat, dropoffLng],
+      ],
+      { padding: [32, 32] },
+    )
+  }, [map, pickupLat, pickupLng, dropoffLat, dropoffLng])
+
+  return null
+}
+
+function RouteMapCard({ origin, destination, originLat, originLng, destinationLat, destinationLng, distanceKm, remainingKm }) {
   return (
     <Card className="overflow-hidden p-0">
-      <div className="relative flex h-40 items-center justify-between bg-surface-container-low px-8">
-        <div className="absolute inset-x-16 top-1/2 -translate-y-1/2 border-t-2 border-dashed border-outline-variant" />
-        <div className="relative z-10 flex flex-col items-center gap-1">
-          <MapPin className="h-6 w-6 text-primary" strokeWidth={1.5} />
-          <span className="text-label-caps text-on-surface-variant">{origin}</span>
-        </div>
-        <div className="relative z-10 flex flex-col items-center gap-1">
-          <MapPin className="h-6 w-6 text-status-green-text" strokeWidth={1.5} />
-          <span className="text-label-caps text-on-surface-variant">{destination}</span>
-        </div>
+      <div className="h-96 w-full">
+        <MapContainer center={[originLat, originLng]} zoom={12} scrollWheelZoom={false} className="h-full w-full">
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <FitRouteBounds pickupLat={originLat} pickupLng={originLng} dropoffLat={destinationLat} dropoffLng={destinationLng} />
+          <Polyline
+            positions={[
+              [originLat, originLng],
+              [destinationLat, destinationLng],
+            ]}
+            pathOptions={{ color: 'var(--color-primary)', weight: 2, dashArray: '6 8' }}
+          />
+          <Marker position={[originLat, originLng]} icon={pickupIcon}>
+            <Tooltip permanent direction="top" offset={[0, -26]}>
+              {origin}
+            </Tooltip>
+          </Marker>
+          <Marker position={[destinationLat, destinationLng]} icon={dropoffIcon}>
+            <Tooltip permanent direction="top" offset={[0, -26]}>
+              {destination}
+            </Tooltip>
+          </Marker>
+        </MapContainer>
       </div>
       {distanceKm != null && (
         <Card.Footer className="flex items-center justify-between">

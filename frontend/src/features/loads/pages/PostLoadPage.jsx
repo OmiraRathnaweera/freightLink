@@ -6,10 +6,10 @@ import Card from '../../../components/Card.jsx'
 import {
   FormikCheckbox,
   FormikDateTimeField,
+  FormikDualLocationField,
   FormikNumberField,
   FormikSubmitButton,
   FormikTextArea,
-  FormikTextField,
 } from '../../../components/form/index.js'
 import { useCreateLoadMutation } from '../api/loadsApi.js'
 import { createLoadSchema } from '../lib/validationSchemas.js'
@@ -76,19 +76,14 @@ function PostLoadPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikTextField name="pickupAddress" label="Pickup Address" placeholder="123 Galle Rd, Colombo 03" />
-                <FormikTextField name="dropoffAddress" label="Dropoff Address" placeholder="45 Kandy Rd, Kandy" />
-              </div>
-
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikNumberField name="pickupLat" label="Pickup Latitude" mono placeholder="6.9271" />
-                <FormikNumberField name="pickupLng" label="Pickup Longitude" mono placeholder="79.8612" />
-              </div>
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikNumberField name="dropoffLat" label="Dropoff Latitude" mono placeholder="7.2906" />
-                <FormikNumberField name="dropoffLng" label="Dropoff Longitude" mono placeholder="80.6337" />
-              </div>
+              <FormikDualLocationField
+                pickupAddressName="pickupAddress"
+                pickupLatName="pickupLat"
+                pickupLngName="pickupLng"
+                dropoffAddressName="dropoffAddress"
+                dropoffLatName="dropoffLat"
+                dropoffLngName="dropoffLng"
+              />
 
               <FormikTextArea
                 name="cargoDescription"
