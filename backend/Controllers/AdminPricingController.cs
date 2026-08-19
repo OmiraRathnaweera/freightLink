@@ -135,6 +135,52 @@ public class AdminPricingController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>The single current formula-constant configuration (base fare, per-kg rate, maintenance allowance).</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the current <see cref="PricingFormulaConfigResponseDto"/>.</returns>
+    [HttpGet("formula-config")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<PricingFormulaConfigResponseDto>> GetCurrentFormulaConfig(CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.GetCurrentPricingFormulaConfig(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Lists every formula-config row ever recorded, including superseded and soft-deleted rows, newest first.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the full formula-config history.</returns>
+    [HttpGet("formula-config/history")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<List<PricingFormulaConfigResponseDto>>> GetFormulaConfigHistory(CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.GetPricingFormulaConfigHistory(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Records a new, current formula-constant configuration. Always inserts a new row — never updates an existing one.</summary>
+    /// <param name="request">The new configuration's content.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>201 with the created <see cref="PricingFormulaConfigResponseDto"/>.</returns>
+    [HttpPost("formula-config")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<PricingFormulaConfigResponseDto>> CreateFormulaConfig([FromBody] CreatePricingFormulaConfigDto request, CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.CreatePricingFormulaConfig(request, GetCurrentUserId(), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>Soft-deletes a formula-constant configuration (sets <c>DeletedAt</c>/<c>DeletedByUserId</c>). Never issues a hard delete.</summary>
+    /// <param name="id">The configuration's id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with a success message.</returns>
+    [HttpDelete("formula-config/{id:guid}")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<PricingConfigDeleteResponseDto>> DeleteFormulaConfig(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.SoftDeletePricingFormulaConfig(id, GetCurrentUserId(), cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>Extracts the authenticated user's id from the <c>NameIdentifier</c> claim on the access token.</summary>
     /// <returns>The caller's user id.</returns>
     /// <exception cref="ApiException">401 if the claim is absent or not a well-formed GUID.</exception>
