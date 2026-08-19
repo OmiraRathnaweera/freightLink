@@ -604,6 +604,48 @@ Design details:
 
 ---
 
+## ADR-020: Enumerated Value Sets as Native Enum Types, Not Lookup Tables
+
+**Status:** Accepted
+**Date:** August 2026
+
+### Context
+The schema contains roughly two dozen closed value sets — user roles, the status chain of every major entity, evidence types, agent roles, approval decisions, notification categories. Two questions had to be settled together: how these are stored, and where their authoritative definition lives.
+
+The storage question surfaced first with `User.Role`. A `Role` lookup table with a foreign key from `User` is the conventional relational answer and was the schema's original design. On review the team found the usual justification for it does not hold here: a lookup table is required by Third Normal Form only if *role metadata* (display name, description, permission set) is stored, since that metadata depends on the role rather than on the user. FreightLink stores no such metadata — authorization is expressed through `[Authorize(Roles = ...)]` attributes in code, not database rows — so a single atomic value on `User` introduces no transitive dependency and the table earns nothing.
+
+The definition question surfaced separately: value sets were being invented ad hoc in C# as each component was built, with no single place to check them, which risks the four components drifting apart on spelling and on which terminal states exist.
+
+### Decision
+Every closed value set is stored as a **PostgreSQL native enum type** (or, where a project constraint prevents that, a `text` column with an equivalent `CHECK` constraint), mapped to a C# enum with `HasConversion<string>()` in EF Core so values remain human-readable in `psql` during the live demo. No lookup tables are created for value sets.
+
+The authoritative definition of every enum lives in a single **Enum Inventory** document (`docs/enum-inventory.md`), grouped by owning component. Adding or renaming a value is a change to that document first, then a migration. `FuelType` and `VehicleClass`, introduced by ADR-019, follow this same convention.
+
+Two substantive points were settled while producing the inventory:
+
+- **`AgencyStatus` distinguishes `Verified` from `Active`.** `Verified` means the Admin has approved the agency's KYC/compliance documents; `Active` means verified *and* currently accepting jobs (at least one available vehicle, at least one active driver, availability switched on). `Verified ↔ Active` is the transition the Flutter availability-management screen writes, in both directions; movement into and out of `Suspended` is Admin-only. **Agent 2's eligibility query filters on `Active` only** — this is the reason the distinction had to be resolved rather than left implicit.
+- **Terminal states were missing from four documented chains.** `LoadStatus.Cancelled`, `AssignmentStatus.Cancelled`, `TripStatus.Cancelled`, and `InvoiceStatus.Void` are all produced by endpoints that already exist and are required by mandatory edge case 2, but none appeared in the status chains as originally written. All four are now part of their respective enums.
+
+### Consequences
+**Positive**
+- The database rejects an invalid value exactly as a foreign key would have, so dropping the lookup table costs nothing in integrity while removing a join from every user query.
+- Enum members and database values are the same strings, so `[Authorize(Roles = "AgencyStaff")]` lines up with what is stored, with no mapping layer in between and nothing to get out of sync.
+- A single inventory document gives the four component owners one place to check a value set before using it, and gives the viva a written artefact to point at — a value set that exists only in C# is one an evaluator cannot inspect.
+- Resolving `Verified` vs `Active` removes a genuine ambiguity in Agent 2's eligibility filter that would otherwise have been settled silently, and differently, by whoever implemented it first.
+
+**Negative**
+- Adding a value to a PostgreSQL enum type requires a migration (`ALTER TYPE ... ADD VALUE`) rather than an `INSERT`, so value sets are less convenient to extend at runtime than lookup-table rows. Judged appropriate here precisely because these sets should not change casually — each value implies branching logic in code.
+- The design assumes **exactly one role per user**. If a user ever needs two roles simultaneously (an owner-dispatcher who also drives), `User.Role` must be replaced by a `UserRole` junction table. This is recorded explicitly as a correctness boundary, not a preference, so that the constraint is a known one rather than a surprise.
+- Enum members and the inventory document can drift if the document is not updated alongside a migration; the team treats the document as the first step of any enum change rather than as documentation written afterwards.
+
+### Alternatives Considered
+- **`Role` lookup table with a foreign key from `User` (original design):** Rejected — required by 3NF only if role metadata is stored, which it is not; adds a table and a join without adding information.
+- **Plain `text`/`varchar` status columns with no constraint:** Rejected outright — permits `'shipper'`, `'Shipper '`, and `'SHIPPER'` to coexist as distinct values, which silently breaks every status filter and eligibility query in the system.
+- **Integer-backed enums (EF Core's default mapping):** Rejected — stores `2` where a human reading the table needs `Active`, which makes both debugging and live demonstration of data changes materially harder for no benefit.
+- **A single generic `Lookup` table holding all value sets:** Rejected — a polymorphic key/value table defeats type safety entirely and would require every join to filter on a category discriminator.
+
+---
+
 ## Summary of Decisions
 
 | ADR No. | Title | Status |
@@ -627,6 +669,7 @@ Design details:
 | ADR-017 | No competitive bidding — single AI-recommended agency, confirmed via job proposal | Accepted |
 | ADR-018 | Automatic retry with a capped attempt limit, and Shipper email notifications, on agency decline | Accepted |
 | ADR-019 | Admin-managed pricing configuration — fuel price & vehicle-class efficiency reference tables | Accepted |
+| ADR-020 | Enumerated value sets as native enum types, not lookup tables | Accepted |
 
 ---
 
