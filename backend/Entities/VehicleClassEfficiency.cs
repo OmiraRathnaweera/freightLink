@@ -25,6 +25,17 @@ public class VehicleClassEfficiency
     /// <summary>Upper bound (exclusive) of the payload band; null for an open-ended top tier (e.g. ContainerTruck).</summary>
     public decimal? MaxPayloadKg { get; set; }
 
+    /// <summary>
+    /// Lower bound (inclusive) of the cargo-volume band this tier covers, in cubic meters. Independent
+    /// of <see cref="MinPayloadKg"/>/<see cref="MaxPayloadKg"/> — a load's tier is resolved from
+    /// whichever dimension (weight or volume) demands the larger class, so a bulky-but-light load is
+    /// correctly upsized instead of receiving an inappropriate weight-only tier.
+    /// </summary>
+    public decimal MinVolumeM3 { get; set; }
+
+    /// <summary>Upper bound (exclusive) of the volume band; null for an open-ended top tier.</summary>
+    public decimal? MaxVolumeM3 { get; set; }
+
     /// <summary>Fuel consumption for this tier, in litres per 100 km.</summary>
     public decimal FuelConsumptionLPer100Km { get; set; }
 

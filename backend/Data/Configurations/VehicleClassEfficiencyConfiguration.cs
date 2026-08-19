@@ -36,5 +36,7 @@ public class VehicleClassEfficiencyConfiguration : IEntityTypeConfiguration<Vehi
         builder.ToTable(t => t.HasCheckConstraint("ck_vce_consumption_positive", "\"FuelConsumptionLPer100Km\" > 0"));
         builder.ToTable(t => t.HasCheckConstraint("ck_vce_payload_bounds",
             "\"MinPayloadKg\" >= 0 AND (\"MaxPayloadKg\" IS NULL OR \"MaxPayloadKg\" > \"MinPayloadKg\")"));
+        builder.ToTable(t => t.HasCheckConstraint("ck_vce_volume_bounds",
+            "\"MinVolumeM3\" >= 0 AND (\"MaxVolumeM3\" IS NULL OR \"MaxVolumeM3\" > \"MinVolumeM3\")"));
     }
 }
