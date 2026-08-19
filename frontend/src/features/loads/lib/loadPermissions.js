@@ -14,6 +14,7 @@ import { LoadStatus, UserRole } from '../../../lib/enums.js'
 // hides (a stale/cached role or status could still get a 403/422).
 const EDITABLE_STATUSES = [LoadStatus.DRAFT, LoadStatus.POSTED]
 const CANCELLABLE_STATUSES = [LoadStatus.DRAFT, LoadStatus.POSTED, LoadStatus.MATCHED]
+const PUBLISHABLE_STATUSES = [LoadStatus.DRAFT]
 
 export function isLoadEditable(status) {
   return EDITABLE_STATUSES.includes(status)
@@ -21,6 +22,13 @@ export function isLoadEditable(status) {
 
 export function isLoadCancellable(status) {
   return CANCELLABLE_STATUSES.includes(status)
+}
+
+// A Draft load is also "editable" (EDITABLE_STATUSES includes Draft), so
+// this is deliberately its own check rather than reusing isLoadEditable —
+// Posted loads are editable but not publishable (already published).
+export function isLoadPublishable(status) {
+  return PUBLISHABLE_STATUSES.includes(status)
 }
 
 export function canCreateLoad(role) {
@@ -33,6 +41,10 @@ export function canEditLoad(role, status) {
 
 export function canCancelLoad(role, status) {
   return role === UserRole.SHIPPER && isLoadCancellable(status)
+}
+
+export function canPublishLoad(role, status) {
+  return role === UserRole.SHIPPER && isLoadPublishable(status)
 }
 
 export function canManageLoadFiles(role) {

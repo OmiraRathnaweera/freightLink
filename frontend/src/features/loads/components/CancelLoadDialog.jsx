@@ -6,7 +6,7 @@ import { useCancelLoadMutation } from '../api/loadsApi.js'
 import { cancelLoadSchema } from '../lib/validationSchemas.js'
 import { getLoadErrorMessage } from '../lib/errorMessages.js'
 
-// Confirm dialog for PATCH /loads/{id}/cancel (docs/load-management-api.md
+// Confirm dialog for PATCH /loads/{id}/status (docs/load-management-api.md
 // Section 3.5) — only ever rendered for a Shipper-owned load in
 // Draft/Posted/Matched (canCancelLoad — loadPermissions.js), by
 // RowActionsMenu (table row) or LoadDetailPage (detail action bar), each
