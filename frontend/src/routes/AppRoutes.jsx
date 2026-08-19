@@ -1,4 +1,4 @@
-import { createBrowserRouter, createRoutesFromElements, Route } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, Navigate, Route } from 'react-router-dom'
 import DashboardLayout from '../layouts/DashboardLayout.jsx'
 import ProtectedRoute from './ProtectedRoute.jsx'
 import PublicRoute from './PublicRoute.jsx'
@@ -15,6 +15,8 @@ import AgenciesPage from '../features/agencies/pages/AgenciesPage.jsx'
 import TripsPage from '../features/trips/pages/TripsPage.jsx'
 import BillingPage from '../features/billing/pages/BillingPage.jsx'
 import AgentWorkflowConsolePage from '../features/agent-workflows/pages/AgentWorkflowConsolePage.jsx'
+import FuelRatesPage from '../features/pricingConfig/pages/FuelRatesPage.jsx'
+import VehicleEfficiencyPage from '../features/pricingConfig/pages/VehicleEfficiencyPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
@@ -51,6 +53,10 @@ const router = createBrowserRouter(
           <Route path="/trips" element={<TripsPage />} />
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/agent-workflows" element={<AgentWorkflowConsolePage />} />
+
+          <Route path="/pricing-config" element={<Navigate to="/pricing-config/fuel-rates" replace />} />
+          <Route path="/pricing-config/fuel-rates" element={<FuelRatesPage />} />
+          <Route path="/pricing-config/vehicle-efficiency" element={<VehicleEfficiencyPage />} />
         </Route>
       </Route>
     </>,

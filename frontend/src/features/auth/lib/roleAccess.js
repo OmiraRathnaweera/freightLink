@@ -19,7 +19,7 @@ export const ROLE_ALLOWED_PREFIXES = {
   [UserRole.SHIPPER]: ['/loads', '/billing', '/agent-workflows'],
   [UserRole.AGENCY_STAFF]: ['/agencies', '/trips', '/billing'],
   [UserRole.DRIVER]: ['/trips'],
-  [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/agent-workflows'],
+  [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/agent-workflows', '/pricing-config'],
 }
 
 function isPathGated(pathname) {
