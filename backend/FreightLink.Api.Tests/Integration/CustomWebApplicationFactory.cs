@@ -68,12 +68,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Seeds default pricing config (one current <see cref="FuelPriceRate"/>, one wide-open
-    /// <see cref="VehicleClassEfficiency"/> tier — wide-open on both payload and volume — and one
-    /// current <see cref="PricingFormulaConfig"/>) into the InMemory database right after the host is
-    /// built, so every integration test that creates/edits a Load — which now computes
-    /// <c>estimatedPrice</c> via <c>PricingConfigService</c> — keeps working without seeding it itself.
-    /// Mirrors <c>LoadServiceTests.SeedDefaultPricingConfigAsync</c>'s unit-test equivalent.
+    /// Seeds default pricing reference data (one current <see cref="FuelPriceRate"/> and one wide-open
+    /// <see cref="VehicleClassEfficiency"/> tier — wide-open on both payload and volume) into the InMemory
+    /// database right after the host is built. This data is not consumed by <c>LoadService</c> — Load
+    /// creation/editing does not depend on it — it exists so <c>AdminPricingControllerTests</c>' fuel-rate
+    /// and vehicle-efficiency endpoint tests have a baseline row to exercise against.
     /// </summary>
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -123,19 +122,6 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             MinVolumeM3 = 0m,
             MaxVolumeM3 = 100_000m,
             FuelConsumptionLPer100Km = 15m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = pricingSeedUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
-        {
-            PricingFormulaConfigId = Guid.NewGuid(),
-            BaseFare = 500m,
-            RatePerKg = 10m,
-            DriverMaintenanceMarginAllowancePerKm = 50m,
             Source = "test-seed",
             EffectiveFrom = now,
             SetByUserId = pricingSeedUserId,

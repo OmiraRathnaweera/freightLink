@@ -18,91 +18,23 @@ namespace FreightLink.Api.Tests.Services;
 /// </summary>
 public class LoadServiceTests
 {
-    /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test, seeded with default pricing config (see <see cref="SeedDefaultPricingConfigAsync"/>).</summary>
-    private static async Task<AppDbContext> CreateContextAsync(bool seedPricing = true) => await CreateContextAsync(Guid.NewGuid().ToString(), seedPricing);
+    /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test.</summary>
+    private static Task<AppDbContext> CreateContextAsync() => CreateContextAsync(Guid.NewGuid().ToString());
 
     /// <summary>
     /// Creates an InMemory-backed <see cref="AppDbContext"/> against a caller-supplied database name,
     /// so concurrency tests can open a second, independent context onto the same underlying data.
-    /// Seeds default pricing config unless <paramref name="seedPricing"/> is <c>false</c> — every test
-    /// exercising <see cref="LoadService.CreateAsync"/>/<see cref="LoadService.UpdateAsync"/> now needs
-    /// pricing config to exist (see <see cref="LoadService.CalculateEstimatedPriceAsync"/>), so this
-    /// seeds by default rather than requiring every existing test to opt in individually.
     /// </summary>
-    private static async Task<AppDbContext> CreateContextAsync(string databaseName, bool seedPricing = true)
+    private static Task<AppDbContext> CreateContextAsync(string databaseName)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
-        var dbContext = new AppDbContext(options);
-
-        if (seedPricing)
-        {
-            await SeedDefaultPricingConfigAsync(dbContext);
-        }
-
-        return dbContext;
-    }
-
-    /// <summary>
-    /// Seeds one current <see cref="FuelPriceRate"/> (AutoDiesel), one wide-open
-    /// <see cref="VehicleClassEfficiency"/> tier (<c>MinPayloadKg = 0</c>, <c>MaxPayloadKg = null</c>,
-    /// and likewise wide-open on volume) — deliberately a single all-covering tier, not the three real
-    /// ADR-019 tiers, so every weight/volume-based test keeps passing without per-test changes — and one
-    /// current <see cref="PricingFormulaConfig"/> (the exact old <c>PricingConstants</c> placeholder
-    /// values, so existing price-formula assertions keep passing unchanged).
-    /// </summary>
-    private static async Task SeedDefaultPricingConfigAsync(AppDbContext dbContext)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var setByUserId = await SeedShipperUserAsync(dbContext, fullName: "Pricing Admin");
-
-        dbContext.FuelPriceRates.Add(new FuelPriceRate
-        {
-            FuelPriceRateId = Guid.NewGuid(),
-            FuelType = FuelType.AutoDiesel,
-            PricePerLitre = 350m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = setByUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
-        {
-            VehicleClassEfficiencyId = Guid.NewGuid(),
-            ClassLabel = VehicleClass.MiniTruck,
-            MinPayloadKg = 0m,
-            MaxPayloadKg = null,
-            MinVolumeM3 = 0m,
-            MaxVolumeM3 = null,
-            FuelConsumptionLPer100Km = 15m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = setByUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
-        {
-            PricingFormulaConfigId = Guid.NewGuid(),
-            BaseFare = 500m,
-            RatePerKg = 10m,
-            DriverMaintenanceMarginAllowancePerKm = 50m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = setByUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        await dbContext.SaveChangesAsync();
+        return Task.FromResult(new AppDbContext(options));
     }
 
     /// <summary>Builds a real <see cref="LoadService"/> wired to the given DB context.</summary>
-    private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext, new PricingConfigService(dbContext));
+    private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext);
 
     /// <summary>Seeds a minimal Shipper user row for <c>Load.ShipperUserId</c> to reference.</summary>
     private static async Task<Guid> SeedShipperUserAsync(AppDbContext dbContext, string fullName = "Jane Shipper")
@@ -237,146 +169,19 @@ public class LoadServiceTests
     }
 
     /// <summary>
-    /// EstimatedPrice is computed automatically on create per ADR-015/ADR-019:
-    /// baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg), with ratePerKm derived from the
-    /// seeded fuel price and vehicle-class efficiency (see <see cref="SeedDefaultPricingConfigAsync"/>).
+    /// EstimatedPrice is left null on create — pricing is the AI agent's responsibility, not
+    /// LoadService's; Load creation never depends on any pricing config existing.
     /// </summary>
     [Fact]
-    public async Task CreateAsync_ComputesEstimatedPrice()
+    public async Task CreateAsync_LeavesEstimatedPriceNull()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var request = ValidCreateLoadDto();
 
-        var result = await sut.CreateAsync(shipperUserId, request);
+        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
 
-        Assert.NotNull(result.EstimatedPrice);
-
-        var distanceKm = HaversineDistanceKm(
-            (double)request.PickupLat!.Value, (double)request.PickupLng!.Value,
-            (double)request.DropoffLat!.Value, (double)request.DropoffLng!.Value);
-        // 350m/15m are SeedDefaultPricingConfigAsync's PricePerLitre/FuelConsumptionLPer100Km;
-        // 500m/10m/50m mirror PricingConstants.BaseFare/RatePerKg/DriverMaintenanceMarginAllowancePerKm.
-        var ratePerKm = 350m / 100m * 15m + 50m;
-        var expected = 500m + (decimal)distanceKm * ratePerKm + request.WeightKg * 10m;
-
-        Assert.Equal(expected, result.EstimatedPrice!.Value, 2);
-    }
-
-    /// <summary>Create is blocked (not silently priced null) if no current fuel price is configured for any matching tier.</summary>
-    [Fact]
-    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoFuelPriceConfigured()
-    {
-        using var dbContext = await CreateContextAsync(seedPricing: false);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
-        {
-            VehicleClassEfficiencyId = Guid.NewGuid(),
-            ClassLabel = VehicleClass.MiniTruck,
-            MinPayloadKg = 0m,
-            MaxPayloadKg = null,
-            FuelConsumptionLPer100Km = 15m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await dbContext.SaveChangesAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-        Assert.Empty(dbContext.Loads);
-    }
-
-    /// <summary>Create is blocked (not silently priced null) if no vehicle-class tier covers the load's weight.</summary>
-    [Fact]
-    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoMatchingTier()
-    {
-        using var dbContext = await CreateContextAsync(seedPricing: false);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        dbContext.FuelPriceRates.Add(new FuelPriceRate
-        {
-            FuelPriceRateId = Guid.NewGuid(),
-            FuelType = FuelType.AutoDiesel,
-            PricePerLitre = 350m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await dbContext.SaveChangesAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-        Assert.Empty(dbContext.Loads);
-    }
-
-    /// <summary>Create is blocked if a fuel price and a matching tier both exist but no <see cref="PricingFormulaConfig"/> does — the formula's base fare/rate constants are Admin-managed too, per ADR-019, not a hardcoded fallback.</summary>
-    [Fact]
-    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoFormulaConfigured()
-    {
-        using var dbContext = await CreateContextAsync(seedPricing: false);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        dbContext.FuelPriceRates.Add(new FuelPriceRate
-        {
-            FuelPriceRateId = Guid.NewGuid(),
-            FuelType = FuelType.AutoDiesel,
-            PricePerLitre = 350m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
-        {
-            VehicleClassEfficiencyId = Guid.NewGuid(),
-            ClassLabel = VehicleClass.MiniTruck,
-            MinPayloadKg = 0m,
-            MaxPayloadKg = null,
-            MinVolumeM3 = 0m,
-            MaxVolumeM3 = null,
-            FuelConsumptionLPer100Km = 15m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await dbContext.SaveChangesAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-        Assert.Empty(dbContext.Loads);
-    }
-
-    /// <summary>Duplicates <c>LoadService.CalculateHaversineDistanceKm</c> for test-side expected-value computation.</summary>
-    private static double HaversineDistanceKm(double lat1, double lng1, double lat2, double lng2)
-    {
-        const double earthRadiusKm = 6371.0;
-        var lat1Rad = lat1 * Math.PI / 180.0;
-        var lat2Rad = lat2 * Math.PI / 180.0;
-        var deltaLatRad = (lat2 - lat1) * Math.PI / 180.0;
-        var deltaLngRad = (lng2 - lng1) * Math.PI / 180.0;
-
-        var a = Math.Sin(deltaLatRad / 2) * Math.Sin(deltaLatRad / 2) +
-                Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
-                Math.Sin(deltaLngRad / 2) * Math.Sin(deltaLngRad / 2);
-        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-        return earthRadiusKm * c;
+        Assert.Null(result.EstimatedPrice);
     }
 
     /// <summary>A pickup window where End is not after Start is rejected before any DB write.</summary>
@@ -843,9 +648,9 @@ public class LoadServiceTests
         }
     }
 
-    /// <summary>Editing a load's weight recomputes EstimatedPrice rather than leaving the stale value from create.</summary>
+    /// <summary>Editing a load's weight does not touch EstimatedPrice — LoadService never computes pricing.</summary>
     [Fact]
-    public async Task UpdateAsync_RecomputesEstimatedPrice_WhenWeightChanges()
+    public async Task UpdateAsync_DoesNotComputeEstimatedPrice_WhenWeightChanges()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
@@ -857,8 +662,7 @@ public class LoadServiceTests
 
         var result = await sut.UpdateAsync(created.LoadId, shipperUserId, updateRequest);
 
-        Assert.NotNull(result.EstimatedPrice);
-        Assert.NotEqual(created.EstimatedPrice, result.EstimatedPrice);
+        Assert.Null(result.EstimatedPrice);
     }
 
     /// <summary>A load past Posted (Matched or later, including terminal states) cannot be edited.</summary>

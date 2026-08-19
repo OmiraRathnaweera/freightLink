@@ -113,16 +113,10 @@ public enum ErrorCode
     /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxVolumeM3</c> was not strictly greater than its <c>MinVolumeM3</c> (mirrors <c>ck_vce_volume_bounds</c>).</summary>
     VEHICLE_CLASS_EFFICIENCY_INVALID_VOLUME_BAND,
 
-    /// <summary>No <c>PricingFormulaConfig</c> exists with the requested id.</summary>
-    PRICING_FORMULA_CONFIG_NOT_FOUND,
-
-    /// <summary>A soft delete was attempted on a <c>PricingFormulaConfig</c> row that is already soft-deleted.</summary>
-    PRICING_FORMULA_CONFIG_ALREADY_DELETED,
-
     /// <summary>
-    /// No current <c>FuelPriceRate</c>, no matching <c>VehicleClassEfficiency</c> tier, or no current
-    /// <c>PricingFormulaConfig</c> exists to compute a load's <c>estimatedPrice</c>. An Admin must
-    /// configure pricing data before loads can be created or edited.
+    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, or no <c>VehicleClassEfficiency</c>
+    /// tier covers the requested weight/volume. Thrown by <c>IPricingConfigService</c>'s current-value
+    /// lookups; not raised by <c>LoadService</c>, which does not depend on any pricing config existing.
     /// </summary>
     PRICING_CONFIG_MISSING,
 

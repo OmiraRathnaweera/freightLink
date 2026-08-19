@@ -46,7 +46,6 @@ public class AppDbContext : DbContext
 
     public DbSet<FuelPriceRate> FuelPriceRates => Set<FuelPriceRate>();
     public DbSet<VehicleClassEfficiency> VehicleClassEfficiencies => Set<VehicleClassEfficiency>();
-    public DbSet<PricingFormulaConfig> PricingFormulaConfigs => Set<PricingFormulaConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

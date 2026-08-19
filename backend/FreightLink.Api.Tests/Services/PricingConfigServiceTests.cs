@@ -85,16 +85,6 @@ public class PricingConfigServiceTests
         EffectiveFrom = effectiveFrom ?? DateTimeOffset.UtcNow
     };
 
-    private static CreatePricingFormulaConfigDto ValidPricingFormulaConfigDto(
-        decimal baseFare = 500m, decimal ratePerKg = 10m, decimal maintenanceAllowance = 50m, DateTimeOffset? effectiveFrom = null) => new()
-    {
-        BaseFare = baseFare,
-        RatePerKg = ratePerKg,
-        DriverMaintenanceMarginAllowancePerKm = maintenanceAllowance,
-        Source = "test",
-        EffectiveFrom = effectiveFrom ?? DateTimeOffset.UtcNow
-    };
-
     // --- FuelPriceRate ---
 
     [Fact]
@@ -501,98 +491,6 @@ public class PricingConfigServiceTests
 
         var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
         return (false, exception.Code);
-    }
-
-    // --- PricingFormulaConfig ---
-
-    [Fact]
-    public async Task CreatePricingFormulaConfig_InsertsNewRow_AndReturnsSetByUserName()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-
-        var result = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
-
-        Assert.NotEqual(Guid.Empty, result.PricingFormulaConfigId);
-        Assert.Equal(500m, result.BaseFare);
-        Assert.Equal(adminId, result.SetByUserId);
-        Assert.Equal("Pricing Admin", result.SetByUserName);
-    }
-
-    [Fact]
-    public async Task GetCurrentPricingFormulaConfig_ReturnsLatestNonDeletedRow()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 400m, effectiveFrom: now.AddDays(-2)), adminId);
-        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 600m, effectiveFrom: now.AddDays(-1)), adminId);
-
-        var result = await sut.GetCurrentPricingFormulaConfig();
-
-        Assert.Equal(600m, result.BaseFare);
-    }
-
-    [Fact]
-    public async Task GetCurrentPricingFormulaConfig_ThrowsPricingConfigMissing_WhenNoneExist()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetCurrentPricingFormulaConfig());
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-    }
-
-    [Fact]
-    public async Task SoftDeletePricingFormulaConfig_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
-
-        var result = await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
-
-        Assert.Equal(created.PricingFormulaConfigId, result.Id);
-        Assert.False(string.IsNullOrWhiteSpace(result.Message));
-
-        var row = await dbContext.PricingFormulaConfigs.AsNoTracking().SingleAsync(x => x.PricingFormulaConfigId == created.PricingFormulaConfigId);
-        Assert.NotNull(row.DeletedAt);
-    }
-
-    [Fact]
-    public async Task SoftDeletePricingFormulaConfig_Throws_WhenNotFound()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeletePricingFormulaConfig(Guid.NewGuid(), adminId));
-
-        Assert.Equal(ErrorCode.PRICING_FORMULA_CONFIG_NOT_FOUND, exception.Code);
-    }
-
-    // --- GetPricingSnapshotForEstimate ---
-
-    [Fact]
-    public async Task GetPricingSnapshotForEstimate_ReturnsAllThreePiecesTogether()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 350m), adminId);
-        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, null), adminId);
-        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 500m), adminId);
-
-        var snapshot = await sut.GetPricingSnapshotForEstimate(200m, 2m);
-
-        Assert.Equal(VehicleClass.MiniTruck, snapshot.Tier.ClassLabel);
-        Assert.Equal(350m, snapshot.FuelPrice.PricePerLitre);
-        Assert.Equal(500m, snapshot.FormulaConfig.BaseFare);
     }
 
     [Fact]
