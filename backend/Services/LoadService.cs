@@ -1,5 +1,4 @@
 using System.Net;
-using FreightLink.Api.Common;
 using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -42,7 +41,7 @@ public class LoadService : ILoadService
         // aborts the create outright — no Load row is added or saved, per the agreed "block, don't
         // silently guess" behavior.
         var estimatedPrice = await CalculateEstimatedPriceAsync(
-            request.WeightKg, request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value, cancellationToken);
+            request.WeightKg, request.VolumeM3, request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value, cancellationToken);
 
         var initialStatus = request.PostImmediately ? LoadStatus.Posted : LoadStatus.Draft;
         if (!LoadStatusTransitionRules.CanCreateAs(initialStatus))
@@ -260,7 +259,7 @@ public class LoadService : ILoadService
         // inputs besides the pricing config itself) may have changed. A missing pricing config
         // (PRICING_CONFIG_MISSING) aborts the update before any field is mutated.
         var estimatedPrice = await CalculateEstimatedPriceAsync(
-            request.WeightKg, request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value, cancellationToken);
+            request.WeightKg, request.VolumeM3, request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value, cancellationToken);
 
         load.CargoDescription = request.CargoDescription;
         load.WeightKg = request.WeightKg;
@@ -359,24 +358,26 @@ public class LoadService : ILoadService
     /// <summary>
     /// Computes <c>estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)</c>
     /// per ADR-015, with <c>ratePerKm</c> derived per ADR-019 from the current fuel price and the
-    /// <paramref name="weightKg"/>-matched vehicle-class fuel-efficiency tier, rather than a single flat
-    /// constant. Distance is computed with <see cref="CalculateHaversineDistanceKm"/> — Component A's
-    /// estimate always uses straight-line distance, never an external routing call.
+    /// <paramref name="weightKg"/>/<paramref name="volumeM3"/>-matched vehicle-class fuel-efficiency
+    /// tier, and <c>baseFare</c>/<c>ratePerKg</c> read from the current Admin-managed formula config,
+    /// rather than any hardcoded constants. All three pieces are read together as one atomic snapshot
+    /// via <see cref="IPricingConfigService.GetPricingSnapshotForEstimate"/>, so no concurrent Admin
+    /// write can land between them. Distance is computed with <see cref="CalculateHaversineDistanceKm"/>
+    /// — Component A's estimate always uses straight-line distance, never an external routing call.
     /// </summary>
     /// <exception cref="ApiException">
-    /// 503 <see cref="ErrorCode.PRICING_CONFIG_MISSING"/> if no current fuel price or no matching
-    /// vehicle-class efficiency tier exists — this deliberately blocks the caller rather than
-    /// silently falling back to a guessed price.
+    /// 503 <see cref="ErrorCode.PRICING_CONFIG_MISSING"/> if no current fuel price, no matching
+    /// vehicle-class efficiency tier, or no current formula config exists — this deliberately blocks
+    /// the caller rather than silently falling back to a guessed price.
     /// </exception>
-    private async Task<decimal> CalculateEstimatedPriceAsync(decimal weightKg, decimal pickupLat, decimal pickupLng, decimal dropoffLat, decimal dropoffLng, CancellationToken cancellationToken)
+    private async Task<decimal> CalculateEstimatedPriceAsync(decimal weightKg, decimal volumeM3, decimal pickupLat, decimal pickupLng, decimal dropoffLat, decimal dropoffLng, CancellationToken cancellationToken)
     {
-        var tier = await _pricingConfigService.GetTierForWeight(weightKg, cancellationToken);
-        var fuelPrice = await _pricingConfigService.GetCurrentFuelPrice(PricingConstants.EstimatorFuelType, cancellationToken);
+        var snapshot = await _pricingConfigService.GetPricingSnapshotForEstimate(weightKg, volumeM3, cancellationToken);
 
-        var ratePerKm = fuelPrice.PricePerLitre / 100m * tier.FuelConsumptionLPer100Km + PricingConstants.DriverMaintenanceMarginAllowancePerKm;
+        var ratePerKm = snapshot.FuelPrice.PricePerLitre / 100m * snapshot.Tier.FuelConsumptionLPer100Km + snapshot.FormulaConfig.DriverMaintenanceMarginAllowancePerKm;
         var distanceKm = CalculateHaversineDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
 
-        return PricingConstants.BaseFare + distanceKm * ratePerKm + weightKg * PricingConstants.RatePerKg;
+        return snapshot.FormulaConfig.BaseFare + distanceKm * ratePerKm + weightKg * snapshot.FormulaConfig.RatePerKg;
     }
 
     /// <summary>
