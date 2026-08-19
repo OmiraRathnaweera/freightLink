@@ -107,13 +107,22 @@ public enum ErrorCode
     /// <summary>A new <c>VehicleClassEfficiency</c> row's payload band overlaps another class's current band.</summary>
     VEHICLE_CLASS_EFFICIENCY_BAND_OVERLAP,
 
-    /// <summary>A new <c>VehicleClassEfficiency</c> row's payload band would leave a gap in weight-space coverage.</summary>
+    /// <summary>A new <c>VehicleClassEfficiency</c> row's payload or volume band would leave a gap in that dimension's coverage.</summary>
     VEHICLE_CLASS_EFFICIENCY_BAND_GAP,
 
+    /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxVolumeM3</c> was not strictly greater than its <c>MinVolumeM3</c> (mirrors <c>ck_vce_volume_bounds</c>).</summary>
+    VEHICLE_CLASS_EFFICIENCY_INVALID_VOLUME_BAND,
+
+    /// <summary>No <c>PricingFormulaConfig</c> exists with the requested id.</summary>
+    PRICING_FORMULA_CONFIG_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>PricingFormulaConfig</c> row that is already soft-deleted.</summary>
+    PRICING_FORMULA_CONFIG_ALREADY_DELETED,
+
     /// <summary>
-    /// No current <c>FuelPriceRate</c> or no matching <c>VehicleClassEfficiency</c> tier exists to
-    /// compute a load's <c>estimatedPrice</c>. An Admin must configure pricing data before loads can
-    /// be created or edited.
+    /// No current <c>FuelPriceRate</c>, no matching <c>VehicleClassEfficiency</c> tier, or no current
+    /// <c>PricingFormulaConfig</c> exists to compute a load's <c>estimatedPrice</c>. An Admin must
+    /// configure pricing data before loads can be created or edited.
     /// </summary>
     PRICING_CONFIG_MISSING,
 

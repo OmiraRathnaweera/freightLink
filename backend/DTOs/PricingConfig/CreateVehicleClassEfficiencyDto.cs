@@ -41,6 +41,24 @@ public class CreateVehicleClassEfficiencyDto
     [Range(0, double.MaxValue)]
     public decimal? MaxPayloadKg { get; set; }
 
+    /// <summary>
+    /// Lower bound (inclusive) of the cargo-volume band, in cubic meters. Nullable so
+    /// <see cref="RequiredAttribute"/> actually rejects an omitted JSON field — same reasoning as
+    /// <see cref="MinPayloadKg"/>. Independent of the payload band: a load's tier is resolved from
+    /// whichever dimension (weight or volume) demands the larger class.
+    /// </summary>
+    [Required]
+    [Range(0, double.MaxValue)]
+    public decimal? MinVolumeM3 { get; set; }
+
+    /// <summary>
+    /// Upper bound (exclusive) of the volume band, in cubic meters. Omit for an open-ended top tier.
+    /// Must be strictly greater than <see cref="MinVolumeM3"/> when present (mirrors the DB's
+    /// <c>ck_vce_volume_bounds</c> CHECK) — enforced by the service layer, not here.
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal? MaxVolumeM3 { get; set; }
+
     /// <summary>Fuel consumption for this tier, in litres per 100 km. Must be greater than zero, mirroring the DB's <c>ck_vce_consumption_positive</c> CHECK.</summary>
     [Required]
     [Range(0.01, double.MaxValue, ErrorMessage = "FuelConsumptionLPer100Km must be greater than zero")]

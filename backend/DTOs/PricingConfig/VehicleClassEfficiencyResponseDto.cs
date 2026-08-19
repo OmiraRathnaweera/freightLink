@@ -19,6 +19,12 @@ public class VehicleClassEfficiencyResponseDto
     /// <summary>Upper bound (exclusive) of the payload band; null for an open-ended top tier.</summary>
     public decimal? MaxPayloadKg { get; set; }
 
+    /// <summary>Lower bound (inclusive) of the cargo-volume band, in cubic meters.</summary>
+    public decimal MinVolumeM3 { get; set; }
+
+    /// <summary>Upper bound (exclusive) of the volume band; null for an open-ended top tier.</summary>
+    public decimal? MaxVolumeM3 { get; set; }
+
     /// <summary>Fuel consumption for this tier, in litres per 100 km.</summary>
     public decimal FuelConsumptionLPer100Km { get; set; }
 
