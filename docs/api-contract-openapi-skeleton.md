@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 8**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 9**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -19,6 +19,7 @@
 | 6 | 13 Aug 2026 | Load Management hardening: `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now genuinely use `409 LOAD_CONCURRENCY_CONFLICT` (Postgres `xmin` optimistic concurrency), superseding the earlier claim that no Load endpoint used `409`; `POST /loads` retries internally on a `ReferenceCode` collision before returning `409 LOAD_REFERENCE_CODE_CONFLICT`; `POST /loads`/`PUT /loads/{id}` reject identical pickup/dropoff coordinates with `400 LOAD_PICKUP_DROPOFF_IDENTICAL`; `GET /loads` rejects an out-of-range `page`/`pageSize` combination with `400 LOAD_PAGE_OUT_OF_RANGE` and now paginates deterministically (ties broken by `loadId`) and case-insensitive `search` matching is index-backed (`pg_trgm`). No path, role, or response-shape changes. |
 | 7 | 15 Aug 2026 | Component A file attachments implemented: `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` link an already-uploaded file (from `POST /files/single`) to a load — never re-implements Cloudinary upload/delete, only the `LoadFile` metadata linkage. Also closes a documentation gap (no functional change): `GET /loads` has always supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were documented until now — added the missing `components/parameters` entries and wired them into the path. |
 | 8 | 17 Aug 2026 | `LoadResponse`/`LoadListItem` enriched with `shipperName` (server-resolved from `User.FullName`, joined via the existing `Load.ShipperUser` navigation — no new `/users/{id}` endpoint was added or is planned) so Admin views of loads owned by other Shippers can show a display name instead of only a raw `shipperUserId`. `LoadListItem` also gained `shipperUserId` itself (previously detail-only on `LoadResponse`) so the frontend's id-based fallback label works on list rows too, not just the single-load view. `GET /loads/{id}` also now returns the load's full `LoadStatusHistory` audit trail as `statusHistory` (newest first) directly on the response — this **supersedes** the `GET /loads/{id}/status-history` row below, which will not be built as a separate endpoint. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` responses leave `statusHistory` as an empty array (the caller already knows the single transition it just made). Also documents the frontend side for the first time: the React app's Load Management screens (`frontend/src/features/loads`) and full auth flow (`frontend/src/features/auth`) are now wired against the real backend — `POST/GET /loads`, `GET/PUT /loads/{id}`, `PATCH /loads/{id}/cancel`, the `/loads/{id}/files` attach flow, and all of Section 4.1 (`/auth/*`) — via TanStack Query + Axios (see `frontend/docs/load-management-api.md`). No frontend work exists yet against Sections 4.3–4.6 (Agencies, Assignments/Trips, Billing, Workflows), which also remain unimplemented on the backend. |
+| 9 | 19 Aug 2026 | `PATCH /loads/{id}/cancel` **retired and replaced** by `PATCH /loads/{id}/status` — a single endpoint for every Shipper-initiated load status change, closing the gap that a `Draft` load created without `postImmediately` had no way to later become `Posted`. Request body changes from `CancelLoadRequest` (`{ reason }`) to `ChangeLoadStatusRequest` (`{ status, reason }`); `status` must be `Posted` (publish, no reason) or `Cancelled` (reason required, same `400 LOAD_CANCEL_REASON_REQUIRED` as before) — any other value, including `Matched`/`InTransit`/`Delivered`/`Closed`, is rejected `422 INVALID_LOAD_STATUS_TRANSITION` even though those are legal transitions in `LoadStatusTransitionRules`' graph, since they're reached only by internal processes (the AI matching workflow, trip events), never by this Shipper-facing endpoint. Same role/ownership/concurrency behavior as the old `.../cancel` endpoint it replaces. Frontend's `cancelLoad`/`useCancelLoadMutation` (`loadsApi.js`) now call the new endpoint internally, unchanged externally; new `publishLoad`/`usePublishLoadMutation` added alongside, not yet wired to any UI control. |
 
 ---
 
@@ -145,7 +146,7 @@ Query parameters, applied consistently across all `GET` list endpoints:
 | GET | `/loads` | Search/filter/sort/paginate loads | Shipper (own), Admin (all) |
 | GET | `/loads/{id}` | Load detail incl. full status-change history (`statusHistory`, newest first) and current `workflowRunId` (if any) | Shipper (own), Admin |
 | PUT | `/loads/{id}` | Edit a load (only while `Draft`/`Posted`) | Shipper (own) |
-| PATCH | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
+| PATCH | `/loads/{id}/status` | Change a load's status — publish (`Posted`) or cancel (`Cancelled`); every other status is set only by internal processes (Rev. 9, supersedes `.../cancel`) | Shipper (own) |
 | POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper *(not yet implemented)* |
 | ~~GET~~ | ~~`/loads/{id}/status-history`~~ | **Superseded, Rev. 8** — never built as a separate endpoint; the full timeline now rides along on `GET /loads/{id}`'s `statusHistory` field instead | — |
 | POST | `/loads/{id}/files` | Attach an already-uploaded file (`POST /files/single`) to a load, classified `Manifest`/`Invoice`/`CargoPhoto`/`Other` | Shipper (own) |
@@ -464,10 +465,17 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
-  /loads/{id}/cancel:
+  /loads/{id}/status:
     patch:
       tags: [Loads]
-      summary: Cancel a load (status transition to Cancelled, never a hard delete — ADR-019)
+      summary: Change a load's status — publish (Posted) or cancel (Cancelled); never a hard delete (ADR-019)
+      description: >
+        The single endpoint for every Shipper-initiated load status change (Rev. 9, supersedes the
+        retired PATCH /loads/{id}/cancel). status must be Posted or Cancelled — every other value,
+        including Matched/InTransit/Delivered/Closed, is rejected 422 INVALID_LOAD_STATUS_TRANSITION
+        even though those are legal transitions in LoadStatusTransitionRules' graph, since they're
+        reached only by internal processes (the AI matching workflow, trip events), never by this
+        Shipper-facing endpoint.
       x-allowed-roles: [Shipper]
       x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED); Admin is role-gated out entirely (403), never reaches an ownership check"
       parameters:
@@ -477,7 +485,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CancelLoadRequest'
+              $ref: '#/components/schemas/ChangeLoadStatusRequest'
       responses:
         '200':
           description: OK
@@ -1028,19 +1036,23 @@ components:
         pickupWindowStart: { type: string, format: date-time }
         pickupWindowEnd: { type: string, format: date-time }
 
-    CancelLoadRequest:
+    ChangeLoadStatusRequest:
       type: object
       description: >
-        PATCH /loads/{id}/cancel body. reason is optional at the schema level but enforced as
-        required by the service before it writes the LoadStatusHistory row (400
+        PATCH /loads/{id}/status body (Rev. 9). status is required and must be Posted or Cancelled —
+        any other value is rejected 422 INVALID_LOAD_STATUS_TRANSITION before reason is even
+        considered. reason is optional at the schema level but enforced as required by the service
+        when status is Cancelled, before it writes the LoadStatusHistory row (400
         LOAD_CANCEL_REASON_REQUIRED if missing/blank) — mirrors LoadStatusHistory's own
-        ck_lsh_cancel_reason CHECK.
+        ck_lsh_cancel_reason CHECK. Ignored when status is Posted.
+      required: [status]
       properties:
+        status: { type: string, enum: [Posted, Cancelled] }
         reason: { type: string, maxLength: 500, nullable: true }
 
     LoadResponse:
       type: object
-      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and PATCH /loads/{id}/cancel.
+      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and PATCH /loads/{id}/status.
       properties:
         loadId: { type: string, format: uuid }
         shipperUserId: { type: string, format: uuid }
@@ -1066,7 +1078,7 @@ components:
           type: array
           description: >
             Full LoadStatusHistory audit trail, newest first. Only populated by GET /loads/{id} — the
-            POST/PUT/PATCH .../cancel responses that also return LoadResponse leave this as an empty
+            POST/PUT/PATCH .../status responses that also return LoadResponse leave this as an empty
             array, since the caller already knows the single transition it just made.
           items: { $ref: '#/components/schemas/LoadStatusHistoryResponse' }
 
