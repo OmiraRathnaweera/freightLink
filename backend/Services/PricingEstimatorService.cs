@@ -35,15 +35,17 @@ public class PricingEstimatorService : IPricingEstimatorService
         var vehicleClass = request.SuggestedVehicleClass!.Value;
         var distanceKm = request.DistanceKm!.Value;
 
-        // By exact class label, not GetTierForWeightAndVolume — Agent 3 has already chosen the
-        // vehicle class, so this endpoint must not re-derive one from Load.WeightKg/VolumeM3.
-        var efficiency = await _pricingConfigService.GetCurrentVehicleClassEfficiency(vehicleClass, cancellationToken);
-
-        // AutoDiesel is the estimator's fixed fuel type, per the task this endpoint implements — not
-        // worth a dedicated constants file for a single literal.
-        var fuelPrice = await _pricingConfigService.GetCurrentFuelPrice(FuelType.AutoDiesel, cancellationToken);
-
-        var formulaConfig = await _pricingConfigService.GetCurrentPricingFormulaConfig(cancellationToken);
+        // A single, locked read of all three current config rows together — not three separate
+        // calls — so a concurrent Admin write can't land between them and produce an estimate that
+        // mixes a pre-write value from one table with a post-write value from another. By exact class
+        // label, not GetTierForWeightAndVolume — Agent 3 has already chosen the vehicle class, so
+        // this endpoint must not re-derive one from Load.WeightKg/VolumeM3. AutoDiesel is the
+        // estimator's fixed fuel type, per the task this endpoint implements — not worth a dedicated
+        // constants file for a single literal.
+        var snapshot = await _pricingConfigService.GetPricingSnapshotForEstimate(vehicleClass, FuelType.AutoDiesel, cancellationToken);
+        var efficiency = snapshot.Efficiency;
+        var fuelPrice = snapshot.FuelPrice;
+        var formulaConfig = snapshot.FormulaConfig;
 
         var ratePerKm = (fuelPrice.PricePerLitre / 100m) * efficiency.FuelConsumptionLPer100Km
                        + formulaConfig.DriverCostPerKm + formulaConfig.MaintenanceAllowancePerKm;

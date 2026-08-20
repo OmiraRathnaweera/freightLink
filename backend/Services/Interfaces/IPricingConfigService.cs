@@ -118,4 +118,15 @@ public interface IPricingConfigService
     /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>DeletedByUserId</c>.</param>
     /// <exception cref="Common.Exceptions.ApiException">404 if no such row exists; 422 if it is already soft-deleted.</exception>
     Task<PricingConfigDeleteResponseDto> SoftDeletePricingFormulaConfig(Guid pricingFormulaConfigId, Guid actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the current <see cref="Entities.VehicleClassEfficiency"/> (for <paramref name="classLabel"/>),
+    /// current <see cref="Entities.FuelPriceRate"/> (for <paramref name="fuelType"/>), and current
+    /// <see cref="Entities.PricingFormulaConfig"/> as one atomic snapshot, under the same lock every
+    /// pricing-config write is serialized by — so an Admin write landing mid-read can never combine a
+    /// value from before the write with a value from after it. This is what
+    /// <c>PricingEstimatorService</c> uses instead of three separate, individually-unlocked calls.
+    /// </summary>
+    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if any of the three current rows doesn't exist.</exception>
+    Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(VehicleClass classLabel, FuelType fuelType, CancellationToken cancellationToken = default);
 }

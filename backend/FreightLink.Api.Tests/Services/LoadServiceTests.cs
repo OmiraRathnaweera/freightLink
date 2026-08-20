@@ -648,7 +648,10 @@ public class LoadServiceTests
         }
     }
 
-    /// <summary>Editing a load's weight does not touch EstimatedPrice — LoadService never computes pricing.</summary>
+    /// <summary>
+    /// LoadService never computes a price itself (that's PricingEstimatorService's job) — editing a
+    /// freshly created load, which has no EstimatedPrice yet, leaves it null either way.
+    /// </summary>
     [Fact]
     public async Task UpdateAsync_DoesNotComputeEstimatedPrice_WhenWeightChanges()
     {
@@ -663,6 +666,73 @@ public class LoadServiceTests
         var result = await sut.UpdateAsync(created.LoadId, shipperUserId, updateRequest);
 
         Assert.Null(result.EstimatedPrice);
+    }
+
+    /// <summary>
+    /// A previously-estimated price is invalidated the moment any input the internal estimator prices
+    /// against changes — weight here — since there is no synchronous re-estimation wired into this
+    /// edit path and a stale price would otherwise keep showing as if it still reflected the load.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_ClearsEstimatedPrice_WhenWeightChanges()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        load.EstimatedPrice = 5000m;
+        await dbContext.SaveChangesAsync();
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.WeightKg = load.WeightKg + 1000m;
+
+        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
+
+        Assert.Null(result.EstimatedPrice);
+    }
+
+    /// <summary>Same as the weight case, but for a pickup/dropoff coordinate change — distanceKm is the other estimator input this edit path can invalidate.</summary>
+    [Fact]
+    public async Task UpdateAsync_ClearsEstimatedPrice_WhenPickupCoordinatesChange()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        load.EstimatedPrice = 5000m;
+        await dbContext.SaveChangesAsync();
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.PickupLat = load.PickupLat + 1m;
+
+        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
+
+        Assert.Null(result.EstimatedPrice);
+    }
+
+    /// <summary>An edit that changes only non-pricing fields (e.g. cargo description) leaves an existing EstimatedPrice untouched.</summary>
+    [Fact]
+    public async Task UpdateAsync_PreservesEstimatedPrice_WhenPricingInputsUnchanged()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        load.EstimatedPrice = 5000m;
+        await dbContext.SaveChangesAsync();
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.WeightKg = load.WeightKg;
+        updateRequest.VolumeM3 = load.VolumeM3;
+        updateRequest.PickupLat = load.PickupLat;
+        updateRequest.PickupLng = load.PickupLng;
+        updateRequest.DropoffLat = load.DropoffLat;
+        updateRequest.DropoffLng = load.DropoffLng;
+        updateRequest.CargoDescription = "Changed description only";
+
+        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
+
+        Assert.Equal(5000m, result.EstimatedPrice);
     }
 
     /// <summary>A load past Posted (Matched or later, including terminal states) cannot be edited.</summary>

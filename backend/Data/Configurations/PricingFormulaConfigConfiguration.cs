@@ -41,7 +41,9 @@ public class PricingFormulaConfigConfiguration : IEntityTypeConfiguration<Pricin
             t.HasCheckConstraint("ck_pfc_rate_per_kg_bounds", "\"RatePerKg\" >= 0");
             t.HasCheckConstraint("ck_pfc_driver_cost_bounds", "\"DriverCostPerKm\" >= 0");
             t.HasCheckConstraint("ck_pfc_maintenance_allowance_bounds", "\"MaintenanceAllowancePerKm\" >= 0");
-            t.HasCheckConstraint("ck_pfc_margin_percent_bounds", "\"MarginPercent\" >= 0");
+            // MarginPercent is a fraction (0.15 = 15%), capped at 1 (100%) to match the frontend's
+            // own maximum — the DB-level backstop for CreatePricingFormulaConfigDto's [Range(0, 1)].
+            t.HasCheckConstraint("ck_pfc_margin_percent_bounds", "\"MarginPercent\" >= 0 AND \"MarginPercent\" <= 1");
         });
     }
 }

@@ -14,12 +14,15 @@ namespace FreightLink.Api.Services;
 public class PricingConfigService : IPricingConfigService
 {
     /// <summary>
-    /// Serializes every pricing-config write (<c>Create*</c>/<c>SoftDelete*</c> across both tables)
-    /// within this process. This is what makes <see cref="CreateVehicleClassEfficiency"/>'s
+    /// Serializes every pricing-config write (<c>Create*</c>/<c>SoftDelete*</c> across all three
+    /// tables) and <see cref="GetPricingSnapshotForEstimate"/>'s combined read within this process.
+    /// This is what makes <see cref="CreateVehicleClassEfficiency"/>'s
     /// read-validate-insert sequence safe against a concurrent request racing the same stale snapshot,
-    /// and makes two concurrent soft-deletes of the same row resolve deterministically (the second sees
-    /// the first's committed state instead of silently overwriting <c>DeletedByUserId</c>). <c>static</c>
-    /// is required — a new
+    /// makes two concurrent soft-deletes of the same row resolve deterministically (the second sees
+    /// the first's committed state instead of silently overwriting <c>DeletedByUserId</c>), and keeps
+    /// <see cref="GetPricingSnapshotForEstimate"/>'s three reads from straddling a concurrent write
+    /// (which would otherwise let the internal price estimator combine a pre-write value from one
+    /// table with a post-write value from another). <c>static</c> is required — a new
     /// <see cref="PricingConfigService"/> instance is constructed per request (scoped DI), so only a
     /// process-wide field actually coordinates across concurrent requests. Deliberately a plain mutex,
     /// not a reader/writer lock — this app runs as a single instance (one <c>compose.yaml</c> service,
@@ -358,6 +361,32 @@ public class PricingConfigService : IPricingConfigService
             await _dbContext.SaveChangesAsync(cancellationToken);
 
             return new PricingConfigDeleteResponseDto { Message = "Pricing formula configuration deleted successfully.", Id = config.PricingFormulaConfigId };
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(VehicleClass classLabel, FuelType fuelType, CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            // All three reads happen while holding the same lock every Create*/SoftDelete* write is
+            // serialized by, so a concurrent Admin write can't land between them — the estimator gets
+            // one internally-consistent snapshot, never a mix of a pre-write and post-write value.
+            var efficiency = await GetCurrentVehicleClassEfficiencyEntityAsync(classLabel, cancellationToken);
+            var fuelPrice = await GetCurrentFuelPriceEntityAsync(fuelType, cancellationToken);
+            var formulaConfig = await GetCurrentPricingFormulaConfigEntityAsync(cancellationToken);
+
+            return new PricingSnapshotDto
+            {
+                Efficiency = MapToResponse(efficiency, ResolveUserName(efficiency.SetByUser?.FullName)),
+                FuelPrice = MapToResponse(fuelPrice, ResolveUserName(fuelPrice.SetByUser?.FullName)),
+                FormulaConfig = MapToResponse(formulaConfig, ResolveUserName(formulaConfig.SetByUser?.FullName))
+            };
         }
         finally
         {

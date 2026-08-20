@@ -38,11 +38,12 @@ public class CreatePricingFormulaConfigDto
     public decimal? MaintenanceAllowancePerKm { get; set; }
 
     /// <summary>
-    /// Profit margin as a fraction (e.g. <c>0.15</c> for 15%), not a whole percent. See
-    /// <see cref="BaseFare"/> for why this is nullable.
+    /// Profit margin as a fraction (e.g. <c>0.15</c> for 15%), not a whole percent — capped at
+    /// <c>1</c> (100%), matching the frontend's own maximum. See <see cref="BaseFare"/> for why this
+    /// is nullable.
     /// </summary>
     [Required]
-    [Range(0, double.MaxValue, ErrorMessage = "MarginPercent must be zero or greater")]
+    [Range(0, 1, ErrorMessage = "MarginPercent must be between 0 and 1 (0% to 100%)")]
     public decimal? MarginPercent { get; set; }
 
     /// <summary>Citation for where these values came from, e.g. "Cost-based derivation, ADR-019 methodology, dated".</summary>

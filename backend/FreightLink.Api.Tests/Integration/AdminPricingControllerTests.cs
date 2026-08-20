@@ -220,6 +220,23 @@ public class AdminPricingControllerTests
         Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
     }
 
+    /// <summary>MarginPercent is a fraction capped at 1 (100%), matching the frontend's own maximum — DataAnnotations rejects anything above it automatically.</summary>
+    [Fact]
+    public async Task CreateFormulaConfig_Returns400_WhenMarginPercentAboveOne()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/admin/pricing/formula-config", await SeedAndMintAdminTokenAsync(factory));
+        var dto = ValidPricingFormulaConfigDto();
+        dto.MarginPercent = 1.5m;
+        request.Content = JsonContent.Create(dto);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
+    }
+
     /// <summary>GET /admin/pricing/formula-config returns the current configuration (the factory's seed, if nothing newer was created).</summary>
     [Fact]
     public async Task GetCurrentFormulaConfig_Returns200_ForAdmin()

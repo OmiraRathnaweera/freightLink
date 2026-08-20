@@ -374,6 +374,43 @@ public class PricingConfigServiceTests
         Assert.Equal(ErrorCode.PRICING_FORMULA_CONFIG_NOT_FOUND, exception.Code);
     }
 
+    /// <summary>
+    /// The combined snapshot read PricingEstimatorService uses instead of three separate calls
+    /// returns the current value from all three tables together.
+    /// </summary>
+    [Fact]
+    public async Task GetPricingSnapshotForEstimate_ReturnsCurrentValuesFromAllThreeTables()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 355m), adminId);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(fuelConsumption: 12m), adminId);
+        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 600m), adminId);
+
+        var snapshot = await sut.GetPricingSnapshotForEstimate(VehicleClass.MiniTruck, FuelType.AutoDiesel);
+
+        Assert.Equal(355m, snapshot.FuelPrice.PricePerLitre);
+        Assert.Equal(12m, snapshot.Efficiency.FuelConsumptionLPer100Km);
+        Assert.Equal(600m, snapshot.FormulaConfig.BaseFare);
+    }
+
+    /// <summary>If any one of the three tables has no current row, the whole snapshot fails loudly rather than returning a partial result.</summary>
+    [Fact]
+    public async Task GetPricingSnapshotForEstimate_Throws_WhenFormulaConfigMissing()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(), adminId);
+        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(), adminId);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetPricingSnapshotForEstimate(VehicleClass.MiniTruck, FuelType.AutoDiesel));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+    }
+
     // --- VehicleClassEfficiency ---
 
     [Fact]

@@ -245,6 +245,20 @@ public class LoadService : ILoadService
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
         ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
 
+        // Every input the internal estimator (PricingEstimatorService) prices against —
+        // WeightKg/VolumeM3 (vehicle-class tier, ratePerKg) and the pickup/dropoff coordinates
+        // (distanceKm, computed by the caller) — invalidates any existing EstimatedPrice the moment
+        // it changes. There is no synchronous re-estimation wired into this edit path, so a stale
+        // price is cleared rather than silently left attached to a load whose dimensions/route it no
+        // longer reflects; the Agentic AI pipeline is expected to re-estimate separately.
+        var pricingInputsChanged =
+            load.WeightKg != request.WeightKg ||
+            load.VolumeM3 != request.VolumeM3 ||
+            load.PickupLat != request.PickupLat!.Value ||
+            load.PickupLng != request.PickupLng!.Value ||
+            load.DropoffLat != request.DropoffLat!.Value ||
+            load.DropoffLng != request.DropoffLng!.Value;
+
         load.CargoDescription = request.CargoDescription;
         load.WeightKg = request.WeightKg;
         load.VolumeM3 = request.VolumeM3;
@@ -256,6 +270,11 @@ public class LoadService : ILoadService
         load.DropoffLng = request.DropoffLng!.Value;
         load.PickupWindowStart = request.PickupWindowStart;
         load.PickupWindowEnd = request.PickupWindowEnd;
+
+        if (pricingInputsChanged)
+        {
+            load.EstimatedPrice = null;
+        }
 
         await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
