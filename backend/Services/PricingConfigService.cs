@@ -275,6 +275,96 @@ public class PricingConfigService : IPricingConfigService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<PricingFormulaConfigResponseDto> GetCurrentPricingFormulaConfig(CancellationToken cancellationToken = default)
+    {
+        var current = await GetCurrentPricingFormulaConfigEntityAsync(cancellationToken);
+        return MapToResponse(current, ResolveUserName(current.SetByUser?.FullName));
+    }
+
+    /// <inheritdoc />
+    public async Task<List<PricingFormulaConfigResponseDto>> GetPricingFormulaConfigHistory(CancellationToken cancellationToken = default)
+    {
+        var rows = await _dbContext.PricingFormulaConfigs.AsNoTracking()
+            .Include(x => x.SetByUser)
+            .OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.PricingFormulaConfigId)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(x => MapToResponse(x, ResolveUserName(x.SetByUser?.FullName))).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<PricingFormulaConfigResponseDto> CreatePricingFormulaConfig(CreatePricingFormulaConfigDto request, Guid actingUserId, CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var config = new PricingFormulaConfig
+            {
+                PricingFormulaConfigId = Guid.NewGuid(),
+                BaseFare = request.BaseFare!.Value,
+                RatePerKg = request.RatePerKg!.Value,
+                DriverCostPerKm = request.DriverCostPerKm!.Value,
+                MaintenanceAllowancePerKm = request.MaintenanceAllowancePerKm!.Value,
+                MarginPercent = request.MarginPercent!.Value,
+                Source = request.Source,
+                EffectiveFrom = request.EffectiveFrom,
+                SetByUserId = actingUserId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            _dbContext.PricingFormulaConfigs.Add(config);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            // config.SetByUser is never populated at this point (a freshly-added tracked entity has
+            // no navigation fix-up from the DB), so the setter's display name is resolved with a
+            // dedicated lookup rather than an Include on an entity that was just inserted, not queried.
+            var setByUserName = await _dbContext.Users.AsNoTracking()
+                .Where(u => u.UserId == actingUserId)
+                .Select(u => u.FullName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return MapToResponse(config, ResolveUserName(setByUserName));
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PricingConfigDeleteResponseDto> SoftDeletePricingFormulaConfig(Guid pricingFormulaConfigId, Guid actingUserId, CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            var config = await _dbContext.PricingFormulaConfigs
+                .FirstOrDefaultAsync(x => x.PricingFormulaConfigId == pricingFormulaConfigId, cancellationToken);
+
+            if (config is null)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.PRICING_FORMULA_CONFIG_NOT_FOUND, "The requested pricing formula configuration could not be found.");
+            }
+
+            if (config.DeletedAt is not null)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.PRICING_FORMULA_CONFIG_ALREADY_DELETED, "This pricing formula configuration has already been soft-deleted.");
+            }
+
+            config.DeletedAt = DateTimeOffset.UtcNow;
+            config.DeletedByUserId = actingUserId;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return new PricingConfigDeleteResponseDto { Message = "Pricing formula configuration deleted successfully.", Id = config.PricingFormulaConfigId };
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
+
     /// <summary>The current (non-deleted, non-future-dated, latest-<c>EffectiveFrom</c>) row for <paramref name="fuelType"/>.</summary>
     private async Task<FuelPriceRate> GetCurrentFuelPriceEntityAsync(FuelType fuelType, CancellationToken cancellationToken)
     {
@@ -331,6 +421,25 @@ public class PricingConfigService : IPricingConfigService
             .GroupBy(x => x.ClassLabel)
             .Select(g => g.OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.VehicleClassEfficiencyId).First())
             .ToList();
+    }
+
+    /// <summary>The current (non-deleted, non-future-dated, latest-<c>EffectiveFrom</c>) <see cref="PricingFormulaConfig"/> row.</summary>
+    private async Task<PricingFormulaConfig> GetCurrentPricingFormulaConfigEntityAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var current = await _dbContext.PricingFormulaConfigs.AsNoTracking()
+            .Include(x => x.SetByUser)
+            .Where(x => x.DeletedAt == null && x.EffectiveFrom <= now)
+            .OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.PricingFormulaConfigId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (current is null)
+        {
+            throw new ApiException(HttpStatusCode.ServiceUnavailable, ErrorCode.PRICING_CONFIG_MISSING,
+                "No current pricing formula configuration exists. An Admin must add one before loads can be priced.");
+        }
+
+        return current;
     }
 
     /// <summary>
@@ -453,5 +562,23 @@ public class PricingConfigService : IPricingConfigService
         CreatedAt = efficiency.CreatedAt,
         DeletedAt = efficiency.DeletedAt,
         DeletedByUserId = efficiency.DeletedByUserId
+    };
+
+    /// <summary>Maps a <see cref="PricingFormulaConfig"/> entity to its wire-facing representation.</summary>
+    private static PricingFormulaConfigResponseDto MapToResponse(PricingFormulaConfig config, string setByUserName) => new()
+    {
+        PricingFormulaConfigId = config.PricingFormulaConfigId,
+        BaseFare = config.BaseFare,
+        RatePerKg = config.RatePerKg,
+        DriverCostPerKm = config.DriverCostPerKm,
+        MaintenanceAllowancePerKm = config.MaintenanceAllowancePerKm,
+        MarginPercent = config.MarginPercent,
+        Source = config.Source,
+        EffectiveFrom = config.EffectiveFrom,
+        SetByUserId = config.SetByUserId,
+        SetByUserName = setByUserName,
+        CreatedAt = config.CreatedAt,
+        DeletedAt = config.DeletedAt,
+        DeletedByUserId = config.DeletedByUserId
     };
 }

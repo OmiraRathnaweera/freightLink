@@ -114,11 +114,26 @@ public enum ErrorCode
     VEHICLE_CLASS_EFFICIENCY_INVALID_VOLUME_BAND,
 
     /// <summary>
-    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, or no <c>VehicleClassEfficiency</c>
-    /// tier covers the requested weight/volume. Thrown by <c>IPricingConfigService</c>'s current-value
-    /// lookups; not raised by <c>LoadService</c>, which does not depend on any pricing config existing.
+    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, no <c>VehicleClassEfficiency</c>
+    /// tier covers the requested weight/volume, or no current <c>PricingFormulaConfig</c> exists.
+    /// Thrown by <c>IPricingConfigService</c>'s current-value lookups; not raised by <c>LoadService</c>,
+    /// which does not depend on any pricing config existing.
     /// </summary>
     PRICING_CONFIG_MISSING,
+
+    /// <summary>No <c>PricingFormulaConfig</c> exists with the requested id.</summary>
+    PRICING_FORMULA_CONFIG_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>PricingFormulaConfig</c> row that is already soft-deleted.</summary>
+    PRICING_FORMULA_CONFIG_ALREADY_DELETED,
+
+    /// <summary>
+    /// <c>POST /internal/pricing/estimate</c> was called with a missing or incorrect
+    /// <c>X-Internal-Api-Key</c> header. Thrown by <c>InternalApiKeyAuthFilter</c> — distinct from
+    /// <see cref="UNAUTHORIZED"/>, which is reserved for JWT failures written directly by the
+    /// JwtBearer handler, not thrown as an <c>ApiException</c>.
+    /// </summary>
+    INTERNAL_API_KEY_INVALID,
 
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,

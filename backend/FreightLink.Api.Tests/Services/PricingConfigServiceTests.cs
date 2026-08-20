@@ -236,6 +236,144 @@ public class PricingConfigServiceTests
         Assert.Equal(ErrorCode.FUEL_PRICE_RATE_NOT_FOUND, exception.Code);
     }
 
+    private static CreatePricingFormulaConfigDto ValidPricingFormulaConfigDto(
+        decimal baseFare = 500m, decimal ratePerKg = 10m, decimal driverCostPerKm = 20m,
+        decimal maintenanceAllowancePerKm = 5m, decimal marginPercent = 0.15m, DateTimeOffset? effectiveFrom = null) => new()
+    {
+        BaseFare = baseFare,
+        RatePerKg = ratePerKg,
+        DriverCostPerKm = driverCostPerKm,
+        MaintenanceAllowancePerKm = maintenanceAllowancePerKm,
+        MarginPercent = marginPercent,
+        Source = "test",
+        EffectiveFrom = effectiveFrom ?? DateTimeOffset.UtcNow
+    };
+
+    // --- PricingFormulaConfig ---
+
+    [Fact]
+    public async Task CreatePricingFormulaConfig_InsertsNewRow_AndReturnsSetByUserName()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+
+        var result = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
+
+        Assert.NotEqual(Guid.Empty, result.PricingFormulaConfigId);
+        Assert.Equal(adminId, result.SetByUserId);
+        Assert.Equal("Pricing Admin", result.SetByUserName);
+        Assert.Null(result.DeletedAt);
+        Assert.Single(dbContext.PricingFormulaConfigs);
+    }
+
+    [Fact]
+    public async Task GetCurrentPricingFormulaConfig_ReturnsLatestNonDeletedRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+
+        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 400m, effectiveFrom: now.AddDays(-2)), adminId);
+        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 450m, effectiveFrom: now.AddDays(-1)), adminId);
+
+        var result = await sut.GetCurrentPricingFormulaConfig();
+
+        Assert.Equal(450m, result.BaseFare);
+    }
+
+    [Fact]
+    public async Task GetCurrentPricingFormulaConfig_ThrowsPricingConfigMissing_WhenNoneExist()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetCurrentPricingFormulaConfig());
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+    }
+
+    [Fact]
+    public async Task GetCurrentPricingFormulaConfig_IgnoresSoftDeletedRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
+        await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetCurrentPricingFormulaConfig());
+
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+    }
+
+    [Fact]
+    public async Task GetPricingFormulaConfigHistory_ReturnsAllRowsIncludingDeleted_NewestFirst()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+
+        var first = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 400m, effectiveFrom: now.AddDays(-2)), adminId);
+        var second = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 450m, effectiveFrom: now.AddDays(-1)), adminId);
+        await sut.SoftDeletePricingFormulaConfig(first.PricingFormulaConfigId, adminId);
+
+        var history = await sut.GetPricingFormulaConfigHistory();
+
+        Assert.Equal(2, history.Count);
+        Assert.Equal(second.PricingFormulaConfigId, history[0].PricingFormulaConfigId);
+        Assert.NotNull(history.Single(h => h.PricingFormulaConfigId == first.PricingFormulaConfigId).DeletedAt);
+    }
+
+    [Fact]
+    public async Task SoftDeletePricingFormulaConfig_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
+
+        var result = await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
+
+        Assert.Equal(created.PricingFormulaConfigId, result.Id);
+        Assert.False(string.IsNullOrWhiteSpace(result.Message));
+
+        var row = await dbContext.PricingFormulaConfigs.AsNoTracking().SingleAsync(x => x.PricingFormulaConfigId == created.PricingFormulaConfigId);
+        Assert.NotNull(row.DeletedAt);
+        Assert.Equal(adminId, row.DeletedByUserId);
+    }
+
+    [Fact]
+    public async Task SoftDeletePricingFormulaConfig_Throws_WhenAlreadyDeleted()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
+        await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
+        Assert.Equal(ErrorCode.PRICING_FORMULA_CONFIG_ALREADY_DELETED, exception.Code);
+    }
+
+    [Fact]
+    public async Task SoftDeletePricingFormulaConfig_Throws_WhenNotFound()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeletePricingFormulaConfig(Guid.NewGuid(), adminId));
+
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+        Assert.Equal(ErrorCode.PRICING_FORMULA_CONFIG_NOT_FOUND, exception.Code);
+    }
+
     // --- VehicleClassEfficiency ---
 
     [Fact]
