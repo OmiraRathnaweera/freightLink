@@ -63,7 +63,7 @@ public class LoadService : ILoadService
             Status = initialStatus,
             CreatedAt = now,
             UpdatedAt = now
-        };
+        }; 
 
         var historyRow = new LoadStatusHistory
         {
