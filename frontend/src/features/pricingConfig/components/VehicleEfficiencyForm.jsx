@@ -17,6 +17,8 @@ const INITIAL_VALUES = {
   classLabel: '',
   minPayloadKg: '',
   maxPayloadKg: '',
+  minVolumeM3: '',
+  maxVolumeM3: '',
   fuelConsumptionLPer100Km: '',
   source: '',
   effectiveFrom: '',
@@ -26,8 +28,9 @@ const VEHICLE_CLASS_OPTIONS = Object.values(VehicleClass).map((value) => ({ valu
 
 // Insert-only, per ADR-019's versioning rule — always "Add", never "Edit".
 // Built on the project's existing Formik + Yup field kit, same pattern as
-// FuelRateForm. maxPayloadKg is left blank for the open-ended top tier
-// (e.g. ContainerTruck) and simply omitted from the payload in that case.
+// FuelRateForm. maxPayloadKg/maxVolumeM3 are left blank for the open-ended
+// top tier (e.g. ContainerTruck) and simply omitted from the payload in
+// that case.
 function VehicleEfficiencyForm() {
   const createMutation = useCreateVehicleEfficiencyMutation()
 
@@ -38,6 +41,8 @@ function VehicleEfficiencyForm() {
         classLabel: values.classLabel,
         minPayloadKg: values.minPayloadKg,
         maxPayloadKg: values.maxPayloadKg === '' ? undefined : values.maxPayloadKg,
+        minVolumeM3: values.minVolumeM3,
+        maxVolumeM3: values.maxVolumeM3 === '' ? undefined : values.maxVolumeM3,
         fuelConsumptionLPer100Km: values.fuelConsumptionLPer100Km,
         source: values.source.trim(),
         effectiveFrom: fromDateTimeLocalInput(values.effectiveFrom),
@@ -80,6 +85,15 @@ function VehicleEfficiencyForm() {
             <FormikNumberField
               name="maxPayloadKg"
               label="Max Payload (kg)"
+              helperText="Leave blank for an open-ended tier"
+              step="0.01"
+              min="0"
+              mono
+            />
+            <FormikNumberField name="minVolumeM3" label="Min Volume (m³)" step="0.01" min="0" mono />
+            <FormikNumberField
+              name="maxVolumeM3"
+              label="Max Volume (m³)"
               helperText="Leave blank for an open-ended tier"
               step="0.01"
               min="0"

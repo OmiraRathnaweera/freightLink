@@ -61,6 +61,7 @@ const NAV_ITEMS = [
     children: [
       { to: '/pricing-config/fuel-rates', label: 'Fuel Prices' },
       { to: '/pricing-config/vehicle-efficiency', label: 'Vehicle Class Efficiency' },
+      { to: '/pricing-config/formula', label: 'Pricing Formula' },
     ],
   },
 ]

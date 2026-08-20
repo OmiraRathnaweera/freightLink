@@ -30,6 +30,11 @@ function formatPayloadBand(minPayloadKg, maxPayloadKg) {
   return `${minPayloadKg.toLocaleString('en-LK')}–${maxPayloadKg.toLocaleString('en-LK')} kg`
 }
 
+function formatVolumeBand(minVolumeM3, maxVolumeM3) {
+  if (maxVolumeM3 == null) return `${minVolumeM3.toLocaleString('en-LK')}+ m³`
+  return `${minVolumeM3.toLocaleString('en-LK')}–${maxVolumeM3.toLocaleString('en-LK')} m³`
+}
+
 function VehicleEfficiencySection() {
   const [showHistory, setShowHistory] = useState(false)
   const [historyVehicleClass, setHistoryVehicleClass] = useState('')
@@ -85,6 +90,7 @@ function VehicleEfficiencySection() {
               <tr className="text-label-caps text-on-surface-variant">
                 <th className="py-table-cell-py pr-table-cell-px font-normal">Vehicle Class</th>
                 <th className="py-table-cell-py pr-table-cell-px font-normal">Payload Band</th>
+                <th className="py-table-cell-py pr-table-cell-px font-normal">Volume Band</th>
                 <th className="py-table-cell-py pr-table-cell-px font-normal">Fuel Consumption</th>
                 <th className="py-table-cell-py pr-table-cell-px font-normal">Source</th>
                 <th className="py-table-cell-py pr-table-cell-px font-normal">Effective From</th>
@@ -98,6 +104,9 @@ function VehicleEfficiencySection() {
                   <td className="py-table-cell-py pr-table-cell-px text-on-surface">{tier.classLabel}</td>
                   <td className="py-table-cell-py pr-table-cell-px text-data-mono text-on-surface">
                     {formatPayloadBand(tier.minPayloadKg, tier.maxPayloadKg)}
+                  </td>
+                  <td className="py-table-cell-py pr-table-cell-px text-data-mono text-on-surface">
+                    {formatVolumeBand(tier.minVolumeM3, tier.maxVolumeM3)}
                   </td>
                   <td className="py-table-cell-py pr-table-cell-px text-data-mono text-on-surface">
                     {tier.fuelConsumptionLPer100Km} L/100km
@@ -180,6 +189,7 @@ function VehicleEfficiencySection() {
                 <thead>
                   <tr className="text-label-caps text-on-surface-variant">
                     <th className="py-table-cell-py pr-table-cell-px font-normal">Payload Band</th>
+                    <th className="py-table-cell-py pr-table-cell-px font-normal">Volume Band</th>
                     <th className="py-table-cell-py pr-table-cell-px font-normal">Fuel Consumption</th>
                     <th className="py-table-cell-py pr-table-cell-px font-normal">Source</th>
                     <th className="py-table-cell-py pr-table-cell-px font-normal">Effective From</th>
@@ -194,6 +204,9 @@ function VehicleEfficiencySection() {
                     >
                       <td className="py-table-cell-py pr-table-cell-px text-data-mono text-on-surface">
                         {formatPayloadBand(tier.minPayloadKg, tier.maxPayloadKg)}
+                      </td>
+                      <td className="py-table-cell-py pr-table-cell-px text-data-mono text-on-surface">
+                        {formatVolumeBand(tier.minVolumeM3, tier.maxVolumeM3)}
                       </td>
                       <td className="py-table-cell-py pr-table-cell-px text-data-mono text-on-surface">
                         {tier.fuelConsumptionLPer100Km} L/100km

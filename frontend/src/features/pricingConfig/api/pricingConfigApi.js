@@ -17,11 +17,30 @@ import { queryClient } from '../../../lib/api/queryClient.js'
  */
 
 /**
+ * @typedef {object} PricingFormulaConfig
+ * @property {string} pricingFormulaConfigId
+ * @property {number} baseFare
+ * @property {number} ratePerKg
+ * @property {number} driverCostPerKm
+ * @property {number} maintenanceAllowancePerKm
+ * @property {number} marginPercent
+ * @property {string} source
+ * @property {string} effectiveFrom
+ * @property {string} setByUserId
+ * @property {string} setByUserName
+ * @property {string} createdAt
+ * @property {string|null} deletedAt
+ * @property {string|null} deletedByUserId
+ */
+
+/**
  * @typedef {object} VehicleEfficiency
  * @property {string} vehicleClassEfficiencyId
  * @property {string} classLabel
  * @property {number} minPayloadKg
  * @property {number|null} maxPayloadKg
+ * @property {number} minVolumeM3
+ * @property {number|null} maxVolumeM3
  * @property {number} fuelConsumptionLPer100Km
  * @property {string} source
  * @property {string} effectiveFrom
@@ -41,6 +60,11 @@ export const pricingConfigKeys = {
   fuelRateHistory: (fuelType) => [...pricingConfigKeys.fuelRates(), 'history', fuelType],
   vehicleEfficiency: () => [...pricingConfigKeys.all, 'vehicleEfficiency'],
   vehicleEfficiencyHistory: (vehicleClass) => [...pricingConfigKeys.vehicleEfficiency(), 'history', vehicleClass],
+  // No dimension key — PricingFormulaConfig is a singleton resource
+  // (one current row total), unlike fuel rates/vehicle efficiency which
+  // are keyed per fuel type/vehicle class.
+  formulaConfig: () => [...pricingConfigKeys.all, 'formulaConfig'],
+  formulaConfigHistory: () => [...pricingConfigKeys.formulaConfig(), 'history'],
 }
 
 export async function listFuelRates() {
@@ -73,6 +97,22 @@ export async function createVehicleEfficiency(data) {
 
 export async function deleteVehicleEfficiency(id) {
   return api.delete(`/admin/pricing/vehicle-efficiency/${id}`)
+}
+
+export async function getCurrentFormulaConfig() {
+  return api.get('/admin/pricing/formula-config')
+}
+
+export async function getFormulaConfigHistory() {
+  return api.get('/admin/pricing/formula-config/history')
+}
+
+export async function createFormulaConfig(data) {
+  return api.post('/admin/pricing/formula-config', data)
+}
+
+export async function deleteFormulaConfig(id) {
+  return api.delete(`/admin/pricing/formula-config/${id}`)
 }
 
 export function useFuelRatesQuery(options) {
@@ -139,6 +179,40 @@ export function useDeleteVehicleEfficiencyMutation(options) {
     mutationFn: deleteVehicleEfficiency,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: pricingConfigKeys.vehicleEfficiency() })
+      options?.onSuccess?.(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useCurrentFormulaConfigQuery(options) {
+  return useQuery({ queryKey: pricingConfigKeys.formulaConfig(), queryFn: getCurrentFormulaConfig, ...options })
+}
+
+export function useFormulaConfigHistoryQuery(options) {
+  return useQuery({
+    queryKey: pricingConfigKeys.formulaConfigHistory(),
+    queryFn: getFormulaConfigHistory,
+    ...options,
+  })
+}
+
+export function useCreateFormulaConfigMutation(options) {
+  return useMutation({
+    mutationFn: createFormulaConfig,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: pricingConfigKeys.formulaConfig() })
+      options?.onSuccess?.(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useDeleteFormulaConfigMutation(options) {
+  return useMutation({
+    mutationFn: deleteFormulaConfig,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: pricingConfigKeys.formulaConfig() })
       options?.onSuccess?.(data, variables, context)
     },
     ...options,
