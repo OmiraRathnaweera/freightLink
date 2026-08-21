@@ -25,7 +25,10 @@ function PublishLoadDialog({ loadId, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4">
+    // z-[1100]: see CancelLoadDialog.jsx — Leaflet's zoom-control panes sit at
+    // z-index:1000 and aren't isolated in their own stacking context, so a
+    // plain z-50 here would render underneath RouteMapCard's map.
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-primary/40 p-4">
       <div className="w-full max-w-md rounded-md border border-slate-border bg-surface-container-lowest p-6 shadow-soft">
         <h2 className="text-headline-md text-on-surface">Publish this load?</h2>
         <p className="mt-1 text-body-md text-on-surface-variant">

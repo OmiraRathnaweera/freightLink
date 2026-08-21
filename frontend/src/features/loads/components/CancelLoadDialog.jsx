@@ -15,7 +15,11 @@ function CancelLoadDialog({ loadId, onClose }) {
   const cancelMutation = useCancelLoadMutation(loadId)
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4">
+    // z-[1100]: Leaflet's own CSS gives its zoom-control panes z-index:1000
+    // (.leaflet-top/.leaflet-bottom), and RouteMapCard's MapContainer isn't
+    // isolated in its own stacking context, so a plain z-50 here loses to the
+    // map and renders underneath it — see RouteMapCard.jsx.
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-primary/40 p-4">
       <div className="w-full max-w-md rounded-md border border-slate-border bg-surface-container-lowest p-6 shadow-soft">
         <h2 className="text-headline-md text-on-surface">Cancel this load?</h2>
         <p className="mt-1 text-body-md text-on-surface-variant">This can't be undone. Provide a reason for the cancellation.</p>
