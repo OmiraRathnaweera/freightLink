@@ -3,6 +3,7 @@ using System.Text.Json;
 using CloudinaryDotNet;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
+using FreightLink.Api.Common.Filters;
 using FreightLink.Api.Common.Options;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Common;
@@ -121,6 +122,13 @@ builder.Services.Configure<AdminSeedOptions>(options =>
     options.Password = builder.Configuration["ADMIN_USER_PASSWORD"];
 });
 
+// Shared secret for internal-only, non-JWT endpoints (e.g. POST /internal/pricing/estimate) —
+// same flat-key pattern as the admin-seed credentials above.
+builder.Services.Configure<InternalApiOptions>(options =>
+{
+    options.ApiKey = builder.Configuration["INTERNAL_API_KEY"];
+});
+
 // Cloudinary settings (Cloudinary:* / CLOUDINARY__* env vars). Same case-insensitive "__"-to-":"
 // mapping as the other sections above.
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
@@ -192,7 +200,9 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPricingConfigService, PricingConfigService>();
+builder.Services.AddScoped<IPricingEstimatorService, PricingEstimatorService>();
 builder.Services.AddScoped<ILoadService, LoadService>();
+builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();

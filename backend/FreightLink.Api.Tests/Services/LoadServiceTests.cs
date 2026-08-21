@@ -18,91 +18,23 @@ namespace FreightLink.Api.Tests.Services;
 /// </summary>
 public class LoadServiceTests
 {
-    /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test, seeded with default pricing config (see <see cref="SeedDefaultPricingConfigAsync"/>).</summary>
-    private static async Task<AppDbContext> CreateContextAsync(bool seedPricing = true) => await CreateContextAsync(Guid.NewGuid().ToString(), seedPricing);
+    /// <summary>Creates a fresh, isolated InMemory-backed <see cref="AppDbContext"/> for one test.</summary>
+    private static Task<AppDbContext> CreateContextAsync() => CreateContextAsync(Guid.NewGuid().ToString());
 
     /// <summary>
     /// Creates an InMemory-backed <see cref="AppDbContext"/> against a caller-supplied database name,
     /// so concurrency tests can open a second, independent context onto the same underlying data.
-    /// Seeds default pricing config unless <paramref name="seedPricing"/> is <c>false</c> — every test
-    /// exercising <see cref="LoadService.CreateAsync"/>/<see cref="LoadService.UpdateAsync"/> now needs
-    /// pricing config to exist (see <see cref="LoadService.CalculateEstimatedPriceAsync"/>), so this
-    /// seeds by default rather than requiring every existing test to opt in individually.
     /// </summary>
-    private static async Task<AppDbContext> CreateContextAsync(string databaseName, bool seedPricing = true)
+    private static Task<AppDbContext> CreateContextAsync(string databaseName)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
             .UseInMemoryDatabase(databaseName)
             .Options;
-        var dbContext = new AppDbContext(options);
-
-        if (seedPricing)
-        {
-            await SeedDefaultPricingConfigAsync(dbContext);
-        }
-
-        return dbContext;
-    }
-
-    /// <summary>
-    /// Seeds one current <see cref="FuelPriceRate"/> (AutoDiesel), one wide-open
-    /// <see cref="VehicleClassEfficiency"/> tier (<c>MinPayloadKg = 0</c>, <c>MaxPayloadKg = null</c>,
-    /// and likewise wide-open on volume) — deliberately a single all-covering tier, not the three real
-    /// ADR-019 tiers, so every weight/volume-based test keeps passing without per-test changes — and one
-    /// current <see cref="PricingFormulaConfig"/> (the exact old <c>PricingConstants</c> placeholder
-    /// values, so existing price-formula assertions keep passing unchanged).
-    /// </summary>
-    private static async Task SeedDefaultPricingConfigAsync(AppDbContext dbContext)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var setByUserId = await SeedShipperUserAsync(dbContext, fullName: "Pricing Admin");
-
-        dbContext.FuelPriceRates.Add(new FuelPriceRate
-        {
-            FuelPriceRateId = Guid.NewGuid(),
-            FuelType = FuelType.AutoDiesel,
-            PricePerLitre = 350m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = setByUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
-        {
-            VehicleClassEfficiencyId = Guid.NewGuid(),
-            ClassLabel = VehicleClass.MiniTruck,
-            MinPayloadKg = 0m,
-            MaxPayloadKg = null,
-            MinVolumeM3 = 0m,
-            MaxVolumeM3 = null,
-            FuelConsumptionLPer100Km = 15m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = setByUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
-        {
-            PricingFormulaConfigId = Guid.NewGuid(),
-            BaseFare = 500m,
-            RatePerKg = 10m,
-            DriverMaintenanceMarginAllowancePerKm = 50m,
-            Source = "test-seed",
-            EffectiveFrom = now,
-            SetByUserId = setByUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-
-        await dbContext.SaveChangesAsync();
+        return Task.FromResult(new AppDbContext(options));
     }
 
     /// <summary>Builds a real <see cref="LoadService"/> wired to the given DB context.</summary>
-    private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext, new PricingConfigService(dbContext));
+    private static LoadService CreateSut(AppDbContext dbContext) => new(dbContext);
 
     /// <summary>Seeds a minimal Shipper user row for <c>Load.ShipperUserId</c> to reference.</summary>
     private static async Task<Guid> SeedShipperUserAsync(AppDbContext dbContext, string fullName = "Jane Shipper")
@@ -237,146 +169,19 @@ public class LoadServiceTests
     }
 
     /// <summary>
-    /// EstimatedPrice is computed automatically on create per ADR-015/ADR-019:
-    /// baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg), with ratePerKm derived from the
-    /// seeded fuel price and vehicle-class efficiency (see <see cref="SeedDefaultPricingConfigAsync"/>).
+    /// EstimatedPrice is left null on create — pricing is the AI agent's responsibility, not
+    /// LoadService's; Load creation never depends on any pricing config existing.
     /// </summary>
     [Fact]
-    public async Task CreateAsync_ComputesEstimatedPrice()
+    public async Task CreateAsync_LeavesEstimatedPriceNull()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var request = ValidCreateLoadDto();
 
-        var result = await sut.CreateAsync(shipperUserId, request);
+        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
 
-        Assert.NotNull(result.EstimatedPrice);
-
-        var distanceKm = HaversineDistanceKm(
-            (double)request.PickupLat!.Value, (double)request.PickupLng!.Value,
-            (double)request.DropoffLat!.Value, (double)request.DropoffLng!.Value);
-        // 350m/15m are SeedDefaultPricingConfigAsync's PricePerLitre/FuelConsumptionLPer100Km;
-        // 500m/10m/50m mirror PricingConstants.BaseFare/RatePerKg/DriverMaintenanceMarginAllowancePerKm.
-        var ratePerKm = 350m / 100m * 15m + 50m;
-        var expected = 500m + (decimal)distanceKm * ratePerKm + request.WeightKg * 10m;
-
-        Assert.Equal(expected, result.EstimatedPrice!.Value, 2);
-    }
-
-    /// <summary>Create is blocked (not silently priced null) if no current fuel price is configured for any matching tier.</summary>
-    [Fact]
-    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoFuelPriceConfigured()
-    {
-        using var dbContext = await CreateContextAsync(seedPricing: false);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
-        {
-            VehicleClassEfficiencyId = Guid.NewGuid(),
-            ClassLabel = VehicleClass.MiniTruck,
-            MinPayloadKg = 0m,
-            MaxPayloadKg = null,
-            FuelConsumptionLPer100Km = 15m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await dbContext.SaveChangesAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-        Assert.Empty(dbContext.Loads);
-    }
-
-    /// <summary>Create is blocked (not silently priced null) if no vehicle-class tier covers the load's weight.</summary>
-    [Fact]
-    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoMatchingTier()
-    {
-        using var dbContext = await CreateContextAsync(seedPricing: false);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        dbContext.FuelPriceRates.Add(new FuelPriceRate
-        {
-            FuelPriceRateId = Guid.NewGuid(),
-            FuelType = FuelType.AutoDiesel,
-            PricePerLitre = 350m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await dbContext.SaveChangesAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-        Assert.Empty(dbContext.Loads);
-    }
-
-    /// <summary>Create is blocked if a fuel price and a matching tier both exist but no <see cref="PricingFormulaConfig"/> does — the formula's base fare/rate constants are Admin-managed too, per ADR-019, not a hardcoded fallback.</summary>
-    [Fact]
-    public async Task CreateAsync_ThrowsPricingConfigMissing_WhenNoFormulaConfigured()
-    {
-        using var dbContext = await CreateContextAsync(seedPricing: false);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        dbContext.FuelPriceRates.Add(new FuelPriceRate
-        {
-            FuelPriceRateId = Guid.NewGuid(),
-            FuelType = FuelType.AutoDiesel,
-            PricePerLitre = 350m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
-        {
-            VehicleClassEfficiencyId = Guid.NewGuid(),
-            ClassLabel = VehicleClass.MiniTruck,
-            MinPayloadKg = 0m,
-            MaxPayloadKg = null,
-            MinVolumeM3 = 0m,
-            MaxVolumeM3 = null,
-            FuelConsumptionLPer100Km = 15m,
-            Source = "test",
-            EffectiveFrom = now,
-            SetByUserId = shipperUserId,
-            CreatedAt = now,
-            UpdatedAt = now
-        });
-        await dbContext.SaveChangesAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipperUserId, ValidCreateLoadDto()));
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-        Assert.Empty(dbContext.Loads);
-    }
-
-    /// <summary>Duplicates <c>LoadService.CalculateHaversineDistanceKm</c> for test-side expected-value computation.</summary>
-    private static double HaversineDistanceKm(double lat1, double lng1, double lat2, double lng2)
-    {
-        const double earthRadiusKm = 6371.0;
-        var lat1Rad = lat1 * Math.PI / 180.0;
-        var lat2Rad = lat2 * Math.PI / 180.0;
-        var deltaLatRad = (lat2 - lat1) * Math.PI / 180.0;
-        var deltaLngRad = (lng2 - lng1) * Math.PI / 180.0;
-
-        var a = Math.Sin(deltaLatRad / 2) * Math.Sin(deltaLatRad / 2) +
-                Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
-                Math.Sin(deltaLngRad / 2) * Math.Sin(deltaLngRad / 2);
-        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-        return earthRadiusKm * c;
+        Assert.Null(result.EstimatedPrice);
     }
 
     /// <summary>A pickup window where End is not after Start is rejected before any DB write.</summary>
@@ -476,7 +281,7 @@ public class LoadServiceTests
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-        await sut.CancelAsync(created.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" });
+        await sut.ChangeStatusAsync(created.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" });
 
         var result = await sut.GetByIdAsync(created.LoadId, shipperUserId, UserRole.Shipper);
 
@@ -843,9 +648,12 @@ public class LoadServiceTests
         }
     }
 
-    /// <summary>Editing a load's weight recomputes EstimatedPrice rather than leaving the stale value from create.</summary>
+    /// <summary>
+    /// LoadService never computes a price itself (that's PricingEstimatorService's job) — editing a
+    /// freshly created load, which has no EstimatedPrice yet, leaves it null either way.
+    /// </summary>
     [Fact]
-    public async Task UpdateAsync_RecomputesEstimatedPrice_WhenWeightChanges()
+    public async Task UpdateAsync_DoesNotComputeEstimatedPrice_WhenWeightChanges()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
@@ -857,8 +665,74 @@ public class LoadServiceTests
 
         var result = await sut.UpdateAsync(created.LoadId, shipperUserId, updateRequest);
 
-        Assert.NotNull(result.EstimatedPrice);
-        Assert.NotEqual(created.EstimatedPrice, result.EstimatedPrice);
+        Assert.Null(result.EstimatedPrice);
+    }
+
+    /// <summary>
+    /// A previously-estimated price is invalidated the moment any input the internal estimator prices
+    /// against changes — weight here — since there is no synchronous re-estimation wired into this
+    /// edit path and a stale price would otherwise keep showing as if it still reflected the load.
+    /// </summary>
+    [Fact]
+    public async Task UpdateAsync_ClearsEstimatedPrice_WhenWeightChanges()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        load.EstimatedPrice = 5000m;
+        await dbContext.SaveChangesAsync();
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.WeightKg = load.WeightKg + 1000m;
+
+        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
+
+        Assert.Null(result.EstimatedPrice);
+    }
+
+    /// <summary>Same as the weight case, but for a pickup/dropoff coordinate change — distanceKm is the other estimator input this edit path can invalidate.</summary>
+    [Fact]
+    public async Task UpdateAsync_ClearsEstimatedPrice_WhenPickupCoordinatesChange()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        load.EstimatedPrice = 5000m;
+        await dbContext.SaveChangesAsync();
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.PickupLat = load.PickupLat + 1m;
+
+        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
+
+        Assert.Null(result.EstimatedPrice);
+    }
+
+    /// <summary>An edit that changes only non-pricing fields (e.g. cargo description) leaves an existing EstimatedPrice untouched.</summary>
+    [Fact]
+    public async Task UpdateAsync_PreservesEstimatedPrice_WhenPricingInputsUnchanged()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+        load.EstimatedPrice = 5000m;
+        await dbContext.SaveChangesAsync();
+
+        var updateRequest = ValidUpdateLoadDto();
+        updateRequest.WeightKg = load.WeightKg;
+        updateRequest.VolumeM3 = load.VolumeM3;
+        updateRequest.PickupLat = load.PickupLat;
+        updateRequest.PickupLng = load.PickupLng;
+        updateRequest.DropoffLat = load.DropoffLat;
+        updateRequest.DropoffLng = load.DropoffLng;
+        updateRequest.CargoDescription = "Changed description only";
+
+        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
+
+        Assert.Equal(5000m, result.EstimatedPrice);
     }
 
     /// <summary>A load past Posted (Matched or later, including terminal states) cannot be edited.</summary>
@@ -960,11 +834,11 @@ public class LoadServiceTests
         Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
     }
 
-    // --- Cancel ---
+    // --- ChangeStatus: cancel ---
 
     /// <summary>A load in Draft, Posted, or Matched can be cancelled.</summary>
     [Fact]
-    public async Task CancelAsync_Succeeds_FromValidStatuses()
+    public async Task ChangeStatusAsync_Cancel_Succeeds_FromValidStatuses()
     {
         var cancellableStatuses = new[] { LoadStatus.Draft, LoadStatus.Posted, LoadStatus.Matched };
         foreach (var status in cancellableStatuses)
@@ -974,7 +848,7 @@ public class LoadServiceTests
             var shipperUserId = await SeedShipperUserAsync(dbContext);
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
 
-            var result = await sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" });
+            var result = await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" });
 
             Assert.Equal("Cancelled", result.Status);
             Assert.Equal("Jane Shipper", result.ShipperName);
@@ -983,7 +857,7 @@ public class LoadServiceTests
 
     /// <summary>A load already InTransit or in a terminal status cannot be cancelled through this method.</summary>
     [Fact]
-    public async Task CancelAsync_Throws_FromInvalidStatuses()
+    public async Task ChangeStatusAsync_Cancel_Throws_FromInvalidStatuses()
     {
         var nonCancellableStatuses = new[] { LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
         foreach (var status in nonCancellableStatuses)
@@ -994,7 +868,7 @@ public class LoadServiceTests
             var load = await SeedLoadAsync(dbContext, shipperUserId, status);
 
             var exception = await Assert.ThrowsAsync<ApiException>(() =>
-                sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" }));
+                sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" }));
 
             Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
         }
@@ -1002,7 +876,7 @@ public class LoadServiceTests
 
     /// <summary>Cancelling without a reason is rejected before the DB's own cancel-reason CHECK would ever see it.</summary>
     [Fact]
-    public async Task CancelAsync_Throws_WhenReasonMissing()
+    public async Task ChangeStatusAsync_Cancel_Throws_WhenReasonMissing()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
@@ -1010,50 +884,21 @@ public class LoadServiceTests
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
 
         var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = null }));
+            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = null }));
 
         Assert.Equal(ErrorCode.LOAD_CANCEL_REASON_REQUIRED, exception.Code);
     }
 
-    /// <summary>Cancelling a nonexistent load throws a 404-shaped ApiException.</summary>
-    [Fact]
-    public async Task CancelAsync_Throws_WhenNotFound()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(Guid.NewGuid(), Guid.NewGuid(), new CancelLoadDto { Reason = "N/A" }));
-
-        Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
-    }
-
-    /// <summary>A Shipper who does not own the load is forbidden from cancelling it.</summary>
-    [Fact]
-    public async Task CancelAsync_Throws_ForNonOwner()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var ownerId = await SeedShipperUserAsync(dbContext);
-        var otherShipperId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(load.LoadId, otherShipperId, new CancelLoadDto { Reason = "Not my load" }));
-
-        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
-    }
-
     /// <summary>Cancelling records a LoadStatusHistory row capturing the prior status, reason, and actor.</summary>
     [Fact]
-    public async Task CancelAsync_WritesLoadStatusHistoryRow()
+    public async Task ChangeStatusAsync_Cancel_WritesLoadStatusHistoryRow()
     {
         using var dbContext = await CreateContextAsync();
         var sut = CreateSut(dbContext);
         var shipperUserId = await SeedShipperUserAsync(dbContext);
         var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Posted);
 
-        await sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "No longer needed" });
+        await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "No longer needed" });
 
         var historyRow = await dbContext.LoadStatusHistories.SingleAsync(h => h.LoadId == load.LoadId);
         Assert.Equal(LoadStatus.Posted, historyRow.FromStatus);
@@ -1068,7 +913,7 @@ public class LoadServiceTests
     /// and this call gets a 409 instead of silently cancelling over a since-changed row.
     /// </summary>
     [Fact]
-    public async Task CancelAsync_Throws409_WhenLoadWasModifiedConcurrently()
+    public async Task ChangeStatusAsync_Cancel_Throws409_WhenLoadWasModifiedConcurrently()
     {
         var databaseName = Guid.NewGuid().ToString();
         using var seedContext = await CreateContextAsync(databaseName);
@@ -1090,8 +935,111 @@ public class LoadServiceTests
         }
 
         var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CancelAsync(load.LoadId, shipperUserId, new CancelLoadDto { Reason = "Shipper changed plans" }));
+            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" }));
 
         Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
+    }
+
+    // --- ChangeStatus: publish ---
+
+    /// <summary>A Draft load can be published, transitioning it to Posted.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Publish_Succeeds_FromDraft()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+
+        var result = await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+
+        Assert.Equal("Posted", result.Status);
+        Assert.Equal("Jane Shipper", result.ShipperName);
+    }
+
+    /// <summary>A load that is not Draft (already Posted, or any later/terminal status) cannot be published.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Publish_Throws_FromNonDraftStatuses()
+    {
+        var nonDraftStatuses = new[] { LoadStatus.Posted, LoadStatus.Matched, LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
+        foreach (var status in nonDraftStatuses)
+        {
+            using var dbContext = await CreateContextAsync();
+            var sut = CreateSut(dbContext);
+            var shipperUserId = await SeedShipperUserAsync(dbContext);
+            var load = await SeedLoadAsync(dbContext, shipperUserId, status);
+
+            var exception = await Assert.ThrowsAsync<ApiException>(() =>
+                sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
+
+            Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
+        }
+    }
+
+    /// <summary>Publishing records a LoadStatusHistory row capturing the prior status and actor, with no reason.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Publish_WritesLoadStatusHistoryRow()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
+
+        await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+
+        var historyRow = await dbContext.LoadStatusHistories.SingleAsync(h => h.LoadId == load.LoadId);
+        Assert.Equal(LoadStatus.Draft, historyRow.FromStatus);
+        Assert.Equal(LoadStatus.Posted, historyRow.ToStatus);
+        Assert.Null(historyRow.Reason);
+        Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
+    }
+
+    // --- ChangeStatus: shared guards ---
+
+    /// <summary>Changing the status of a nonexistent load throws a 404-shaped ApiException.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Throws_WhenNotFound()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ChangeStatusAsync(Guid.NewGuid(), Guid.NewGuid(), new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
+    }
+
+    /// <summary>A Shipper who does not own the load is forbidden from changing its status.</summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Throws_ForNonOwner()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var ownerId = await SeedShipperUserAsync(dbContext);
+        var otherShipperId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, ownerId, LoadStatus.Draft);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ChangeStatusAsync(load.LoadId, otherShipperId, new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
+
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
+    }
+
+    /// <summary>
+    /// A target status other than Posted/Cancelled is rejected outright — Matched and beyond are
+    /// reached only by internal processes, never by this Shipper-facing endpoint.
+    /// </summary>
+    [Fact]
+    public async Task ChangeStatusAsync_Throws_WhenTargetStatusIsNotPublishOrCancel()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Posted);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Matched }));
+
+        Assert.Equal(ErrorCode.INVALID_LOAD_STATUS_TRANSITION, exception.Code);
     }
 }

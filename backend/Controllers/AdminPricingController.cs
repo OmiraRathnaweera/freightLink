@@ -13,7 +13,7 @@ namespace FreightLink.Api.Controllers;
 
 /// <summary>
 /// Admin-only CRUD over the ADR-019 pricing-config reference tables (<c>FuelPriceRate</c>,
-/// <c>VehicleClassEfficiency</c>). Deliberately thin — every action just extracts the caller's
+/// <c>VehicleClassEfficiency</c>, <c>PricingFormulaConfig</c>). Deliberately thin — every action just extracts the caller's
 /// identity from the access token and delegates to <see cref="IPricingConfigService"/>, which owns all
 /// business rules including the append-only versioning and soft-delete semantics.
 /// </summary>
@@ -135,9 +135,9 @@ public class AdminPricingController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>The single current formula-constant configuration (base fare, per-kg rate, maintenance allowance).</summary>
+    /// <summary>Returns the current (non-deleted, latest <c>EffectiveFrom</c>) pricing formula configuration.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 with the current <see cref="PricingFormulaConfigResponseDto"/>.</returns>
+    /// <returns>200 with the current configuration; 503 if none has been configured yet.</returns>
     [HttpGet("formula-config")]
     [Authorize(Roles = AdminRole)]
     public async Task<ActionResult<PricingFormulaConfigResponseDto>> GetCurrentFormulaConfig(CancellationToken cancellationToken)
@@ -146,9 +146,9 @@ public class AdminPricingController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Lists every formula-config row ever recorded, including superseded and soft-deleted rows, newest first.</summary>
+    /// <summary>Lists every pricing formula configuration ever recorded, including superseded and soft-deleted rows, newest first.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 with the full formula-config history.</returns>
+    /// <returns>200 with the full configuration history.</returns>
     [HttpGet("formula-config/history")]
     [Authorize(Roles = AdminRole)]
     public async Task<ActionResult<List<PricingFormulaConfigResponseDto>>> GetFormulaConfigHistory(CancellationToken cancellationToken)
@@ -157,7 +157,7 @@ public class AdminPricingController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Records a new, current formula-constant configuration. Always inserts a new row — never updates an existing one.</summary>
+    /// <summary>Records a new, current pricing formula configuration. Always inserts a new row — never updates an existing one.</summary>
     /// <param name="request">The new configuration's content.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 with the created <see cref="PricingFormulaConfigResponseDto"/>.</returns>
@@ -169,7 +169,7 @@ public class AdminPricingController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    /// <summary>Soft-deletes a formula-constant configuration (sets <c>DeletedAt</c>/<c>DeletedByUserId</c>). Never issues a hard delete.</summary>
+    /// <summary>Soft-deletes a pricing formula configuration (sets <c>DeletedAt</c>/<c>DeletedByUserId</c>). Never issues a hard delete.</summary>
     /// <param name="id">The configuration's id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with a success message.</returns>

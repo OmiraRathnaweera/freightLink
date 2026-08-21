@@ -87,6 +87,17 @@ public static class LoadStatusTransitionRules
     /// <returns><c>true</c> if a transition to <see cref="LoadStatus.Cancelled"/> is allowed from this status.</returns>
     public static bool CanCancel(LoadStatus currentStatus) => CancellableStatuses.Contains(currentStatus);
 
+    /// <summary>
+    /// Whether a load currently in <paramref name="currentStatus"/> may be published (transitioned to
+    /// <see cref="LoadStatus.Posted"/>). Per <see cref="AllowedTransitions"/>, <see cref="LoadStatus.Posted"/>
+    /// is reachable only from <see cref="LoadStatus.Draft"/> — every later status (<c>Matched</c> and
+    /// beyond) is reached by internal processes (the AI matching workflow, trip events), never by this
+    /// Shipper-facing action.
+    /// </summary>
+    /// <param name="currentStatus">The load's current status.</param>
+    /// <returns><c>true</c> if a transition to <see cref="LoadStatus.Posted"/> is allowed from this status.</returns>
+    public static bool CanPublish(LoadStatus currentStatus) => CanTransition(currentStatus, LoadStatus.Posted);
+
     /// <summary>Whether a direct transition from <paramref name="from"/> to <paramref name="to"/> is allowed.</summary>
     /// <param name="from">The load's current status.</param>
     /// <param name="to">The status being transitioned to.</param>

@@ -57,7 +57,7 @@ export async function listLoads(params) {
  * volumeM3, lat/lng, workflowRunId, updatedAt, and statusHistory. There is
  * no separate status-history endpoint — the full transition timeline
  * (newest first) rides along on this response only; POST/PUT/PATCH
- * .../cancel responses leave statusHistory as an empty array, since the
+ * .../status responses leave statusHistory as an empty array, since the
  * caller already knows the single transition it just made.
  * @returns {Promise<LoadListItem & { volumeM3: number, pickupLat: number, pickupLng: number, dropoffLat: number, dropoffLng: number, workflowRunId: string|null, updatedAt: string, statusHistory: LoadStatusHistoryEntry[] }>}
  */
@@ -75,9 +75,24 @@ export async function updateLoad(id, data) {
   return api.put(`/loads/${id}`, data)
 }
 
-/** PATCH /loads/{id}/cancel — cancel a load (Section 3.5). */
+/**
+ * PATCH /loads/{id}/status — the single endpoint for every Shipper-initiated
+ * load status change (Section 3.5). Only `status: 'Posted'` (publish) and
+ * `status: 'Cancelled'` (cancel, `reason` required) are accepted — every
+ * later status is set only by internal processes, never from the client.
+ */
+export async function changeLoadStatus(id, { status, reason }) {
+  return api.patch(`/loads/${id}/status`, { status, reason })
+}
+
+/** Cancels a load via `changeLoadStatus`. */
 export async function cancelLoad(id, { reason }) {
-  return api.patch(`/loads/${id}/cancel`, { reason })
+  return changeLoadStatus(id, { status: 'Cancelled', reason })
+}
+
+/** Publishes a Draft load via `changeLoadStatus`. */
+export async function publishLoad(id) {
+  return changeLoadStatus(id, { status: 'Posted' })
 }
 
 /**
@@ -154,6 +169,19 @@ export function useUpdateLoadMutation(id, options) {
 export function useCancelLoadMutation(id, options) {
   return useMutation({
     mutationFn: ({ reason }) => cancelLoad(id, { reason }),
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: loadKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: loadKeys.detail(id) })
+      options?.onSuccess?.(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+/** Publish mutation, scoped to one load — invalidates its detail + the list cache. */
+export function usePublishLoadMutation(id, options) {
+  return useMutation({
+    mutationFn: () => publishLoad(id),
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: loadKeys.lists() })
       queryClient.invalidateQueries({ queryKey: loadKeys.detail(id) })

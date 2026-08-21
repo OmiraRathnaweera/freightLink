@@ -1,19 +1,23 @@
 import { Formik, Form } from 'formik'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
+import Button from '../../../components/Button.jsx'
+import EmptyState from '../../../components/EmptyState.jsx'
 import {
   FormikCheckbox,
   FormikDateTimeField,
+  FormikDualLocationField,
   FormikNumberField,
   FormikSubmitButton,
   FormikTextArea,
-  FormikTextField,
 } from '../../../components/form/index.js'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { useCreateLoadMutation } from '../api/loadsApi.js'
 import { createLoadSchema } from '../lib/validationSchemas.js'
 import { getLoadErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
+import { canCreateLoad } from '../lib/loadPermissions.js'
 import { fromDateTimeLocalInput } from '../lib/format.js'
 import { LoadStatus } from '../../../lib/enums.js'
 
@@ -38,7 +42,26 @@ const INITIAL_VALUES = {
 // constraints) instead of the previous uncontrolled placeholder inputs.
 function PostLoadPage() {
   const navigate = useNavigate()
+  const role = useAppSelector((state) => state.auth.role)
   const createMutation = useCreateLoadMutation()
+
+  if (!canCreateLoad(role)) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <EmptyState
+            title="You can't post a load"
+            description="Only Shippers can create loads."
+            action={
+              <Button as={Link} to="/loads" variant="secondary">
+                Back to Loads
+              </Button>
+            }
+          />
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -76,19 +99,14 @@ function PostLoadPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikTextField name="pickupAddress" label="Pickup Address" placeholder="123 Galle Rd, Colombo 03" />
-                <FormikTextField name="dropoffAddress" label="Dropoff Address" placeholder="45 Kandy Rd, Kandy" />
-              </div>
-
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikNumberField name="pickupLat" label="Pickup Latitude" mono placeholder="6.9271" />
-                <FormikNumberField name="pickupLng" label="Pickup Longitude" mono placeholder="79.8612" />
-              </div>
-              <div className="grid grid-cols-1 gap-form-gap sm:grid-cols-2">
-                <FormikNumberField name="dropoffLat" label="Dropoff Latitude" mono placeholder="7.2906" />
-                <FormikNumberField name="dropoffLng" label="Dropoff Longitude" mono placeholder="80.6337" />
-              </div>
+              <FormikDualLocationField
+                pickupAddressName="pickupAddress"
+                pickupLatName="pickupLat"
+                pickupLngName="pickupLng"
+                dropoffAddressName="dropoffAddress"
+                dropoffLatName="dropoffLat"
+                dropoffLngName="dropoffLng"
+              />
 
               <FormikTextArea
                 name="cargoDescription"

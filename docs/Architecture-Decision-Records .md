@@ -22,7 +22,7 @@ An Architecture Decision Record (ADR) captures the context, the decision made, a
 
 Each ADR below records one decision the FreightLink team made while designing and building the platform. These records will be referenced directly during the viva — every team member should be able to explain the context, the decision, and the trade-offs of any ADR related to their owned component.
 
-All decisions recorded here reflect the current, agreed state of the project as described in the project README. No new or speculative decisions have been introduced in this document beyond ADR-019, which the team has agreed and is recording here for the first time.
+All decisions recorded here reflect the current, agreed state of the project as described in the project README.
 
 ---
 
@@ -436,6 +436,7 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 - Component A's estimate uses a straight-line (haversine) `distanceKm`, computed internally with no external API call, appropriate for a rough, pre-matching estimate.
 - Agent 3's pricing uses the real, ORS-routed `distanceKm` (from the `get_route_and_eta` tool call), giving a more accurate figure once an actual candidate agency and route are known.
 - `baseFare`, `ratePerKm`, and `ratePerKg` were originally scoped as shared configuration constants (application settings), not a separate database entity, reused by both calculations so that the two prices remain consistent and genuinely comparable. **This was subsequently refined by ADR-019**, which moves the sourcing and storage of these constants (and introduces weight-tiered `ratePerKm` variation) into two Admin-managed reference tables, without changing the formula itself or the requirement that both calculations stay consistent.
+- **Addendum (post-acceptance):** Agent 3's pricing tool call (`get_price_estimate`, calling the internal `/internal/pricing/calculate` endpoint — see ADR-009's internal-service boundary) uses `distanceKm = route(pickup → dropoff)` via OpenRouteService — the same cargo leg Component A's haversine estimate approximates, just routed instead of straight-line. The agency's yard→pickup leg (returned separately by the `get_route_and_eta` tool call, used only for the shipper-facing ETA) is **not** included in the price calculation. This is a deliberate, documented simplification: real deadhead/positioning cost is excluded, so that both prices remain computed over the same distance concept and Agent 4's price-deviation check stays a genuine like-for-like comparison, per this ADR's original intent.
 
 ### Consequences
 **Positive**
@@ -446,10 +447,12 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 **Negative**
 - A linear formula based on distance and weight is a simplification of real-world freight pricing (which can depend on vehicle type, cargo type, fuel prices, seasonal demand, etc.); this is an accepted, documented simplification appropriate to the academic scope.
 - Exact constant values (`baseFare`, `ratePerKm`, `ratePerKg`) are treated as an implementation/tuning detail, not an architectural decision, and may be adjusted without requiring a new ADR — see ADR-019 for how these values are now sourced, stored, and kept auditable.
+- Excluding the yard→pickup deadhead leg from pricing (see addendum above) means the price does not reflect the agency's full vehicle-occupied trip time, only the loaded cargo leg — an accepted simplification, not an oversight.
 
 ### Alternatives Considered
 - **Two separate, unrelated pricing formulas for the estimate vs. the agent's proposal:** Rejected — would make Agent 4's price-deviation validation meaningless, since it would be comparing two structurally different calculations rather than the same formula applied to better or worse distance data.
 - **Flat-rate pricing (no distance/weight sensitivity):** Rejected — too simplistic to be a credible "business-specific operation beyond CRUD" for Component A, and would give Agent 3's pricing step little genuine work to do.
+- **Pricing Agent 3's proposal on the yard→pickup leg (or yard→pickup + pickup→dropoff combined):** Rejected — pricing only the positioning leg would exclude the actual cargo movement from the price entirely; pricing the full combined trip would break the "same distance concept" comparability with Component A's estimate and complicate Agent 4's validation logic, for a realism gain judged not worth the added complexity at this scope.
 
 ---
 
@@ -573,7 +576,7 @@ Introduce two new, Admin-only-managed reference tables to hold the pricing input
 | `VehicleClassEfficiency` | Fuel consumption (`FuelConsumptionLPer100Km`) and a `Load.WeightKg`/`VolumeM3` payload band (`MinPayloadKg`–`MaxPayloadKg`) per `VehicleClass` tier, used to derive a weight-tiered `ratePerKm` instead of one flat value |
 
 Design details:
-- **`FuelType` and `VehicleClass` are native Postgres enums**, not lookup tables — consistent with the existing `UserRole`/`LoadStatus` convention (small, closed, structural sets). Only the genuinely tunable numeric market data (price, payload bounds, consumption figures) lives in a table, since enums cannot hold editable numeric values.
+- **`FuelType` and `VehicleClass` are native Postgres enums**, not lookup tables — consistent with the existing `UserRole`/`LoadStatus` convention (small, closed, structural sets; see also ADR-020, which generalises this reasoning across the whole schema). Only the genuinely tunable numeric market data (price, payload bounds, consumption figures) lives in a table, since enums cannot hold editable numeric values.
 - **Versioning is append-only**: editing a rate means inserting a new row with a later `EffectiveFrom`; the prior row is left untouched and becomes historical. The "current" value is the latest `EffectiveFrom` row that has not been soft-deleted.
 - **Soft delete, not hard delete**: a `BEFORE DELETE` trigger intercepts any `DELETE` and instead sets `DeletedAt` / `DeletedByUserId`, consistent with the project's existing no-hard-delete rule (enforced elsewhere via `BEFORE DELETE` triggers and `ON DELETE RESTRICT`). Unlike other status-bearing entities, no separate `*StatusHistory` table is introduced for these two tables, since reference data of this kind has no meaningful multi-stage lifecycle to log beyond "current vs. superseded vs. deleted."
 - **`VehicleClassEfficiency` is deliberately decoupled from `Vehicle.VehicleType`** (Component B). The actual `Vehicle` used for a load is not selected until `Trip` creation, which happens after `Assignment` is `Accepted` — by which point Agent 3 has already computed the proposed price. `Load.WeightKg`/`VolumeM3` are used instead as the earliest available proxy for the vehicle class the job will likely need.
@@ -598,7 +601,7 @@ Design details:
 ### Alternatives Considered
 - **Leave `baseFare`/`ratePerKm`/`ratePerKg` as plain hardcoded application-config constants (original ADR-015 scope, unchanged):** Rejected as insufficient on its own — gives no admin editability without a redeploy, and no queryable, timestamped, sourced answer to "where did this number come from" under review-board questioning.
 - **Fetch fuel price and/or freight pricing live from a third-party API at calculation time:** Rejected — no free, official Sri Lanka fuel-price API exists (confirmed by direct search), and even a paid or unofficial one would introduce a live external dependency that could fail during the live demo, for the same reliability reasons already documented in ADR-008 and ADR-012.
-- **Free-text `VehicleType`/`FuelType` columns instead of enums:** Rejected for consistency — the project already established native Postgres enums over lookup tables for exactly this kind of small, closed categorical set (see `UserRole`, `LoadStatus`).
+- **Free-text `VehicleType`/`FuelType` columns instead of enums:** Rejected for consistency — the project already established native Postgres enums over lookup tables for exactly this kind of small, closed categorical set (see `UserRole`, `LoadStatus`, and ADR-020).
 - **Key pricing tiers directly off `Vehicle.VehicleType`:** Rejected — the actual `Vehicle` is not selected until `Trip` creation, which happens after `Assignment` is `Accepted` and after Agent 3 has already computed the proposed price; `Load.WeightKg`/`VolumeM3` bands are used instead as the earliest available proxy.
 - **A full `*StatusHistory` table mirroring `AgencyStatusHistory`/`LoadStatusHistory`:** Rejected as unnecessary for this case — these two tables are pure reference data with no multi-stage business lifecycle; the simpler `EffectiveFrom` versioning plus `DeletedAt` soft-delete satisfies the no-hard-delete rule without the added complexity of a parallel history table.
 

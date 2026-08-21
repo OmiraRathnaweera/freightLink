@@ -1,22 +1,24 @@
 import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Ban, Eye, MoreVertical, Pencil } from 'lucide-react'
+import { Ban, Eye, MoreVertical, Pencil, Send } from 'lucide-react'
 import { useClickOutside } from '../../../hooks/useClickOutside.js'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
-import { canCancelLoad, canEditLoad } from '../lib/loadPermissions.js'
+import { canCancelLoad, canEditLoad, canPublishLoad } from '../lib/loadPermissions.js'
 import CancelLoadDialog from './CancelLoadDialog.jsx'
+import PublishLoadDialog from './PublishLoadDialog.jsx'
 
 // Load Control row actions — a feature component since the menu items
-// (View/Edit/Cancel), their routes, and their role/status-gating are
-// specific to the Loads domain (.claude/rules/frontend-design.md #1).
-// Edit/Cancel are only rendered when both the caller's role and the
-// load's current status allow them (canEditLoad/canCancelLoad —
-// loadPermissions.js), not just disabled — Load mutations are Shipper
-// (owner) only, and a stale/cached role or status could still get a
-// 403/422 from the backend regardless of what the UI shows.
+// (View/Edit/Publish/Cancel), their routes, and their role/status-gating
+// are specific to the Loads domain (.claude/rules/frontend-design.md #1).
+// Edit/Publish/Cancel are only rendered when both the caller's role and the
+// load's current status allow them (canEditLoad/canPublishLoad/
+// canCancelLoad — loadPermissions.js), not just disabled — Load mutations
+// are Shipper (owner) only, and a stale/cached role or status could still
+// get a 403/422 from the backend regardless of what the UI shows.
 function RowActionsMenu({ loadId, status, role }) {
   const [isOpen, setIsOpen] = useState(false)
   const [isCancelOpen, setIsCancelOpen] = useState(false)
+  const [isPublishOpen, setIsPublishOpen] = useState(false)
   const containerRef = useRef(null)
 
   const close = () => setIsOpen(false)
@@ -60,6 +62,20 @@ function RowActionsMenu({ loadId, status, role }) {
               Edit
             </Link>
           )}
+          {canPublishLoad(role, status) && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                close()
+                setIsPublishOpen(true)
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-md text-on-surface hover:bg-slate-100"
+            >
+              <Send className="h-4 w-4" strokeWidth={1.5} />
+              Publish
+            </button>
+          )}
           {canCancelLoad(role, status) && (
             <button
               type="button"
@@ -77,6 +93,7 @@ function RowActionsMenu({ loadId, status, role }) {
         </div>
       )}
       {isCancelOpen && <CancelLoadDialog loadId={loadId} onClose={() => setIsCancelOpen(false)} />}
+      {isPublishOpen && <PublishLoadDialog loadId={loadId} onClose={() => setIsPublishOpen(false)} />}
     </div>
   )
 }

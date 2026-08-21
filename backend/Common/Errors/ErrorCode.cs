@@ -113,6 +113,14 @@ public enum ErrorCode
     /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxVolumeM3</c> was not strictly greater than its <c>MinVolumeM3</c> (mirrors <c>ck_vce_volume_bounds</c>).</summary>
     VEHICLE_CLASS_EFFICIENCY_INVALID_VOLUME_BAND,
 
+    /// <summary>
+    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, no <c>VehicleClassEfficiency</c>
+    /// tier covers the requested weight/volume, or no current <c>PricingFormulaConfig</c> exists.
+    /// Thrown by <c>IPricingConfigService</c>'s current-value lookups; not raised by <c>LoadService</c>,
+    /// which does not depend on any pricing config existing.
+    /// </summary>
+    PRICING_CONFIG_MISSING,
+
     /// <summary>No <c>PricingFormulaConfig</c> exists with the requested id.</summary>
     PRICING_FORMULA_CONFIG_NOT_FOUND,
 
@@ -120,11 +128,12 @@ public enum ErrorCode
     PRICING_FORMULA_CONFIG_ALREADY_DELETED,
 
     /// <summary>
-    /// No current <c>FuelPriceRate</c>, no matching <c>VehicleClassEfficiency</c> tier, or no current
-    /// <c>PricingFormulaConfig</c> exists to compute a load's <c>estimatedPrice</c>. An Admin must
-    /// configure pricing data before loads can be created or edited.
+    /// <c>POST /internal/pricing/estimate</c> was called with a missing or incorrect
+    /// <c>X-Internal-Api-Key</c> header. Thrown by <c>InternalApiKeyAuthFilter</c> — distinct from
+    /// <see cref="UNAUTHORIZED"/>, which is reserved for JWT failures written directly by the
+    /// JwtBearer handler, not thrown as an <c>ApiException</c>.
     /// </summary>
-    PRICING_CONFIG_MISSING,
+    INTERNAL_API_KEY_INVALID,
 
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,

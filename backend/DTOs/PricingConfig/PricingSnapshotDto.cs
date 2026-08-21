@@ -1,19 +1,19 @@
 namespace FreightLink.Api.DTOs.PricingConfig;
 
 /// <summary>
-/// The three pricing-config pieces Component A's estimator needs, read together as one atomic snapshot
-/// (see <see cref="Services.Interfaces.IPricingConfigService.GetPricingSnapshotForEstimate"/>) so no
-/// concurrent Admin write can land between the individual reads and leave the formula computed from a
-/// torn combination of old/new config.
+/// A single, internally-consistent read of every current pricing-config row the internal price
+/// estimator needs, taken atomically under <c>PricingConfigService</c>'s write lock so no Admin
+/// write can land between the three individual reads and produce a mixed-version estimate (e.g. a
+/// new fuel price combined with a stale formula configuration).
 /// </summary>
 public class PricingSnapshotDto
 {
-    /// <summary>The vehicle-class tier matching the load's weight and volume.</summary>
-    public VehicleClassEfficiencyResponseDto Tier { get; set; } = null!;
+    /// <summary>The current efficiency figure for the requested vehicle class.</summary>
+    public VehicleClassEfficiencyResponseDto Efficiency { get; set; } = null!;
 
-    /// <summary>The current fuel price for <see cref="Common.PricingConstants.EstimatorFuelType"/>.</summary>
+    /// <summary>The current fuel price for the requested fuel type.</summary>
     public FuelPriceRateResponseDto FuelPrice { get; set; } = null!;
 
-    /// <summary>The current formula-constant configuration.</summary>
+    /// <summary>The current pricing formula configuration.</summary>
     public PricingFormulaConfigResponseDto FormulaConfig { get; set; } = null!;
 }

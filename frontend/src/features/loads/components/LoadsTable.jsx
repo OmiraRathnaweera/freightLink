@@ -37,7 +37,7 @@ function SortableHeader({ column, label, sortBy, sortDir, onSortChange }) {
 // (.claude/rules/frontend-design.md #1).
 function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = false, role }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto min-h-[60vh]">
       <table className="w-full text-left text-body-md">
         <thead>
           <tr className="text-label-caps text-on-surface-variant">

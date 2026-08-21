@@ -18,17 +18,12 @@ public class LoadService : ILoadService
     /// <summary>Bounded retry count for a <see cref="GenerateReferenceCode"/> collision on <c>uq_load_reference</c> before <see cref="CreateAsync"/> gives up.</summary>
     private const int MaxReferenceCodeGenerationAttempts = 5;
 
-    /// <summary>Mean Earth radius in kilometers, used by <see cref="CalculateHaversineDistanceKm"/>.</summary>
-    private const double EarthRadiusKm = 6371.0;
-
     private readonly AppDbContext _dbContext;
-    private readonly IPricingConfigService _pricingConfigService;
 
-    /// <summary>Creates the load service with its DB context and pricing config service.</summary>
-    public LoadService(AppDbContext dbContext, IPricingConfigService pricingConfigService)
+    /// <summary>Creates the load service with its DB context.</summary>
+    public LoadService(AppDbContext dbContext)
     {
         _dbContext = dbContext;
-        _pricingConfigService = pricingConfigService;
     }
 
     /// <inheritdoc />
@@ -36,12 +31,6 @@ public class LoadService : ILoadService
     {
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
         ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
-
-        // Computed before the load is built so a missing pricing config (PRICING_CONFIG_MISSING)
-        // aborts the create outright — no Load row is added or saved, per the agreed "block, don't
-        // silently guess" behavior.
-        var estimatedPrice = await CalculateEstimatedPriceAsync(
-            request.WeightKg, request.VolumeM3, request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value, cancellationToken);
 
         var initialStatus = request.PostImmediately ? LoadStatus.Posted : LoadStatus.Draft;
         if (!LoadStatusTransitionRules.CanCreateAs(initialStatus))
@@ -69,11 +58,12 @@ public class LoadService : ILoadService
             DropoffLng = request.DropoffLng!.Value,
             PickupWindowStart = request.PickupWindowStart,
             PickupWindowEnd = request.PickupWindowEnd,
-            EstimatedPrice = estimatedPrice,
+            // EstimatedPrice is left unset here — pricing is the AI agent's responsibility, not
+            // LoadService's; it is expected to be populated separately once the agent estimates it.
             Status = initialStatus,
             CreatedAt = now,
             UpdatedAt = now
-        };
+        }; 
 
         var historyRow = new LoadStatusHistory
         {
@@ -255,11 +245,19 @@ public class LoadService : ILoadService
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
         ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
 
-        // Recomputed on every edit — weight and/or pickup/dropoff coordinates (the formula's only
-        // inputs besides the pricing config itself) may have changed. A missing pricing config
-        // (PRICING_CONFIG_MISSING) aborts the update before any field is mutated.
-        var estimatedPrice = await CalculateEstimatedPriceAsync(
-            request.WeightKg, request.VolumeM3, request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value, cancellationToken);
+        // Every input the internal estimator (PricingEstimatorService) prices against —
+        // WeightKg/VolumeM3 (vehicle-class tier, ratePerKg) and the pickup/dropoff coordinates
+        // (distanceKm, computed by the caller) — invalidates any existing EstimatedPrice the moment
+        // it changes. There is no synchronous re-estimation wired into this edit path, so a stale
+        // price is cleared rather than silently left attached to a load whose dimensions/route it no
+        // longer reflects; the Agentic AI pipeline is expected to re-estimate separately.
+        var pricingInputsChanged =
+            load.WeightKg != request.WeightKg ||
+            load.VolumeM3 != request.VolumeM3 ||
+            load.PickupLat != request.PickupLat!.Value ||
+            load.PickupLng != request.PickupLng!.Value ||
+            load.DropoffLat != request.DropoffLat!.Value ||
+            load.DropoffLng != request.DropoffLng!.Value;
 
         load.CargoDescription = request.CargoDescription;
         load.WeightKg = request.WeightKg;
@@ -272,7 +270,11 @@ public class LoadService : ILoadService
         load.DropoffLng = request.DropoffLng!.Value;
         load.PickupWindowStart = request.PickupWindowStart;
         load.PickupWindowEnd = request.PickupWindowEnd;
-        load.EstimatedPrice = estimatedPrice;
+
+        if (pricingInputsChanged)
+        {
+            load.EstimatedPrice = null;
+        }
 
         await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
@@ -280,7 +282,7 @@ public class LoadService : ILoadService
     }
 
     /// <inheritdoc />
-    public async Task<LoadResponseDto> CancelAsync(Guid loadId, Guid cancelledByUserId, CancelLoadDto request, CancellationToken cancellationToken = default)
+    public async Task<LoadResponseDto> ChangeStatusAsync(Guid loadId, Guid actingUserId, ChangeLoadStatusDto request, CancellationToken cancellationToken = default)
     {
         var load = await _dbContext.Loads.Include(l => l.ShipperUser).FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
@@ -289,36 +291,58 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
-        if (load.ShipperUserId != cancelledByUserId)
+        if (load.ShipperUserId != actingUserId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
-        if (!LoadStatusTransitionRules.CanCancel(load.Status))
-        {
-            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be cancelled.");
-        }
+        var targetStatus = request.Status!.Value;
+        string? reason;
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
+        switch (targetStatus)
         {
-            // Proactively enforces LoadStatusHistory's ck_lsh_cancel_reason CHECK, which the
-            // InMemory test provider doesn't evaluate — without this, a missing reason would only
-            // ever be caught against a real Postgres database.
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_CANCEL_REASON_REQUIRED, "A reason is required when cancelling a load.");
+            case LoadStatus.Posted:
+                if (!LoadStatusTransitionRules.CanPublish(load.Status))
+                {
+                    throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be published.");
+                }
+                reason = null;
+                break;
+
+            case LoadStatus.Cancelled:
+                if (!LoadStatusTransitionRules.CanCancel(load.Status))
+                {
+                    throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be cancelled.");
+                }
+                if (string.IsNullOrWhiteSpace(request.Reason))
+                {
+                    // Proactively enforces LoadStatusHistory's ck_lsh_cancel_reason CHECK, which the
+                    // InMemory test provider doesn't evaluate — without this, a missing reason would
+                    // only ever be caught against a real Postgres database.
+                    throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_CANCEL_REASON_REQUIRED, "A reason is required when cancelling a load.");
+                }
+                reason = request.Reason;
+                break;
+
+            default:
+                // Every other status (Matched and beyond) is reached only by internal processes (the
+                // AI matching workflow, trip events) — never accepted from this Shipper-facing endpoint,
+                // regardless of what LoadStatusTransitionRules' transition graph otherwise permits.
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"'{targetStatus}' cannot be set via this endpoint.");
         }
 
         var fromStatus = load.Status;
         var now = DateTimeOffset.UtcNow;
-        load.Status = LoadStatus.Cancelled;
+        load.Status = targetStatus;
 
         _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
         {
             LoadStatusHistoryId = Guid.NewGuid(),
             LoadId = load.LoadId,
-            ChangedByUserId = cancelledByUserId,
+            ChangedByUserId = actingUserId,
             FromStatus = fromStatus,
-            ToStatus = LoadStatus.Cancelled,
-            Reason = request.Reason,
+            ToStatus = targetStatus,
+            Reason = reason,
             ChangedAt = now
         });
 
@@ -353,51 +377,6 @@ public class LoadService : ILoadService
         {
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_PICKUP_WINDOW, "PickupWindowEnd must be after PickupWindowStart.");
         }
-    }
-
-    /// <summary>
-    /// Computes <c>estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)</c>
-    /// per ADR-015, with <c>ratePerKm</c> derived per ADR-019 from the current fuel price and the
-    /// <paramref name="weightKg"/>/<paramref name="volumeM3"/>-matched vehicle-class fuel-efficiency
-    /// tier, and <c>baseFare</c>/<c>ratePerKg</c> read from the current Admin-managed formula config,
-    /// rather than any hardcoded constants. All three pieces are read together as one atomic snapshot
-    /// via <see cref="IPricingConfigService.GetPricingSnapshotForEstimate"/>, so no concurrent Admin
-    /// write can land between them. Distance is computed with <see cref="CalculateHaversineDistanceKm"/>
-    /// — Component A's estimate always uses straight-line distance, never an external routing call.
-    /// </summary>
-    /// <exception cref="ApiException">
-    /// 503 <see cref="ErrorCode.PRICING_CONFIG_MISSING"/> if no current fuel price, no matching
-    /// vehicle-class efficiency tier, or no current formula config exists — this deliberately blocks
-    /// the caller rather than silently falling back to a guessed price.
-    /// </exception>
-    private async Task<decimal> CalculateEstimatedPriceAsync(decimal weightKg, decimal volumeM3, decimal pickupLat, decimal pickupLng, decimal dropoffLat, decimal dropoffLng, CancellationToken cancellationToken)
-    {
-        var snapshot = await _pricingConfigService.GetPricingSnapshotForEstimate(weightKg, volumeM3, cancellationToken);
-
-        var ratePerKm = snapshot.FuelPrice.PricePerLitre / 100m * snapshot.Tier.FuelConsumptionLPer100Km + snapshot.FormulaConfig.DriverMaintenanceMarginAllowancePerKm;
-        var distanceKm = CalculateHaversineDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-
-        return snapshot.FormulaConfig.BaseFare + distanceKm * ratePerKm + weightKg * snapshot.FormulaConfig.RatePerKg;
-    }
-
-    /// <summary>
-    /// Straight-line (great-circle) distance between two coordinates, in kilometers, via the haversine
-    /// formula. Computed in <see langword="double"/> internally since <see cref="decimal"/> has no
-    /// trigonometric operators, then converted back to <see cref="decimal"/> for use in the pricing formula.
-    /// </summary>
-    private static decimal CalculateHaversineDistanceKm(decimal lat1, decimal lng1, decimal lat2, decimal lng2)
-    {
-        var lat1Rad = (double)lat1 * Math.PI / 180.0;
-        var lat2Rad = (double)lat2 * Math.PI / 180.0;
-        var deltaLatRad = (double)(lat2 - lat1) * Math.PI / 180.0;
-        var deltaLngRad = (double)(lng2 - lng1) * Math.PI / 180.0;
-
-        var a = Math.Sin(deltaLatRad / 2) * Math.Sin(deltaLatRad / 2) +
-                Math.Cos(lat1Rad) * Math.Cos(lat2Rad) *
-                Math.Sin(deltaLngRad / 2) * Math.Sin(deltaLngRad / 2);
-        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-
-        return (decimal)(EarthRadiusKm * c);
     }
 
     /// <summary>

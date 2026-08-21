@@ -6,19 +6,22 @@ public class PricingFormulaConfigResponseDto
     /// <summary>The row's id.</summary>
     public Guid PricingFormulaConfigId { get; set; }
 
-    /// <summary>Flat base fare added to every estimate, in the project's base currency (LKR).</summary>
+    /// <summary>Flat fee added to every estimate.</summary>
     public decimal BaseFare { get; set; }
 
-    /// <summary>Per-kilogram rate added to every estimate, in the project's base currency (LKR/kg).</summary>
+    /// <summary>Per-kilogram rate applied to the load's weight.</summary>
     public decimal RatePerKg { get; set; }
 
-    /// <summary>
-    /// Driver/maintenance/margin allowance added on top of the pure fuel-cost component of
-    /// <c>ratePerKm</c>, in the project's base currency (LKR/km).
-    /// </summary>
-    public decimal DriverMaintenanceMarginAllowancePerKm { get; set; }
+    /// <summary>Per-kilometre driver cost allowance.</summary>
+    public decimal DriverCostPerKm { get; set; }
 
-    /// <summary>Citation for where these figures came from.</summary>
+    /// <summary>Per-kilometre vehicle maintenance allowance.</summary>
+    public decimal MaintenanceAllowancePerKm { get; set; }
+
+    /// <summary>Profit margin as a fraction (e.g. <c>0.15</c> for 15%), not a whole percent.</summary>
+    public decimal MarginPercent { get; set; }
+
+    /// <summary>Citation for where these values came from.</summary>
     public string Source { get; set; } = string.Empty;
 
     /// <summary>When this configuration took/takes effect.</summary>
@@ -28,8 +31,8 @@ public class PricingFormulaConfigResponseDto
     public Guid SetByUserId { get; set; }
 
     /// <summary>
-    /// Display name (<see cref="Entities.User.FullName"/>) of the Admin who recorded this configuration.
-    /// Falls back to <c>"Unknown"</c> if the setting user record could not be resolved.
+    /// Display name (<see cref="Entities.User.FullName"/>) of the Admin who recorded this
+    /// configuration. Falls back to <c>"Unknown"</c> if the setting user record could not be resolved.
     /// </summary>
     public string SetByUserName { get; set; } = string.Empty;
 

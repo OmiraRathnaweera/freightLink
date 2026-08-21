@@ -6,18 +6,19 @@ namespace FreightLink.Api.Services.Interfaces;
 /// <summary>
 /// Read/create/soft-delete operations on the ADR-019 pricing-config reference tables
 /// (<see cref="Entities.FuelPriceRate"/>, <see cref="Entities.VehicleClassEfficiency"/>,
-/// <see cref="Entities.PricingFormulaConfig"/>). All three are append-only: "editing" a row means
-/// inserting a new one with a later <c>EffectiveFrom</c>; an existing row is only ever touched by a
-/// <c>SoftDelete*</c> method, which issues an ordinary <c>UPDATE</c>, never a raw <c>DELETE</c> (the
-/// database's <c>trg_deny_delete_*</c> triggers are a backstop, not the mechanism). "Current" row
-/// selection excludes both soft-deleted and not-yet-effective (<c>EffectiveFrom</c> in the future) rows,
-/// and ties on <c>EffectiveFrom</c> are broken deterministically by <c>CreatedAt</c> then id (both
-/// descending) — never an arbitrary/unordered pick. Every write, plus the combined estimator read
-/// (<see cref="GetPricingSnapshotForEstimate"/>), is serialized by a single in-process lock (see
-/// <c>PricingConfigService</c>'s <c>_pricingConfigLock</c>) so concurrent requests can't both validate
-/// against the same stale snapshot, and so the estimator never reads a torn combination of old/new
-/// config. This service performs no authentication — the acting Admin's id is accepted as a plain
-/// parameter, sourced by the caller (in practice, <c>AdminPricingController</c>) from validated JWT claims.
+/// <see cref="Entities.PricingFormulaConfig"/>). All three are
+/// append-only: "editing" a row means inserting a new one with a later <c>EffectiveFrom</c>; an existing
+/// row is only ever touched by a <c>SoftDelete*</c> method, which issues an ordinary <c>UPDATE</c>, never
+/// a raw <c>DELETE</c> (the database's <c>trg_deny_delete_*</c> triggers are a backstop, not the
+/// mechanism). "Current" row selection excludes both soft-deleted and not-yet-effective
+/// (<c>EffectiveFrom</c> in the future) rows, and ties on <c>EffectiveFrom</c> are broken deterministically
+/// by <c>CreatedAt</c> then id (both descending) — never an arbitrary/unordered pick. Every write is
+/// serialized by a single in-process lock (see <c>PricingConfigService</c>'s <c>_pricingConfigLock</c>) so
+/// concurrent requests can't both validate against the same stale snapshot. This data is reference
+/// information for the AI agent's own price estimation, not consumed by <c>LoadService</c> — Load
+/// creation/editing does not depend on any pricing config existing. This service performs no
+/// authentication — the acting Admin's id is accepted as a plain parameter, sourced by the caller (in
+/// practice, <c>AdminPricingController</c>) from validated JWT claims.
 /// </summary>
 public interface IPricingConfigService
 {
@@ -53,21 +54,6 @@ public interface IPricingConfigService
     /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if no configured tier's weight band, or none's volume band, covers the given values.</exception>
     Task<VehicleClassEfficiencyResponseDto> GetTierForWeightAndVolume(decimal weightKg, decimal volumeM3, CancellationToken cancellationToken = default);
 
-    /// <summary>The single current formula-constant configuration — the latest non-future-dated, non-deleted <c>EffectiveFrom</c> row.</summary>
-    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if no current configuration exists.</exception>
-    Task<PricingFormulaConfigResponseDto> GetCurrentPricingFormulaConfig(CancellationToken cancellationToken = default);
-
-    /// <summary>Every formula-config row ever recorded (including future-dated, superseded, and soft-deleted), newest <c>EffectiveFrom</c> first.</summary>
-    Task<List<PricingFormulaConfigResponseDto>> GetPricingFormulaConfigHistory(CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// The tier, fuel price, and formula config Component A's estimator needs, read together under one
-    /// lock acquisition so no concurrent Admin write can land between the three reads (closes the
-    /// inconsistent-snapshot gap a naive sequence of individual calls would have).
-    /// </summary>
-    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if any of the three pieces is missing.</exception>
-    Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(decimal weightKg, decimal volumeM3, CancellationToken cancellationToken = default);
-
     /// <summary>Inserts a new, current <see cref="Entities.FuelPriceRate"/> row. Never updates an existing row.</summary>
     /// <param name="request">The new rate's content.</param>
     /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>SetByUserId</c>.</param>
@@ -86,11 +72,6 @@ public interface IPricingConfigService
     /// volume band conflicts with the other classes' current bands in that dimension.
     /// </exception>
     Task<VehicleClassEfficiencyResponseDto> CreateVehicleClassEfficiency(CreateVehicleClassEfficiencyDto request, Guid actingUserId, CancellationToken cancellationToken = default);
-
-    /// <summary>Inserts a new, current <see cref="Entities.PricingFormulaConfig"/> row. Never updates an existing row.</summary>
-    /// <param name="request">The new configuration's content.</param>
-    /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>SetByUserId</c>.</param>
-    Task<PricingFormulaConfigResponseDto> CreatePricingFormulaConfig(CreatePricingFormulaConfigDto request, Guid actingUserId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Soft-deletes a <see cref="Entities.FuelPriceRate"/> row via an ordinary <c>UPDATE</c> (never a
@@ -113,6 +94,22 @@ public interface IPricingConfigService
     Task<PricingConfigDeleteResponseDto> SoftDeleteVehicleClassEfficiency(Guid vehicleClassEfficiencyId, Guid actingUserId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The single current <see cref="Entities.PricingFormulaConfig"/> — the latest non-future-dated,
+    /// non-deleted <c>EffectiveFrom</c> row. There is only ever one "current" row, unlike the
+    /// per-fuel-type/per-vehicle-class lookups above.
+    /// </summary>
+    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if no current configuration exists.</exception>
+    Task<PricingFormulaConfigResponseDto> GetCurrentPricingFormulaConfig(CancellationToken cancellationToken = default);
+
+    /// <summary>Every <see cref="Entities.PricingFormulaConfig"/> row (including future-dated, superseded, and soft-deleted), newest <c>EffectiveFrom</c> first.</summary>
+    Task<List<PricingFormulaConfigResponseDto>> GetPricingFormulaConfigHistory(CancellationToken cancellationToken = default);
+
+    /// <summary>Inserts a new, current <see cref="Entities.PricingFormulaConfig"/> row. Never updates an existing row.</summary>
+    /// <param name="request">The new configuration's content.</param>
+    /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>SetByUserId</c>.</param>
+    Task<PricingFormulaConfigResponseDto> CreatePricingFormulaConfig(CreatePricingFormulaConfigDto request, Guid actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Soft-deletes a <see cref="Entities.PricingFormulaConfig"/> row via an ordinary <c>UPDATE</c>
     /// (never a raw <c>DELETE</c>). Returns a plain success confirmation, not the soft-deleted row —
     /// fetch <see cref="GetPricingFormulaConfigHistory"/> if the deleted values are still needed.
@@ -121,4 +118,15 @@ public interface IPricingConfigService
     /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>DeletedByUserId</c>.</param>
     /// <exception cref="Common.Exceptions.ApiException">404 if no such row exists; 422 if it is already soft-deleted.</exception>
     Task<PricingConfigDeleteResponseDto> SoftDeletePricingFormulaConfig(Guid pricingFormulaConfigId, Guid actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the current <see cref="Entities.VehicleClassEfficiency"/> (for <paramref name="classLabel"/>),
+    /// current <see cref="Entities.FuelPriceRate"/> (for <paramref name="fuelType"/>), and current
+    /// <see cref="Entities.PricingFormulaConfig"/> as one atomic snapshot, under the same lock every
+    /// pricing-config write is serialized by — so an Admin write landing mid-read can never combine a
+    /// value from before the write with a value from after it. This is what
+    /// <c>PricingEstimatorService</c> uses instead of three separate, individually-unlocked calls.
+    /// </summary>
+    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if any of the three current rows doesn't exist.</exception>
+    Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(VehicleClass classLabel, FuelType fuelType, CancellationToken cancellationToken = default);
 }

@@ -1114,11 +1114,17 @@ namespace FreightLink.Api.Migrations
                     b.Property<Guid?>("DeletedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("DriverMaintenanceMarginAllowancePerKm")
+                    b.Property<decimal>("DriverCostPerKm")
                         .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset>("EffectiveFrom")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("MaintenanceAllowancePerKm")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("MarginPercent")
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("RatePerKg")
                         .HasColumnType("numeric");
@@ -1147,7 +1153,11 @@ namespace FreightLink.Api.Migrations
                         {
                             t.HasCheckConstraint("ck_pfc_base_fare_bounds", "\"BaseFare\" >= 0");
 
-                            t.HasCheckConstraint("ck_pfc_maintenance_allowance_bounds", "\"DriverMaintenanceMarginAllowancePerKm\" >= 0");
+                            t.HasCheckConstraint("ck_pfc_driver_cost_bounds", "\"DriverCostPerKm\" >= 0");
+
+                            t.HasCheckConstraint("ck_pfc_maintenance_allowance_bounds", "\"MaintenanceAllowancePerKm\" >= 0");
+
+                            t.HasCheckConstraint("ck_pfc_margin_percent_bounds", "\"MarginPercent\" >= 0 AND \"MarginPercent\" <= 1");
 
                             t.HasCheckConstraint("ck_pfc_rate_per_kg_bounds", "\"RatePerKg\" >= 0");
                         });
