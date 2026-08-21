@@ -32,6 +32,9 @@ public enum ErrorCode
     /// <summary>The authenticated caller's user record could not be found.</summary>
     USER_NOT_FOUND,
 
+    /// <summary>The requested agency could not be found.</summary>
+    AGENCY_NOT_FOUND,
+
     /// <summary>The requested load could not be found.</summary>
     LOAD_NOT_FOUND,
 

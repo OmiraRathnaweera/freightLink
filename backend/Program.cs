@@ -3,6 +3,7 @@ using System.Text.Json;
 using CloudinaryDotNet;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
+using FreightLink.Api.Common.Filters;
 using FreightLink.Api.Common.Options;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Common;
@@ -121,6 +122,13 @@ builder.Services.Configure<AdminSeedOptions>(options =>
     options.Password = builder.Configuration["ADMIN_USER_PASSWORD"];
 });
 
+// Shared secret for internal-only, non-JWT endpoints (e.g. POST /internal/pricing/estimate) —
+// same flat-key pattern as the admin-seed credentials above.
+builder.Services.Configure<InternalApiOptions>(options =>
+{
+    options.ApiKey = builder.Configuration["INTERNAL_API_KEY"];
+});
+
 // Cloudinary settings (Cloudinary:* / CLOUDINARY__* env vars). Same case-insensitive "__"-to-":"
 // mapping as the other sections above.
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
@@ -169,16 +177,58 @@ builder.Services
         };
     });
 
+// Comma-separated CORS_ORIGINS (e.g. "http://localhost:5173,http://localhost:3000") is the only
+// source for allowed origins — no wildcard fallback, so an empty/unset value denies all cross-origin
+// requests rather than silently allowing everything.
+const string corsPolicyName = "ConfiguredOrigins";
+var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? string.Empty)
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicyName, policy =>
+    {
+        policy.WithOrigins(corsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPricingConfigService, PricingConfigService>();
+builder.Services.AddScoped<IPricingEstimatorService, PricingEstimatorService>();
 builder.Services.AddScoped<ILoadService, LoadService>();
+builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<ILoadFileService, LoadFileService>();
+builder.Services.AddScoped<IAgencyService, AgencyService>();
 
 var app = builder.Build();
+
+// CORS_ORIGINS resolving to zero origins is a deliberate deny-all, not a bug — but it's also the
+// one CORS_ORIGINS outcome that produces no server-side signal at all: every symptom shows up only
+// as a browser-side CORS error on the client, with nothing in the API's own logs to point at the
+// actual cause. A single startup-time log line closes that gap without changing the deny-all
+// behavior itself.
+if (corsOrigins.Length == 0)
+{
+    app.Logger.LogWarning(
+        "CORS_ORIGINS is unset or empty — the '{PolicyName}' policy allows zero origins, so every " +
+        "cross-origin browser request will be rejected. Set CORS_ORIGINS to a comma-separated list " +
+        "(e.g. \"http://localhost:5173,http://localhost:3000\") if browser clients need to reach this API.",
+        corsPolicyName);
+}
+else
+{
+    app.Logger.LogInformation(
+        "CORS_ORIGINS configured '{PolicyName}' with {OriginCount} allowed origin(s): {Origins}",
+        corsPolicyName, corsOrigins.Length, string.Join(", ", corsOrigins));
+}
 
 // Apply any pending EF Core migrations once at startup outside Production. Migrate() only
 // applies migrations not yet recorded in __EFMigrationsHistory — it never drops/recreates
@@ -208,6 +258,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseCors(corsPolicyName);
 
 app.UseAuthentication();
 app.UseAuthorization();
