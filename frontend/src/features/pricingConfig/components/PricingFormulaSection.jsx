@@ -19,11 +19,16 @@ import { formatCurrency, formatDateTime, formatPercent } from '../lib/format.js'
 import { useConfirmDelete } from '../hooks/useConfirmDelete.js'
 import PricingFormulaForm from './PricingFormulaForm.jsx'
 
-// History rows come back newest-EffectiveFrom-first (backend contract) —
-// the first non-deleted row in that order is the "current" one.
-function withCurrentFlag(rows) {
-  const currentIndex = rows.findIndex((row) => !row.deletedAt)
-  return rows.map((row, index) => ({ ...row, isCurrent: index === currentIndex }))
+// "Current" is authoritatively decided by the backend (deletedAt == null
+// && effectiveFrom <= now — see PricingConfigService's
+// GetCurrentPricingFormulaConfigEntityAsync), not by "first non-deleted
+// row in the history list": history is sorted by effectiveFrom regardless
+// of whether that date has actually arrived yet, so a future-dated
+// scheduled row would otherwise be misflagged as current. Comparing
+// against the id GET .../formula-config already returned avoids
+// re-deriving (and duplicating/drifting from) that date rule client-side.
+function withCurrentFlag(rows, currentId) {
+  return rows.map((row) => ({ ...row, isCurrent: row.pricingFormulaConfigId === currentId }))
 }
 
 // Unlike FuelRateSection/VehicleEfficiencySection, PricingFormulaConfig has
@@ -51,7 +56,9 @@ function PricingFormulaSection() {
     }
   }
 
-  const historyRows = historyQuery.data ? withCurrentFlag(historyQuery.data) : []
+  const historyRows = historyQuery.data
+    ? withCurrentFlag(historyQuery.data, currentQuery.data?.pricingFormulaConfigId)
+    : []
 
   return (
     <Card>
