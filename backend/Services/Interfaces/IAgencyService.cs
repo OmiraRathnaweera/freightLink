@@ -10,7 +10,7 @@ public interface IAgencyService
     /// <summary>
     /// Creates a new agency in a pending status.
     /// </summary>
-    Task<AgencyResponseDto> CreateAsync(AgencyCreateDto request, CancellationToken cancellationToken = default);
+    Task<AgencyResponseDto> CreateAsync(Guid currentUserId, AgencyCreateDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves an agency by its ID.

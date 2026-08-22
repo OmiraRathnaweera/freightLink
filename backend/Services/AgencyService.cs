@@ -7,6 +7,7 @@ using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FreightLink.Api.Services;
 
@@ -22,7 +23,7 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
-    public async Task<AgencyResponseDto> CreateAsync(AgencyCreateDto request, CancellationToken cancellationToken = default)
+    public async Task<AgencyResponseDto> CreateAsync(Guid currentUserId, AgencyCreateDto request, CancellationToken cancellationToken = default)
     {
         var existingAgency = await _dbContext.Agencies
             .FirstOrDefaultAsync(a => a.BusinessRegNo == request.BusinessRegNo, cancellationToken);
@@ -50,6 +51,7 @@ public class AgencyService : IAgencyService
         {
             AgencyStatusHistoryId = Guid.NewGuid(),
             AgencyId = agency.AgencyId,
+            ChangedByUserId = currentUserId,
             FromStatus = null,
             ToStatus = AgencyStatus.Pending,
             ChangedAt = now
@@ -58,7 +60,14 @@ public class AgencyService : IAgencyService
         _dbContext.Agencies.Add(agency);
         _dbContext.AgencyStatusHistories.Add(statusHistory);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_agency_regno" })
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "An agency with this business registration number already exists.");
+        }
 
         return MapToResponse(agency);
     }
