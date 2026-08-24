@@ -4,8 +4,7 @@ namespace FreightLink.Api.DTOs.Loads;
 
 /// <summary>
 /// Search/filter/sort/paginate parameters for <see cref="Services.Interfaces.ILoadService.GetListAsync"/>.
-/// Not yet bound from an HTTP query string (no controller exists in this pass) — constructed directly
-/// by callers.
+/// Bound directly from the HTTP query string via <c>[FromQuery]</c> on <c>LoadsController.GetList</c>.
 /// </summary>
 public class LoadListQueryDto
 {

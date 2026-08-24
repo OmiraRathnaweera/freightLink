@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.DTOs.Loads;
+using FreightLink.Api.Entities.Enums;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -239,6 +240,11 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
+        Assert.Equal("Integration Tester", body!.ShipperName);
+        var historyRow = Assert.Single(body.StatusHistory);
+        Assert.Equal("Draft", historyRow.ToStatus);
+        Assert.Null(historyRow.FromStatus);
     }
 
     /// <summary>A Shipper cannot fetch another Shipper's load — 403, not 404, per the contract's ownership-vs-not-found distinction.</summary>
@@ -315,6 +321,7 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
         Assert.True(page!.TotalItems >= 2);
+        Assert.All(page.Items, item => Assert.False(string.IsNullOrWhiteSpace(item.ShipperName)));
     }
 
     /// <summary>
@@ -335,6 +342,39 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>createdFrom/createdTo query params filter the list to the requested inclusive date range.</summary>
+    [Fact]
+    public async Task GetList_WithCreatedFromAndCreatedTo_FiltersByDateRange()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("list-daterange");
+        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
+        var from = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(-1).ToString("O"));
+        var to = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddDays(1).ToString("O"));
+
+        using var request = AuthedRequest(HttpMethod.Get, $"/api/v1/loads?createdFrom={from}&createdTo={to}", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
+        Assert.Contains(page!.Items, item => item.LoadId == load.LoadId);
+    }
+
+    /// <summary>A createdFrom in the future excludes every load, returning an empty page rather than an error.</summary>
+    [Fact]
+    public async Task GetList_WithCreatedFromExcludingAllLoads_ReturnsEmptyItems()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("list-daterange-empty");
+        await CreateLoadAsShipperAsync(tokens.AccessToken);
+        var futureFrom = Uri.EscapeDataString(DateTimeOffset.UtcNow.AddYears(1).ToString("O"));
+
+        using var request = AuthedRequest(HttpMethod.Get, $"/api/v1/loads?createdFrom={futureFrom}", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var page = await response.Content.ReadFromJsonAsync<PagedLoadResponseDto>();
+        Assert.Empty(page!.Items);
     }
 
     // --- Edit (Shipper own only) ---
@@ -364,6 +404,8 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
+        Assert.Equal("Integration Tester", updated!.ShipperName);
     }
 
     /// <summary>A Shipper cannot edit another Shipper's load — 403.</summary>
@@ -422,33 +464,34 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- Cancel (Shipper own only) ---
+    // --- Change status: cancel (Shipper own only) ---
 
     /// <summary>A Shipper can cancel a load they own.</summary>
     [Fact]
-    public async Task Cancel_Returns200_ForOwningShipper()
+    public async Task ChangeStatus_Cancel_Returns200_ForOwningShipper()
     {
         var tokens = await RegisterAndLoginShipperAsync("cancel-own");
         var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
 
-        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken);
-        request.Content = JsonContent.Create(new CancelLoadDto { Reason = "Shipper changed plans" });
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken);
+        request.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" });
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var cancelled = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
         Assert.Equal("Cancelled", cancelled!.Status);
+        Assert.Equal("Integration Tester", cancelled.ShipperName);
     }
 
     /// <summary>An Admin is blocked from cancelling a Shipper's load — role gating, never reaches the service.</summary>
     [Fact]
-    public async Task Cancel_Returns403_ForAdmin()
+    public async Task ChangeStatus_Cancel_Returns403_ForAdmin()
     {
         var ownerTokens = await RegisterAndLoginShipperAsync("cancel-admin-owner");
         var load = await CreateLoadAsShipperAsync(ownerTokens.AccessToken);
 
-        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", MintAdminToken());
-        request.Content = JsonContent.Create(new CancelLoadDto { Reason = "Admin attempted cancel" });
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", MintAdminToken());
+        request.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Admin attempted cancel" });
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -460,19 +503,86 @@ public class LoadsControllerTests : IClassFixture<CustomWebApplicationFactory>
     /// reserved for double-submit/concurrency races) rather than the generic "status conflict" label.
     /// </summary>
     [Fact]
-    public async Task Cancel_Returns422_WhenLoadAlreadyCancelled()
+    public async Task ChangeStatus_Cancel_Returns422_WhenLoadAlreadyCancelled()
     {
         var tokens = await RegisterAndLoginShipperAsync("cancel-twice");
         var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
-        using (var firstCancel = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken))
+        using (var firstCancel = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken))
         {
-            firstCancel.Content = JsonContent.Create(new CancelLoadDto { Reason = "First cancellation" });
+            firstCancel.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "First cancellation" });
             (await _client.SendAsync(firstCancel)).EnsureSuccessStatusCode();
         }
 
-        using var secondCancel = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/cancel", tokens.AccessToken);
-        secondCancel.Content = JsonContent.Create(new CancelLoadDto { Reason = "Second cancellation" });
+        using var secondCancel = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken);
+        secondCancel.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Second cancellation" });
         var response = await _client.SendAsync(secondCancel);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("INVALID_LOAD_STATUS_TRANSITION", await ReadErrorCodeAsync(response));
+    }
+
+    // --- Change status: publish (Shipper own only) ---
+
+    /// <summary>A Shipper can publish a Draft load they own, transitioning it to Posted.</summary>
+    [Fact]
+    public async Task ChangeStatus_Publish_Returns200_ForOwningShipper()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("publish-own");
+        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
+
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken);
+        request.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var published = await response.Content.ReadFromJsonAsync<LoadResponseDto>();
+        Assert.Equal("Posted", published!.Status);
+    }
+
+    /// <summary>An Admin is blocked from publishing a Shipper's load — role gating, never reaches the service.</summary>
+    [Fact]
+    public async Task ChangeStatus_Publish_Returns403_ForAdmin()
+    {
+        var ownerTokens = await RegisterAndLoginShipperAsync("publish-admin-owner");
+        var load = await CreateLoadAsShipperAsync(ownerTokens.AccessToken);
+
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", MintAdminToken());
+        request.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>Publishing an already-Posted load is rejected as 422, not 409.</summary>
+    [Fact]
+    public async Task ChangeStatus_Publish_Returns422_WhenLoadAlreadyPosted()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("publish-twice");
+        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
+        using (var firstPublish = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken))
+        {
+            firstPublish.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+            (await _client.SendAsync(firstPublish)).EnsureSuccessStatusCode();
+        }
+
+        using var secondPublish = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken);
+        secondPublish.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Posted });
+        var response = await _client.SendAsync(secondPublish);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("INVALID_LOAD_STATUS_TRANSITION", await ReadErrorCodeAsync(response));
+    }
+
+    /// <summary>A target status other than Posted/Cancelled is rejected as 422.</summary>
+    [Fact]
+    public async Task ChangeStatus_Returns422_WhenTargetStatusIsNotPublishOrCancel()
+    {
+        var tokens = await RegisterAndLoginShipperAsync("status-matched");
+        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
+
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/loads/{load.LoadId}/status", tokens.AccessToken);
+        request.Content = JsonContent.Create(new ChangeLoadStatusDto { Status = LoadStatus.Matched });
+        var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal("INVALID_LOAD_STATUS_TRANSITION", await ReadErrorCodeAsync(response));

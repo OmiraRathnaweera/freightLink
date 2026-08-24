@@ -4,13 +4,14 @@ using FreightLink.Api.Entities.Enums;
 namespace FreightLink.Api.Services.Interfaces;
 
 /// <summary>
-/// Create/read/edit/cancel operations on <see cref="Entities.Load"/>. Per ADR-019, a load is never
-/// hard-deleted — "cancelling" is a status transition recorded as a <see cref="Entities.LoadStatusHistory"/>
-/// row, governed by <see cref="Common.Domain.LoadStatusTransitionRules"/>. This service performs no
-/// authentication — every acting-user id/role is accepted as a plain parameter, sourced by the caller
-/// (in practice, <c>LoadsController</c>) from validated JWT claims, never from a request body.
-/// Ownership enforcement (a <c>Shipper</c> may only see/edit/cancel their own loads; an <c>Admin</c>
-/// may read any load) is a business rule and so lives here, not in the controller.
+/// Create/read/edit/status-change operations on <see cref="Entities.Load"/>. Per ADR-019, a load is
+/// never hard-deleted — every status change (publish, cancel, and any future one) is a transition
+/// recorded as a <see cref="Entities.LoadStatusHistory"/> row, governed by
+/// <see cref="Common.Domain.LoadStatusTransitionRules"/>. This service performs no authentication —
+/// every acting-user id/role is accepted as a plain parameter, sourced by the caller (in practice,
+/// <c>LoadsController</c>) from validated JWT claims, never from a request body. Ownership enforcement
+/// (a <c>Shipper</c> may only see/edit/change-status their own loads; an <c>Admin</c> may read any
+/// load) is a business rule and so lives here, not in the controller.
 /// </summary>
 public interface ILoadService
 {
@@ -73,23 +74,29 @@ public interface ILoadService
     Task<LoadResponseDto> UpdateAsync(Guid loadId, Guid currentUserId, UpdateLoadDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Transitions a load to <see cref="Entities.Enums.LoadStatus.Cancelled"/> and records a
-    /// <see cref="Entities.LoadStatusHistory"/> row with the given reason. This is a status
-    /// transition, not a delete — no <c>Load</c> row is ever removed. Only the load's owner may
-    /// cancel it.
+    /// The single entry point for every Shipper-initiated status change on a load — publishing
+    /// (<see cref="Entities.Enums.LoadStatus.Draft"/> → <see cref="Entities.Enums.LoadStatus.Posted"/>)
+    /// and cancelling (→ <see cref="Entities.Enums.LoadStatus.Cancelled"/>, from any status
+    /// <see cref="Common.Domain.LoadStatusTransitionRules.CanCancel"/> permits). Records a
+    /// <see cref="Entities.LoadStatusHistory"/> row for the transition. This is never a delete — no
+    /// <c>Load</c> row is ever removed. <see cref="ChangeLoadStatusDto.Status"/> values other than
+    /// <c>Posted</c>/<c>Cancelled</c> are rejected: every later status (<c>Matched</c> and beyond) is
+    /// reached only by internal processes, never by this Shipper-facing endpoint. Only the load's
+    /// owner may change its status.
     /// </summary>
     /// <param name="loadId">The load's id.</param>
-    /// <param name="cancelledByUserId">
+    /// <param name="actingUserId">
     /// The authenticated caller's id — must own the load. Also recorded as the acting user on the
     /// resulting <see cref="Entities.LoadStatusHistory"/> row.
     /// </param>
-    /// <param name="request">The cancellation reason.</param>
+    /// <param name="request">The target status and (when cancelling) the reason.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The cancelled load.</returns>
+    /// <returns>The load in its new status.</returns>
     /// <exception cref="Common.Exceptions.ApiException">
-    /// 404 if no load with this id exists; 403 if the caller does not own this load; 422 if the
-    /// load's current status doesn't allow cancellation; 400 if <see cref="CancelLoadDto.Reason"/>
-    /// is missing.
+    /// 404 if no load with this id exists; 403 if the caller does not own this load; 422 (<see cref="Common.Errors.ErrorCode.INVALID_LOAD_STATUS_TRANSITION"/>)
+    /// if <see cref="ChangeLoadStatusDto.Status"/> is not <c>Posted</c>/<c>Cancelled</c>, or the load's
+    /// current status doesn't allow that transition; 400 if cancelling without a
+    /// <see cref="ChangeLoadStatusDto.Reason"/>.
     /// </exception>
-    Task<LoadResponseDto> CancelAsync(Guid loadId, Guid cancelledByUserId, CancelLoadDto request, CancellationToken cancellationToken = default);
+    Task<LoadResponseDto> ChangeStatusAsync(Guid loadId, Guid actingUserId, ChangeLoadStatusDto request, CancellationToken cancellationToken = default);
 }
