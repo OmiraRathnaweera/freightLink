@@ -23,7 +23,7 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
-    public async Task<AgencyResponseDto> CreateAsync(Guid currentUserId, AgencyCreateDto request, CancellationToken cancellationToken = default)
+    public async Task<AgencyResponseDto> CreateAsync(Guid currentUserId, UserRole currentUserRole, AgencyCreateDto request, CancellationToken cancellationToken = default)
     {
         var existingAgency = await _dbContext.Agencies
             .FirstOrDefaultAsync(a => a.BusinessRegNo == request.BusinessRegNo, cancellationToken);
@@ -73,8 +73,10 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
-    public async Task<AgencyResponseDto> GetByIdAsync(Guid agencyId, CancellationToken cancellationToken = default)
+    public async Task<AgencyResponseDto> GetByIdAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
         var agency = await _dbContext.Agencies.AsNoTracking()
             .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
 
@@ -87,8 +89,13 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<AgencyResponseDto>> GetListAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<AgencyResponseDto>> GetListAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can list all agencies.");
+        }
+
         var agencies = await _dbContext.Agencies.AsNoTracking()
             .ToListAsync(cancellationToken);
 
@@ -96,8 +103,10 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
-    public async Task<AgencyResponseDto> UpdateAsync(Guid agencyId, AgencyUpdateDto request, CancellationToken cancellationToken = default)
+    public async Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default)
     {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
         var agency = await _dbContext.Agencies
             .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
 
@@ -116,6 +125,29 @@ public class AgencyService : IAgencyService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return MapToResponse(agency);
+    }
+
+    private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
+    {
+        if (currentUserRole == UserRole.Admin)
+        {
+            return;
+        }
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var isOwned = await _dbContext.AgencyStaff
+                .AnyAsync(s => s.UserId == currentUserId && s.AgencyId == agencyId, cancellationToken);
+
+            if (!isOwned)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.AGENCY_NOT_OWNED, "You do not have permission to access this agency.");
+            }
+            
+            return;
+        }
+
+        throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
     }
 
     private static AgencyResponseDto MapToResponse(Agency agency)
