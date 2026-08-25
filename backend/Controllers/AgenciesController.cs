@@ -40,7 +40,7 @@ public class AgenciesController : ControllerBase
     /// <summary>
     /// Retrieves a specific agency by its ID.
     /// </summary>
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
     public async Task<ActionResult<AgencyResponseDto>> GetAgency(Guid id, CancellationToken cancellationToken)
     {
@@ -62,7 +62,7 @@ public class AgenciesController : ControllerBase
     /// <summary>
     /// Updates an existing agency's profile details.
     /// </summary>
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
     public async Task<ActionResult<AgencyResponseDto>> UpdateAgency(Guid id, [FromBody] AgencyUpdateDto request, CancellationToken cancellationToken)
     {
