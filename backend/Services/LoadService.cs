@@ -58,10 +58,12 @@ public class LoadService : ILoadService
             DropoffLng = request.DropoffLng!.Value,
             PickupWindowStart = request.PickupWindowStart,
             PickupWindowEnd = request.PickupWindowEnd,
+            // EstimatedPrice is left unset here — pricing is the AI agent's responsibility, not
+            // LoadService's; it is expected to be populated separately once the agent estimates it.
             Status = initialStatus,
             CreatedAt = now,
             UpdatedAt = now
-        };
+        }; 
 
         var historyRow = new LoadStatusHistory
         {
@@ -100,13 +102,24 @@ public class LoadService : ILoadService
             }
         }
 
-        return MapToResponse(load);
+        // load.ShipperUser is never populated at this point (a freshly-added tracked entity has no
+        // navigation fix-up from the DB), so the newly created load's owner name is resolved with a
+        // dedicated lookup rather than an Include on an entity that was just inserted, not queried.
+        var shipperName = await _dbContext.Users.AsNoTracking()
+            .Where(u => u.UserId == shipperUserId)
+            .Select(u => u.FullName)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return MapToResponse(load, ResolveShipperName(shipperName));
     }
 
     /// <inheritdoc />
     public async Task<LoadResponseDto> GetByIdAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
-        var load = await _dbContext.Loads.AsNoTracking().FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+        var load = await _dbContext.Loads.AsNoTracking()
+            .Include(l => l.ShipperUser)
+            .Include(l => l.StatusHistory)
+            .FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
         if (load is null)
         {
@@ -118,7 +131,12 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
-        return MapToResponse(load);
+        var statusHistory = load.StatusHistory
+            .OrderByDescending(h => h.ChangedAt)
+            .Select(MapToStatusHistoryResponse)
+            .ToList();
+
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory);
     }
 
     /// <inheritdoc />
@@ -144,7 +162,9 @@ public class LoadService : ILoadService
         // passing a different shipperUserId filter.
         var effectiveShipperUserId = currentUserRole == UserRole.Admin ? query.ShipperUserId : currentUserId;
 
-        var loads = _dbContext.Loads.AsNoTracking();
+        // Include (not per-row lookups) so the owner's FullName comes back in the same single query
+        // as the page of loads — a plain SQL JOIN — rather than one extra round-trip per row.
+        IQueryable<Load> loads = _dbContext.Loads.AsNoTracking().Include(l => l.ShipperUser);
 
         if (effectiveShipperUserId is { } shipperUserId)
         {
@@ -194,7 +214,7 @@ public class LoadService : ILoadService
 
         return new PagedLoadResponseDto
         {
-            Items = pageOfLoads.Select(MapToListItem).ToList(),
+            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalItems = totalItems,
@@ -205,7 +225,7 @@ public class LoadService : ILoadService
     /// <inheritdoc />
     public async Task<LoadResponseDto> UpdateAsync(Guid loadId, Guid currentUserId, UpdateLoadDto request, CancellationToken cancellationToken = default)
     {
-        var load = await _dbContext.Loads.FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+        var load = await _dbContext.Loads.Include(l => l.ShipperUser).FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
         if (load is null)
         {
@@ -225,6 +245,20 @@ public class LoadService : ILoadService
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
         ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
 
+        // Every input the internal estimator (PricingEstimatorService) prices against —
+        // WeightKg/VolumeM3 (vehicle-class tier, ratePerKg) and the pickup/dropoff coordinates
+        // (distanceKm, computed by the caller) — invalidates any existing EstimatedPrice the moment
+        // it changes. There is no synchronous re-estimation wired into this edit path, so a stale
+        // price is cleared rather than silently left attached to a load whose dimensions/route it no
+        // longer reflects; the Agentic AI pipeline is expected to re-estimate separately.
+        var pricingInputsChanged =
+            load.WeightKg != request.WeightKg ||
+            load.VolumeM3 != request.VolumeM3 ||
+            load.PickupLat != request.PickupLat!.Value ||
+            load.PickupLng != request.PickupLng!.Value ||
+            load.DropoffLat != request.DropoffLat!.Value ||
+            load.DropoffLng != request.DropoffLng!.Value;
+
         load.CargoDescription = request.CargoDescription;
         load.WeightKg = request.WeightKg;
         load.VolumeM3 = request.VolumeM3;
@@ -237,51 +271,78 @@ public class LoadService : ILoadService
         load.PickupWindowStart = request.PickupWindowStart;
         load.PickupWindowEnd = request.PickupWindowEnd;
 
+        if (pricingInputsChanged)
+        {
+            load.EstimatedPrice = null;
+        }
+
         await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
-        return MapToResponse(load);
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName));
     }
 
     /// <inheritdoc />
-    public async Task<LoadResponseDto> CancelAsync(Guid loadId, Guid cancelledByUserId, CancelLoadDto request, CancellationToken cancellationToken = default)
+    public async Task<LoadResponseDto> ChangeStatusAsync(Guid loadId, Guid actingUserId, ChangeLoadStatusDto request, CancellationToken cancellationToken = default)
     {
-        var load = await _dbContext.Loads.FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+        var load = await _dbContext.Loads.Include(l => l.ShipperUser).FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
 
         if (load is null)
         {
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
-        if (load.ShipperUserId != cancelledByUserId)
+        if (load.ShipperUserId != actingUserId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
         }
 
-        if (!LoadStatusTransitionRules.CanCancel(load.Status))
-        {
-            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be cancelled.");
-        }
+        var targetStatus = request.Status!.Value;
+        string? reason;
 
-        if (string.IsNullOrWhiteSpace(request.Reason))
+        switch (targetStatus)
         {
-            // Proactively enforces LoadStatusHistory's ck_lsh_cancel_reason CHECK, which the
-            // InMemory test provider doesn't evaluate — without this, a missing reason would only
-            // ever be caught against a real Postgres database.
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_CANCEL_REASON_REQUIRED, "A reason is required when cancelling a load.");
+            case LoadStatus.Posted:
+                if (!LoadStatusTransitionRules.CanPublish(load.Status))
+                {
+                    throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be published.");
+                }
+                reason = null;
+                break;
+
+            case LoadStatus.Cancelled:
+                if (!LoadStatusTransitionRules.CanCancel(load.Status))
+                {
+                    throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"A load in status '{load.Status}' cannot be cancelled.");
+                }
+                if (string.IsNullOrWhiteSpace(request.Reason))
+                {
+                    // Proactively enforces LoadStatusHistory's ck_lsh_cancel_reason CHECK, which the
+                    // InMemory test provider doesn't evaluate — without this, a missing reason would
+                    // only ever be caught against a real Postgres database.
+                    throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_CANCEL_REASON_REQUIRED, "A reason is required when cancelling a load.");
+                }
+                reason = request.Reason;
+                break;
+
+            default:
+                // Every other status (Matched and beyond) is reached only by internal processes (the
+                // AI matching workflow, trip events) — never accepted from this Shipper-facing endpoint,
+                // regardless of what LoadStatusTransitionRules' transition graph otherwise permits.
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_LOAD_STATUS_TRANSITION, $"'{targetStatus}' cannot be set via this endpoint.");
         }
 
         var fromStatus = load.Status;
         var now = DateTimeOffset.UtcNow;
-        load.Status = LoadStatus.Cancelled;
+        load.Status = targetStatus;
 
         _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
         {
             LoadStatusHistoryId = Guid.NewGuid(),
             LoadId = load.LoadId,
-            ChangedByUserId = cancelledByUserId,
+            ChangedByUserId = actingUserId,
             FromStatus = fromStatus,
-            ToStatus = LoadStatus.Cancelled,
-            Reason = request.Reason,
+            ToStatus = targetStatus,
+            Reason = reason,
             ChangedAt = now
         });
 
@@ -289,7 +350,7 @@ public class LoadService : ILoadService
         // either both land or neither does.
         await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
-        return MapToResponse(load);
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName));
     }
 
     /// <summary>
@@ -365,11 +426,27 @@ public class LoadService : ILoadService
     /// </summary>
     private static string GenerateReferenceCode() => $"LD-{Guid.NewGuid():N}".ToUpperInvariant();
 
+    /// <summary>
+    /// Normalizes a possibly-missing shipper display name to a non-null, non-empty string. A blank
+    /// result means the owning <see cref="User"/> row could not be resolved (e.g. joined navigation
+    /// left unpopulated, or the row was deleted out from under a still-referenced load) — this is
+    /// deliberately never surfaced as null on the wire.
+    /// </summary>
+    private static string ResolveShipperName(string? fullName) =>
+        string.IsNullOrWhiteSpace(fullName) ? "Unknown" : fullName;
+
     /// <summary>Maps a <see cref="Load"/> entity to its full wire-facing representation.</summary>
-    private static LoadResponseDto MapToResponse(Load load) => new()
+    /// <param name="load">The load entity.</param>
+    /// <param name="shipperName">The resolved display name of the load's owning Shipper.</param>
+    /// <param name="statusHistory">
+    /// The load's status-change audit trail, newest first — only supplied by <see cref="GetByIdAsync"/>;
+    /// every other caller leaves this as an empty list (see <see cref="LoadResponseDto.StatusHistory"/>).
+    /// </param>
+    private static LoadResponseDto MapToResponse(Load load, string shipperName, List<LoadStatusHistoryResponseDto>? statusHistory = null) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
+        ShipperName = shipperName,
         ReferenceCode = load.ReferenceCode,
         CargoDescription = load.CargoDescription,
         WeightKg = load.WeightKg,
@@ -388,13 +465,29 @@ public class LoadService : ILoadService
         // component (Component D) — left null here rather than implemented out of scope.
         WorkflowRunId = null,
         CreatedAt = load.CreatedAt,
-        UpdatedAt = load.UpdatedAt
+        UpdatedAt = load.UpdatedAt,
+        StatusHistory = statusHistory ?? new List<LoadStatusHistoryResponseDto>()
+    };
+
+    /// <summary>Maps a <see cref="LoadStatusHistory"/> entity to its wire-facing representation.</summary>
+    private static LoadStatusHistoryResponseDto MapToStatusHistoryResponse(LoadStatusHistory history) => new()
+    {
+        LoadStatusHistoryId = history.LoadStatusHistoryId,
+        FromStatus = history.FromStatus?.ToString(),
+        ToStatus = history.ToStatus.ToString(),
+        Reason = history.Reason,
+        ChangedByUserId = history.ChangedByUserId,
+        ChangedAt = history.ChangedAt
     };
 
     /// <summary>Maps a <see cref="Load"/> entity to its lightweight list-row representation.</summary>
-    private static LoadListItemDto MapToListItem(Load load) => new()
+    /// <param name="load">The load entity.</param>
+    /// <param name="shipperName">The resolved display name of the load's owning Shipper.</param>
+    private static LoadListItemDto MapToListItem(Load load, string shipperName) => new()
     {
         LoadId = load.LoadId,
+        ShipperUserId = load.ShipperUserId,
+        ShipperName = shipperName,
         ReferenceCode = load.ReferenceCode,
         CargoDescription = load.CargoDescription,
         WeightKg = load.WeightKg,

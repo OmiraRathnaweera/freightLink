@@ -27,3 +27,7 @@ dist-ssr
 package-lock.json
 yarn.lock/in
 CLAUDE.md
+.claude/
+.agents/
+skills-lock.json
+.mcp.json
