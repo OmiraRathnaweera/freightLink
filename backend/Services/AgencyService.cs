@@ -89,17 +89,52 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
-    public async Task<IEnumerable<AgencyResponseDto>> GetListAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    public async Task<PagedAgencyResponseDto> GetListAsync(Guid currentUserId, UserRole currentUserRole, AgencyListQueryDto query, CancellationToken cancellationToken = default)
     {
         if (currentUserRole != UserRole.Admin)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can list all agencies.");
         }
 
-        var agencies = await _dbContext.Agencies.AsNoTracking()
+        var dbQuery = _dbContext.Agencies.AsNoTracking();
+
+        if (query.Status.HasValue)
+        {
+            dbQuery = dbQuery.Where(a => a.Status == query.Status.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var search = query.Search.ToLower();
+            dbQuery = dbQuery.Where(a => 
+                a.Name.ToLower().Contains(search) || 
+                a.BusinessRegNo.ToLower().Contains(search) ||
+                a.YardAddress.ToLower().Contains(search));
+        }
+
+        // Default sort by CreatedAt desc
+        dbQuery = query.SortBy?.ToLower() switch
+        {
+            "name" => query.SortDir?.ToLower() == "asc" ? dbQuery.OrderBy(a => a.Name) : dbQuery.OrderByDescending(a => a.Name),
+            "status" => query.SortDir?.ToLower() == "asc" ? dbQuery.OrderBy(a => a.Status) : dbQuery.OrderByDescending(a => a.Status),
+            _ => query.SortDir?.ToLower() == "asc" ? dbQuery.OrderBy(a => a.CreatedAt) : dbQuery.OrderByDescending(a => a.CreatedAt)
+        };
+
+        var totalItems = await dbQuery.CountAsync(cancellationToken);
+
+        var agencies = await dbQuery
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
             .ToListAsync(cancellationToken);
 
-        return agencies.Select(MapToResponse);
+        return new PagedAgencyResponseDto
+        {
+            Items = agencies.Select(MapToResponse).ToList(),
+            Page = query.Page,
+            PageSize = query.PageSize,
+            TotalItems = totalItems,
+            TotalPages = (int)Math.Ceiling(totalItems / (double)query.PageSize)
+        };
     }
 
     /// <inheritdoc />

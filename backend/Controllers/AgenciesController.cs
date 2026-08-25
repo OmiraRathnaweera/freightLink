@@ -53,9 +53,9 @@ public class AgenciesController : ControllerBase
     /// </summary>
     [HttpGet]
     [Authorize(Roles = nameof(UserRole.Admin))]
-    public async Task<ActionResult<IEnumerable<AgencyResponseDto>>> GetAllAgencies(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedAgencyResponseDto>> GetAllAgencies([FromQuery] AgencyListQueryDto query, CancellationToken cancellationToken)
     {
-        var result = await _agencyService.GetListAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        var result = await _agencyService.GetListAsync(GetCurrentUserId(), GetCurrentUserRole(), query, cancellationToken);
         return Ok(result);
     }
 

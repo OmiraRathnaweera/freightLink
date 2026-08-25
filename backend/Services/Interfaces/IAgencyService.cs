@@ -19,9 +19,9 @@ public interface IAgencyService
     Task<AgencyResponseDto> GetByIdAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Retrieves a list of all agencies.
+    /// Retrieves a paged list of all agencies matching the query.
     /// </summary>
-    Task<IEnumerable<AgencyResponseDto>> GetListAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+    Task<PagedAgencyResponseDto> GetListAsync(Guid currentUserId, UserRole currentUserRole, AgencyListQueryDto query, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates an existing agency's details.

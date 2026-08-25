@@ -101,8 +101,8 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
         // Admin gets the ID of agency 2
         using var listReq = AuthedRequest(HttpMethod.Get, "/api/v1/agencies", MintAdminToken());
         var listRes = await _client.SendAsync(listReq);
-        var agencies = await listRes.Content.ReadFromJsonAsync<IEnumerable<AgencyResponseDto>>();
-        var targetAgencyId = agencies!.Last().AgencyId;
+        var page = await listRes.Content.ReadFromJsonAsync<PagedAgencyResponseDto>();
+        var targetAgencyId = page!.Items.Last().AgencyId;
 
         using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{targetAgencyId}", agency1.AccessToken);
         request.Content = JsonContent.Create(new AgencyUpdateDto { Name = "Hacked Name" });
