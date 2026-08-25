@@ -120,8 +120,6 @@ public class AgencyService : IAgencyService
         if (request.YardLat.HasValue) agency.YardLat = request.YardLat.Value;
         if (request.YardLng.HasValue) agency.YardLng = request.YardLng.Value;
 
-        agency.UpdatedAt = DateTimeOffset.UtcNow;
-
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return MapToResponse(agency);
