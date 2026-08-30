@@ -1,13 +1,16 @@
-"""LLM access for the four agents - ADR-008 addendum: Gemini (free tier)
-primary, Ollama fallback (covers the network-dependency risk of a hosted
-API during a live demo). Every call uses structured output (a typed
-Pydantic schema per call site), never free-form text parsing.
+"""LLM access for Agent 1 (Planner) - the only agent implemented so far.
+
+ADR-008 addendum: Gemini (free tier) primary, Ollama fallback (covers the
+network-dependency risk of a hosted API during a live demo). LLM_PROVIDER
+picks the primary provider; when it's Gemini, a failed call additionally
+falls back to Ollama rather than propagating straight away. Always uses
+structured output (a typed Pydantic schema), never free-form text parsing.
 """
 
 import json
 import logging
 from functools import lru_cache
-from typing import Any, TypeVar
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -15,77 +18,57 @@ from freightlink_agent.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar("T", bound=BaseModel)
+# The pipeline is a fixed sequence (ADR-007); the Planner's job is to write
+# an objective and select/order among these stages, never invent new ones.
+PipelineStage = Literal[
+    "Evaluate candidate agencies",
+    "Select agency via routing",
+    "Validate and get shipper approval",
+    "Notify agency",
+]
 
 
 class PlanOutput(BaseModel):
     objective: str
-    steps: list[str]
-
-
-class DomainAnalysisOutput(BaseModel):
-    explanation: str
-    """Plain-language explanation of why the top candidates were chosen and
-    why others were excluded - layered on top of the deterministic
-    eligibility filter, never a replacement for it."""
-
-
-class MatchingPricingOutput(BaseModel):
-    explanation: str
-    """Justifies the #1 (highlighted) pick to the shipper, referencing the
-    real ETA and price Agent 3 computed."""
-
-
-class ValidationOutput(BaseModel):
-    explanation: str
-    recommendation: str
+    steps: list[PipelineStage]
 
 
 class AgentLLM:
     def __init__(self) -> None:
-        settings = get_settings()
-        self._settings = settings
+        self._settings = get_settings()
 
-    def _primary(self):
+    def _gemini(self):
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         return ChatGoogleGenerativeAI(
-            model=self._settings.llm_model,
-            google_api_key=self._settings.gemini_api_key or self._settings.llm_api_key,
+            model=self._settings.gemini_model,
+            google_api_key=self._settings.gemini_api_key,
         )
 
-    def _fallback(self):
+    def _ollama(self):
         from langchain_ollama import ChatOllama
 
-        return ChatOllama(model=self._settings.ollama_model)
+        return ChatOllama(model=self._settings.ollama_model, base_url=self._settings.ollama_base_url)
 
-    async def _structured(self, schema: type[T], system_prompt: str, context: dict[str, Any]) -> T:
+    async def plan(self, system_prompt: str, load_context: dict[str, Any]) -> dict:
         messages = [
             ("system", system_prompt),
-            ("human", json.dumps(context, default=str)),
+            ("human", json.dumps(load_context, default=str)),
         ]
+
+        if self._settings.llm_provider == "ollama":
+            model = self._ollama().with_structured_output(PlanOutput)
+            result: PlanOutput = await model.ainvoke(messages)  # type: ignore[assignment]
+            return result.model_dump()
+
         try:
-            model = self._primary().with_structured_output(schema)
-            return await model.ainvoke(messages)  # type: ignore[return-value]
+            model = self._gemini().with_structured_output(PlanOutput)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
         except Exception:
             logger.warning("Primary LLM (Gemini) failed, falling back to Ollama", exc_info=True)
-            model = self._fallback().with_structured_output(schema)
-            return await model.ainvoke(messages)  # type: ignore[return-value]
+            model = self._ollama().with_structured_output(PlanOutput)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
 
-    async def plan(self, system_prompt: str, context: dict[str, Any]) -> dict:
-        result = await self._structured(PlanOutput, system_prompt, context)
-        return result.model_dump()
-
-    async def explain_domain_analysis(self, system_prompt: str, context: dict[str, Any]) -> dict:
-        result = await self._structured(DomainAnalysisOutput, system_prompt, context)
-        return result.model_dump()
-
-    async def explain_matching_pricing(self, system_prompt: str, context: dict[str, Any]) -> dict:
-        result = await self._structured(MatchingPricingOutput, system_prompt, context)
-        return result.model_dump()
-
-    async def explain_validation(self, system_prompt: str, context: dict[str, Any]) -> dict:
-        result = await self._structured(ValidationOutput, system_prompt, context)
         return result.model_dump()
 
 

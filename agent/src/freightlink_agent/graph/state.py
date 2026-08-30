@@ -1,44 +1,24 @@
-from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any
 from uuid import UUID
 
-from freightlink_agent.schemas.agency import AgencyCandidate
-from freightlink_agent.schemas.workflow import WorkflowStartRequest
+from pydantic import BaseModel
 
 
-@dataclass
-class CandidateScore:
-    """One agency evaluated by Agent 2, carried through to Agent 3."""
+class WorkflowState(BaseModel):
+    """State threaded through the pipeline. Only carries what Agent 1
+    itself reads or writes - fields a later agent (2-4) would need don't
+    belong here until that agent actually exists."""
 
-    agency: AgencyCandidate
-    eligible: bool
-    eligibility_score: float
-    rejection_reason: str | None
-    haversine_distance_km: float
-    haversine_rank: int | None = None
+    load_id: UUID
+    triggered_by_user_id: UUID
+    attempt_no: int
+    load_context: dict[str, Any]
 
-    # Populated by Agent 3, for the top 3-5 only
-    final_rank: int | None = None
-    eta_minutes: int | None = None
-    distance_km: float | None = None
-    estimated_price: float | None = None
-    is_highlighted: bool = False
+    workflow_run_id: UUID | None = None
+    """Null until Agent 1 creates the AgentWorkflowRun row on the backend
+    and gets the real id back."""
+    objective: str | None = None
+    plan_json: str | None = None
 
-
-class PipelineState(TypedDict, total=False):
-    run_id: UUID
-    request: WorkflowStartRequest
-
-    objective: str
-    plan_json: str
-
-    all_candidates: list[CandidateScore]
-    shortlist: list[CandidateScore]
-    """Top 3-5 by haversine distance, handed to Agent 3."""
-    top_candidates: list[CandidateScore]
-    """The same shortlist, re-ranked by real ETA and enriched with pricing."""
-
-    validation: dict[str, Any]
-
-    failed: bool
-    failure_reason: str
+    failed: bool = False
+    failure_reason: str | None = None
