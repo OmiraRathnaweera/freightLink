@@ -43,9 +43,9 @@ async def run(state: WorkflowState) -> dict:
                 attempt_no=state.attempt_no,
             )
         )
-    except BackendClientError:
+    except BackendClientError as exc:
         logger.exception("Could not create AgentWorkflowRun for load %s", state.load_id)
-        return {"failed": True, "failure_reason": "create_workflow_run_failed"}
+        return {"failed": True, "failure_reason": f"create_workflow_run_failed: {exc}"}
 
     workflow_run_id = created.workflow_run_id
     input_data = {"loadId": str(state.load_id), "loadContext": state.load_context}
@@ -72,7 +72,7 @@ async def run(state: WorkflowState) -> dict:
         return {
             "workflow_run_id": workflow_run_id,
             "failed": True,
-            "failure_reason": "planner_llm_failed",
+            "failure_reason": f"planner_llm_failed: {exc}",
         }
 
     plan_json = json.dumps(plan_json_dict)
@@ -87,14 +87,14 @@ async def run(state: WorkflowState) -> dict:
             input_data=input_data,
             output_data=plan_json_dict,
         )
-    except BackendClientError:
+    except BackendClientError as exc:
         logger.exception("Could not report step %s success for run %s", _STEP_NO, workflow_run_id)
         return {
             "workflow_run_id": workflow_run_id,
             "objective": objective,
             "plan_json": plan_json,
             "failed": True,
-            "failure_reason": "report_step_failed",
+            "failure_reason": f"report_step_failed: {exc}",
         }
 
     return {
