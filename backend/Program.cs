@@ -133,6 +133,17 @@ builder.Services.Configure<InternalApiOptions>(options =>
 // mapping as the other sections above.
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
 
+// Email settings (Email:* / EMAIL__* env vars) for GmailEmailService. Only validated when
+// EMAIL__ENABLED is true — mirrors the JWT key-length fail-fast above, but is itself opt-in since
+// email sending (unlike JWT) is an optional feature that's allowed to be entirely unconfigured.
+var emailSection = builder.Configuration.GetSection("Email");
+builder.Services.Configure<EmailOptions>(emailSection);
+var emailOptions = emailSection.Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.Enabled)
+{
+    emailOptions.Validate();
+}
+
 // The Cloudinary SDK client is stateless aside from its credentials, so it's built once as a
 // singleton rather than re-constructed per request/scope.
 builder.Services.AddSingleton(sp =>
@@ -205,6 +216,7 @@ builder.Services.AddScoped<ILoadService, LoadService>();
 builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 

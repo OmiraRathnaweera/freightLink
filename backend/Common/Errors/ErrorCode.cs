@@ -156,5 +156,8 @@ public enum ErrorCode
     FORBIDDEN,
 
     /// <summary>An unhandled exception was caught by the global exception-handling middleware.</summary>
-    INTERNAL_SERVER_ERROR
+    INTERNAL_SERVER_ERROR,
+
+    /// <summary>The SMTP send failed (network/auth/provider failure, not a validation failure) — thrown by <c>GmailEmailService</c>.</summary>
+    EMAIL_SEND_FAILED
 }
