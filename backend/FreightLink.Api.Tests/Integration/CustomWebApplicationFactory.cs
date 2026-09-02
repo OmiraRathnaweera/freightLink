@@ -39,6 +39,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // A known, fixed value so InternalPricingControllerTests can exercise both the correct-key
         // and wrong/missing-key paths against a predictable expectation.
         Environment.SetEnvironmentVariable("INTERNAL_API_KEY", "integration-test-internal-api-key");
+
+        // Disabled so Program.cs's EmailOptions.Validate() fail-fast never fires during integration
+        // tests — no test here exercises real email sending, so no EMAIL__* settings are needed.
+        Environment.SetEnvironmentVariable("EMAIL__ENABLED", "false");
     }
 
     /// <summary>The known <c>INTERNAL_API_KEY</c> value set by this factory, for tests to send as <c>X-Internal-Api-Key</c>.</summary>
