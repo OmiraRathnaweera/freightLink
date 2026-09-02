@@ -159,5 +159,37 @@ public enum ErrorCode
     INTERNAL_SERVER_ERROR,
 
     /// <summary>The SMTP send failed (network/auth/provider failure, not a validation failure) — thrown by <c>GmailEmailService</c>.</summary>
-    EMAIL_SEND_FAILED
+    EMAIL_SEND_FAILED,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>LoadId</c> that doesn't exist.
+    /// Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    LOAD_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>TriggeredByUserId</c> that
+    /// doesn't exist. Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    USER_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>(LoadId, AttemptNo)</c> pair
+    /// that already has a run (mirrors <c>uq_awr_load_attempt</c>). Each attempt number for a given
+    /// load must be started at most once.
+    /// </summary>
+    WORKFLOW_RUN_DUPLICATE_ATTEMPT,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called with a
+    /// <c>workflowRunId</c> that doesn't exist. Thrown by <c>AgentWorkflowService.ReportStepAsync</c>.
+    /// </summary>
+    WORKFLOW_RUN_NOT_FOUND,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called twice for the same
+    /// <c>(WorkflowRunId, StepNo)</c> pair (mirrors <c>uq_agentstep_order</c>). Each step number for a
+    /// given run may be reported at most once.
+    /// </summary>
+    AGENT_STEP_DUPLICATE
 }
