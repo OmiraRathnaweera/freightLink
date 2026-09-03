@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -83,7 +82,7 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
     required LoadFormProvider form,
   }) async {
     final point = isPickup ? form.pickupPoint : form.dropoffPoint;
-    final result = await Navigator.of(context).push<LatLng>(
+    final result = await Navigator.of(context).push<PickedLocation>(
       MaterialPageRoute(
         builder: (_) => LocationPickerScreen(
           title: isPickup ? 'Pickup location' : 'Delivery location',
@@ -93,12 +92,10 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
     );
     if (result == null || !mounted) return;
 
-    final address =
-        '${result.latitude.toStringAsFixed(4)}, ${result.longitude.toStringAsFixed(4)}';
     if (isPickup) {
-      form.setPickup(address, result);
+      form.setPickup(result.address, result.point);
     } else {
-      form.setDropoff(address, result);
+      form.setDropoff(result.address, result.point);
     }
   }
 
