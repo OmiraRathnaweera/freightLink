@@ -40,7 +40,13 @@ class PrimaryButton extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Text(loadingLabel ?? label),
+                Flexible(
+                  child: Text(
+                    loadingLabel ?? label,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
               ],
             )
           : Row(
@@ -50,7 +56,13 @@ class PrimaryButton extends StatelessWidget {
                   Icon(icon, size: 18),
                   const SizedBox(width: 8),
                 ],
-                Text(label),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
+                ),
               ],
             ),
     );
