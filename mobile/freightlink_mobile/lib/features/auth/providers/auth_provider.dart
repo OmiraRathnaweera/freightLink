@@ -1,0 +1,113 @@
+import 'package:flutter/foundation.dart';
+
+import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/storage/token_storage.dart';
+import '../models/auth_user.dart';
+
+enum AuthStatus {
+  /// Bootstrapping: checking for a stored token before deciding.
+  unknown,
+  authenticated,
+  guest,
+}
+
+/// Owns the signed-in session: the access token, the current [AuthUser], and
+/// the single [ApiClient] instance the rest of the app's repositories are
+/// built on (so every request shares the same token/401 handling).
+///
+/// Login/registration screens weren't in the supplied mockups, but are
+/// required scaffolding: every Loads endpoint needs a JWT, and none of this
+/// existed before.
+class AuthProvider extends ChangeNotifier {
+  AuthProvider({TokenStorage? tokenStorage})
+    : _tokenStorage = tokenStorage ?? TokenStorage() {
+    _apiClient = ApiClient(
+      authToken: () => _accessToken,
+      onUnauthorized: _handleUnauthorized,
+    );
+  }
+
+  final TokenStorage _tokenStorage;
+  late final ApiClient _apiClient;
+
+  AuthStatus _status = AuthStatus.unknown;
+  AuthUser? _user;
+  String? _accessToken;
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  AuthStatus get status => _status;
+  AuthUser? get user => _user;
+  bool get isSubmitting => _isSubmitting;
+  String? get errorMessage => _errorMessage;
+  ApiClient get apiClient => _apiClient;
+
+  /// Reads any previously stored token and validates it against `/auth/me`.
+  /// Called once at app startup.
+  Future<void> bootstrap() async {
+    final storedToken = await _tokenStorage.readAccessToken();
+    if (storedToken == null) {
+      _status = AuthStatus.guest;
+      notifyListeners();
+      return;
+    }
+
+    _accessToken = storedToken;
+    try {
+      _user = await _fetchCurrentUser();
+      _status = AuthStatus.authenticated;
+    } on ApiException {
+      await _tokenStorage.clear();
+      _accessToken = null;
+      _status = AuthStatus.guest;
+    }
+    notifyListeners();
+  }
+
+  Future<bool> login({required String email, required String password}) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response =
+          await _apiClient.post(
+                '/auth/login',
+                body: {'email': email, 'password': password},
+              )
+              as Map<String, dynamic>;
+      _accessToken = response['accessToken'] as String;
+      await _tokenStorage.saveAccessToken(_accessToken!);
+      _user = await _fetchCurrentUser();
+      _status = AuthStatus.authenticated;
+      return true;
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> logout() async {
+    _accessToken = null;
+    _user = null;
+    _status = AuthStatus.guest;
+    await _tokenStorage.clear();
+    notifyListeners();
+  }
+
+  Future<AuthUser> _fetchCurrentUser() async {
+    final response = await _apiClient.get('/auth/me') as Map<String, dynamic>;
+    return AuthUser.fromJson(response);
+  }
+
+  void _handleUnauthorized() {
+    if (_status != AuthStatus.authenticated) return;
+    // Fire-and-forget: clears the stored token and flips to guest so the
+    // root widget routes back to the login screen.
+    logout();
+  }
+}
