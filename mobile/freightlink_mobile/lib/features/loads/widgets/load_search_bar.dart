@@ -10,11 +10,17 @@ class LoadSearchBar extends StatelessWidget {
     super.key,
     required this.onChanged,
     this.onFilterTap,
+    this.isFilterActive = false,
     this.hintText = 'Search load ID, origin, destination...',
   });
 
   final ValueChanged<String> onChanged;
   final VoidCallback? onFilterTap;
+
+  /// Highlights the filter button when a status filter is currently applied,
+  /// so it's visible at a glance without opening the filter sheet.
+  final bool isFilterActive;
+
   final String hintText;
 
   @override
@@ -36,11 +42,17 @@ class LoadSearchBar extends StatelessWidget {
         const SizedBox(width: AppConstants.spaceSm),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: AppColors.border),
+            color: isFilterActive ? AppColors.primary : null,
+            border: Border.all(
+              color: isFilterActive ? AppColors.primary : AppColors.border,
+            ),
             borderRadius: BorderRadius.circular(10),
           ),
           child: IconButton(
-            icon: const Icon(Icons.tune_rounded),
+            icon: Icon(
+              Icons.tune_rounded,
+              color: isFilterActive ? AppColors.onPrimary : AppColors.ink,
+            ),
             onPressed: onFilterTap,
           ),
         ),
