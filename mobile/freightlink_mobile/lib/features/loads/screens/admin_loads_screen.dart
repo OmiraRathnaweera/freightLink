@@ -10,7 +10,7 @@ import '../providers/loads_list_provider.dart';
 import '../widgets/load_card.dart';
 import '../widgets/load_list_skeleton.dart';
 import '../widgets/load_search_bar.dart';
-import '../widgets/load_status_filter_sheet.dart';
+import '../widgets/load_status_filter_chips.dart';
 import 'load_detail_screen.dart';
 
 /// **All Loads (Admin)** — every shipper's loads
@@ -61,8 +61,18 @@ class _AdminLoadsBody extends StatelessWidget {
               child: LoadSearchBar(
                 hintText: 'Search load ID, route...',
                 onChanged: provider.onSearchChanged,
-                isFilterActive: provider.statusFilter != null,
-                onFilterTap: () => showLoadStatusFilterSheet(context, provider),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppConstants.spaceLg,
+                AppConstants.spaceMd,
+                AppConstants.spaceLg,
+                0,
+              ),
+              child: LoadStatusFilterChips(
+                selected: provider.statusFilter,
+                onChanged: provider.setStatusFilter,
               ),
             ),
             Expanded(child: _buildBody(context, provider)),
