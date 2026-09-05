@@ -31,16 +31,18 @@ class FreightLinkApp extends StatelessWidget {
         title: AppConstants.appName,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
-        home: const _RootScreen(),
+        home: const RootScreen(),
       ),
     );
   }
 }
 
 /// Switches between the login screen and the app shell based on
-/// [AuthProvider.status], set by `bootstrap()` at startup.
-class _RootScreen extends StatelessWidget {
-  const _RootScreen();
+/// [AuthProvider.status], set by `bootstrap()` at startup. Public (rather
+/// than the usual private-widget convention) so widget tests can pump this
+/// exact routing switch instead of re-implementing a copy of it.
+class RootScreen extends StatelessWidget {
+  const RootScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
