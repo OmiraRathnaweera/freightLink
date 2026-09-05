@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../features/auth/providers/auth_provider.dart';
-import '../../features/loads/screens/admin_loads_screen.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
 import 'app_top_bar.dart';
 import 'coming_soon_placeholder.dart';
@@ -22,26 +19,14 @@ class _AppShellState extends State<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.select<AuthProvider, bool>(
-      (auth) => auth.user?.isAdmin ?? false,
-    );
-
+    // Admin accounts are rejected at login (see AuthProvider) and never
+    // reach this shell, so there's no Admin-only entry point here anymore.
     final tabs = [
       ComingSoonPlaceholder(
         title: 'Dashboard',
         icon: Icons.dashboard_outlined,
         bottomLeading: const AppAvatar(),
-        actions: [
-          const NotificationBellButton(),
-          if (isAdmin)
-            IconButton(
-              tooltip: 'All Loads (Admin)',
-              icon: const Icon(Icons.admin_panel_settings_outlined),
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AdminLoadsScreen()),
-              ),
-            ),
-        ],
+        actions: const [NotificationBellButton()],
       ),
       const MyLoadsScreen(),
       const ComingSoonPlaceholder(

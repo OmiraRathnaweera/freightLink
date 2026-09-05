@@ -55,8 +55,18 @@ class AuthProvider extends ChangeNotifier {
 
     _accessToken = storedToken;
     try {
-      _user = await _fetchCurrentUser();
-      _status = AuthStatus.authenticated;
+      final user = await _fetchCurrentUser();
+      if (user.isAdmin) {
+        // Admin accounts don't get a mobile session — see the note on
+        // login() below. A previously-stored admin token (from before this
+        // restriction existed) is discarded rather than honored.
+        await _tokenStorage.clear();
+        _accessToken = null;
+        _status = AuthStatus.guest;
+      } else {
+        _user = user;
+        _status = AuthStatus.authenticated;
+      }
     } on ApiException {
       await _tokenStorage.clear();
       _accessToken = null;
@@ -79,7 +89,19 @@ class AuthProvider extends ChangeNotifier {
               as Map<String, dynamic>;
       _accessToken = response['accessToken'] as String;
       await _tokenStorage.saveAccessToken(_accessToken!);
-      _user = await _fetchCurrentUser();
+      final user = await _fetchCurrentUser();
+      if (user.isAdmin) {
+        // Admin accounts manage the platform from the web portal, not this
+        // app — reject the session rather than letting an Admin land in a
+        // Shipper-shaped UI with no Admin flows behind it.
+        await _tokenStorage.clear();
+        _accessToken = null;
+        _errorMessage =
+            'Admin accounts can\'t sign in to the mobile app. '
+            'Please use the web portal instead.';
+        return false;
+      }
+      _user = user;
       _status = AuthStatus.authenticated;
       return true;
     } on ApiException catch (error) {
