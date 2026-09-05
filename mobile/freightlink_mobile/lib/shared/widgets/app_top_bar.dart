@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../features/auth/providers/auth_provider.dart';
 
 /// The persistent top bar from the mockups: a leading avatar/back button, a
 /// bold title (with an optional subtitle line), and trailing actions (the
@@ -71,30 +73,116 @@ class _BackButton extends StatelessWidget {
 }
 
 /// The circular avatar shown as the leading widget on top-level tab screens.
+/// Tapping it opens a small menu with the signed-in user's name/email and a
+/// "Log out" action — there's no dedicated account screen yet, so this is
+/// the one place logout is reachable from.
 class AppAvatar extends StatelessWidget {
-  const AppAvatar({super.key, this.initials = 'FL'});
+  const AppAvatar({super.key});
 
-  final String initials;
+  static String _initialsOf(String fullName) {
+    final parts = fullName
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty);
+    final letters = parts.take(2).map((p) => p[0].toUpperCase());
+    final initials = letters.join();
+    return initials.isEmpty ? '?' : initials;
+  }
+
+  Future<void> _confirmLogout(BuildContext context, AuthProvider auth) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text("You'll need to sign in again to continue."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Log out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed ?? false) {
+      await auth.logout();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+    final initials = user == null ? '?' : _initialsOf(user.fullName);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: AppColors.statusNeutralBg,
-        child: Text(
-          initials,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: AppColors.inkMuted,
+      child: PopupMenuButton<String>(
+        tooltip: 'Account',
+        offset: const Offset(0, 44),
+        itemBuilder: (menuContext) => [
+          if (user != null)
+            PopupMenuItem<String>(
+              enabled: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    user.fullName,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    user.email,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.inkMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (user != null) const PopupMenuDivider(),
+          const PopupMenuItem<String>(
+            value: _logoutMenuValue,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.logout_rounded,
+                  size: 18,
+                  color: AppColors.statusErrorFg,
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Log out',
+                  style: TextStyle(color: AppColors.statusErrorFg),
+                ),
+              ],
+            ),
+          ),
+        ],
+        onSelected: (_) => _confirmLogout(context, auth),
+        child: CircleAvatar(
+          radius: 16,
+          backgroundColor: AppColors.statusNeutralBg,
+          child: Text(
+            initials,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: AppColors.inkMuted,
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+const _logoutMenuValue = 'logout';
 
 /// The notification bell trailing action shown on top-level tab screens.
 class NotificationBellButton extends StatelessWidget {
