@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/app_top_bar.dart';
+import '../../../shared/widgets/cancel_reason_dialog.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../data/loads_repository.dart';
@@ -162,34 +163,8 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
   /// the closest real capability: cancel the load (`PATCH .../status` →
   /// Cancelled), which requires a reason.
   Future<void> _cancelLoad(Load editing) async {
-    final reasonController = TextEditingController();
-    final reason = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Cancel this load?'),
-        content: TextField(
-          controller: reasonController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Reason',
-            hintText: 'Why is this load being cancelled?',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Keep load'),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(reasonController.text.trim()),
-            child: const Text('Cancel load'),
-          ),
-        ],
-      ),
-    );
-    reasonController.dispose();
-    if (reason == null || reason.isEmpty || !mounted) return;
+    final reason = await showCancelReasonDialog(context);
+    if (reason == null || !mounted) return;
 
     try {
       final updated = await context.read<LoadsRepository>().cancel(
