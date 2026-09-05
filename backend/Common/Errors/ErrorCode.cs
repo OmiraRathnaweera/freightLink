@@ -32,6 +32,12 @@ public enum ErrorCode
     /// <summary>The authenticated caller's user record could not be found.</summary>
     USER_NOT_FOUND,
 
+    /// <summary>The requested agency could not be found.</summary>
+    AGENCY_NOT_FOUND,
+
+    /// <summary>The agency exists but does not belong to the authenticated caller.</summary>
+    AGENCY_NOT_OWNED,
+
     /// <summary>The requested load could not be found.</summary>
     LOAD_NOT_FOUND,
 
@@ -118,6 +124,52 @@ public enum ErrorCode
     /// <summary>A detach was attempted on a LoadFile attachment that does not exist under the given load.</summary>
     LOAD_FILE_NOT_FOUND,
 
+    /// <summary>No <c>FuelPriceRate</c> exists with the requested id.</summary>
+    FUEL_PRICE_RATE_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>FuelPriceRate</c> row that is already soft-deleted.</summary>
+    FUEL_PRICE_RATE_ALREADY_DELETED,
+
+    /// <summary>No <c>VehicleClassEfficiency</c> exists with the requested id.</summary>
+    VEHICLE_CLASS_EFFICIENCY_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>VehicleClassEfficiency</c> row that is already soft-deleted.</summary>
+    VEHICLE_CLASS_EFFICIENCY_ALREADY_DELETED,
+
+    /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxPayloadKg</c> was not strictly greater than its <c>MinPayloadKg</c> (mirrors <c>ck_vce_payload_bounds</c>).</summary>
+    VEHICLE_CLASS_EFFICIENCY_INVALID_PAYLOAD_BAND,
+
+    /// <summary>A new <c>VehicleClassEfficiency</c> row's payload band overlaps another class's current band.</summary>
+    VEHICLE_CLASS_EFFICIENCY_BAND_OVERLAP,
+
+    /// <summary>A new <c>VehicleClassEfficiency</c> row's payload or volume band would leave a gap in that dimension's coverage.</summary>
+    VEHICLE_CLASS_EFFICIENCY_BAND_GAP,
+
+    /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxVolumeM3</c> was not strictly greater than its <c>MinVolumeM3</c> (mirrors <c>ck_vce_volume_bounds</c>).</summary>
+    VEHICLE_CLASS_EFFICIENCY_INVALID_VOLUME_BAND,
+
+    /// <summary>
+    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, no <c>VehicleClassEfficiency</c>
+    /// tier covers the requested weight/volume, or no current <c>PricingFormulaConfig</c> exists.
+    /// Thrown by <c>IPricingConfigService</c>'s current-value lookups; not raised by <c>LoadService</c>,
+    /// which does not depend on any pricing config existing.
+    /// </summary>
+    PRICING_CONFIG_MISSING,
+
+    /// <summary>No <c>PricingFormulaConfig</c> exists with the requested id.</summary>
+    PRICING_FORMULA_CONFIG_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>PricingFormulaConfig</c> row that is already soft-deleted.</summary>
+    PRICING_FORMULA_CONFIG_ALREADY_DELETED,
+
+    /// <summary>
+    /// <c>POST /internal/pricing/estimate</c> was called with a missing or incorrect
+    /// <c>X-Internal-Api-Key</c> header. Thrown by <c>InternalApiKeyAuthFilter</c> — distinct from
+    /// <see cref="UNAUTHORIZED"/>, which is reserved for JWT failures written directly by the
+    /// JwtBearer handler, not thrown as an <c>ApiException</c>.
+    /// </summary>
+    INTERNAL_API_KEY_INVALID,
+
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
     /// expired, or fails signature/issuer/audience validation. Written by the JwtBearer handler's
@@ -133,6 +185,41 @@ public enum ErrorCode
     FORBIDDEN,
 
     /// <summary>An unhandled exception was caught by the global exception-handling middleware.</summary>
-    INTERNAL_SERVER_ERROR
+    INTERNAL_SERVER_ERROR,
+
+    /// <summary>The SMTP send failed (network/auth/provider failure, not a validation failure) — thrown by <c>GmailEmailService</c>.</summary>
+    EMAIL_SEND_FAILED,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>LoadId</c> that doesn't exist.
+    /// Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    LOAD_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>TriggeredByUserId</c> that
+    /// doesn't exist. Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    USER_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>(LoadId, AttemptNo)</c> pair
+    /// that already has a run (mirrors <c>uq_awr_load_attempt</c>). Each attempt number for a given
+    /// load must be started at most once.
+    /// </summary>
+    WORKFLOW_RUN_DUPLICATE_ATTEMPT,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called with a
+    /// <c>workflowRunId</c> that doesn't exist. Thrown by <c>AgentWorkflowService.ReportStepAsync</c>.
+    /// </summary>
+    WORKFLOW_RUN_NOT_FOUND,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called twice for the same
+    /// <c>(WorkflowRunId, StepNo)</c> pair (mirrors <c>uq_agentstep_order</c>). Each step number for a
+    /// given run may be reported at most once.
+    /// </summary>
+    AGENT_STEP_DUPLICATE
 }
 

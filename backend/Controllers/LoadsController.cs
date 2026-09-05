@@ -11,9 +11,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace FreightLink.Api.Controllers;
 
 /// <summary>
-/// Load management endpoints (Component A): create, read (single/list), edit, and cancel. Deliberately
-/// thin — every action just extracts the caller's identity/role from the access token and delegates to
-/// <see cref="ILoadService"/>, which owns all business rules including ownership enforcement.
+/// Load management endpoints (Component A): create, read (single/list), edit, and change status
+/// (publish/cancel). Deliberately thin — every action just extracts the caller's identity/role from
+/// the access token and delegates to <see cref="ILoadService"/>, which owns all business rules
+/// including ownership enforcement.
 /// </summary>
 [ApiController]
 [Route("api/v1/loads")]
@@ -94,18 +95,20 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
-    /// Cancels a load (a status transition, never a hard delete). Only the owning Shipper may cancel,
-    /// and only from a status that still permits it.
+    /// Changes a load's status — the single endpoint for every Shipper-initiated status change
+    /// (publishing a Draft load to Posted, or cancelling). This is a status transition, never a hard
+    /// delete. Only the owning Shipper may change status, and only into a status/from a status this
+    /// endpoint permits.
     /// </summary>
     /// <param name="id">The load's id.</param>
-    /// <param name="request">The cancellation reason.</param>
+    /// <param name="request">The target status and (when cancelling) the reason.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 with the cancelled <see cref="LoadResponseDto"/>.</returns>
-    [HttpPatch("{id:guid}/cancel")]
+    /// <returns>200 with the <see cref="LoadResponseDto"/> in its new status.</returns>
+    [HttpPatch("{id:guid}/status")]
     [Authorize(Roles = ShipperRole)]
-    public async Task<ActionResult<LoadResponseDto>> Cancel(Guid id, [FromBody] CancelLoadDto request, CancellationToken cancellationToken)
+    public async Task<ActionResult<LoadResponseDto>> ChangeStatus(Guid id, [FromBody] ChangeLoadStatusDto request, CancellationToken cancellationToken)
     {
-        var result = await _loadService.CancelAsync(id, GetCurrentUserId(), request, cancellationToken);
+        var result = await _loadService.ChangeStatusAsync(id, GetCurrentUserId(), request, cancellationToken);
         return Ok(result);
     }
 

@@ -141,3 +141,19 @@ export const ApprovalDecisionType = Object.freeze({
   REJECT: 'Reject',
   REVISE: 'Revise',
 })
+
+// --- Pricing Configuration (ADR-019) ---
+// Fuel grade a FuelPriceRate row prices.
+export const FuelType = Object.freeze({
+  AUTO_DIESEL: 'AutoDiesel',
+  PETROL_92: 'Petrol92',
+  PETROL_95: 'Petrol95',
+  SUPER_DIESEL: 'SuperDiesel',
+})
+
+// Vehicle-class tier a VehicleClassEfficiency row prices.
+export const VehicleClass = Object.freeze({
+  MINI_TRUCK: 'MiniTruck',
+  MEDIUM_LORRY: 'MediumLorry',
+  CONTAINER_TRUCK: 'ContainerTruck',
+})

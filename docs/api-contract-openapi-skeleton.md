@@ -4,7 +4,7 @@
 **Jira:** `Y3S01-15` · Epic: Foundation & Shared Infrastructure (`Y3S01-1`) · Sprint 1 (1–7 Aug 2026)
 **Owner:** Ratnaweera O.V. (Team Leader) — Component C, Agent 3
 **Repository:** https://github.com/OmiraRathnaweera/freightLink
-**Status:** Draft — Sprint 1 skeleton, **Rev. 7**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
+**Status:** Draft — Sprint 1 skeleton, **Rev. 11**. Component owners fill in request/response schema detail as their controllers are implemented (Sprint 2 onward).
 
 ### Change Log
 
@@ -18,6 +18,10 @@
 | 5 | 13 Aug 2026 | Load cancellation changed from `POST /loads/{id}/cancel` to `PATCH /loads/{id}/cancel` — `PATCH` matches its actual semantics (a partial state-transition update), reserving `POST` for resource creation. No change to auth, ownership, or request/response shape. |
 | 6 | 13 Aug 2026 | Load Management hardening: `PUT /loads/{id}` and `PATCH /loads/{id}/cancel` now genuinely use `409 LOAD_CONCURRENCY_CONFLICT` (Postgres `xmin` optimistic concurrency), superseding the earlier claim that no Load endpoint used `409`; `POST /loads` retries internally on a `ReferenceCode` collision before returning `409 LOAD_REFERENCE_CODE_CONFLICT`; `POST /loads`/`PUT /loads/{id}` reject identical pickup/dropoff coordinates with `400 LOAD_PICKUP_DROPOFF_IDENTICAL`; `GET /loads` rejects an out-of-range `page`/`pageSize` combination with `400 LOAD_PAGE_OUT_OF_RANGE` and now paginates deterministically (ties broken by `loadId`) and case-insensitive `search` matching is index-backed (`pg_trgm`). No path, role, or response-shape changes. |
 | 7 | 15 Aug 2026 | Component A file attachments implemented: `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` link an already-uploaded file (from `POST /files/single`) to a load — never re-implements Cloudinary upload/delete, only the `LoadFile` metadata linkage. Also closes a documentation gap (no functional change): `GET /loads` has always supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were documented until now — added the missing `components/parameters` entries and wired them into the path. |
+| 8 | 17 Aug 2026 | `LoadResponse`/`LoadListItem` enriched with `shipperName` (server-resolved from `User.FullName`, joined via the existing `Load.ShipperUser` navigation — no new `/users/{id}` endpoint was added or is planned) so Admin views of loads owned by other Shippers can show a display name instead of only a raw `shipperUserId`. `LoadListItem` also gained `shipperUserId` itself (previously detail-only on `LoadResponse`) so the frontend's id-based fallback label works on list rows too, not just the single-load view. `GET /loads/{id}` also now returns the load's full `LoadStatusHistory` audit trail as `statusHistory` (newest first) directly on the response — this **supersedes** the `GET /loads/{id}/status-history` row below, which will not be built as a separate endpoint. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` responses leave `statusHistory` as an empty array (the caller already knows the single transition it just made). Also documents the frontend side for the first time: the React app's Load Management screens (`frontend/src/features/loads`) and full auth flow (`frontend/src/features/auth`) are now wired against the real backend — `POST/GET /loads`, `GET/PUT /loads/{id}`, `PATCH /loads/{id}/cancel`, the `/loads/{id}/files` attach flow, and all of Section 4.1 (`/auth/*`) — via TanStack Query + Axios (see `frontend/docs/load-management-api.md`). No frontend work exists yet against Sections 4.3–4.6 (Agencies, Assignments/Trips, Billing, Workflows), which also remain unimplemented on the backend. |
+| 9 | 19 Aug 2026 | `PATCH /loads/{id}/cancel` **retired and replaced** by `PATCH /loads/{id}/status` — a single endpoint for every Shipper-initiated load status change, closing the gap that a `Draft` load created without `postImmediately` had no way to later become `Posted`. Request body changes from `CancelLoadRequest` (`{ reason }`) to `ChangeLoadStatusRequest` (`{ status, reason }`); `status` must be `Posted` (publish, no reason) or `Cancelled` (reason required, same `400 LOAD_CANCEL_REASON_REQUIRED` as before) — any other value, including `Matched`/`InTransit`/`Delivered`/`Closed`, is rejected `422 INVALID_LOAD_STATUS_TRANSITION` even though those are legal transitions in `LoadStatusTransitionRules`' graph, since they're reached only by internal processes (the AI matching workflow, trip events), never by this Shipper-facing endpoint. Same role/ownership/concurrency behavior as the old `.../cancel` endpoint it replaces. Frontend's `cancelLoad`/`useCancelLoadMutation` (`loadsApi.js`) now call the new endpoint internally, unchanged externally; new `publishLoad`/`usePublishLoadMutation` added alongside, not yet wired to any UI control. |
+| 10 | 20 Aug 2026 | **`POST /loads/{id}/estimate` (Section 4.2, always "not yet implemented") retired — never built.** Replaced by an internal, non-shipper-facing estimator: `POST /internal/pricing/estimate`, called only by the Agentic AI pipeline (Agent 3) after it has selected a vehicle class and routed the trip via `get_route_and_eta`. Deliberately **outside** the `/api/v1` base path (Section 2), since it is service-to-service, not part of the public API surface (Section 1's scoping note) — guarded by a shared-secret `X-Internal-Api-Key` header, not JWT; carries no role/ownership concept at all. `LoadService` itself remains fully decoupled from pricing (Rev. 9-era refactor, undocumented here previously since it was a removal, not an addition) — this endpoint alone reads `Load.WeightKg` and writes `Load.EstimatedPrice`. Also adds **Section 4.8**, a new Admin-only CRUD resource, `PricingFormulaConfig` (`baseFare`, `ratePerKg`, `driverCostPerKm`, `maintenanceAllowancePerKm`, `marginPercent`), under `/admin/pricing/formula-config` — same append-only/versioned/soft-deleted pattern as the pre-existing (previously undocumented) `/admin/pricing/fuel-rates` and `/admin/pricing/vehicle-efficiency`, which Section 4.8 now documents for the first time alongside it. The estimator combines all three: `ratePerKm = ((fuelPrice.pricePerLitre / 100) × efficiency.fuelConsumptionLPer100Km + driverCostPerKm + maintenanceAllowancePerKm) × (1 + marginPercent)`, then `estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)` — the same ADR-015 formula shape, with `ratePerKm` now derived rather than a flat constant. `marginPercent` is capped `[0, 1]` (100%), matching the frontend's own maximum, enforced by both the DTO's `Range` and a DB `CHECK`. `PUT /loads/{id}` now clears an existing `EstimatedPrice` (sets it back to `null`) whenever the edit changes any of the estimator's inputs — `weightKg`, `volumeM3`, or either coordinate pair — since this edit path has no synchronous re-estimation wired to it and a stale price would otherwise keep showing as if it still reflected the load's current weight/volume/route; unaffected by an edit that changes only non-pricing fields (e.g. `cargoDescription`). `PricingConfigService.GetPricingSnapshotForEstimate` reads all three current config rows as one snapshot under the same in-process lock every config write is serialized by, so the estimator can never combine a pre-write value from one table with a post-write value from another when an Admin write lands mid-estimate. |
+| 11 | 21 Aug 2026 | `PATCH /loads/{id}/cancel`, retired in Rev. 9, is **restored as a compatibility alias** alongside `PATCH /loads/{id}/status` — same auth/ownership/transition rules, delegates internally to the same `ChangeStatusAsync(..., Cancelled)` call with a fixed target status. Request body is the pre-Rev.-9 `CancelLoadRequest` (`{ reason }`) again, not `ChangeLoadStatusRequest`. Kept so any caller still built against the old route (outside this repo's own React client, which already migrated to `.../status` in Rev. 9 and is unchanged) doesn't break; no plan to retire it a second time. |
 
 ---
 
@@ -142,11 +146,12 @@ Query parameters, applied consistently across all `GET` list endpoints:
 |---|---|---|---|
 | POST | `/loads` | Create a load (full form — React; quick-post — Flutter) | Shipper |
 | GET | `/loads` | Search/filter/sort/paginate loads | Shipper (own), Admin (all) |
-| GET | `/loads/{id}` | Load detail incl. status timeline and current `workflowRunId` (if any) | Shipper (own), Admin |
+| GET | `/loads/{id}` | Load detail incl. full status-change history (`statusHistory`, newest first) and current `workflowRunId` (if any) | Shipper (own), Admin |
 | PUT | `/loads/{id}` | Edit a load (only while `Draft`/`Posted`) | Shipper (own) |
-| PATCH | `/loads/{id}/cancel` | Cancel a load — a status transition to `Cancelled`, never a hard delete (ADR-019) | Shipper (own) |
-| POST | `/loads/{id}/estimate` | Price estimate — `baseFare + distanceKm×ratePerKm + weightKg×ratePerKg` (haversine distance) | Shipper *(not yet implemented)* |
-| GET | `/loads/{id}/status-history` | Full status timeline | Shipper (own), Admin *(not yet implemented)* |
+| PATCH | `/loads/{id}/status` | Change a load's status — publish (`Posted`) or cancel (`Cancelled`); every other status is set only by internal processes (Rev. 9, supersedes `.../cancel`) | Shipper (own) |
+| PATCH | `/loads/{id}/cancel` | **Compatibility alias, Rev. 11.** Same effect as `PATCH /loads/{id}/status` with `status: Cancelled`; body is `{ reason }`, not `{ status, reason }`. Kept for callers still built against the pre-Rev.-9 route — this repo's own React client already uses `.../status` and doesn't call this alias | Shipper (own) |
+| ~~POST~~ | ~~`/loads/{id}/estimate`~~ | **Retired, Rev. 10 — never built.** Replaced by the internal-only `POST /internal/pricing/estimate` (Section 4.8), called only by the Agentic AI pipeline, not the Shipper | — |
+| ~~GET~~ | ~~`/loads/{id}/status-history`~~ | **Superseded, Rev. 8** — never built as a separate endpoint; the full timeline now rides along on `GET /loads/{id}`'s `statusHistory` field instead | — |
 | POST | `/loads/{id}/files` | Attach an already-uploaded file (`POST /files/single`) to a load, classified `Manifest`/`Invoice`/`CargoPhoto`/`Other` | Shipper (own) |
 | GET | `/loads/{id}/files` | List attached files | Shipper (own), Admin |
 | DELETE | `/loads/{id}/files/{fileId}` | Detach a file (removes only the `LoadFile` link; the underlying upload is untouched) | Shipper (own) |
@@ -164,6 +169,10 @@ Query parameters, applied consistently across all `GET` list endpoints:
 > **Implemented in Rev. 7:** `POST/GET /loads/{id}/files` and `DELETE /loads/{id}/files/{fileId}` are live in the new `LoadFilesController`/`LoadFileService`. Attach only ever references an already-uploaded file by its Cloudinary `publicId` (obtained from `POST /files/single` beforehand) plus a `fileType` classification — it never re-accepts url/size/contentType from the client, since those already live durably on the `UploadedFile` row created by that prior upload call. Attach can fail with `404 LOAD_NOT_FOUND` (load), `403 LOAD_NOT_OWNED` (not the load's Shipper), `404 LOAD_FILE_UPLOAD_NOT_FOUND` (unknown `publicId`), `403 FILE_NOT_OWNED` (the upload isn't the caller's), or `409 FILE_IN_USE` (the upload is already attached elsewhere — the same code `DELETE /files/{publicId}` already used the other direction). List is Shipper (own) or Admin (any); detach is Shipper (own) only, `404 LOAD_FILE_NOT_FOUND` if the attachment id doesn't exist under that load, `204` on success. Detach removes only the `LoadFile` link — the underlying upload stays deletable afterward via the existing `DELETE /files/{publicId}` once nothing attaches to it.
 >
 > **Documentation gap closed in Rev. 7 (no functional change):** `GET /loads` has supported `search`, `sortBy`, `sortDir`, `shipperUserId`, `createdFrom`, `createdTo` query params since Rev. 4/6, but only `page`/`pageSize`/`status` were ever added to this doc's `components/parameters`/path — the other six are now documented too.
+>
+> **Retired in Rev. 10:** `POST /loads/{id}/estimate` was never implemented and will not be — Component A does not provide a shipper-facing price estimate at all. Pricing is entirely the Agentic AI pipeline's responsibility (Agent 3), computed via the internal-only `POST /internal/pricing/estimate` (Section 4.8) after a candidate agency/vehicle class is selected and the trip is routed. `LoadService` itself never depends on any pricing config existing and never computes `EstimatedPrice` — that column is populated exclusively by the internal estimator.
+>
+> **Implemented in Rev. 8:** `LoadResponse` and `LoadListItem` both gained `shipperName` — resolved server-side from `User.FullName` via the existing `Load.ShipperUser` navigation (an `Include` on the single-row fetches, a JOIN on the list query — no N+1), so an Admin viewing loads across multiple Shippers sees a display name rather than only a raw `shipperUserId`. Falls back to `"Unknown"` if the owning user row can't be resolved. This is a **read-side enrichment only** — no `/users/{id}` lookup endpoint or general user-directory API was added, matching the smallest-change decision recorded for this feature. `LoadListItem` also carries `shipperUserId` alongside `shipperName` (it was previously detail-only, on `LoadResponse`) — the frontend's shared `formatShipperName(shipperName, shipperUserId)` fallback needs both on the same row to render an id-based label when a name can't be resolved, and that fallback was dead code on the list view until this field existed there too. Separately, `GET /loads/{id}` now also returns `statusHistory` (the load's full `LoadStatusHistory` trail, newest first, via a second `Include` on the same query) — this fulfills the `status-history` row above, which is retired as a would-be separate endpoint rather than built. `POST /loads`, `PUT /loads/{id}`, and `PATCH /loads/{id}/cancel` all still return `LoadResponse`, but leave `statusHistory` as `[]`, since a caller of those three already knows the one transition it just triggered.
 
 ### 4.3 Component B — Agency & Fleet Management (Owner: D.B.A.H.W. Bandara)
 
@@ -254,6 +263,30 @@ Query parameters, applied consistently across all `GET` list endpoints:
 >
 > Only image files (`.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, `.bmp`, `.heic`, `.heif`, `.tif`, `.tiff`) and `.pdf` are accepted (allowlist, not a blocklist), max 10 MB each — everything else is rejected with `400 BLOCKED_FILE_TYPE`.
 
+### 4.8 Admin Pricing Configuration & Internal Price Estimator (shared infrastructure for the Agentic AI pipeline)
+
+**Status: Implemented (Rev. 10 for `formula-config` and the internal estimator; `fuel-rates`/`vehicle-efficiency` were implemented earlier but undocumented here until now).** Per **ADR-019/ADR-015**, three Admin-managed reference tables hold every tunable the pricing formula needs — `FuelPriceRate`, `VehicleClassEfficiency`, `PricingFormulaConfig` — all under `/admin/pricing`, all append-only/versioned (`EffectiveFrom`) and soft-deleted (`DeletedAt`/`DeletedByUserId`), never hard-deleted. This data is not consumed anywhere in Component A — `LoadService` create/edit never touches it — it exists solely for the internal price estimator below.
+
+| Method | Path | Description | Roles |
+|---|---|---|---|
+| GET | `/admin/pricing/fuel-rates` | Current price for every fuel type that has one | Admin |
+| GET | `/admin/pricing/fuel-rates/history?fuelType=` | Full history for one fuel type, newest first | Admin |
+| POST | `/admin/pricing/fuel-rates` | Record a new, current fuel price (always inserts, never updates) | Admin |
+| DELETE | `/admin/pricing/fuel-rates/{id}` | Soft-delete a fuel price row | Admin |
+| GET | `/admin/pricing/vehicle-efficiency` | Current figure for every vehicle class that has one | Admin |
+| GET | `/admin/pricing/vehicle-efficiency/history?vehicleClass=` | Full history for one vehicle class, newest first | Admin |
+| POST | `/admin/pricing/vehicle-efficiency` | Record a new, current efficiency figure (rejected on payload/volume band overlap or gap against other classes' current bands) | Admin |
+| DELETE | `/admin/pricing/vehicle-efficiency/{id}` | Soft-delete an efficiency figure | Admin |
+| GET | `/admin/pricing/formula-config` | The single current pricing formula configuration (`baseFare`, `ratePerKg`, `driverCostPerKm`, `maintenanceAllowancePerKm`, `marginPercent`) | Admin |
+| GET | `/admin/pricing/formula-config/history` | Full configuration history, newest first | Admin |
+| POST | `/admin/pricing/formula-config` | Record a new, current configuration (always inserts, never updates) | Admin |
+| DELETE | `/admin/pricing/formula-config/{id}` | Soft-delete a configuration row | Admin |
+| POST | `/internal/pricing/estimate` | Compute and persist `Load.EstimatedPrice` for a load, given an already-selected vehicle class and an already-routed distance | **Internal only — `X-Internal-Api-Key` header, not JWT; no role/ownership concept** |
+
+> **All twelve `/admin/pricing/*` routes are guarded identically**: no ownership concept applies (this is global reference data, not per-Shipper/per-Agency data), so `403` means "not `Admin`," never "not the owner." Every `Create*` write is serialized by a single in-process lock, so two concurrent writes race safely instead of both validating against the same stale snapshot. "Current" selection excludes both soft-deleted and not-yet-effective (`EffectiveFrom` in the future) rows, and ties on `EffectiveFrom` are broken deterministically (`CreatedAt` then id, both descending) — never an arbitrary pick.
+>
+> **`POST /internal/pricing/estimate` is the one endpoint in this entire document that does not carry the `/api/v1` prefix** (Section 2's base-URL convention applies to the public/versioned client-facing surface; this is an internal service-to-service call — see Section 1's scoping note). It accepts exactly `{ loadId, suggestedVehicleClass, distanceKm }`: the caller (Agent 3) has already chosen `suggestedVehicleClass` and already computed `distanceKm` via its own `get_route_and_eta` tool call — this endpoint does **not** infer a vehicle class from `Load.WeightKg`/`VolumeM3` (that's `GetTierForWeightAndVolume`, a *different*, weight/volume-band-based lookup used elsewhere; this endpoint looks up the efficiency figure by the supplied class label directly instead) and does **not** compute distance itself. It fixes fuel type to `AutoDiesel`. On success it writes only `Load.EstimatedPrice` (no new column, no other field touched) and returns the full breakdown (`estimatedPrice`, `distanceKm`, `vehicleClass`, `ratePerKm`, `ratePerKg`, `baseFare`) in the response only — the breakdown itself is not persisted. If any of the three reference tables has no current row for the requested inputs, it fails loudly with `503 PRICING_CONFIG_MISSING` — never a silent hardcoded fallback. Not currently logged to the `ToolCall` table: that table's `ck_toolcall_allowlist` CHECK constraint only permits `ToolName = 'get_route_and_eta'` today, and no service in this codebase writes `ToolCall` rows yet at all for any tool — extending the allowlist is a migration, deliberately out of scope for this revision. If Agent 3 needs an audit trail of this specific call, it is logged on the Python agent side, or added later via its own migration.
+
 ---
 
 ## 5. OpenAPI 3.0 Skeleton
@@ -270,7 +303,7 @@ info:
     FreightMatch LK — freight-matching platform API (SE3090 Assignment 1).
     Consumed identically by the React (Admin / Shipper) and Flutter
     (Shipper-lightweight, Agency Staff, Driver) clients.
-  version: 0.7.0-sprint2-loadfiles-rev7
+  version: 0.8.0-sprint2-loadstatushistory-rev8
 servers:
   - url: /api/v1
     description: Relative base path (host resolved per environment)
@@ -423,7 +456,7 @@ paths:
       - $ref: '#/components/parameters/IdPathParam'
     get:
       tags: [Loads]
-      summary: Load detail incl. status timeline and current workflowRunId
+      summary: Load detail incl. full statusHistory (newest first) and current workflowRunId
       x-allowed-roles: [Shipper, Admin]
       x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED otherwise); Admin may fetch any load"
       responses:
@@ -461,10 +494,17 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
-  /loads/{id}/cancel:
+  /loads/{id}/status:
     patch:
       tags: [Loads]
-      summary: Cancel a load (status transition to Cancelled, never a hard delete — ADR-019)
+      summary: Change a load's status — publish (Posted) or cancel (Cancelled); never a hard delete (ADR-019)
+      description: >
+        The single endpoint for every Shipper-initiated load status change (Rev. 9, supersedes the
+        retired PATCH /loads/{id}/cancel). status must be Posted or Cancelled — every other value,
+        including Matched/InTransit/Delivered/Closed, is rejected 422 INVALID_LOAD_STATUS_TRANSITION
+        even though those are legal transitions in LoadStatusTransitionRules' graph, since they're
+        reached only by internal processes (the AI matching workflow, trip events), never by this
+        Shipper-facing endpoint.
       x-allowed-roles: [Shipper]
       x-ownership-note: "Shipper must own the load (403 LOAD_NOT_OWNED); Admin is role-gated out entirely (403), never reaches an ownership check"
       parameters:
@@ -474,7 +514,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CancelLoadRequest'
+              $ref: '#/components/schemas/ChangeLoadStatusRequest'
       responses:
         '200':
           description: OK
@@ -489,20 +529,9 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
-  # --- Not yet implemented (Component A, planned) ---
-  /loads/{id}/estimate:
-    post:
-      tags: [Loads]
-      summary: Price estimate (baseFare + distanceKm*ratePerKm + weightKg*ratePerKg)
-      parameters:
-        - $ref: '#/components/parameters/IdPathParam'
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PriceEstimate'
+  # --- Retired Rev. 10: POST /loads/{id}/estimate was never implemented and will not be.
+  # Component A has no shipper-facing price estimate — see /internal/pricing/estimate below
+  # (Section 4.8) and the Rev. 10 changelog entry.
 
   # --- Implemented Rev. 7 (Component A) ---
   /loads/{id}/files:
@@ -831,6 +860,102 @@ paths:
                 $ref: '#/components/schemas/FileDeleteResult'
         '403': { $ref: '#/components/responses/Unauthorized' }
 
+  # --- Implemented Rev. 10 (Admin Pricing Configuration, Section 4.8) ---
+  /admin/pricing/formula-config:
+    get:
+      tags: [AdminPricing]
+      summary: Current pricing formula configuration
+      x-allowed-roles: [Admin]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingFormulaConfigResponse'
+        '503': { description: No current configuration exists (PRICING_CONFIG_MISSING) }
+    post:
+      tags: [AdminPricing]
+      summary: Record a new, current pricing formula configuration (always inserts, never updates)
+      x-allowed-roles: [Admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePricingFormulaConfigRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingFormulaConfigResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '403': { $ref: '#/components/responses/Unauthorized' }
+
+  /admin/pricing/formula-config/history:
+    get:
+      tags: [AdminPricing]
+      summary: Full pricing formula configuration history, newest first
+      x-allowed-roles: [Admin]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PricingFormulaConfigResponse' }
+
+  /admin/pricing/formula-config/{id}:
+    delete:
+      tags: [AdminPricing]
+      summary: Soft-delete a pricing formula configuration row
+      x-allowed-roles: [Admin]
+      parameters:
+        - $ref: '#/components/parameters/IdPathParam'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingConfigDeleteResponse'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { description: Already soft-deleted (PRICING_FORMULA_CONFIG_ALREADY_DELETED) }
+
+  # --- Implemented Rev. 10 — internal only, NOT prefixed with /api/v1 (see Section 4.8) ---
+  /internal/pricing/estimate:
+    post:
+      tags: [Internal]
+      summary: Compute and persist Load.EstimatedPrice for an agent-selected vehicle class and agent-routed distance
+      description: >
+        Called only by the Agentic AI pipeline (Agent 3), after selecting a candidate vehicle class
+        and calling get_route_and_eta for a real, ORS-routed distance. Never called by a shipper or
+        any public client. Does not infer vehicle class from Load.WeightKg/VolumeM3 and does not
+        compute distance itself — both are supplied by the caller.
+      x-internal-only: true
+      x-auth: "X-Internal-Api-Key header (shared secret), not JWT — no role/ownership concept"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstimatePricingRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingEstimateResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { description: Missing or incorrect X-Internal-Api-Key header (INTERNAL_API_KEY_INVALID) }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { description: No current fuel price, vehicle-class efficiency, or formula configuration exists (PRICING_CONFIG_MISSING) }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -975,14 +1100,63 @@ components:
         accessToken: { type: string }
         refreshToken: { type: string }
 
-    PriceEstimate:
+    CreatePricingFormulaConfigRequest:
+      type: object
+      description: POST /admin/pricing/formula-config body. Always inserts a new, current row (append-only versioning) — never updates an existing one. All five numeric fields allow zero, so each is required explicitly rather than relying on a non-nullable default.
+      required: [baseFare, ratePerKg, driverCostPerKm, maintenanceAllowancePerKm, marginPercent, source, effectiveFrom]
+      properties:
+        baseFare: { type: number, format: double, minimum: 0 }
+        ratePerKg: { type: number, format: double, minimum: 0 }
+        driverCostPerKm: { type: number, format: double, minimum: 0 }
+        maintenanceAllowancePerKm: { type: number, format: double, minimum: 0 }
+        marginPercent: { type: number, format: double, minimum: 0, maximum: 1, description: "Fraction, not a whole percent — 0.15 means 15%; capped at 1 (100%), matching the frontend's own maximum" }
+        source: { type: string, minLength: 1, maxLength: 500 }
+        effectiveFrom: { type: string, format: date-time }
+
+    PricingFormulaConfigResponse:
       type: object
       properties:
+        pricingFormulaConfigId: { type: string, format: uuid }
+        baseFare: { type: number, format: double }
+        ratePerKg: { type: number, format: double }
+        driverCostPerKm: { type: number, format: double }
+        maintenanceAllowancePerKm: { type: number, format: double }
+        marginPercent: { type: number, format: double }
+        source: { type: string }
+        effectiveFrom: { type: string, format: date-time }
+        setByUserId: { type: string, format: uuid }
+        setByUserName: { type: string }
+        createdAt: { type: string, format: date-time }
+        deletedAt: { type: string, format: date-time, nullable: true }
+        deletedByUserId: { type: string, format: uuid, nullable: true }
+
+    PricingConfigDeleteResponse:
+      type: object
+      description: Response for every DELETE /admin/pricing/* route — a success confirmation only, not the soft-deleted row.
+      properties:
+        message: { type: string }
+        id: { type: string, format: uuid }
+
+    EstimatePricingRequest:
+      type: object
+      description: POST /internal/pricing/estimate body.
+      required: [loadId, suggestedVehicleClass, distanceKm]
+      properties:
+        loadId: { type: string, format: uuid }
+        suggestedVehicleClass: { type: string, enum: [MiniTruck, MediumLorry, ContainerTruck], description: "Agent-selected; not inferred from Load.WeightKg/VolumeM3" }
+        distanceKm: { type: number, format: double, exclusiveMinimum: 0, description: "Agent-routed (ORS), not computed by this endpoint" }
+
+    PricingEstimateResponse:
+      type: object
+      description: Only estimatedPrice is persisted (onto the existing Load.EstimatedPrice column); every other field is response-only.
+      properties:
+        loadId: { type: string, format: uuid }
         estimatedPrice: { type: number, format: double }
         distanceKm: { type: number, format: double }
-        baseFare: { type: number, format: double }
+        vehicleClass: { type: string, enum: [MiniTruck, MediumLorry, ContainerTruck] }
         ratePerKm: { type: number, format: double }
         ratePerKg: { type: number, format: double }
+        baseFare: { type: number, format: double }
 
     CreateLoadRequest:
       type: object
@@ -1025,22 +1199,27 @@ components:
         pickupWindowStart: { type: string, format: date-time }
         pickupWindowEnd: { type: string, format: date-time }
 
-    CancelLoadRequest:
+    ChangeLoadStatusRequest:
       type: object
       description: >
-        PATCH /loads/{id}/cancel body. reason is optional at the schema level but enforced as
-        required by the service before it writes the LoadStatusHistory row (400
+        PATCH /loads/{id}/status body (Rev. 9). status is required and must be Posted or Cancelled —
+        any other value is rejected 422 INVALID_LOAD_STATUS_TRANSITION before reason is even
+        considered. reason is optional at the schema level but enforced as required by the service
+        when status is Cancelled, before it writes the LoadStatusHistory row (400
         LOAD_CANCEL_REASON_REQUIRED if missing/blank) — mirrors LoadStatusHistory's own
-        ck_lsh_cancel_reason CHECK.
+        ck_lsh_cancel_reason CHECK. Ignored when status is Posted.
+      required: [status]
       properties:
+        status: { type: string, enum: [Posted, Cancelled] }
         reason: { type: string, maxLength: 500, nullable: true }
 
     LoadResponse:
       type: object
-      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and PATCH /loads/{id}/cancel.
+      description: Full single-resource response for POST /loads, GET /loads/{id}, PUT /loads/{id}, and PATCH /loads/{id}/status.
       properties:
         loadId: { type: string, format: uuid }
         shipperUserId: { type: string, format: uuid }
+        shipperName: { type: string, description: "Resolved server-side from User.FullName; falls back to \"Unknown\" if the owning user can't be resolved. No /users/{id} endpoint exists — this is the only way either client learns a load owner's display name." }
         referenceCode: { type: string, description: "Server-generated, unique (uq_load_reference)" }
         cargoDescription: { type: string }
         weightKg: { type: number, format: double }
@@ -1058,12 +1237,32 @@ components:
         workflowRunId: { type: string, format: uuid, nullable: true, description: "Always null until Section 4.6's AgentWorkflowRun join is implemented" }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+        statusHistory:
+          type: array
+          description: >
+            Full LoadStatusHistory audit trail, newest first. Only populated by GET /loads/{id} — the
+            POST/PUT/PATCH .../status responses that also return LoadResponse leave this as an empty
+            array, since the caller already knows the single transition it just made.
+          items: { $ref: '#/components/schemas/LoadStatusHistoryResponse' }
+
+    LoadStatusHistoryResponse:
+      type: object
+      description: One recorded LoadStatus transition, as included in LoadResponse.statusHistory.
+      properties:
+        loadStatusHistoryId: { type: string, format: uuid }
+        fromStatus: { type: string, nullable: true, description: "Null only for the load's very first status row" }
+        toStatus: { type: string }
+        reason: { type: string, nullable: true, description: "Set only for transitions that require one (e.g. cancellation)" }
+        changedByUserId: { type: string, format: uuid }
+        changedAt: { type: string, format: date-time }
 
     LoadListItem:
       type: object
-      description: Lightweight row shape used inside PagedLoadResponse.items — omits lat/lng, volume, shipperUserId, and workflowRunId.
+      description: Lightweight row shape used inside PagedLoadResponse.items — omits lat/lng, volume, and workflowRunId (present on LoadResponse only).
       properties:
         loadId: { type: string, format: uuid }
+        shipperUserId: { type: string, format: uuid, description: "Kept on the list row (not detail-only) so a client-side fallback label can identify the owner by id when shipperName falls back to \"Unknown\"" }
+        shipperName: { type: string, description: "Resolved server-side from User.FullName; falls back to \"Unknown\" if the owning user can't be resolved" }
         referenceCode: { type: string }
         cargoDescription: { type: string }
         weightKg: { type: number, format: double }
@@ -1135,7 +1334,6 @@ components:
 
     # --- Skeleton only below this line ---
     # Each owner defines their entity schemas here as their controllers land:
-    #   LoadStatusHistory                         -> Dias H.N.P.K.       (Component A — Load itself done in Rev. 4; LoadFile attachment done in Rev. 7)
     #   Agency, Vehicle, Driver, ComplianceDoc    -> D.B.A.H.W. Bandara  (Component B)
     #   Assignment, Trip, TripEvent, TripEvidence -> Ratnaweera O.V.     (Component C)
     #   Invoice, Dispute                          -> Balasooriya B.K.N.N. (Component D)
