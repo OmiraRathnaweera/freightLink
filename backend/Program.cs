@@ -220,6 +220,7 @@ builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
+builder.Services.AddScoped<ITripService, TripService>();
 
 var app = builder.Build();
 
