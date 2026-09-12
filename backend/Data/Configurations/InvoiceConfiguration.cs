@@ -13,6 +13,12 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
 
         builder.HasIndex(x => x.InvoiceNumber).IsUnique().HasDatabaseName("uq_invoice_number");
 
+        // Explicit name lets InvoiceService.CreateAsync identify this constraint by name
+        // in the PostgresException.ConstraintName when a race between two concurrent
+        // create-for-the-same-trip requests hits the database. Without a stable name the
+        // catch clause cannot distinguish a TripId collision from an InvoiceNumber collision.
+        builder.HasIndex(x => x.TripId).IsUnique().HasDatabaseName("uq_invoice_trip_id");
+
         builder.Property(x => x.Amount).HasPrecision(12, 2);
 
         builder.Property(x => x.CreatedAt).HasDefaultValueSql("now()");

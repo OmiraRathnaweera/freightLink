@@ -27,9 +27,9 @@ public class DisputeService : IDisputeService
     /// <inheritdoc />
     public async Task<DisputeResponseDto> CreateAsync(Guid currentUserId, UserRole role, CreateDisputeDto request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Trim().Length < 5)
+        if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Trim().Length < 10)
         {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Dispute description must be at least 5 characters long.");
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Dispute description must be at least 10 characters long.");
         }
 
         var trip = await _dbContext.Trips
@@ -182,9 +182,9 @@ public class DisputeService : IDisputeService
     /// <inheritdoc />
     public async Task<DisputeResponseDto> UpdateAsync(Guid disputeId, Guid currentUserId, UserRole role, UpdateDisputeDto request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Trim().Length < 5)
+        if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Trim().Length < 10)
         {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Dispute description must be at least 5 characters long.");
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Dispute description must be at least 10 characters long.");
         }
 
         var dispute = await _dbContext.Disputes

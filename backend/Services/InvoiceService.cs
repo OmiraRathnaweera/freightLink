@@ -87,11 +87,36 @@ public class InvoiceService : IInvoiceService
                 await _dbContext.SaveChangesAsync(cancellationToken);
                 break;
             }
-            catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } || ex.InnerException?.Message.Contains("UNIQUE") == true)
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
             {
+                // 23505 = unique_violation. Two separate unique constraints can fire here:
+                //
+                //   uq_invoice_number  – InvoiceNumber collision (random suffix, very rare).
+                //                        Safe to regenerate and retry.
+                //
+                //   uq_invoice_trip_id – A concurrent request for the same TripId committed
+                //                        between the AnyAsync check above (TOCTOU gap) and this
+                //                        SaveChanges call.  Retrying with a new number would
+                //                        fail again on the same constraint, so surface the
+                //                        correct business error immediately.
+                //
+                // Any other constraint name is unexpected; re-throw so it surfaces as an
+                // unhandled exception (→ 500) rather than masking the real cause.
+                if (pgEx.ConstraintName == "uq_invoice_trip_id")
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVOICE_ALREADY_EXISTS_FOR_TRIP,
+                        $"An invoice already exists for trip '{request.TripId}'.");
+                }
+
+                if (pgEx.ConstraintName != "uq_invoice_number")
+                {
+                    throw;
+                }
+
                 if (attempt >= MaxInvoiceNumberGenerationAttempts)
                 {
-                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INTERNAL_SERVER_ERROR, "Could not generate a unique invoice number; please retry.");
+                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LOAD_REFERENCE_CODE_CONFLICT,
+                        "Could not generate a unique invoice number after several attempts; please retry.");
                 }
 
                 invoice.InvoiceNumber = GenerateInvoiceNumber();

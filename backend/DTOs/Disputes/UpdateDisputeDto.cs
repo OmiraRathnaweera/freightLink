@@ -15,6 +15,6 @@ public class UpdateDisputeDto
 
     /// <summary>Detailed description of the issue.</summary>
     [Required]
-    [StringLength(2000, MinimumLength = 5, ErrorMessage = "Description must be between 5 and 2000 characters.")]
+    [StringLength(2000, MinimumLength = 10, ErrorMessage = "Description must be between 10 and 2000 characters.")]
     public string Description { get; set; } = string.Empty;
 }
