@@ -221,6 +221,7 @@ builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 builder.Services.AddScoped<ITripService, TripService>();
+builder.Services.AddScoped<IRouteService, RouteService>();
 
 var app = builder.Build();
 
