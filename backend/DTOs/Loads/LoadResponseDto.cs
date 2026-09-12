@@ -12,6 +12,13 @@ public class LoadResponseDto
     /// <summary>The id of the Shipper user who owns this load.</summary>
     public Guid ShipperUserId { get; set; }
 
+    /// <summary>
+    /// Display name (<see cref="Entities.User.FullName"/>) of the Shipper user who owns this load, for
+    /// Admin views that list/inspect loads across multiple shippers. Falls back to <c>"Unknown"</c> if
+    /// the owning user record could not be resolved.
+    /// </summary>
+    public string ShipperName { get; set; } = string.Empty;
+
     /// <summary>Server-generated, unique reference code for this load.</summary>
     public string ReferenceCode { get; set; } = string.Empty;
 
@@ -62,4 +69,11 @@ public class LoadResponseDto
 
     /// <summary>When the load was last updated.</summary>
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// The load's full status-change audit trail, newest first. Only populated by
+    /// <c>GET /api/v1/loads/{id}</c> — <c>POST</c>/<c>PUT</c>/<c>PATCH .../cancel</c> responses leave
+    /// this as an empty list, since the caller already knows the single transition it just made.
+    /// </summary>
+    public List<LoadStatusHistoryResponseDto> StatusHistory { get; set; } = new();
 }
