@@ -92,6 +92,9 @@ public enum ErrorCode
     /// <summary>The requested trip could not be found.</summary>
     TRIP_NOT_FOUND,
 
+    /// <summary>Invoice generation on delivery requires the trip to be in Delivered status.</summary>
+    TRIP_NOT_DELIVERED,
+
     /// <summary>The requested invoice could not be found.</summary>
     INVOICE_NOT_FOUND,
 

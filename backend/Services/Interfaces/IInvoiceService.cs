@@ -25,4 +25,15 @@ public interface IInvoiceService
 
     /// <summary>Voids/cancels an invoice if it is in a voidable state.</summary>
     Task<InvoiceResponseDto> VoidAsync(Guid invoiceId, Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Auto-generates a placeholder invoice for a trip when it reaches Delivered status (delivery event).
+    /// Uses a fixed placeholder amount until Component A's pricing and Agent 3's matching are wired together.
+    /// </summary>
+    /// <param name="tripId">The delivered trip's ID.</param>
+    /// <param name="currentUserId">Optional ID of the acting user (for authorization check, if user-initiated).</param>
+    /// <param name="role">Optional role of the acting user.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created invoice response DTO.</returns>
+    Task<InvoiceResponseDto> CreateOnTripDeliveredAsync(Guid tripId, Guid? currentUserId = null, UserRole? role = null, CancellationToken cancellationToken = default);
 }

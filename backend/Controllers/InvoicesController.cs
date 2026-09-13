@@ -19,6 +19,7 @@ namespace FreightLink.Api.Controllers;
 public class InvoicesController : ControllerBase
 {
     private const string InvoiceCreationRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
+    private const string DeliveryEventRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver) + "," + nameof(UserRole.Admin);
 
     private readonly IInvoiceService _invoiceService;
 
@@ -37,6 +38,21 @@ public class InvoicesController : ControllerBase
     public async Task<ActionResult<InvoiceResponseDto>> Create([FromBody] CreateInvoiceDto request, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.CreateAsync(GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// Auto-generates a placeholder invoice for a trip that has reached Delivered status (delivery event).
+    /// </summary>
+    /// <param name="tripId">The delivered trip's ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>201 Created with the generated invoice details.</returns>
+    [HttpPost("on-delivery/{tripId:guid}")]
+    [HttpPost("delivery-event/{tripId:guid}")]
+    [Authorize(Roles = DeliveryEventRoles)]
+    public async Task<ActionResult<InvoiceResponseDto>> CreateOnDelivery(Guid tripId, CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.CreateOnTripDeliveredAsync(tripId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }
 

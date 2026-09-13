@@ -20,6 +20,13 @@ namespace FreightLink.Api.Services;
 public class InvoiceService : IInvoiceService
 {
     private const int MaxInvoiceNumberGenerationAttempts = 5;
+
+    /// <summary>
+    /// Placeholder fixed invoice amount (in LKR) used when a trip is delivered,
+    /// until Component A's pricing and Agent 3's matching are wired together.
+    /// </summary>
+    public const decimal PlaceholderInvoiceAmount = 25000.00m;
+
     private readonly AppDbContext _dbContext;
 
     /// <summary>Initializes a new instance of <see cref="InvoiceService"/>.</summary>
@@ -391,6 +398,94 @@ public class InvoiceService : IInvoiceService
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToResponse(invoice);
+    }
+
+    /// <inheritdoc />
+    public async Task<InvoiceResponseDto> CreateOnTripDeliveredAsync(Guid tripId, Guid? currentUserId = null, UserRole? role = null, CancellationToken cancellationToken = default)
+    {
+        var trip = await _dbContext.Trips
+            .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
+            .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
+                    .ThenInclude(ag => ag.Staff)
+            .Include(t => t.Driver)
+            .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
+
+        if (trip is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, $"Trip '{tripId}' was not found.");
+        }
+
+        if (currentUserId.HasValue && role.HasValue)
+        {
+            EnforceTripPartyAuthorization(trip, currentUserId.Value, role.Value);
+        }
+
+        if (trip.Status != TripStatus.Delivered)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.TRIP_NOT_DELIVERED,
+                $"Trip '{tripId}' cannot generate an invoice on delivery because it is in status '{trip.Status}', not 'Delivered'.");
+        }
+
+        var exists = await _dbContext.Invoices.AnyAsync(i => i.TripId == tripId, cancellationToken);
+        if (exists)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVOICE_ALREADY_EXISTS_FOR_TRIP,
+                $"An invoice already exists for trip '{tripId}'.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var invoice = new Invoice
+        {
+            InvoiceId = Guid.NewGuid(),
+            TripId = tripId,
+            InvoiceNumber = GenerateInvoiceNumber(),
+            // Placeholder logic: uses a fixed amount for now as requested.
+            // Once Component A's pricing and Agent 3's matching are wired together, this will use
+            // the real agreed price (e.g., from trip.Assignment.ProposedPrice or pricing calculator).
+            Amount = PlaceholderInvoiceAmount,
+            Currency = "LKR",
+            Status = InvoiceStatus.Issued,
+            IssuedAt = now,
+            DueDate = DateOnly.FromDateTime(now.UtcDateTime.AddDays(7)),
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _dbContext.Invoices.Add(invoice);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                break;
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+            {
+                if (pgEx.ConstraintName == "uq_invoice_trip_id")
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVOICE_ALREADY_EXISTS_FOR_TRIP,
+                        $"An invoice already exists for trip '{tripId}'.");
+                }
+
+                if (pgEx.ConstraintName != "uq_invoice_number")
+                {
+                    throw;
+                }
+
+                if (attempt >= MaxInvoiceNumberGenerationAttempts)
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LOAD_REFERENCE_CODE_CONFLICT,
+                        "Could not generate a unique invoice number after several attempts; please retry.");
+                }
+
+                invoice.InvoiceNumber = GenerateInvoiceNumber();
+            }
+        }
+
         return MapToResponse(invoice);
     }
 

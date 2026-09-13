@@ -362,4 +362,89 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.NotNull(json);
         Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
+
+    [Fact]
+    public async Task PostOnDelivery_WithoutAuth_Returns401()
+    {
+        var response = await _client.PostAsync($"/api/v1/invoices/on-delivery/{Guid.NewGuid()}", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostOnDelivery_AuthenticatedShipper_CreatesAndReturns201()
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var token = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+
+        var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponseDto>();
+        Assert.NotNull(invoice);
+        Assert.Equal(trip.TripId, invoice.TripId);
+        Assert.Equal(25000m, invoice.Amount);
+        Assert.Equal("LKR", invoice.Currency);
+        Assert.Equal(InvoiceStatus.Issued, invoice.Status);
+    }
+
+    [Fact]
+    public async Task PostOnDelivery_WhenTripNotDelivered_Returns422()
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var tripEntity = await db.Trips.FindAsync(trip.TripId);
+            tripEntity!.Status = TripStatus.InTransit;
+            await db.SaveChangesAsync();
+        }
+
+        var token = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+
+        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
+        Assert.NotNull(json);
+        Assert.Equal("TRIP_NOT_DELIVERED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task PostOnDelivery_WhenNotOwned_Returns403()
+    {
+        var (_, _, _, trip) = await SeedTripDataAsync();
+        var randomUserId = Guid.NewGuid();
+        var token = MintToken(randomUserId, UserRole.Shipper);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PostOnDelivery_WhenAlreadyExists_Returns409()
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var token = MintToken(shipper.UserId, UserRole.Shipper);
+
+        // First call creates the invoice
+        var req1 = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
+        req1.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var res1 = await _client.SendAsync(req1);
+        Assert.Equal(HttpStatusCode.Created, res1.StatusCode);
+
+        // Second call should conflict
+        var req2 = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
+        req2.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var res2 = await _client.SendAsync(req2);
+        Assert.Equal(HttpStatusCode.Conflict, res2.StatusCode);
+    }
 }
