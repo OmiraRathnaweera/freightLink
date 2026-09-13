@@ -18,6 +18,10 @@ public class UpdateInvoiceDto
     [StringLength(10, MinimumLength = 3)]
     public string Currency { get; set; } = "LKR";
 
-    /// <summary>Optional due date for the invoice.</summary>
+    /// <summary>
+    /// Optional due date for the invoice. When supplied, must not be earlier than the
+    /// invoice's existing issuance date (UTC) — enforced by service validation and the
+    /// <c>ck_invoice_due</c> database constraint.
+    /// </summary>
     public DateOnly? DueDate { get; set; }
 }

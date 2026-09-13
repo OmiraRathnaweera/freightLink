@@ -115,6 +115,13 @@ public enum ErrorCode
     /// <summary>An invalid invoice amount was supplied.</summary>
     INVALID_INVOICE_AMOUNT,
 
+    /// <summary>
+    /// The supplied <c>DueDate</c> falls before the invoice's issuance date.
+    /// The database constraint <c>ck_invoice_due</c> requires
+    /// <c>DueDate &gt;= (IssuedAt AT TIME ZONE 'UTC')::date</c>.
+    /// </summary>
+    INVALID_INVOICE_DUE_DATE,
+
     /// <summary>The requested dispute could not be found.</summary>
     DISPUTE_NOT_FOUND,
 

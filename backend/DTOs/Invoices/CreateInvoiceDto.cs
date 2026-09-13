@@ -21,7 +21,11 @@ public class CreateInvoiceDto
     [StringLength(10, MinimumLength = 3)]
     public string Currency { get; set; } = "LKR";
 
-    /// <summary>Optional due date for the invoice.</summary>
+    /// <summary>
+    /// Optional due date for the invoice. When supplied, must not be earlier than today (UTC),
+    /// as the invoice's <c>IssuedAt</c> is set to the current UTC date on creation
+    /// (<c>ck_invoice_due</c>: <c>DueDate &gt;= (IssuedAt AT TIME ZONE 'UTC')::date</c>).
+    /// </summary>
     public DateOnly? DueDate { get; set; }
 
     /// <summary>If true, creates the invoice directly in 'Issued' status instead of 'Draft'.</summary>

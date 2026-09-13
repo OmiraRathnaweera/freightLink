@@ -34,6 +34,12 @@ public class InvoiceService : IInvoiceService
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_INVOICE_AMOUNT, "Invoice amount must be greater than zero.");
         }
 
+        if (request.DueDate.HasValue && request.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_DUE_DATE,
+                "DueDate cannot be earlier than today (UTC); the invoice is issued on the current date.");
+        }
+
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Load)
@@ -266,6 +272,12 @@ public class InvoiceService : IInvoiceService
         if (!InvoiceStatusTransitionRules.CanEdit(invoice.Status))
         {
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_STATUS_TRANSITION, $"Invoice in status '{invoice.Status}' cannot be edited.");
+        }
+
+        if (request.DueDate.HasValue && request.DueDate.Value < DateOnly.FromDateTime(invoice.IssuedAt.UtcDateTime))
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_DUE_DATE,
+                $"DueDate cannot be earlier than the invoice's issuance date ({DateOnly.FromDateTime(invoice.IssuedAt.UtcDateTime):yyyy-MM-dd}).");
         }
 
         invoice.Amount = request.Amount;
