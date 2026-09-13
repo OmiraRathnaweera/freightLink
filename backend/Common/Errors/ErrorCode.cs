@@ -133,6 +133,13 @@ public enum ErrorCode
 
     /// <summary>The dispute has already been resolved or rejected.</summary>
     DISPUTE_ALREADY_RESOLVED,
+
+    /// <summary>
+    /// A dispute in status <c>Open</c> or <c>UnderReview</c> already exists for this
+    /// (TripId, Category) combination. The database unique partial index
+    /// <c>ux_dispute_open</c> enforces at most one live dispute per trip per category.
+    /// </summary>
+    DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
     /// <summary>An attach was attempted referencing an UploadedFile publicId that does not exist.</summary>
     LOAD_FILE_UPLOAD_NOT_FOUND,
 

@@ -325,4 +325,58 @@ public class DisputeServiceTests
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
         Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
     }
+
+    [Fact]
+    public async Task CreateAsync_DuplicateLiveDisputeSameTripAndCategory_ThrowsConflict()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        // First dispute — must succeed.
+        await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Cargo damaged on first delivery attempt."
+        });
+
+        // Second dispute with the same (TripId, Category) while the first is still Open.
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Cargo still damaged on second inspection."
+        }));
+
+        Assert.Equal(HttpStatusCode.Conflict, ex.StatusCode);
+        Assert.Equal(ErrorCode.DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY, ex.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_DifferentCategorySameTrip_Succeeds()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        // One live Damage dispute.
+        await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Cargo damaged on arrival at destination."
+        });
+
+        // Different category — must be allowed independently.
+        var result = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Billing,
+            Description = "Overcharged for the delivery service."
+        });
+
+        Assert.Equal(DisputeCategory.Billing, result.Category);
+        Assert.Equal(DisputeStatus.Open, result.Status);
+    }
 }

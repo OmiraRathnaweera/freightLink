@@ -8,6 +8,7 @@ using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FreightLink.Api.Services;
 
@@ -48,6 +49,24 @@ public class DisputeService : IDisputeService
 
         EnforceTripPartyAuthorization(trip, currentUserId, role);
 
+        // Application-level pre-check: gives a readable 409 on the normal (non-concurrent) path
+        // and avoids a round-trip to SaveChanges when the caller can clearly see the conflict.
+        // This check is NOT a substitute for the catch below — two concurrent requests that both
+        // pass this check can still race to SaveChanges and hit ux_dispute_open simultaneously.
+        var liveStatuses = new[] { DisputeStatus.Open, DisputeStatus.UnderReview };
+        var liveDuplicateExists = await _dbContext.Disputes.AnyAsync(
+            d => d.TripId == request.TripId
+              && d.Category == request.Category
+              && liveStatuses.Contains(d.Status),
+            cancellationToken);
+
+        if (liveDuplicateExists)
+        {
+            throw new ApiException(HttpStatusCode.Conflict,
+                ErrorCode.DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
+                $"An open dispute for category '{request.Category}' already exists for trip '{request.TripId}'.");
+        }
+
         var now = DateTimeOffset.UtcNow;
         var dispute = new Dispute
         {
@@ -62,7 +81,26 @@ public class DisputeService : IDisputeService
         };
 
         _dbContext.Disputes.Add(dispute);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
+        {
+            // 23505 = unique_violation. The only unique index on Disputes that a CreateAsync
+            // call can violate is ux_dispute_open (TripId, Category) filtered to Open/UnderReview.
+            // Any other constraint name is unexpected — re-throw so it surfaces as a real 500
+            // rather than silently masking the cause.
+            if (pgEx.ConstraintName == "ux_dispute_open")
+            {
+                throw new ApiException(HttpStatusCode.Conflict,
+                    ErrorCode.DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
+                    $"An open dispute for category '{request.Category}' already exists for trip '{request.TripId}'.");
+            }
+
+            throw;
+        }
 
         return MapToResponse(dispute);
     }
