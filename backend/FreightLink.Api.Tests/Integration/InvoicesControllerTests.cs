@@ -292,4 +292,74 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.NotNull(voidedInvoice);
         Assert.Equal(InvoiceStatus.Void, voidedInvoice.Status);
     }
+
+    [Theory]
+    [InlineData("US1")]
+    [InlineData("ABCD")]
+    [InlineData("dollars")]
+    [InlineData("USDT")]
+    public async Task PostInvoice_InvalidCurrency_Returns400ValidationError(string invalidCurrency)
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var token = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new
+            {
+                tripId = trip.TripId,
+                amount = 25000m,
+                currency = invalidCurrency
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
+        Assert.NotNull(json);
+        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
+    [Theory]
+    [InlineData("US1")]
+    [InlineData("ABCD")]
+    [InlineData("dollars")]
+    [InlineData("USDT")]
+    public async Task PutInvoice_InvalidCurrency_Returns400ValidationError(string invalidCurrency)
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var token = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                Amount = 18000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var createRes = await _client.SendAsync(createReq);
+        var createdInvoice = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>())!;
+
+        var updateReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/invoices/{createdInvoice.InvoiceId}")
+        {
+            Content = JsonContent.Create(new
+            {
+                amount = 19000m,
+                currency = invalidCurrency
+            })
+        };
+        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var updateRes = await _client.SendAsync(updateReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, updateRes.StatusCode);
+        var json = await updateRes.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
+        Assert.NotNull(json);
+        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
 }

@@ -489,4 +489,73 @@ public class InvoiceServiceTests
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
         Assert.Equal(ErrorCode.INVOICE_NOT_OWNED, ex.Code);
     }
+
+    [Theory]
+    [InlineData("US1")]
+    [InlineData("ABCD")]
+    [InlineData("dollars")]
+    [InlineData("USDT")]
+    public async Task CreateAsync_InvalidCurrency_ThrowsValidationError(string invalidCurrency)
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                Amount = 15000m,
+                Currency = invalidCurrency
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, ex.Code);
+    }
+
+    [Theory]
+    [InlineData("US1")]
+    [InlineData("ABCD")]
+    [InlineData("dollars")]
+    [InlineData("USDT")]
+    public async Task UpdateAsync_InvalidCurrency_ThrowsValidationError(string invalidCurrency)
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            Amount = 15000m,
+            Currency = "LKR"
+        });
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.UpdateAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper, new UpdateInvoiceDto
+            {
+                Amount = 16000m,
+                Currency = invalidCurrency
+            }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, ex.Code);
+    }
+
+    [Fact]
+    public async Task CreateAsync_ValidLowercaseCurrency_NormalizesToUpper()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            Amount = 15000m,
+            Currency = "usd"
+        });
+
+        Assert.Equal("USD", created.Currency);
+    }
 }

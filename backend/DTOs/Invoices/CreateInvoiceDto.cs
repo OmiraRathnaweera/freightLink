@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using FreightLink.Api.Common.Validation;
 
 namespace FreightLink.Api.DTOs.Invoices;
 
@@ -16,9 +17,10 @@ public class CreateInvoiceDto
     [Range(0.01, 100_000_000, ErrorMessage = "Amount must be greater than zero.")]
     public decimal Amount { get; set; }
 
-    /// <summary>Currency code (e.g. LKR, USD). Defaults to LKR.</summary>
+    /// <summary>ISO-4217 currency code (exactly three uppercase letters, e.g. LKR, USD). Defaults to LKR.</summary>
     [Required]
-    [StringLength(10, MinimumLength = 3)]
+    [RegularExpression(InvoicePatterns.CurrencyCodePattern,
+        ErrorMessage = "Currency must be a valid ISO-4217 code: exactly three uppercase letters (e.g. LKR, USD).")]
     public string Currency { get; set; } = "LKR";
 
     /// <summary>

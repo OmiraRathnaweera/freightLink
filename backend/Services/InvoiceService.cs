@@ -9,6 +9,8 @@ using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using System.Text.RegularExpressions;
+using FreightLink.Api.Common.Validation;
 
 namespace FreightLink.Api.Services;
 
@@ -32,6 +34,13 @@ public class InvoiceService : IInvoiceService
         if (request.Amount <= 0)
         {
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_INVOICE_AMOUNT, "Invoice amount must be greater than zero.");
+        }
+
+        var currency = string.IsNullOrWhiteSpace(request.Currency) ? "LKR" : request.Currency.Trim().ToUpperInvariant();
+        if (!Regex.IsMatch(currency, InvoicePatterns.CurrencyCodePattern))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR,
+                "Currency must be a valid ISO-4217 code: exactly three uppercase letters (e.g. LKR, USD).");
         }
 
         if (request.DueDate.HasValue && request.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
@@ -76,7 +85,7 @@ public class InvoiceService : IInvoiceService
             TripId = request.TripId,
             InvoiceNumber = GenerateInvoiceNumber(),
             Amount = request.Amount,
-            Currency = string.IsNullOrWhiteSpace(request.Currency) ? "LKR" : request.Currency.Trim().ToUpperInvariant(),
+            Currency = currency,
             Status = initialStatus,
             // Drafts have no issued timestamp yet; IssuedAt is set when the invoice transitions
             // to Issued (either here via IssueImmediately, or later via UpdateStatusAsync).
@@ -254,6 +263,13 @@ public class InvoiceService : IInvoiceService
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_INVOICE_AMOUNT, "Invoice amount must be greater than zero.");
         }
 
+        var currency = string.IsNullOrWhiteSpace(request.Currency) ? "LKR" : request.Currency.Trim().ToUpperInvariant();
+        if (!Regex.IsMatch(currency, InvoicePatterns.CurrencyCodePattern))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR,
+                "Currency must be a valid ISO-4217 code: exactly three uppercase letters (e.g. LKR, USD).");
+        }
+
         var invoice = await _dbContext.Invoices
             .Include(i => i.Trip)
                 .ThenInclude(t => t.Assignment)
@@ -294,7 +310,7 @@ public class InvoiceService : IInvoiceService
         }
 
         invoice.Amount = request.Amount;
-        invoice.Currency = string.IsNullOrWhiteSpace(request.Currency) ? "LKR" : request.Currency.Trim().ToUpperInvariant();
+        invoice.Currency = currency;
         invoice.DueDate = request.DueDate;
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
 
