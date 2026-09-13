@@ -83,21 +83,11 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// Connection string comes only from ConnectionStrings:DefaultConnection (env var
-// CONNECTIONSTRINGS__DEFAULTCONNECTION) — never hardcoded in appsettings.json. The mixed-case
-// section/key names here vs. .env.example's SCREAMING_CASE are not a mismatch to fix: ASP.NET
-// Core's environment-variable configuration provider maps "__" to ":" and every configuration
-// lookup (GetSection, GetConnectionString, the [] indexer) is case-insensitive by design, so
-// "ConnectionStrings:DefaultConnection" and "CONNECTIONSTRINGS__DEFAULTCONNECTION" are the same
-// key — deliberately keeping C# lookups in the PascalCase that matches the bound POCO property
-// names (e.g. JwtOptions.Issuer below), rather than forcing ALL-CAPS C# to visually match the env
-// var spelling, which the "__"-to-":" translation would make misleading anyway.
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// JWT settings (Jwt:* / JWT__* env vars) used both to bind JwtOptions for DI and, immediately
-// below, to configure the JwtBearer handler's signing-key/issuer/audience validation. Same
-// case-insensitive "__"-to-":" mapping as the connection string above.
+
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtOptions>(jwtSection);
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
@@ -217,6 +207,8 @@ builder.Services.AddScoped<ILoadService, LoadService>();
 builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();

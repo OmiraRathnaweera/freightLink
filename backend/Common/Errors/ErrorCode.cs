@@ -89,6 +89,57 @@ public enum ErrorCode
     /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
     FILE_IN_USE,
 
+    /// <summary>The requested trip could not be found.</summary>
+    TRIP_NOT_FOUND,
+
+    /// <summary>The requested invoice could not be found.</summary>
+    INVOICE_NOT_FOUND,
+
+    /// <summary>The invoice exists but does not belong to the caller's organization/role.</summary>
+    INVOICE_NOT_OWNED,
+
+    /// <summary>An invoice already exists for this trip (1-to-1 relationship enforced).</summary>
+    INVOICE_ALREADY_EXISTS_FOR_TRIP,
+
+    /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_INVOICE_STATUS_TRANSITION,
+
+    /// <summary>
+    /// A status transition targeting <c>Paid</c> or <c>Failed</c> was attempted via the public
+    /// user-facing status endpoint. Those statuses are exclusively managed by the
+    /// signature-verified payment-gateway webhook and may never be set directly by an
+    /// authenticated application user.
+    /// </summary>
+    INVOICE_STATUS_GATEWAY_OWNED,
+
+    /// <summary>An invalid invoice amount was supplied.</summary>
+    INVALID_INVOICE_AMOUNT,
+
+    /// <summary>
+    /// The supplied <c>DueDate</c> falls before the invoice's issuance date.
+    /// The database constraint <c>ck_invoice_due</c> requires
+    /// <c>DueDate &gt;= (IssuedAt AT TIME ZONE 'UTC')::date</c>.
+    /// </summary>
+    INVALID_INVOICE_DUE_DATE,
+
+    /// <summary>The requested dispute could not be found.</summary>
+    DISPUTE_NOT_FOUND,
+
+    /// <summary>The dispute exists but does not belong to the authenticated caller.</summary>
+    DISPUTE_NOT_OWNED,
+
+    /// <summary>A dispute mutation or resolution was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_DISPUTE_STATUS_TRANSITION,
+
+    /// <summary>The dispute has already been resolved or rejected.</summary>
+    DISPUTE_ALREADY_RESOLVED,
+
+    /// <summary>
+    /// A dispute in status <c>Open</c> or <c>UnderReview</c> already exists for this
+    /// (TripId, Category) combination. The database unique partial index
+    /// <c>ux_dispute_open</c> enforces at most one live dispute per trip per category.
+    /// </summary>
+    DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
     /// <summary>An attach was attempted referencing an UploadedFile publicId that does not exist.</summary>
     LOAD_FILE_UPLOAD_NOT_FOUND,
 
@@ -193,3 +244,4 @@ public enum ErrorCode
     /// </summary>
     AGENT_STEP_DUPLICATE
 }
+

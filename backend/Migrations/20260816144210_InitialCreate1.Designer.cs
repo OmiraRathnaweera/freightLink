@@ -3,6 +3,7 @@ using System;
 using FreightLink.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FreightLink.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260816144210_InitialCreate1")]
+    partial class InitialCreate1
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -582,60 +585,6 @@ namespace FreightLink.Api.Migrations
                     b.ToTable("Drivers");
                 });
 
-            modelBuilder.Entity("FreightLink.Api.Entities.FuelPriceRate", b =>
-                {
-                    b.Property<Guid>("FuelPriceRateId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("EffectiveFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("FuelType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("PricePerLitre")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("SetByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("FuelPriceRateId");
-
-                    b.HasIndex("DeletedByUserId");
-
-                    b.HasIndex("SetByUserId");
-
-                    b.HasIndex("FuelType", "EffectiveFrom");
-
-                    b.ToTable("FuelPriceRates", t =>
-                        {
-                            t.HasCheckConstraint("ck_fpr_price_positive", "\"PricePerLitre\" > 0");
-                        });
-                });
-
             modelBuilder.Entity("FreightLink.Api.Entities.Invoice", b =>
                 {
                     b.Property<Guid>("InvoiceId")
@@ -663,7 +612,7 @@ namespace FreightLink.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset?>("IssuedAt")
+                    b.Property<DateTimeOffset>("IssuedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
@@ -685,8 +634,7 @@ namespace FreightLink.Api.Migrations
                         .HasDatabaseName("uq_invoice_number");
 
                     b.HasIndex("TripId")
-                        .IsUnique()
-                        .HasDatabaseName("uq_invoice_trip_id");
+                        .IsUnique();
 
                     b.ToTable("Invoices", t =>
                         {
@@ -694,7 +642,7 @@ namespace FreightLink.Api.Migrations
 
                             t.HasCheckConstraint("ck_invoice_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
 
-                            t.HasCheckConstraint("ck_invoice_due", "\"DueDate\" IS NULL OR \"IssuedAt\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
+                            t.HasCheckConstraint("ck_invoice_due", "\"DueDate\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
                         });
                 });
 
@@ -1091,76 +1039,6 @@ namespace FreightLink.Api.Migrations
                     b.ToTable("PaymentWebhookEvents", t =>
                         {
                             t.HasCheckConstraint("ck_pwe_error", "\"ProcessingStatus\" <> 'Error' OR \"ErrorMessage\" IS NOT NULL");
-                        });
-                });
-
-            modelBuilder.Entity("FreightLink.Api.Entities.PricingFormulaConfig", b =>
-                {
-                    b.Property<Guid>("PricingFormulaConfigId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<decimal>("BaseFare")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("DriverCostPerKm")
-                        .HasColumnType("numeric");
-
-                    b.Property<DateTimeOffset>("EffectiveFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("MaintenanceAllowancePerKm")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("MarginPercent")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("RatePerKg")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("SetByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("PricingFormulaConfigId");
-
-                    b.HasIndex("DeletedByUserId");
-
-                    b.HasIndex("EffectiveFrom");
-
-                    b.HasIndex("SetByUserId");
-
-                    b.ToTable("PricingFormulaConfigs", t =>
-                        {
-                            t.HasCheckConstraint("ck_pfc_base_fare_bounds", "\"BaseFare\" >= 0");
-
-                            t.HasCheckConstraint("ck_pfc_driver_cost_bounds", "\"DriverCostPerKm\" >= 0");
-
-                            t.HasCheckConstraint("ck_pfc_maintenance_allowance_bounds", "\"MaintenanceAllowancePerKm\" >= 0");
-
-                            t.HasCheckConstraint("ck_pfc_margin_percent_bounds", "\"MarginPercent\" >= 0 AND \"MarginPercent\" <= 1");
-
-                            t.HasCheckConstraint("ck_pfc_rate_per_kg_bounds", "\"RatePerKg\" >= 0");
                         });
                 });
 
@@ -1604,76 +1482,6 @@ namespace FreightLink.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FreightLink.Api.Entities.VehicleClassEfficiency", b =>
-                {
-                    b.Property<Guid>("VehicleClassEfficiencyId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<string>("ClassLabel")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("EffectiveFrom")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("FuelConsumptionLPer100Km")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("MaxPayloadKg")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("MaxVolumeM3")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("MinPayloadKg")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("MinVolumeM3")
-                        .HasColumnType("numeric");
-
-                    b.Property<Guid>("SetByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Source")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("VehicleClassEfficiencyId");
-
-                    b.HasIndex("DeletedByUserId");
-
-                    b.HasIndex("SetByUserId");
-
-                    b.HasIndex("ClassLabel", "EffectiveFrom");
-
-                    b.ToTable("VehicleClassEfficiencies", t =>
-                        {
-                            t.HasCheckConstraint("ck_vce_consumption_positive", "\"FuelConsumptionLPer100Km\" > 0");
-
-                            t.HasCheckConstraint("ck_vce_payload_bounds", "\"MinPayloadKg\" >= 0 AND (\"MaxPayloadKg\" IS NULL OR \"MaxPayloadKg\" > \"MinPayloadKg\")");
-
-                            t.HasCheckConstraint("ck_vce_volume_bounds", "\"MinVolumeM3\" >= 0 AND (\"MaxVolumeM3\" IS NULL OR \"MaxVolumeM3\" > \"MinVolumeM3\")");
-                        });
-                });
-
             modelBuilder.Entity("FreightLink.Api.Entities.AgencyStaff", b =>
                 {
                     b.HasOne("FreightLink.Api.Entities.Agency", "Agency")
@@ -1875,24 +1683,6 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("FreightLink.Api.Entities.FuelPriceRate", b =>
-                {
-                    b.HasOne("FreightLink.Api.Entities.User", "DeletedByUser")
-                        .WithMany()
-                        .HasForeignKey("DeletedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FreightLink.Api.Entities.User", "SetByUser")
-                        .WithMany()
-                        .HasForeignKey("SetByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("DeletedByUser");
-
-                    b.Navigation("SetByUser");
-                });
-
             modelBuilder.Entity("FreightLink.Api.Entities.Invoice", b =>
                 {
                     b.HasOne("FreightLink.Api.Entities.Trip", "Trip")
@@ -2000,24 +1790,6 @@ namespace FreightLink.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Invoice");
-                });
-
-            modelBuilder.Entity("FreightLink.Api.Entities.PricingFormulaConfig", b =>
-                {
-                    b.HasOne("FreightLink.Api.Entities.User", "DeletedByUser")
-                        .WithMany()
-                        .HasForeignKey("DeletedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FreightLink.Api.Entities.User", "SetByUser")
-                        .WithMany()
-                        .HasForeignKey("SetByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("DeletedByUser");
-
-                    b.Navigation("SetByUser");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.RefreshToken", b =>
@@ -2138,24 +1910,6 @@ namespace FreightLink.Api.Migrations
                         .IsRequired();
 
                     b.Navigation("Agency");
-                });
-
-            modelBuilder.Entity("FreightLink.Api.Entities.VehicleClassEfficiency", b =>
-                {
-                    b.HasOne("FreightLink.Api.Entities.User", "DeletedByUser")
-                        .WithMany()
-                        .HasForeignKey("DeletedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("FreightLink.Api.Entities.User", "SetByUser")
-                        .WithMany()
-                        .HasForeignKey("SetByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("DeletedByUser");
-
-                    b.Navigation("SetByUser");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.Agency", b =>
