@@ -10,6 +10,7 @@ public class ResolveDisputeDto
 {
     /// <summary>The formal outcome of the dispute resolution.</summary>
     [Required]
+    [EnumDataType(typeof(DisputeOutcome), ErrorMessage = "Outcome must be a valid DisputeOutcome value.")]
     public DisputeOutcome Outcome { get; set; }
 
     /// <summary>Resolution notes / justification by the adjudicator.</summary>

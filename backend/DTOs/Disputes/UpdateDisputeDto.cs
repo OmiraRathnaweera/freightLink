@@ -11,6 +11,7 @@ public class UpdateDisputeDto
 {
     /// <summary>The revised category of the dispute.</summary>
     [Required]
+    [EnumDataType(typeof(DisputeCategory), ErrorMessage = "Category must be a valid DisputeCategory value.")]
     public DisputeCategory Category { get; set; }
 
     /// <summary>Detailed description of the issue.</summary>

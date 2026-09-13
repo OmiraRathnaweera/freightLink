@@ -236,7 +236,18 @@ public class DisputeService : IDisputeService
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.DISPUTE_ALREADY_RESOLVED, $"Dispute is already in terminal status '{dispute.Status}'.");
         }
 
-        var nextStatus = request.Outcome == DisputeOutcome.Rejected ? DisputeStatus.Rejected : DisputeStatus.Resolved;
+        // Map outcome → terminal dispute status explicitly so that every defined DisputeOutcome
+        // member has a deliberate mapping and any undefined numeric value that bypasses DTO
+        // model-binding (e.g. a direct service call) is rejected here rather than silently
+        // falling into the Resolved branch via the former "!= Rejected ⇒ Resolved" ternary.
+        var nextStatus = request.Outcome switch
+        {
+            DisputeOutcome.Upheld          => DisputeStatus.Resolved,
+            DisputeOutcome.PartiallyUpheld => DisputeStatus.Resolved,
+            DisputeOutcome.Rejected        => DisputeStatus.Rejected,
+            _ => throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR,
+                     $"'{request.Outcome}' is not a valid dispute outcome.")
+        };
         var now = DateTimeOffset.UtcNow;
 
         var resolution = dispute.Resolution;
