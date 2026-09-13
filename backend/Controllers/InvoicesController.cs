@@ -80,6 +80,7 @@ public class InvoicesController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the transitioned invoice.</returns>
     [HttpPatch("{id:guid}/status")]
+    [Authorize(Roles = InvoiceCreationRoles)]
     public async Task<ActionResult<InvoiceResponseDto>> UpdateStatus(Guid id, [FromBody] UpdateInvoiceStatusDto request, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.UpdateStatusAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);

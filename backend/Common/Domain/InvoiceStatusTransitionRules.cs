@@ -20,6 +20,20 @@ public static class InvoiceStatusTransitionRules
     public static readonly IReadOnlySet<InvoiceStatus> VoidableStatuses =
         new HashSet<InvoiceStatus> { InvoiceStatus.Draft, InvoiceStatus.Issued, InvoiceStatus.PaymentPending, InvoiceStatus.Failed };
 
+    /// <summary>
+    /// Statuses that may only be written by the signature-verified payment-gateway webhook.
+    /// Authenticated users must never be permitted to drive an invoice into one of these states
+    /// directly; doing so would bypass the gateway's signature verification entirely.
+    /// </summary>
+    public static readonly IReadOnlySet<InvoiceStatus> GatewayOwnedStatuses =
+        new HashSet<InvoiceStatus> { InvoiceStatus.Paid, InvoiceStatus.Failed };
+
+    /// <summary>
+    /// Returns <c>true</c> when <paramref name="status"/> may only be set by the payment gateway,
+    /// never by an authenticated application user.
+    /// </summary>
+    public static bool IsGatewayOwned(InvoiceStatus status) => GatewayOwnedStatuses.Contains(status);
+
     /// <summary>The legal state machine graph for invoice status transitions.</summary>
     public static readonly IReadOnlyDictionary<InvoiceStatus, IReadOnlySet<InvoiceStatus>> AllowedTransitions =
         new Dictionary<InvoiceStatus, IReadOnlySet<InvoiceStatus>>

@@ -104,6 +104,14 @@ public enum ErrorCode
     /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
     INVALID_INVOICE_STATUS_TRANSITION,
 
+    /// <summary>
+    /// A status transition targeting <c>Paid</c> or <c>Failed</c> was attempted via the public
+    /// user-facing status endpoint. Those statuses are exclusively managed by the
+    /// signature-verified payment-gateway webhook and may never be set directly by an
+    /// authenticated application user.
+    /// </summary>
+    INVOICE_STATUS_GATEWAY_OWNED,
+
     /// <summary>An invalid invoice amount was supplied.</summary>
     INVALID_INVOICE_AMOUNT,
 

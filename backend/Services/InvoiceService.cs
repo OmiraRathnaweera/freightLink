@@ -297,6 +297,12 @@ public class InvoiceService : IInvoiceService
 
         EnforceTripPartyAuthorization(invoice.Trip, currentUserId, role);
 
+        if (InvoiceStatusTransitionRules.IsGatewayOwned(request.Status))
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.INVOICE_STATUS_GATEWAY_OWNED,
+                $"Status '{request.Status}' is managed exclusively by the payment gateway and cannot be set directly.");
+        }
+
         if (!InvoiceStatusTransitionRules.CanTransition(invoice.Status, request.Status))
         {
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_STATUS_TRANSITION, $"Cannot transition invoice from '{invoice.Status}' to '{request.Status}'.");
