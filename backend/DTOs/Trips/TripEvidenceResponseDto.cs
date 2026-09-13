@@ -21,6 +21,9 @@ public class TripEvidenceResponseDto
     /// </summary>
     public string StorageKey { get; set; } = string.Empty;
 
+    /// <summary>Publicly-accessible URL of the captured evidence photo/document.</summary>
+    public string? SecureUrl { get; set; }
+
     /// <summary>Optional GPS latitude captured at the moment of evidence capture.</summary>
     public decimal? CapturedLat { get; set; }
 

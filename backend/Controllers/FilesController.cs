@@ -10,6 +10,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
+using FreightLink.Api.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+
 namespace FreightLink.Api.Controllers;
 
 /// <summary>
@@ -34,11 +38,15 @@ public class FilesController : ControllerBase
         nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver);
 
     private readonly IFileUploadService _fileUploadService;
+    private readonly AppDbContext _dbContext;
+    private readonly IConfiguration _configuration;
 
-    /// <summary>Creates the controller with its injected file upload service.</summary>
-    public FilesController(IFileUploadService fileUploadService)
+    /// <summary>Creates the controller with its injected file upload service, db context, and configuration.</summary>
+    public FilesController(IFileUploadService fileUploadService, AppDbContext dbContext, IConfiguration configuration)
     {
         _fileUploadService = fileUploadService;
+        _dbContext = dbContext;
+        _configuration = configuration;
     }
 
     /// <summary>
@@ -74,6 +82,42 @@ public class FilesController : ControllerBase
     {
         var result = await _fileUploadService.DeleteSingleAsync(publicId, GetCurrentUserId(), cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Serves locally uploaded file content or redirects to the external Cloudinary URL.
+    /// AllowAnonymous so image tags and evidence previews can load media without requiring an Authorization header.
+    /// </summary>
+    /// <param name="publicId">The public ID of the file.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    [HttpGet("content/{*publicId}")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetContent(string publicId, CancellationToken cancellationToken)
+    {
+        var fileRecord = await _dbContext.UploadedFiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(f => f.PublicId == publicId, cancellationToken);
+
+        var storageDir = _configuration["FILE_STORAGE_PATH"] ?? Path.Combine(Directory.GetCurrentDirectory(), "storage", "uploads");
+        var fileGuid = Path.GetFileName(publicId);
+
+        if (Directory.Exists(storageDir))
+        {
+            var matchingFiles = Directory.GetFiles(storageDir, $"{fileGuid}.*");
+            if (matchingFiles.Length > 0)
+            {
+                var localPath = matchingFiles[0];
+                var contentType = fileRecord?.ContentType ?? "application/octet-stream";
+                return PhysicalFile(Path.GetFullPath(localPath), contentType);
+            }
+        }
+
+        if (fileRecord != null && !string.IsNullOrEmpty(fileRecord.SecureUrl) && fileRecord.SecureUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect(fileRecord.SecureUrl);
+        }
+
+        return NotFound();
     }
 
     /// <summary>Extracts the authenticated user's id from the <c>NameIdentifier</c> claim on the access token.</summary>

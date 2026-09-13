@@ -26,11 +26,17 @@ public class TripListItemDto
     /// </summary>
     public Guid AgencyId { get; set; }
 
+    /// <summary>The executing agency's name, if resolved.</summary>
+    public string? AgencyName { get; set; }
+
     /// <summary>The assigned vehicle's id.</summary>
     public Guid VehicleId { get; set; }
 
     /// <summary>The assigned driver's id.</summary>
     public Guid DriverId { get; set; }
+
+    /// <summary>The assigned driver's full name, if resolved.</summary>
+    public string? DriverName { get; set; }
 
     /// <summary>The trip's current status (e.g. "Assigned", "PickedUp", "InTransit", "Delivered").</summary>
     public string Status { get; set; } = string.Empty;

@@ -20,11 +20,38 @@ public class TripResponseDto
     /// <summary>The executing agency's id, denormalized from <c>Trip.Assignment.AgencyId</c>.</summary>
     public Guid AgencyId { get; set; }
 
+    /// <summary>The executing agency's name, if resolved.</summary>
+    public string? AgencyName { get; set; }
+
     /// <summary>The assigned vehicle's id.</summary>
     public Guid VehicleId { get; set; }
 
+    /// <summary>The assigned vehicle's registration number, if resolved.</summary>
+    public string? VehicleRegistrationNo { get; set; }
+
     /// <summary>The assigned driver's id.</summary>
     public Guid DriverId { get; set; }
+
+    /// <summary>The assigned driver's full name, if resolved.</summary>
+    public string? DriverName { get; set; }
+
+    /// <summary>Origin / pickup address from the load.</summary>
+    public string? PickupAddress { get; set; }
+
+    /// <summary>Destination / dropoff address from the load.</summary>
+    public string? DropoffAddress { get; set; }
+
+    /// <summary>Pickup latitude.</summary>
+    public decimal? PickupLat { get; set; }
+
+    /// <summary>Pickup longitude.</summary>
+    public decimal? PickupLng { get; set; }
+
+    /// <summary>Dropoff latitude.</summary>
+    public decimal? DropoffLat { get; set; }
+
+    /// <summary>Dropoff longitude.</summary>
+    public decimal? DropoffLng { get; set; }
 
     /// <summary>The trip's current status (e.g. "Assigned", "PickedUp", "InTransit", "Delivered").</summary>
     public string Status { get; set; } = string.Empty;

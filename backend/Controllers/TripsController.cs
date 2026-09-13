@@ -32,6 +32,9 @@ public class TripsController : ControllerBase
     /// <summary>See remarks on <see cref="ShipperOrAdminRoles"/> for why these are <see langword="nameof"/>-built, not string literals.</summary>
     private const string AgencyStaffOrDriverRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver);
 
+    /// <summary>Roles authorized to create or reassign trips.</summary>
+    private const string AgencyStaffOrAdminRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
+
     /// <summary>See remarks on <see cref="ShipperOrAdminRoles"/> for why these are <see langword="nameof"/>-built, not string literals.</summary>
     private const string AgencyStaffOrDriverOrAdminRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver) + "," + nameof(UserRole.Admin);
 
@@ -52,6 +55,20 @@ public class TripsController : ControllerBase
     public TripsController(ITripService tripService)
     {
         _tripService = tripService;
+    }
+
+    /// <summary>
+    /// Dispatches and creates a new trip, assigning an agency vehicle and driver to an accepted assignment.
+    /// </summary>
+    /// <param name="request">The creation payload including assignment, vehicle, and driver ids.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>201 Created with the created <see cref="TripResponseDto"/>.</returns>
+    [HttpPost]
+    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    public async Task<ActionResult<TripResponseDto>> Create([FromBody] CreateTripDto request, CancellationToken cancellationToken)
+    {
+        var result = await _tripService.CreateAsync(request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = result.TripId }, result);
     }
 
     /// <summary>
@@ -86,6 +103,21 @@ public class TripsController : ControllerBase
     }
 
     /// <summary>
+    /// Modifies an existing trip's vehicle or driver assignment prior to departure (while still in Assigned status).
+    /// </summary>
+    /// <param name="id">The trip's id.</param>
+    /// <param name="request">The updated vehicle and/or driver ids with optional notes.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the updated <see cref="TripResponseDto"/>.</returns>
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    public async Task<ActionResult<TripResponseDto>> Update(Guid id, [FromBody] UpdateTripDto request, CancellationToken cancellationToken)
+    {
+        var result = await _tripService.UpdateAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Advances a trip's status. Hard-blocked at the database level (per ADR-004) from reaching
     /// <c>PickedUp</c>/<c>Delivered</c> without the matching evidence already captured via
     /// <see cref="UploadEvidence"/>.
@@ -99,6 +131,37 @@ public class TripsController : ControllerBase
     public async Task<ActionResult<TripResponseDto>> ChangeStatus(Guid id, [FromBody] ChangeTripStatusDto request, CancellationToken cancellationToken)
     {
         var result = await _tripService.ChangeStatusAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Cancels an active trip (Assigned, PickedUp, or InTransit). Soft-delete / lifecycle cancellation per ADR-019.
+    /// </summary>
+    /// <param name="id">The trip's id.</param>
+    /// <param name="reason">Optional cancellation reason query parameter.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the cancelled <see cref="TripResponseDto"/>.</returns>
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = AgencyStaffOrDriverOrAdminRoles)]
+    public async Task<ActionResult<TripResponseDto>> Delete(Guid id, [FromQuery] string? reason, CancellationToken cancellationToken)
+    {
+        var request = string.IsNullOrWhiteSpace(reason) ? null : new CancelTripDto { Reason = reason };
+        var result = await _tripService.CancelAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Cancels an active trip (Assigned, PickedUp, or InTransit) with an optional request body. Semantic alias for cancel.
+    /// </summary>
+    /// <param name="id">The trip's id.</param>
+    /// <param name="request">Optional cancellation payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the cancelled <see cref="TripResponseDto"/>.</returns>
+    [HttpPatch("{id:guid}/cancel")]
+    [Authorize(Roles = AgencyStaffOrDriverOrAdminRoles)]
+    public async Task<ActionResult<TripResponseDto>> Cancel(Guid id, [FromBody] CancelTripDto? request, CancellationToken cancellationToken)
+    {
+        var result = await _tripService.CancelAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 
@@ -128,6 +191,20 @@ public class TripsController : ControllerBase
     public async Task<ActionResult<List<TripEvidenceResponseDto>>> GetEvidence(Guid id, CancellationToken cancellationToken)
     {
         var result = await _tripService.GetEvidenceAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Seeds complete example testing trips (Assigned, InTransit, Delivered) with full hierarchy
+    /// for Swagger testing and UI verification. AllowAnonymous for convenient local dev use.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the list of seeded trips.</returns>
+    [HttpPost("seed-example")]
+    [AllowAnonymous]
+    public async Task<ActionResult<List<TripResponseDto>>> SeedExample(CancellationToken cancellationToken)
+    {
+        var result = await _tripService.SeedExampleTripsAsync(cancellationToken);
         return Ok(result);
     }
 

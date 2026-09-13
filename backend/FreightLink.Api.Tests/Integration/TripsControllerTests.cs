@@ -171,78 +171,75 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    /// <summary>An AgencyStaff caller reaches the (stub) service layer.</summary>
+    /// <summary>An AgencyStaff caller reaches the service layer and gets 200 OK.</summary>
     [Fact]
-    public async Task GetList_ReachesStub_ForAgencyStaff()
+    public async Task GetList_Returns200_ForAgencyStaff()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/v1/trips", MintTokenWithRoles("AgencyStaff")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    /// <summary>A Driver caller reaches the (stub) service layer.</summary>
+    /// <summary>A Driver caller reaches the service layer and gets 200 OK.</summary>
     [Fact]
-    public async Task GetList_ReachesStub_ForDriver()
+    public async Task GetList_Returns200_ForDriver()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/v1/trips", MintTokenWithRoles("Driver")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    /// <summary>An Admin caller reaches the (stub) service layer.</summary>
+    /// <summary>An Admin caller reaches the service layer and gets 200 OK.</summary>
     [Fact]
-    public async Task GetList_ReachesStub_ForAdmin()
+    public async Task GetList_Returns200_ForAdmin()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/v1/trips", MintTokenWithRoles("Admin")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     // --- GET /trips/{id} (all four roles admitted by the role gate) ---
 
-    /// <summary>A Shipper caller reaches the (stub) service layer — unlike GetList, Shipper is admitted here per the API contract.</summary>
+    /// <summary>A Shipper caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetById_ReachesStub_ForShipper()
+    public async Task GetById_Returns404_ForShipper()
     {
         var tokens = await RegisterAndLoginShipperAsync("trips-getbyid-shipper");
 
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", tokens.AccessToken));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>An AgencyStaff caller reaches the (stub) service layer.</summary>
+    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetById_ReachesStub_ForAgencyStaff()
+    public async Task GetById_Returns404_ForAgencyStaff()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("AgencyStaff")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>A Driver caller reaches the (stub) service layer.</summary>
+    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetById_ReachesStub_ForDriver()
+    public async Task GetById_Returns404_ForDriver()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Driver")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>An Admin caller reaches the (stub) service layer.</summary>
+    /// <summary>An Admin caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetById_ReachesStub_ForAdmin()
+    public async Task GetById_Returns404_ForAdmin()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
     // --- POST /trips/{id}/status (AgencyStaff, Driver only) ---
@@ -271,28 +268,28 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    /// <summary>An AgencyStaff caller reaches the (stub) service layer.</summary>
+    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task ChangeStatus_ReachesStub_ForAgencyStaff()
+    public async Task ChangeStatus_Returns404_ForAgencyStaff()
     {
         using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/status", MintTokenWithRoles("AgencyStaff"));
         request.Content = JsonContent.Create(ValidChangeStatusDto());
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>A Driver caller reaches the (stub) service layer.</summary>
+    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task ChangeStatus_ReachesStub_ForDriver()
+    public async Task ChangeStatus_Returns404_ForDriver()
     {
         using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/status", MintTokenWithRoles("Driver"));
         request.Content = JsonContent.Create(ValidChangeStatusDto());
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
     // --- POST /trips/{id}/evidence (AgencyStaff, Driver only) ---
@@ -321,71 +318,189 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    /// <summary>An AgencyStaff caller reaches the (stub) service layer.</summary>
+    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task UploadEvidence_ReachesStub_ForAgencyStaff()
+    public async Task UploadEvidence_Returns404_ForAgencyStaff()
     {
         using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("AgencyStaff"));
         request.Content = JsonContent.Create(ValidUploadEvidenceDto());
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>A Driver caller reaches the (stub) service layer.</summary>
+    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task UploadEvidence_ReachesStub_ForDriver()
+    public async Task UploadEvidence_Returns404_ForDriver()
     {
         using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("Driver"));
         request.Content = JsonContent.Create(ValidUploadEvidenceDto());
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
     // --- GET /trips/{id}/evidence (all four roles admitted) ---
 
-    /// <summary>A Shipper caller reaches the (stub) service layer.</summary>
+    /// <summary>A Shipper caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetEvidence_ReachesStub_ForShipper()
+    public async Task GetEvidence_Returns404_ForShipper()
     {
         var tokens = await RegisterAndLoginShipperAsync("trips-getevidence-shipper");
 
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", tokens.AccessToken));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>An AgencyStaff caller reaches the (stub) service layer.</summary>
+    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetEvidence_ReachesStub_ForAgencyStaff()
+    public async Task GetEvidence_Returns404_ForAgencyStaff()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("AgencyStaff")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>A Driver caller reaches the (stub) service layer.</summary>
+    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetEvidence_ReachesStub_ForDriver()
+    public async Task GetEvidence_Returns404_ForDriver()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("Driver")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>An Admin caller reaches the (stub) service layer.</summary>
+    /// <summary>An Admin caller reaches the service layer; returns 404 for a non-existent trip.</summary>
     [Fact]
-    public async Task GetEvidence_ReachesStub_ForAdmin()
+    public async Task GetEvidence_Returns404_ForAdmin()
     {
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("Admin")));
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
-        Assert.Equal("INTERNAL_SERVER_ERROR", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    // --- Create / Update / Delete / Cancel ---
+
+    [Fact]
+    public async Task Create_Returns401_WithoutToken()
+    {
+        var response = await _client.PostAsJsonAsync("/api/v1/trips", new CreateTripDto
+        {
+            AssignmentId = Guid.NewGuid(),
+            VehicleId = Guid.NewGuid(),
+            DriverId = Guid.NewGuid()
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_Returns403_ForShipper()
+    {
+        var shipperTokens = await RegisterAndLoginShipperAsync("trip-create");
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/trips", shipperTokens.AccessToken);
+        request.Content = JsonContent.Create(new CreateTripDto
+        {
+            AssignmentId = Guid.NewGuid(),
+            VehicleId = Guid.NewGuid(),
+            DriverId = Guid.NewGuid()
+        });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_Returns404_ForAdmin_WhenAssignmentDoesNotExist()
+    {
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/trips", MintTokenWithRoles("Admin"));
+        request.Content = JsonContent.Create(new CreateTripDto
+        {
+            AssignmentId = Guid.NewGuid(),
+            VehicleId = Guid.NewGuid(),
+            DriverId = Guid.NewGuid()
+        });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("ASSIGNMENT_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Update_Returns401_WithoutToken()
+    {
+        var response = await _client.PutAsJsonAsync($"/api/v1/trips/{Guid.NewGuid()}", new UpdateTripDto
+        {
+            VehicleId = Guid.NewGuid()
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_Returns403_ForShipper()
+    {
+        var shipperTokens = await RegisterAndLoginShipperAsync("trip-update");
+        using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/trips/{Guid.NewGuid()}", shipperTokens.AccessToken);
+        request.Content = JsonContent.Create(new UpdateTripDto { VehicleId = Guid.NewGuid() });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_Returns404_ForAdmin_WhenTripDoesNotExist()
+    {
+        using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin"));
+        request.Content = JsonContent.Create(new UpdateTripDto { VehicleId = Guid.NewGuid() });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Delete_Returns401_WithoutToken()
+    {
+        var response = await _client.DeleteAsync($"/api/v1/trips/{Guid.NewGuid()}");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_Returns403_ForShipper()
+    {
+        var shipperTokens = await RegisterAndLoginShipperAsync("trip-delete");
+        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", shipperTokens.AccessToken);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_Returns404_ForAdmin_WhenTripDoesNotExist()
+    {
+        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin"));
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Cancel_Returns404_ForAdmin_WhenTripDoesNotExist()
+    {
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/trips/{Guid.NewGuid()}/cancel", MintTokenWithRoles("Admin"));
+        request.Content = JsonContent.Create(new CancelTripDto { Reason = "test" });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 }

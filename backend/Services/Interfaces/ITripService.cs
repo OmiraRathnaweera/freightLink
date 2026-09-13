@@ -110,4 +110,45 @@ public interface ITripService
     /// class-level remarks.
     /// </exception>
     Task<List<TripEvidenceResponseDto>> GetEvidenceAsync(Guid tripId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Creates and dispatches a new Trip for an accepted assignment, assigning an agency vehicle and driver.
+    /// Initiates the trip in <see cref="TripStatus.Assigned"/> status and logs an initial <see cref="Entities.TripEvent"/>.
+    /// </summary>
+    /// <param name="request">The assignment, vehicle, and driver identifiers with optional notes.</param>
+    /// <param name="currentUserId">The authenticated caller's id.</param>
+    /// <param name="currentUserRole">The authenticated caller's role (AgencyStaff or Admin).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The newly created trip detail.</returns>
+    Task<TripResponseDto> CreateAsync(CreateTripDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing trip's vehicle or driver assignment prior to departure (while still <see cref="TripStatus.Assigned"/>).
+    /// </summary>
+    /// <param name="tripId">The trip's id.</param>
+    /// <param name="request">The new vehicle and/or driver identifiers and optional explanation notes.</param>
+    /// <param name="currentUserId">The authenticated caller's id.</param>
+    /// <param name="currentUserRole">The authenticated caller's role (AgencyStaff or Admin).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The updated trip detail.</returns>
+    Task<TripResponseDto> UpdateAsync(Guid tripId, UpdateTripDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancels a trip in an active state (<see cref="TripStatus.Assigned"/>, <see cref="TripStatus.PickedUp"/>, or <see cref="TripStatus.InTransit"/>).
+    /// Represents the domain's soft-delete / lifecycle cancellation operation adhering to ADR-019.
+    /// </summary>
+    /// <param name="tripId">The trip's id.</param>
+    /// <param name="request">Optional cancellation reason.</param>
+    /// <param name="currentUserId">The authenticated caller's id.</param>
+    /// <param name="currentUserRole">The authenticated caller's role (AgencyStaff, Driver, or Admin).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The cancelled trip detail.</returns>
+    Task<TripResponseDto> CancelAsync(Guid tripId, CancelTripDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Seeds complete example testing trips (Assigned, InTransit, Delivered) for development and UI testing.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The list of seeded trip details.</returns>
+    Task<List<TripResponseDto>> SeedExampleTripsAsync(CancellationToken cancellationToken = default);
 }
