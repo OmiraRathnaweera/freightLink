@@ -269,7 +269,7 @@ public class InvoiceService : IInvoiceService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.INVOICE_NOT_FOUND, $"Invoice '{invoiceId}' was not found.");
         }
 
-        EnforceTripPartyAuthorization(invoice.Trip, currentUserId, role);
+        EnforceTripPartyWriteAuthorization(invoice.Trip, currentUserId, role);
 
         if (!InvoiceStatusTransitionRules.CanEdit(invoice.Status))
         {
@@ -320,7 +320,7 @@ public class InvoiceService : IInvoiceService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.INVOICE_NOT_FOUND, $"Invoice '{invoiceId}' was not found.");
         }
 
-        EnforceTripPartyAuthorization(invoice.Trip, currentUserId, role);
+        EnforceTripPartyWriteAuthorization(invoice.Trip, currentUserId, role);
 
         if (InvoiceStatusTransitionRules.IsGatewayOwned(request.Status))
         {
@@ -364,7 +364,7 @@ public class InvoiceService : IInvoiceService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.INVOICE_NOT_FOUND, $"Invoice '{invoiceId}' was not found.");
         }
 
-        EnforceTripPartyAuthorization(invoice.Trip, currentUserId, role);
+        EnforceTripPartyWriteAuthorization(invoice.Trip, currentUserId, role);
 
         if (!InvoiceStatusTransitionRules.CanVoid(invoice.Status))
         {
@@ -401,6 +401,33 @@ public class InvoiceService : IInvoiceService
         }
 
         throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.INVOICE_NOT_OWNED, "You do not have permission to access this invoice or trip.");
+    }
+
+    /// <summary>
+    /// Stricter variant used by mutating operations (update, status transition, void).
+    /// Drivers are trip participants who may read invoice data but must not alter billing
+    /// state — they are excluded here even when the base read check would pass.
+    /// </summary>
+    private static void EnforceTripPartyWriteAuthorization(Trip trip, Guid currentUserId, UserRole role)
+    {
+        if (role == UserRole.Admin)
+        {
+            return;
+        }
+
+        if (role == UserRole.Shipper && trip.Assignment?.Load?.ShipperUserId == currentUserId)
+        {
+            return;
+        }
+
+        if (role == UserRole.AgencyStaff && trip.Assignment?.Agency?.Staff != null && trip.Assignment.Agency.Staff.Any(s => s.UserId == currentUserId))
+        {
+            return;
+        }
+
+        // Driver is intentionally omitted: drivers may view invoices for trips they drive
+        // but must not update amounts, transition status, or void billing records.
+        throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.INVOICE_NOT_OWNED, "You do not have permission to modify this invoice.");
     }
 
     private static string GenerateInvoiceNumber()

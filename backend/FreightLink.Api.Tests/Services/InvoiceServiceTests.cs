@@ -418,4 +418,75 @@ public class InvoiceServiceTests
         var voided = await sut.VoidAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper);
         Assert.Equal(InvoiceStatus.Void, voided.Status);
     }
+
+    [Fact]
+    public async Task UpdateAsync_DriverRole_ThrowsForbidden()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, driver, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            Amount = 20000m,
+            Currency = "LKR",
+            IssueImmediately = false
+        });
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.UpdateAsync(created.InvoiceId, driver.UserId, UserRole.Driver, new UpdateInvoiceDto
+            {
+                Amount = 1m,
+                Currency = "LKR"
+            }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVOICE_NOT_OWNED, ex.Code);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_DriverRole_ThrowsForbidden()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, driver, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            Amount = 20000m,
+            Currency = "LKR",
+            IssueImmediately = false
+        });
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.UpdateStatusAsync(created.InvoiceId, driver.UserId, UserRole.Driver,
+                new UpdateInvoiceStatusDto { Status = InvoiceStatus.Issued }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVOICE_NOT_OWNED, ex.Code);
+    }
+
+    [Fact]
+    public async Task VoidAsync_DriverRole_ThrowsForbidden()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, driver, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            Amount = 20000m,
+            Currency = "LKR",
+            IssueImmediately = true
+        });
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.VoidAsync(created.InvoiceId, driver.UserId, UserRole.Driver));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVOICE_NOT_OWNED, ex.Code);
+    }
 }

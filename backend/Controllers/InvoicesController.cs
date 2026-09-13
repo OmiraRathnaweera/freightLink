@@ -68,6 +68,7 @@ public class InvoicesController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the updated invoice.</returns>
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = InvoiceCreationRoles)]
     public async Task<ActionResult<InvoiceResponseDto>> Update(Guid id, [FromBody] UpdateInvoiceDto request, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.UpdateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
@@ -93,6 +94,7 @@ public class InvoicesController : ControllerBase
     /// <returns>200 OK with the voided invoice.</returns>
     [HttpPatch("{id:guid}/void")]
     [HttpPatch("{id:guid}/cancel")]
+    [Authorize(Roles = InvoiceCreationRoles)]
     public async Task<ActionResult<InvoiceResponseDto>> Void(Guid id, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.VoidAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
