@@ -37,7 +37,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             t.HasCheckConstraint("ck_invoice_amount", "\"Amount\" > 0");
             t.HasCheckConstraint("ck_invoice_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
             t.HasCheckConstraint("ck_invoice_due",
-                "\"DueDate\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
+                "\"DueDate\" IS NULL OR \"IssuedAt\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
         });
     }
 }

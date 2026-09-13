@@ -78,7 +78,9 @@ public class InvoiceService : IInvoiceService
             Amount = request.Amount,
             Currency = string.IsNullOrWhiteSpace(request.Currency) ? "LKR" : request.Currency.Trim().ToUpperInvariant(),
             Status = initialStatus,
-            IssuedAt = now,
+            // Drafts have no issued timestamp yet; IssuedAt is set when the invoice transitions
+            // to Issued (either here via IssueImmediately, or later via UpdateStatusAsync).
+            IssuedAt = request.IssueImmediately ? now : null,
             DueDate = request.DueDate,
             CreatedAt = now,
             UpdatedAt = now
@@ -274,10 +276,21 @@ public class InvoiceService : IInvoiceService
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_STATUS_TRANSITION, $"Invoice in status '{invoice.Status}' cannot be edited.");
         }
 
-        if (request.DueDate.HasValue && request.DueDate.Value < DateOnly.FromDateTime(invoice.IssuedAt.UtcDateTime))
+        if (request.DueDate.HasValue)
         {
-            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_DUE_DATE,
-                $"DueDate cannot be earlier than the invoice's issuance date ({DateOnly.FromDateTime(invoice.IssuedAt.UtcDateTime):yyyy-MM-dd}).");
+            // For a draft, IssuedAt is not yet set; guard DueDate against today instead so a
+            // caller editing a draft can still set a future DueDate without hitting a null deref.
+            var issuanceDateFloor = invoice.IssuedAt.HasValue
+                ? DateOnly.FromDateTime(invoice.IssuedAt.Value.UtcDateTime)
+                : DateOnly.FromDateTime(DateTime.UtcNow);
+
+            if (request.DueDate.Value < issuanceDateFloor)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_DUE_DATE,
+                    invoice.IssuedAt.HasValue
+                        ? $"DueDate cannot be earlier than the invoice's issuance date ({issuanceDateFloor:yyyy-MM-dd})."
+                        : "DueDate cannot be earlier than today (UTC).");
+            }
         }
 
         invoice.Amount = request.Amount;
@@ -321,6 +334,12 @@ public class InvoiceService : IInvoiceService
         }
 
         invoice.Status = request.Status;
+        // Stamp the issued timestamp the moment a Draft is formally issued, regardless of
+        // whether the transition is triggered here or was set at creation via IssueImmediately.
+        if (request.Status == InvoiceStatus.Issued && invoice.IssuedAt is null)
+        {
+            invoice.IssuedAt = DateTimeOffset.UtcNow;
+        }
         invoice.UpdatedAt = DateTimeOffset.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);

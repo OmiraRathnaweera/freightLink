@@ -25,8 +25,8 @@ public class InvoiceResponseDto
     /// <summary>The current lifecycle status of the invoice.</summary>
     public InvoiceStatus Status { get; set; }
 
-    /// <summary>When the invoice was issued.</summary>
-    public DateTimeOffset IssuedAt { get; set; }
+    /// <summary>When the invoice was issued. Null while the invoice is still a Draft.</summary>
+    public DateTimeOffset? IssuedAt { get; set; }
 
     /// <summary>Due date for payment if specified.</summary>
     public DateOnly? DueDate { get; set; }
