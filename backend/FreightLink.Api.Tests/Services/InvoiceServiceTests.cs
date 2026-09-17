@@ -558,4 +558,114 @@ public class InvoiceServiceTests
 
         Assert.Equal("USD", created.Currency);
     }
+
+    [Fact]
+    public async Task CreateOnTripDeliveredAsync_WhenTripNotFound_Throws404()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CreateOnTripDeliveredAsync(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.NotFound, ex.StatusCode);
+        Assert.Equal(ErrorCode.TRIP_NOT_FOUND, ex.Code);
+    }
+
+    [Fact]
+    public async Task CreateOnTripDeliveredAsync_WhenTripNotDelivered_Throws422()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        // trip is initially InTransit in SeedTripGraphAsync
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CreateOnTripDeliveredAsync(trip.TripId, shipper.UserId, UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, ex.StatusCode);
+        Assert.Equal(ErrorCode.TRIP_NOT_DELIVERED, ex.Code);
+    }
+
+    [Fact]
+    public async Task CreateOnTripDeliveredAsync_WhenUnauthorizedUser_Throws403()
+    {
+        using var db = CreateContext();
+        var (_, _, _, _, trip) = await SeedTripGraphAsync(db);
+        trip.Status = TripStatus.Delivered;
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db);
+        var randomUserId = Guid.NewGuid();
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CreateOnTripDeliveredAsync(trip.TripId, randomUserId, UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVOICE_NOT_OWNED, ex.Code);
+    }
+
+    [Fact]
+    public async Task CreateOnTripDeliveredAsync_WhenTripDelivered_CreatesInvoiceWithPlaceholderAmount()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, _, trip) = await SeedTripGraphAsync(db);
+        trip.Status = TripStatus.Delivered;
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db);
+        var result = await sut.CreateOnTripDeliveredAsync(trip.TripId, shipper.UserId, UserRole.Shipper);
+
+        Assert.NotNull(result);
+        Assert.Equal(trip.TripId, result.TripId);
+        Assert.Equal(InvoiceService.PlaceholderInvoiceAmount, result.Amount);
+        Assert.Equal("LKR", result.Currency);
+        Assert.Equal(InvoiceStatus.Issued, result.Status);
+        Assert.NotNull(result.IssuedAt);
+        Assert.NotNull(result.DueDate);
+        Assert.StartsWith("INV-", result.InvoiceNumber);
+
+        // Verify persisted in DB
+        var persisted = await db.Invoices.FirstOrDefaultAsync(i => i.TripId == trip.TripId);
+        Assert.NotNull(persisted);
+        Assert.Equal(InvoiceService.PlaceholderInvoiceAmount, persisted.Amount);
+        Assert.Equal(InvoiceStatus.Issued, persisted.Status);
+    }
+
+    [Fact]
+    public async Task CreateOnTripDeliveredAsync_WithoutUserContext_CreatesInvoiceSuccessfully()
+    {
+        using var db = CreateContext();
+        var (_, _, _, _, trip) = await SeedTripGraphAsync(db);
+        trip.Status = TripStatus.Delivered;
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db);
+        var result = await sut.CreateOnTripDeliveredAsync(trip.TripId);
+
+        Assert.NotNull(result);
+        Assert.Equal(trip.TripId, result.TripId);
+        Assert.Equal(InvoiceService.PlaceholderInvoiceAmount, result.Amount);
+        Assert.Equal(InvoiceStatus.Issued, result.Status);
+    }
+
+    [Fact]
+    public async Task CreateOnTripDeliveredAsync_WhenInvoiceAlreadyExists_Throws409Conflict()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, _, trip) = await SeedTripGraphAsync(db);
+        trip.Status = TripStatus.Delivered;
+        await db.SaveChangesAsync();
+
+        var sut = CreateSut(db);
+        // First creation succeeds
+        await sut.CreateOnTripDeliveredAsync(trip.TripId, shipper.UserId, UserRole.Shipper);
+
+        // Second creation throws Conflict
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.CreateOnTripDeliveredAsync(trip.TripId, shipper.UserId, UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.Conflict, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVOICE_ALREADY_EXISTS_FOR_TRIP, ex.Code);
+    }
 }
