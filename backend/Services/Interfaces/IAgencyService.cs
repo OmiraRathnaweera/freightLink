@@ -24,6 +24,11 @@ public interface IAgencyService
     Task<PagedAgencyResponseDto> GetListAsync(Guid currentUserId, UserRole currentUserRole, AgencyListQueryDto query, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Retrieves a list of agencies that have compliance documents expiring within the specified number of days.
+    /// </summary>
+    Task<IEnumerable<AgencyExpiringComplianceDto>> GetAgenciesWithExpiringComplianceAsync(int days, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Updates an existing agency's details.
     /// </summary>
     Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default);

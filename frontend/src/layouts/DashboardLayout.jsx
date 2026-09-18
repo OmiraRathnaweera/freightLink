@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom'
+﻿import { NavLink, Outlet } from 'react-router-dom'
 import {
   Building2,
   CircleDollarSign,
@@ -27,30 +27,30 @@ import { cx } from '../lib/cx.js'
 //
 // SidebarProvider is mounted here (not in main.jsx) on purpose: sidebar
 // open/closed state is only ever read by this layout, so it stays out of
-// the global Redux store — a textbook case for Context instead of Redux
+// the global Redux store â€” a textbook case for Context instead of Redux
 // Toolkit. (See ADR: state-management strategy.)
 //
 // Dark off-canvas sidebar, per the Loads-screens Stitch research: of the 12
 // screens, only "My Loads" Empty/Loading/Error (screens 9-11) have a
-// genuinely-coded dark sidebar (bg-primary) — the "Admin Panel" screens
+// genuinely-coded dark sidebar (bg-primary) â€” the "Admin Panel" screens
 // (4,6,7) look dark in their screenshots but the exported code is actually
 // light (a Stitch screenshot/code mismatch), and 6 other screens use no
 // sidebar at all. This adopts the one real dark-sidebar pattern globally,
 // per the user's explicit instruction. None of Stitch's exports had working
-// off-canvas behavior (just `hidden` below md with an inert hamburger) —
+// off-canvas behavior (just `hidden` below md with an inert hamburger) â€”
 // the open/close drawer behavior here is built from scratch.
 //
 // Nav items map to this app's real 5 feature routes, not either of the
 // Stitch Loads-screens' own nav lists (both reference pages that don't
 // exist in this app). Visibility is filtered per role via
 // isRouteAllowedForRole below, reading the same centralized
-// src/features/auth/lib/roleAccess.js map ProtectedRoute uses — so the
+// src/features/auth/lib/roleAccess.js map ProtectedRoute uses â€” so the
 // sidebar can never link to a section the signed-in role would just get
 // bounced from, and there's one place (not two) to update when a role
 // gains access to a route.
 const NAV_ITEMS = [
   { to: '/loads', label: 'Loads', icon: Package },
-  { to: '/agencies', label: 'Agencies', icon: Building2 },
+  { to: '/agencies', label: 'Agencies', icon: Building2, children: [ { to: '/agencies', label: 'All Agencies', end: true }, { to: '/agencies/verification', label: 'Verification Queue' } ] },
   { to: '/trips', label: 'Trips', icon: RouteIcon },
   { to: '/billing', label: 'Billing', icon: Receipt },
   { to: '/agent-workflows', label: 'Agent Workflows', icon: Workflow },
@@ -128,6 +128,7 @@ function DashboardLayoutContent() {
                     <NavLink
                       key={child.to}
                       to={child.to}
+                      end={child.end}
                       onClick={closeSidebar}
                       className={({ isActive }) =>
                         cx(
@@ -197,3 +198,4 @@ function DashboardLayoutContent() {
 }
 
 export default DashboardLayout
+

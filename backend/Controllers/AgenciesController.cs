@@ -60,6 +60,17 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves a list of agencies with compliance documents expiring soon.
+    /// </summary>
+    [HttpGet("expiring-compliance")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IEnumerable<AgencyExpiringComplianceDto>>> GetExpiringCompliance([FromQuery] int days = 30, CancellationToken cancellationToken = default)
+    {
+        var result = await _agencyService.GetAgenciesWithExpiringComplianceAsync(days, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Updates an existing agency's profile details.
     /// </summary>
     [HttpPut("{id:guid}")]

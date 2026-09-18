@@ -1,4 +1,4 @@
-import { createBrowserRouter, createRoutesFromElements, Navigate, Route } from 'react-router-dom'
+﻿import { createBrowserRouter, createRoutesFromElements, Navigate, Route } from 'react-router-dom'
 import DashboardLayout from '../layouts/DashboardLayout.jsx'
 import ProtectedRoute from './ProtectedRoute.jsx'
 import PublicRoute from './PublicRoute.jsx'
@@ -12,6 +12,7 @@ import PostLoadPage from '../features/loads/pages/PostLoadPage.jsx'
 import LoadDetailPage from '../features/loads/pages/LoadDetailPage.jsx'
 import EditLoadPage from '../features/loads/pages/EditLoadPage.jsx'
 import AgenciesPage from '../features/agencies/pages/AgenciesPage.jsx'
+import AgencyVerificationPage from '../features/agencies/pages/AgencyVerificationPage.jsx'
 import TripsPage from '../features/trips/pages/TripsPage.jsx'
 import TripDetailPage from '../features/trips/pages/TripDetailPage.jsx'
 import BillingPage from '../features/billing/pages/BillingPage.jsx'
@@ -23,13 +24,13 @@ import PricingFormulaPage from '../features/pricingConfig/pages/PricingFormulaPa
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
 //
-// A single <ProtectedRoute /> wraps the whole DashboardLayout subtree — it
+// A single <ProtectedRoute /> wraps the whole DashboardLayout subtree â€” it
 // checks isAuthenticated AND, per-request, looks up whether the current
 // URL is allowed for the signed-in role via
 // src/features/auth/lib/roleAccess.js's ROLE_ALLOWED_PREFIXES map. There's
 // no per-route-group role wrapper to maintain here: a new feature route
 // just gets added below, and its role access is granted by adding its
-// path prefix to that map — nothing in this file changes.
+// path prefix to that map â€” nothing in this file changes.
 const router = createBrowserRouter(
   createRoutesFromElements(
     <>
@@ -52,6 +53,7 @@ const router = createBrowserRouter(
           <Route path="/loads/:loadId/edit" element={<EditLoadPage />} />
 
           <Route path="/agencies" element={<AgenciesPage />} />
+          <Route path="/agencies/verification" element={<AgencyVerificationPage />} />
           <Route path="/trips" element={<TripsPage />} />
           <Route path="/trips/:tripId" element={<TripDetailPage />} />
           <Route path="/billing" element={<BillingPage />} />
@@ -68,3 +70,4 @@ const router = createBrowserRouter(
 )
 
 export default router
+

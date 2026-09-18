@@ -110,4 +110,23 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task GetExpiringCompliance_Returns200_ForAdmin()
+    {
+        using var request = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/expiring-compliance?days=30", MintAdminToken());
+        var response = await _client.SendAsync(request);
+        
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetExpiringCompliance_Returns403_ForAgencyStaff()
+    {
+        var tokens = await RegisterAndLoginAgencyAsync("expiring-fail", "EXPFAIL");
+        using var request = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/expiring-compliance", tokens.AccessToken);
+        
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }
