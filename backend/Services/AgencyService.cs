@@ -138,6 +138,40 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
+    public async Task<IEnumerable<AgencyExpiringComplianceDto>> GetAgenciesWithExpiringComplianceAsync(int days, CancellationToken cancellationToken = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var thresholdDate = today.AddDays(days);
+
+        var agencies = await _dbContext.Agencies
+            .Include(a => a.ComplianceDocs)
+            .Where(a => a.ComplianceDocs.Any(d => 
+                d.Status == ComplianceDocStatus.Verified &&
+                d.ExpiresOn.HasValue &&
+                d.ExpiresOn.Value <= thresholdDate &&
+                d.ExpiresOn.Value >= today))
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return agencies.Select(a => new AgencyExpiringComplianceDto
+        {
+            Agency = MapToResponse(a),
+            ExpiringDocs = a.ComplianceDocs
+                .Where(d => d.Status == ComplianceDocStatus.Verified && d.ExpiresOn.HasValue && d.ExpiresOn.Value <= thresholdDate && d.ExpiresOn.Value >= today)
+                .Select(d => new ComplianceDocResponseDto
+                {
+                    ComplianceDocId = d.ComplianceDocId,
+                    DocType = d.DocType,
+                    DocNumber = d.DocNumber,
+                    StorageKey = d.StorageKey,
+                    IssuedOn = d.IssuedOn,
+                    ExpiresOn = d.ExpiresOn,
+                    Status = d.Status
+                })
+        });
+    }
+
+    /// <inheritdoc />
     public async Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
