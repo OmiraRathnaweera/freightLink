@@ -245,6 +245,54 @@ public enum ErrorCode
     /// <c>(WorkflowRunId, StepNo)</c> pair (mirrors <c>uq_agentstep_order</c>). Each step number for a
     /// given run may be reported at most once.
     /// </summary>
-    AGENT_STEP_DUPLICATE
+    AGENT_STEP_DUPLICATE,
+
+    /// <summary>The requested trip could not be found.</summary>
+    TRIP_NOT_FOUND,
+
+    /// <summary>The caller does not have access to the requested trip.</summary>
+    TRIP_ACCESS_DENIED,
+
+    /// <summary>The requested trip status transition is not permitted from its current status.</summary>
+    INVALID_TRIP_STATUS_TRANSITION,
+
+    /// <summary>Pickup or delivery evidence is required before transitioning to PickedUp or Delivered.</summary>
+    TRIP_EVIDENCE_REQUIRED,
+
+    /// <summary>Evidence of this type already exists for this trip.</summary>
+    TRIP_EVIDENCE_ALREADY_EXISTS,
+
+    /// <summary>The caller's role does not match the required role for this evidence type.</summary>
+    TRIP_EVIDENCE_ROLE_MISMATCH,
+
+    /// <summary>The requested assignment could not be found.</summary>
+    ASSIGNMENT_NOT_FOUND,
+
+    /// <summary>The assignment exists but does not belong to the caller's agency.</summary>
+    ASSIGNMENT_NOT_OWNED,
+
+    /// <summary>A trip has already been created for this assignment.</summary>
+    TRIP_ALREADY_EXISTS,
+
+    /// <summary>The requested vehicle could not be found.</summary>
+    VEHICLE_NOT_FOUND,
+
+    /// <summary>The vehicle does not belong to the executing agency.</summary>
+    VEHICLE_NOT_OWNED,
+
+    /// <summary>The vehicle is inactive or already committed to an active trip.</summary>
+    VEHICLE_UNAVAILABLE,
+
+    /// <summary>The requested driver could not be found.</summary>
+    DRIVER_NOT_FOUND,
+
+    /// <summary>The driver does not belong to the executing agency.</summary>
+    DRIVER_NOT_OWNED,
+
+    /// <summary>The driver is inactive or already committed to an active trip.</summary>
+    DRIVER_UNAVAILABLE,
+
+    /// <summary>The trip cannot be modified because it has already progressed past the Assigned state.</summary>
+    TRIP_CANNOT_BE_MODIFIED
 }
 
