@@ -985,6 +985,33 @@ public class TripService : ITripService
             });
         }
 
+        if (!await _dbContext.Users.AnyAsync(u => u.UserId == staffUserId, cancellationToken))
+        {
+            _dbContext.Users.Add(new User
+            {
+                UserId = staffUserId,
+                Role = UserRole.AgencyStaff,
+                Email = "agency@freightlink.lk",
+                FullName = "Kasun Jayasuriya",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+                IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
+        if (!await _dbContext.AgencyStaff.AnyAsync(s => s.UserId == staffUserId && s.AgencyId == agencyId, cancellationToken))
+        {
+            _dbContext.AgencyStaff.Add(new AgencyStaff
+            {
+                UserId = staffUserId,
+                AgencyId = agencyId,
+                JobTitle = "Operations Dispatcher",
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+
         // 3. Drivers
         var driver1Id = Guid.Parse("d1000000-0000-0000-0000-000000000001");
         var driver2Id = Guid.Parse("d2000000-0000-0000-0000-000000000002");
@@ -1168,10 +1195,37 @@ public class TripService : ITripService
             });
         }
 
+        var load4Id = Guid.Parse("a4000000-0000-0000-0000-000000000004");
+        if (!await _dbContext.Loads.AnyAsync(l => l.LoadId == load4Id, cancellationToken))
+        {
+            _dbContext.Loads.Add(new Load
+            {
+                LoadId = load4Id,
+                ShipperUserId = shipperUserId,
+                ReferenceCode = "LD-JAF-CMB-04",
+                CargoDescription = "Fresh Northern Agricultural Produce & Dry Goods (500 Crates)",
+                WeightKg = 4200,
+                VolumeM3 = 18.0m,
+                PickupAddress = "Jaffna Central Wholesale Market, Hospital Road, Jaffna",
+                PickupLat = 9.661500m,
+                PickupLng = 80.025500m,
+                DropoffAddress = "Manning Market Wholesale Complex, Peliyagoda",
+                DropoffLat = 6.965000m,
+                DropoffLng = 79.885000m,
+                PickupWindowStart = now.AddHours(2),
+                PickupWindowEnd = now.AddDays(2),
+                EstimatedPrice = 78500.00m,
+                Status = LoadStatus.Posted,
+                CreatedAt = now.AddHours(-3),
+                UpdatedAt = now
+            });
+        }
+
         // 6. WorkflowRuns
         var workflow1Id = Guid.Parse("f1000000-0000-0000-0000-000000000001");
         var workflow2Id = Guid.Parse("f2000000-0000-0000-0000-000000000002");
         var workflow3Id = Guid.Parse("f3000000-0000-0000-0000-000000000003");
+        var workflow4Id = Guid.Parse("f4000000-0000-0000-0000-000000000004");
 
         if (!await _dbContext.AgentWorkflowRuns.AnyAsync(w => w.WorkflowRunId == workflow1Id, cancellationToken))
         {
@@ -1224,10 +1278,28 @@ public class TripService : ITripService
             });
         }
 
+        if (!await _dbContext.AgentWorkflowRuns.AnyAsync(w => w.WorkflowRunId == workflow4Id, cancellationToken))
+        {
+            _dbContext.AgentWorkflowRuns.Add(new AgentWorkflowRun
+            {
+                WorkflowRunId = workflow4Id,
+                LoadId = load4Id,
+                TriggeredByUserId = shipperUserId,
+                AttemptNo = 1,
+                Objective = "Match Jaffna-Colombo Agricultural Load",
+                Status = WorkflowRunStatus.Completed,
+                StartedAt = now.AddHours(-2),
+                CompletedAt = now.AddHours(-2),
+                CreatedAt = now.AddHours(-2),
+                UpdatedAt = now
+            });
+        }
+
         // 7. Assignments
         var assignment1Id = Guid.Parse("b1000000-0000-0000-0000-000000000001");
         var assignment2Id = Guid.Parse("b2000000-0000-0000-0000-000000000002");
         var assignment3Id = Guid.Parse("b3000000-0000-0000-0000-000000000003");
+        var assignment4Id = Guid.Parse("b4000000-0000-0000-0000-000000000004");
 
         if (!await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment1Id, cancellationToken))
         {
@@ -1276,6 +1348,23 @@ public class TripService : ITripService
                 ProposedEtaMinutes = 280,
                 Status = AssignmentStatus.Accepted,
                 CreatedAt = now.AddDays(-4),
+                UpdatedAt = now
+            });
+        }
+
+        if (!await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment4Id, cancellationToken))
+        {
+            _dbContext.Assignments.Add(new Assignment
+            {
+                AssignmentId = assignment4Id,
+                LoadId = load4Id,
+                AgencyId = agencyId,
+                WorkflowRunId = workflow4Id,
+                ProposedPrice = 78500.00m,
+                RoutedDistanceKm = 395.5m,
+                ProposedEtaMinutes = 420,
+                Status = AssignmentStatus.Proposed,
+                CreatedAt = now.AddHours(-2),
                 UpdatedAt = now
             });
         }

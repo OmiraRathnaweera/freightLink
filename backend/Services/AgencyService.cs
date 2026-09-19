@@ -183,6 +183,98 @@ public class AgencyService : IAgencyService
         throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
     }
 
+    /// <inheritdoc />
+    public async Task<List<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        var vehicles = await _dbContext.Vehicles.AsNoTracking()
+            .Where(v => v.AgencyId == agencyId)
+            .OrderBy(v => v.RegistrationNo)
+            .ToListAsync(cancellationToken);
+
+        return vehicles.Select(v => new VehicleResponseDto
+        {
+            VehicleId = v.VehicleId,
+            AgencyId = v.AgencyId,
+            RegistrationNo = v.RegistrationNo,
+            VehicleType = v.VehicleType.ToString(),
+            CapacityKg = v.CapacityKg,
+            VolumeM3 = v.VolumeM3,
+            Status = v.Status.ToString(),
+            IsAvailable = v.Status == VehicleStatus.Available,
+            CreatedAt = v.CreatedAt,
+            UpdatedAt = v.UpdatedAt
+        }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<List<DriverResponseDto>> GetDriversAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        var drivers = await _dbContext.Drivers.AsNoTracking()
+            .Include(d => d.User)
+            .Where(d => d.AgencyId == agencyId)
+            .OrderBy(d => d.User.FullName)
+            .ToListAsync(cancellationToken);
+
+        return drivers.Select(d => new DriverResponseDto
+        {
+            DriverId = d.DriverId,
+            UserId = d.UserId,
+            AgencyId = d.AgencyId,
+            FullName = d.User?.FullName ?? string.Empty,
+            Email = d.User?.Email ?? string.Empty,
+            LicenceNo = d.LicenceNo,
+            LicenceExpiry = d.LicenceExpiry,
+            Status = d.Status.ToString(),
+            IsActive = d.Status == DriverStatus.Active,
+            CreatedAt = d.CreatedAt,
+            UpdatedAt = d.UpdatedAt
+        }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        Guid targetAgencyId;
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var staff = await _dbContext.AgencyStaff.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+            if (staff == null)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "No agency staff profile found for caller.");
+            }
+            targetAgencyId = staff.AgencyId;
+        }
+        else if (agencyId.HasValue)
+        {
+            targetAgencyId = agencyId.Value;
+        }
+        else
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Agency ID must be specified.");
+        }
+
+        var agency = await _dbContext.Agencies.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.AgencyId == targetAgencyId, cancellationToken);
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        var vehicles = await GetVehiclesAsync(targetAgencyId, currentUserId, currentUserRole, cancellationToken);
+        var drivers = await GetDriversAsync(targetAgencyId, currentUserId, currentUserRole, cancellationToken);
+
+        return new AgencyFleetResponseDto
+        {
+            AgencyId = targetAgencyId,
+            AgencyName = agency.Name,
+            Vehicles = vehicles,
+            Drivers = drivers
+        };
+    }
+
     private static AgencyResponseDto MapToResponse(Agency agency)
     {
         return new AgencyResponseDto

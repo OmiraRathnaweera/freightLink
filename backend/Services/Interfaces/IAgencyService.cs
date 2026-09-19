@@ -27,4 +27,19 @@ public interface IAgencyService
     /// Updates an existing agency's details.
     /// </summary>
     Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists vehicles belonging to an agency.
+    /// </summary>
+    Task<List<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists drivers belonging to an agency.
+    /// </summary>
+    Task<List<DriverResponseDto>> GetDriversAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves full fleet resources (vehicles and drivers) for an agency.
+    /// </summary>
+    Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

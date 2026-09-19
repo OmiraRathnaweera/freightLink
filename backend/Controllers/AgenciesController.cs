@@ -70,6 +70,50 @@ public class AgenciesController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Lists all vehicles in an agency's fleet.
+    /// </summary>
+    [HttpGet("{id:guid}/vehicles")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<List<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetVehiclesAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Lists all drivers employed by an agency.
+    /// </summary>
+    [HttpGet("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<List<DriverResponseDto>>> GetDrivers(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetDriversAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers).
+    /// </summary>
+    [HttpGet("my/fleet")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetMyFleet(CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetFleetAsync(null, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Retrieves full fleet resources (vehicles + drivers) for a specific agency.
+    /// </summary>
+    [HttpGet("{id:guid}/fleet")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetFleet(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetFleetAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
