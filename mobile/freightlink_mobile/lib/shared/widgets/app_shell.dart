@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../features/auth/providers/auth_provider.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
+import '../../features/trips/screens/job_proposals_screen.dart';
 import 'app_top_bar.dart';
 import 'coming_soon_placeholder.dart';
 
-/// The app's persistent 4-tab shell (Dashboard / Loads / Payments / Reports)
-/// from the mockups. Only the Loads tab is fully built; the rest render a
-/// placeholder — see the implementation plan's "App shell" scope decision.
+/// The app's persistent 4-tab shell (Dashboard / Loads or Proposals / Payments / Reports).
+/// Renders [JobProposalsScreen] for AgencyStaff and [MyLoadsScreen] for Shippers.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -15,12 +17,19 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 1; // Loads tab is the app's real home for now.
+  int _index = 1; // Loads / Proposals tab is the primary operational view.
 
   @override
   Widget build(BuildContext context) {
-    // Admin accounts are rejected at login (see AuthProvider) and never
-    // reach this shell, so there's no Admin-only entry point here anymore.
+    final user = context.watch<AuthProvider>().user;
+    final isAgencyStaff = user?.isAgencyStaff ?? false;
+
+    final primaryOperationalScreen = isAgencyStaff
+        ? const JobProposalsScreen()
+        : const MyLoadsScreen();
+
+    final operationalTabLabel = isAgencyStaff ? 'Proposals' : 'Loads';
+
     final tabs = [
       ComingSoonPlaceholder(
         title: 'Dashboard',
@@ -28,7 +37,7 @@ class _AppShellState extends State<AppShell> {
         bottomLeading: const AppAvatar(),
         actions: const [NotificationBellButton()],
       ),
-      const MyLoadsScreen(),
+      primaryOperationalScreen,
       const ComingSoonPlaceholder(
         title: 'Payments',
         icon: Icons.payments_outlined,
@@ -44,20 +53,20 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (value) => setState(() => _index = value),
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_shipping_outlined),
-            label: 'Loads',
+            icon: Icon(isAgencyStaff ? Icons.assignment_outlined : Icons.local_shipping_outlined),
+            label: operationalTabLabel,
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.payments_outlined),
             label: 'Payments',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.bar_chart_rounded),
             label: 'Reports',
           ),

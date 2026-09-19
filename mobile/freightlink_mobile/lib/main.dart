@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/loads/data/loads_repository.dart';
+import 'features/trips/data/trips_repository.dart';
 import 'shared/widgets/app_shell.dart';
 
 void main() {
@@ -25,6 +26,9 @@ class FreightLinkApp extends StatelessWidget {
         // every request.
         ProxyProvider<AuthProvider, LoadsRepository>(
           update: (_, auth, _) => LoadsRepository(auth.apiClient),
+        ),
+        ProxyProvider<AuthProvider, TripsRepository>(
+          update: (_, auth, _) => TripsRepository(auth.apiClient),
         ),
       ],
       child: MaterialApp(

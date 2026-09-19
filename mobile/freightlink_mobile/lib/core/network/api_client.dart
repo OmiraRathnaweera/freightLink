@@ -89,6 +89,36 @@ class ApiClient {
     );
   }
 
+  Future<dynamic> postMultipart(
+    String path, {
+    required List<int> fileBytes,
+    required String filename,
+    String fieldName = 'file',
+    Map<String, String>? fields,
+  }) {
+    return _send(() async {
+      final request = http.MultipartRequest('POST', _uri(path));
+      final token = authToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          fieldName,
+          fileBytes,
+          filename: filename,
+        ),
+      );
+
+      final streamedResponse = await _http.send(request);
+      return http.Response.fromStream(streamedResponse);
+    });
+  }
+
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     final http.Response response;
     try {

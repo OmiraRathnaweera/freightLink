@@ -29,4 +29,6 @@ class AuthUser {
 
   bool get isAdmin => role == 'Admin';
   bool get isShipper => role == 'Shipper';
+  bool get isAgencyStaff => role == 'AgencyStaff';
+  bool get isDriver => role == 'Driver';
 }
