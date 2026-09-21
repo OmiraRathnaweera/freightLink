@@ -100,8 +100,8 @@ class TripsRepository {
     final body = <String, dynamic>{
       'publicId': publicId,
       'evidenceType': evidenceType,
-      if (lat != null) 'capturedLat': lat,
-      if (lng != null) 'capturedLng': lng,
+      'capturedLat': ?lat,
+      'capturedLng': ?lng,
     };
 
     final json = await _client.post(
@@ -146,5 +146,39 @@ class TripsRepository {
     return json
         .map((e) => TripEvidence.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  /// Lists trips (for AgencyStaff / Driver / Admin) via GET /api/v1/trips.
+  /// When called by a Driver, results are automatically scoped by the backend to that driver.
+  Future<PagedResult<TripResponse>> getTrips({
+    String? status,
+    int page = 1,
+    int pageSize = 20,
+    String? sortBy,
+    String? sortDir,
+  }) async {
+    final query = <String, dynamic>{
+      'page': page,
+      'pageSize': pageSize,
+      if (status != null && status.isNotEmpty) 'status': status,
+      if (sortBy != null && sortBy.isNotEmpty) 'sortBy': sortBy,
+      if (sortDir != null && sortDir.isNotEmpty) 'sortDir': sortDir,
+    };
+
+    final json = await _client.get('/trips', query: query) as Map<String, dynamic>;
+    return PagedResult.fromJson(json, TripResponse.fromJson);
+  }
+
+  /// Convenience method to fetch the driver's currently active assigned trip (if any).
+  /// Queries the driver's trips, finds the first active trip (Assigned, PickedUp, InTransit),
+  /// and fetches its full detail via [getTripById].
+  Future<TripResponse?> getDriverActiveTrip() async {
+    final paged = await getTrips(pageSize: 20, sortBy: 'createdAt', sortDir: 'desc');
+    final active = paged.items.where((t) =>
+      t.isAssigned || t.isPickedUp || t.isInTransit
+    ).firstOrNull;
+
+    if (active == null) return null;
+    return getTripById(active.tripId);
   }
 }

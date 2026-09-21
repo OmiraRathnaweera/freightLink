@@ -10,7 +10,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../data/trips_repository.dart';
-import '../models/trip_evidence.dart';
 import '../models/trip_models.dart';
 import '../services/image_capture_service.dart';
 
@@ -631,7 +630,7 @@ class _ProofOfPickupScreenState extends State<ProofOfPickupScreen> {
         children: [
           const Text(
             'Pickup Notes (Optional)',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: AppColors.ink,

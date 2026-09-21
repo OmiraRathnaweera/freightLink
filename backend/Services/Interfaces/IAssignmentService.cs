@@ -22,4 +22,17 @@ public interface IAssignmentService
     /// Declines a proposed assignment for a load (ADR-017 / ADR-018).
     /// </summary>
     Task<AssignmentResponseDto> DeclineAsync(Guid loadId, DeclineAssignmentDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Approves a proposed assignment or load, creating the real Assignment (Accepted)
+    /// and updating/creating the Trip to Assigned status (ADR-016 / Y3S01-96).
+    /// Records an ApprovalDecision row (Approve) and marks the workflow run as Completed.
+    /// </summary>
+    Task<AssignmentResponseDto> ApproveAsync(Guid assignmentOrLoadId, ApproveAssignmentDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Approves an AI agent workflow run from the admin console (Y3S01-95/96),
+    /// creating the real Assignment (Accepted) and creating/updating the Trip to Assigned status.
+    /// </summary>
+    Task<AssignmentResponseDto> ApproveWorkflowRunAsync(Guid workflowRunId, ApproveWorkflowRunDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

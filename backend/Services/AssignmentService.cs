@@ -153,6 +153,429 @@ public class AssignmentService : IAssignmentService
         return MapToDetail(assignment);
     }
 
+    /// <inheritdoc />
+    public async Task<AssignmentResponseDto> ApproveAsync(
+        Guid assignmentOrLoadId,
+        ApproveAssignmentDto? request,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        var assignment = await _dbContext.Assignments
+            .Include(a => a.Load)
+                .ThenInclude(l => l.ShipperUser)
+            .Include(a => a.Agency)
+            .Include(a => a.WorkflowRun)
+            .Include(a => a.Trip)
+            .FirstOrDefaultAsync(a => a.AssignmentId == assignmentOrLoadId || a.LoadId == assignmentOrLoadId, cancellationToken);
+
+        if (assignment == null)
+        {
+            var isRun = await _dbContext.AgentWorkflowRuns.AnyAsync(r => r.WorkflowRunId == assignmentOrLoadId, cancellationToken);
+            if (isRun)
+            {
+                return await ApproveWorkflowRunAsync(assignmentOrLoadId, new ApproveWorkflowRunDto
+                {
+                    VehicleId = request?.VehicleId,
+                    DriverId = request?.DriverId,
+                    Notes = request?.Notes
+                }, currentUserId, currentUserRole, cancellationToken);
+            }
+
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.ASSIGNMENT_NOT_FOUND, "The requested assignment could not be found.");
+        }
+
+        await EnforceOwnershipAsync(assignment, currentUserId, currentUserRole, cancellationToken);
+
+        if (assignment.Status == AssignmentStatus.Declined)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Declined assignments cannot be approved.");
+        }
+
+        if (assignment.Status == AssignmentStatus.Cancelled)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Cancelled assignments cannot be approved.");
+        }
+
+        if (assignment.Status == AssignmentStatus.Accepted && assignment.Trip != null && assignment.Trip.Status == TripStatus.Assigned)
+        {
+            return MapToDetail(assignment);
+        }
+
+        var (vehicleId, driverId) = await ResolveVehicleAndDriverAsync(assignment.AgencyId, request?.VehicleId, request?.DriverId, cancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
+        assignment.Status = AssignmentStatus.Accepted;
+        assignment.UpdatedAt = now;
+
+        if (assignment.Trip == null)
+        {
+            var tripId = Guid.NewGuid();
+            var trip = new Trip
+            {
+                TripId = tripId,
+                AssignmentId = assignment.AssignmentId,
+                VehicleId = vehicleId,
+                DriverId = driverId,
+                Status = TripStatus.Assigned,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+            _dbContext.Trips.Add(trip);
+            assignment.Trip = trip;
+
+            var tripEvent = new TripEvent
+            {
+                TripEventId = Guid.NewGuid(),
+                TripId = tripId,
+                RecordedByUserId = currentUserId,
+                FromStatus = null,
+                ToStatus = TripStatus.Assigned,
+                Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip created and vehicle/driver assigned upon approval." : request.Notes.Trim(),
+                OccurredAt = now
+            };
+            _dbContext.TripEvents.Add(tripEvent);
+        }
+        else
+        {
+            if (assignment.Trip.Status != TripStatus.Assigned)
+            {
+                var prevStatus = assignment.Trip.Status;
+                assignment.Trip.Status = TripStatus.Assigned;
+                assignment.Trip.VehicleId = vehicleId;
+                assignment.Trip.DriverId = driverId;
+                assignment.Trip.UpdatedAt = now;
+
+                var tripEvent = new TripEvent
+                {
+                    TripEventId = Guid.NewGuid(),
+                    TripId = assignment.Trip.TripId,
+                    RecordedByUserId = currentUserId,
+                    FromStatus = prevStatus,
+                    ToStatus = TripStatus.Assigned,
+                    Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip updated to Assigned status upon approval." : request.Notes.Trim(),
+                    OccurredAt = now
+                };
+                _dbContext.TripEvents.Add(tripEvent);
+            }
+        }
+
+        if (assignment.Load != null)
+        {
+            var prevLoadStatus = assignment.Load.Status;
+            assignment.Load.Status = LoadStatus.Matched;
+            assignment.Load.UpdatedAt = now;
+
+            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            {
+                LoadStatusHistoryId = Guid.NewGuid(),
+                LoadId = assignment.LoadId,
+                FromStatus = prevLoadStatus,
+                ToStatus = LoadStatus.Matched,
+                ChangedByUserId = currentUserId,
+                Reason = "Load matched and assignment approved.",
+                ChangedAt = now
+            });
+        }
+
+        var workflowRun = assignment.WorkflowRun ?? await _dbContext.AgentWorkflowRuns.FirstOrDefaultAsync(r => r.WorkflowRunId == assignment.WorkflowRunId, cancellationToken);
+        if (workflowRun != null)
+        {
+            workflowRun.Status = WorkflowRunStatus.Completed;
+            workflowRun.CompletedAt = now;
+            workflowRun.UpdatedAt = now;
+
+            var hasApproveDecision = await _dbContext.ApprovalDecisions
+                .AnyAsync(d => d.WorkflowRunId == workflowRun.WorkflowRunId && d.Decision == ApprovalDecisionType.Approve, cancellationToken);
+
+            if (!hasApproveDecision)
+            {
+                var seqNo = await _dbContext.ApprovalDecisions
+                    .CountAsync(d => d.WorkflowRunId == workflowRun.WorkflowRunId, cancellationToken) + 1;
+
+                _dbContext.ApprovalDecisions.Add(new ApprovalDecision
+                {
+                    ApprovalDecisionId = Guid.NewGuid(),
+                    WorkflowRunId = workflowRun.WorkflowRunId,
+                    DecidedByUserId = currentUserId,
+                    SequenceNo = Math.Max(1, seqNo),
+                    Decision = ApprovalDecisionType.Approve,
+                    Reason = request?.Notes,
+                    DecidedAt = now
+                });
+            }
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return MapToDetail(assignment);
+    }
+
+    /// <inheritdoc />
+    public async Task<AssignmentResponseDto> ApproveWorkflowRunAsync(
+        Guid workflowRunId,
+        ApproveWorkflowRunDto? request,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only Admin may approve agent workflow runs.");
+        }
+
+        var run = await _dbContext.AgentWorkflowRuns
+            .Include(r => r.Load)
+                .ThenInclude(l => l.ShipperUser)
+            .Include(r => r.MatchCandidates)
+            .Include(r => r.Assignments)
+                .ThenInclude(a => a.Trip)
+            .FirstOrDefaultAsync(r => r.WorkflowRunId == workflowRunId, cancellationToken);
+
+        if (run == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.WORKFLOW_RUN_NOT_FOUND, "The requested workflow run could not be found.");
+        }
+
+        var existingAssignment = run.Assignments.FirstOrDefault(a => a.Status == AssignmentStatus.Proposed || a.Status == AssignmentStatus.Accepted);
+        if (existingAssignment != null)
+        {
+            return await ApproveAsync(existingAssignment.AssignmentId, new ApproveAssignmentDto
+            {
+                VehicleId = request?.VehicleId,
+                DriverId = request?.DriverId,
+                Notes = request?.Notes
+            }, currentUserId, currentUserRole, cancellationToken);
+        }
+
+        Guid agencyId;
+        if (request?.AgencyId.HasValue == true)
+        {
+            agencyId = request.AgencyId.Value;
+        }
+        else
+        {
+            var topCandidate = run.MatchCandidates
+                .Where(c => c.Eligible)
+                .OrderBy(c => c.Rank)
+                .FirstOrDefault();
+
+            if (topCandidate == null)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.NO_ELIGIBLE_MATCH_CANDIDATE, "No eligible agency match candidate found for this workflow run.");
+            }
+            agencyId = topCandidate.AgencyId;
+        }
+
+        var (vehicleId, driverId) = await ResolveVehicleAndDriverAsync(agencyId, request?.VehicleId, request?.DriverId, cancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
+        var proposedPrice = run.Load?.EstimatedPrice ?? 50000m;
+        decimal? routedDistanceKm = null;
+        int? proposedEtaMinutes = null;
+
+        var assignment = new Assignment
+        {
+            AssignmentId = Guid.NewGuid(),
+            LoadId = run.LoadId,
+            AgencyId = agencyId,
+            WorkflowRunId = run.WorkflowRunId,
+            ProposedPrice = proposedPrice,
+            RoutedDistanceKm = routedDistanceKm,
+            ProposedEtaMinutes = proposedEtaMinutes,
+            Status = AssignmentStatus.Accepted,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        _dbContext.Assignments.Add(assignment);
+
+        var tripId = Guid.NewGuid();
+        var trip = new Trip
+        {
+            TripId = tripId,
+            AssignmentId = assignment.AssignmentId,
+            VehicleId = vehicleId,
+            DriverId = driverId,
+            Status = TripStatus.Assigned,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        _dbContext.Trips.Add(trip);
+        assignment.Trip = trip;
+
+        var tripEvent = new TripEvent
+        {
+            TripEventId = Guid.NewGuid(),
+            TripId = tripId,
+            RecordedByUserId = currentUserId,
+            FromStatus = null,
+            ToStatus = TripStatus.Assigned,
+            Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip created upon admin match approval." : request.Notes.Trim(),
+            OccurredAt = now
+        };
+        _dbContext.TripEvents.Add(tripEvent);
+
+        if (run.Load != null)
+        {
+            var prevLoadStatus = run.Load.Status;
+            run.Load.Status = LoadStatus.Matched;
+            run.Load.UpdatedAt = now;
+
+            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            {
+                LoadStatusHistoryId = Guid.NewGuid(),
+                LoadId = run.LoadId,
+                FromStatus = prevLoadStatus,
+                ToStatus = LoadStatus.Matched,
+                ChangedByUserId = currentUserId,
+                Reason = "Load matched and assignment approved by admin.",
+                ChangedAt = now
+            });
+        }
+
+        run.Status = WorkflowRunStatus.Completed;
+        run.CompletedAt = now;
+        run.UpdatedAt = now;
+
+        var seqNo = await _dbContext.ApprovalDecisions
+            .CountAsync(d => d.WorkflowRunId == run.WorkflowRunId, cancellationToken) + 1;
+
+        _dbContext.ApprovalDecisions.Add(new ApprovalDecision
+        {
+            ApprovalDecisionId = Guid.NewGuid(),
+            WorkflowRunId = run.WorkflowRunId,
+            DecidedByUserId = currentUserId,
+            SequenceNo = Math.Max(1, seqNo),
+            Decision = ApprovalDecisionType.Approve,
+            Reason = request?.Notes,
+            DecidedAt = now
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return await GetByIdAsync(assignment.AssignmentId, currentUserId, currentUserRole, cancellationToken);
+    }
+
+    private async Task<(Guid VehicleId, Guid DriverId)> ResolveVehicleAndDriverAsync(
+        Guid agencyId,
+        Guid? requestedVehicleId,
+        Guid? requestedDriverId,
+        CancellationToken cancellationToken)
+    {
+        Guid vehicleId;
+        if (requestedVehicleId.HasValue)
+        {
+            var vehicle = await _dbContext.Vehicles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(v => v.VehicleId == requestedVehicleId.Value, cancellationToken);
+
+            if (vehicle == null)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.VEHICLE_NOT_FOUND, "The requested vehicle could not be found.");
+            }
+
+            if (vehicle.AgencyId != agencyId)
+            {
+                throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VEHICLE_NOT_OWNED, "The assigned vehicle must belong to the executing agency.");
+            }
+
+            if (vehicle.Status == VehicleStatus.Maintenance || vehicle.Status == VehicleStatus.Retired)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.VEHICLE_UNAVAILABLE, "The selected vehicle is not available (in maintenance or retired).");
+            }
+
+            var isVehicleBusy = await _dbContext.Trips
+                .AnyAsync(t => t.VehicleId == requestedVehicleId.Value &&
+                               (t.Status == TripStatus.Assigned || t.Status == TripStatus.PickedUp || t.Status == TripStatus.InTransit),
+                          cancellationToken);
+
+            if (isVehicleBusy)
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.VEHICLE_UNAVAILABLE, "The selected vehicle is currently engaged in another active trip.");
+            }
+
+            vehicleId = vehicle.VehicleId;
+        }
+        else
+        {
+            var busyVehicleIds = await _dbContext.Trips
+                .Where(t => t.Status == TripStatus.Assigned || t.Status == TripStatus.PickedUp || t.Status == TripStatus.InTransit)
+                .Select(t => t.VehicleId)
+                .ToListAsync(cancellationToken);
+
+            var availableVehicle = await _dbContext.Vehicles
+                .Where(v => v.AgencyId == agencyId &&
+                            v.Status != VehicleStatus.Maintenance &&
+                            v.Status != VehicleStatus.Retired &&
+                            !busyVehicleIds.Contains(v.VehicleId))
+                .OrderBy(v => v.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (availableVehicle == null)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.VEHICLE_UNAVAILABLE, "No available active vehicle found for the agency. Please specify a vehicle.");
+            }
+
+            vehicleId = availableVehicle.VehicleId;
+        }
+
+        Guid driverId;
+        if (requestedDriverId.HasValue)
+        {
+            var driver = await _dbContext.Drivers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.DriverId == requestedDriverId.Value, cancellationToken);
+
+            if (driver == null)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DRIVER_NOT_FOUND, "The requested driver could not be found.");
+            }
+
+            if (driver.AgencyId != agencyId)
+            {
+                throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.DRIVER_NOT_OWNED, "The assigned driver must belong to the executing agency.");
+            }
+
+            if (driver.Status != DriverStatus.Active)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.DRIVER_UNAVAILABLE, "The selected driver is not active.");
+            }
+
+            var isDriverBusy = await _dbContext.Trips
+                .AnyAsync(t => t.DriverId == requestedDriverId.Value &&
+                               (t.Status == TripStatus.Assigned || t.Status == TripStatus.PickedUp || t.Status == TripStatus.InTransit),
+                          cancellationToken);
+
+            if (isDriverBusy)
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_UNAVAILABLE, "The selected driver is currently engaged in another active trip.");
+            }
+
+            driverId = driver.DriverId;
+        }
+        else
+        {
+            var busyDriverIds = await _dbContext.Trips
+                .Where(t => t.Status == TripStatus.Assigned || t.Status == TripStatus.PickedUp || t.Status == TripStatus.InTransit)
+                .Select(t => t.DriverId)
+                .ToListAsync(cancellationToken);
+
+            var availableDriver = await _dbContext.Drivers
+                .Where(d => d.AgencyId == agencyId && d.Status == DriverStatus.Active && !busyDriverIds.Contains(d.DriverId))
+                .OrderBy(d => d.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (availableDriver == null)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.DRIVER_UNAVAILABLE, "No available active driver found for the agency. Please specify a driver.");
+            }
+
+            driverId = availableDriver.DriverId;
+        }
+
+        return (vehicleId, driverId);
+    }
+
     private async Task EnforceOwnershipAsync(Assignment assignment, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {
         if (currentUserRole == UserRole.Admin) return;

@@ -62,6 +62,18 @@ public class AssignmentsController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Approves a proposed assignment or load, creating the real Assignment (Accepted)
+    /// and creating/updating the Trip to Assigned status (ADR-016 / Y3S01-96).
+    /// </summary>
+    [HttpPost("{id:guid}/approve")]
+    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    public async Task<ActionResult<AssignmentResponseDto>> Approve(Guid id, [FromBody] ApproveAssignmentDto? request, CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.ApproveAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);

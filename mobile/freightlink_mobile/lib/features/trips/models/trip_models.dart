@@ -37,6 +37,14 @@ class TripResponse {
     required this.status,
     this.pickupAddress,
     this.dropoffAddress,
+    this.cargoDescription,
+    this.weightKg,
+    this.volumeM3,
+    this.pickupWindowStart,
+    this.pickupWindowEnd,
+    this.referenceCode,
+    this.routedDistanceKm,
+    this.proposedEtaMinutes,
     this.evidence = const [],
     required this.createdAt,
     this.updatedAt,
@@ -46,6 +54,17 @@ class TripResponse {
     DateTime parseDate(dynamic value) {
       if (value == null) return DateTime.now();
       return DateTime.tryParse(value.toString()) ?? DateTime.now();
+    }
+
+    DateTime? tryParseDate(dynamic value) {
+      if (value == null) return null;
+      return DateTime.tryParse(value.toString());
+    }
+
+    double? parseDouble(dynamic value) {
+      if (value == null) return null;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString());
     }
 
     final evidenceList = (json['evidence'] as List<dynamic>?)
@@ -66,6 +85,14 @@ class TripResponse {
       status: json['status'] as String? ?? 'Assigned',
       pickupAddress: json['pickupAddress'] as String?,
       dropoffAddress: json['dropoffAddress'] as String?,
+      cargoDescription: json['cargoDescription'] as String?,
+      weightKg: parseDouble(json['weightKg']),
+      volumeM3: parseDouble(json['volumeM3']),
+      pickupWindowStart: tryParseDate(json['pickupWindowStart']),
+      pickupWindowEnd: tryParseDate(json['pickupWindowEnd']),
+      referenceCode: json['referenceCode'] as String?,
+      routedDistanceKm: parseDouble(json['routedDistanceKm']),
+      proposedEtaMinutes: json['proposedEtaMinutes'] as int?,
       evidence: evidenceList,
       createdAt: parseDate(json['createdAt']),
       updatedAt: json['updatedAt'] != null ? parseDate(json['updatedAt']) : null,
@@ -84,6 +111,14 @@ class TripResponse {
   final String status;
   final String? pickupAddress;
   final String? dropoffAddress;
+  final String? cargoDescription;
+  final double? weightKg;
+  final double? volumeM3;
+  final DateTime? pickupWindowStart;
+  final DateTime? pickupWindowEnd;
+  final String? referenceCode;
+  final double? routedDistanceKm;
+  final int? proposedEtaMinutes;
   final List<TripEvidence> evidence;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -99,4 +134,29 @@ class TripResponse {
   bool get hasDeliveryProof => evidence.any((e) => e.isDeliveryProof);
   TripEvidence? get pickupProof =>
       evidence.where((e) => e.isPickupProof).firstOrNull;
+  TripEvidence? get deliveryProof =>
+      evidence.where((e) => e.isDeliveryProof).firstOrNull;
+
+  String get formattedDistance =>
+      routedDistanceKm != null ? '${routedDistanceKm!.toStringAsFixed(1)} km' : 'Distance TBD';
+
+  String get formattedDuration {
+    if (proposedEtaMinutes == null) return 'Duration TBD';
+    final hours = proposedEtaMinutes! ~/ 60;
+    final minutes = proposedEtaMinutes! % 60;
+    if (hours > 0 && minutes > 0) return '${hours}h ${minutes}m';
+    if (hours > 0) return '${hours}h transit';
+    return '${minutes}m transit';
+  }
+
+  String get formattedCargoSummary {
+    final parts = <String>[];
+    if (weightKg != null) {
+      parts.add('${weightKg!.toStringAsFixed(0)} kg');
+    }
+    if (volumeM3 != null) {
+      parts.add('${volumeM3!.toStringAsFixed(1)} m³');
+    }
+    return parts.join(' • ');
+  }
 }

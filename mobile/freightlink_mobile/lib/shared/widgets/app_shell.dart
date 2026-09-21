@@ -3,12 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
+import '../../features/trips/screens/driver_assigned_trip_screen.dart';
 import '../../features/trips/screens/job_proposals_screen.dart';
 import 'app_top_bar.dart';
 import 'coming_soon_placeholder.dart';
 
-/// The app's persistent 4-tab shell (Dashboard / Loads or Proposals / Payments / Reports).
-/// Renders [JobProposalsScreen] for AgencyStaff and [MyLoadsScreen] for Shippers.
+/// The app's persistent 4-tab shell (Dashboard / Loads, Proposals, or My Trip / Payments / Reports).
+/// Renders [DriverAssignedTripScreen] for Drivers, [JobProposalsScreen] for AgencyStaff, and [MyLoadsScreen] for Shippers.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -17,18 +18,31 @@ class AppShell extends StatefulWidget {
 }
 
 class _AppShellState extends State<AppShell> {
-  int _index = 1; // Loads / Proposals tab is the primary operational view.
+  int _index = 1; // Loads / Proposals / My Trip tab is the primary operational view.
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final isAgencyStaff = user?.isAgencyStaff ?? false;
+    final isDriver = user?.isDriver ?? false;
 
-    final primaryOperationalScreen = isAgencyStaff
-        ? const JobProposalsScreen()
-        : const MyLoadsScreen();
+    final primaryOperationalScreen = isDriver
+        ? const DriverAssignedTripScreen()
+        : isAgencyStaff
+            ? const JobProposalsScreen()
+            : const MyLoadsScreen();
 
-    final operationalTabLabel = isAgencyStaff ? 'Proposals' : 'Loads';
+    final operationalTabLabel = isDriver
+        ? 'My Trip'
+        : isAgencyStaff
+            ? 'Proposals'
+            : 'Loads';
+
+    final operationalTabIcon = isDriver
+        ? Icons.navigation_outlined
+        : isAgencyStaff
+            ? Icons.assignment_outlined
+            : Icons.local_shipping_outlined;
 
     final tabs = [
       ComingSoonPlaceholder(
@@ -59,7 +73,7 @@ class _AppShellState extends State<AppShell> {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(isAgencyStaff ? Icons.assignment_outlined : Icons.local_shipping_outlined),
+            icon: Icon(operationalTabIcon),
             label: operationalTabLabel,
           ),
           const BottomNavigationBarItem(

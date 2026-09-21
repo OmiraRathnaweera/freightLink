@@ -243,6 +243,7 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
     );
 
     if (shouldDecline != true) return;
+    if (!mounted) return;
 
     setState(() {
       _isDeclining = true;

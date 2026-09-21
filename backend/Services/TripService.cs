@@ -41,6 +41,8 @@ public class TripService : ITripService
             .AsNoTracking()
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Agency)
+            .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
             .Include(t => t.Driver)
                 .ThenInclude(d => d.User)
             .Include(t => t.Vehicle);
@@ -451,6 +453,9 @@ public class TripService : ITripService
         VehicleId = t.VehicleId,
         DriverId = t.DriverId,
         DriverName = t.Driver?.User?.FullName,
+        PickupAddress = t.Assignment?.Load?.PickupAddress,
+        DropoffAddress = t.Assignment?.Load?.DropoffAddress,
+        ReferenceCode = t.Assignment?.Load?.ReferenceCode,
         Status = t.Status.ToString(),
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt
@@ -473,6 +478,14 @@ public class TripService : ITripService
         PickupLng = t.Assignment?.Load?.PickupLng,
         DropoffLat = t.Assignment?.Load?.DropoffLat,
         DropoffLng = t.Assignment?.Load?.DropoffLng,
+        CargoDescription = t.Assignment?.Load?.CargoDescription,
+        WeightKg = t.Assignment?.Load?.WeightKg,
+        VolumeM3 = t.Assignment?.Load?.VolumeM3,
+        PickupWindowStart = t.Assignment?.Load?.PickupWindowStart,
+        PickupWindowEnd = t.Assignment?.Load?.PickupWindowEnd,
+        ReferenceCode = t.Assignment?.Load?.ReferenceCode,
+        RoutedDistanceKm = t.Assignment?.RoutedDistanceKm,
+        ProposedEtaMinutes = t.Assignment?.ProposedEtaMinutes,
         Status = t.Status.ToString(),
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt,
