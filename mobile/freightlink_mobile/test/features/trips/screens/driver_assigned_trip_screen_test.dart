@@ -151,7 +151,7 @@ void main() {
 
     await pumpApp(
       tester,
-      const DriverAssignedTripScreen(),
+      const DriverAssignedTripScreen(enableAutoPolling: false),
       tripsRepository: mockTripsRepo,
       authProvider: mockAuthProvider,
     );
@@ -183,6 +183,10 @@ void main() {
 
     // Verify Header & Status
     expect(find.byKey(const Key('active_trip_view')), findsOneWidget);
+    expect(find.byKey(const Key('new_assignment_banner')), findsOneWidget);
+    expect(find.text('New Assigned Trip (Post-Approval)'), findsOneWidget);
+    expect(find.byKey(const Key('assigned_status_card')), findsOneWidget);
+    expect(find.text('Awaiting Pickup Verification'), findsOneWidget);
     expect(find.text('TRIP #C2000000'), findsOneWidget);
     expect(find.text('ASSIGNED'), findsOneWidget);
     expect(find.text('Load Ref: LD-KLY-GAL-02'), findsOneWidget);
@@ -262,7 +266,7 @@ void main() {
 
     await pumpApp(
       tester,
-      const DriverAssignedTripScreen(),
+      const DriverAssignedTripScreen(enableAutoPolling: false),
       tripsRepository: mockTripsRepo,
       authProvider: mockAuthProvider,
     );
@@ -284,7 +288,7 @@ void main() {
 
     await pumpApp(
       tester,
-      const DriverAssignedTripScreen(),
+      const DriverAssignedTripScreen(enableAutoPolling: false),
       tripsRepository: mockTripsRepo,
       authProvider: mockAuthProvider,
     );
@@ -295,5 +299,52 @@ void main() {
     expect(find.text('Trip In Transit'), findsOneWidget);
     expect(find.byKey(const Key('capture_delivery_proof_button')), findsOneWidget);
     expect(find.text('Complete Delivery & Capture Proof'), findsOneWidget);
+  });
+
+  testWidgets(
+      'DriverAssignedTripScreen updates from empty state to assigned trip when Check for Assignments is tapped (Y3S01-99)',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    var fetchCount = 0;
+    when(() => mockTripsRepo.getDriverActiveTrip()).thenAnswer((_) async {
+      fetchCount++;
+      // First call (initial): no trip assigned yet
+      if (fetchCount == 1) return null;
+      // Subsequent call (post-approval): newly assigned trip appears!
+      return sampleAssignedTrip;
+    });
+
+    await pumpApp(
+      tester,
+      const DriverAssignedTripScreen(enableAutoPolling: false),
+      tripsRepository: mockTripsRepo,
+      authProvider: mockAuthProvider,
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify initial empty state while waiting for Admin approval
+    expect(find.byKey(const Key('empty_trip_card')), findsOneWidget);
+    expect(find.text('No Active Trip Assigned'), findsOneWidget);
+    expect(find.byKey(const Key('check_assignments_button')), findsOneWidget);
+    expect(find.byKey(const Key('active_trip_view')), findsNothing);
+
+    // Admin approves in React console -> Driver taps 'Check for Assignments' in Flutter
+    await tester.tap(find.byKey(const Key('check_assignments_button')));
+    await tester.pumpAndSettle();
+
+    // Verify newly assigned trip appears post-approval
+    expect(find.byKey(const Key('empty_trip_card')), findsNothing);
+    expect(find.byKey(const Key('active_trip_view')), findsOneWidget);
+    expect(find.byKey(const Key('new_assignment_banner')), findsOneWidget);
+    expect(find.text('New Assigned Trip (Post-Approval)'), findsOneWidget);
+    expect(find.text('ASSIGNED'), findsOneWidget);
+    expect(find.text('Kelaniya Distribution Hub, Peliyagoda'), findsOneWidget);
+    expect(find.text('Galle Port Warehouse Complex, Galle'), findsOneWidget);
+    expect(find.text('WP-DA-8920'), findsOneWidget);
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +23,7 @@ class DriverAssignedTripScreen extends StatefulWidget {
     super.key,
     this.tripsRepository,
     this.initialTrip,
+    this.enableAutoPolling = true,
   });
 
   /// Optional repository override for testing.
@@ -29,19 +32,25 @@ class DriverAssignedTripScreen extends StatefulWidget {
   /// Optional initial trip for widget tests or instant display.
   final TripResponse? initialTrip;
 
+  /// Whether to automatically poll for new assignments when empty.
+  final bool enableAutoPolling;
+
   @override
   State<DriverAssignedTripScreen> createState() => _DriverAssignedTripScreenState();
 }
 
-class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen> {
+class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
+    with WidgetsBindingObserver {
   TripResponse? _trip;
   bool _isLoading = false;
   bool _isAdvancing = false;
   String? _errorMessage;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.initialTrip != null) {
       _trip = widget.initialTrip;
     } else {
@@ -49,14 +58,46 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen> {
     }
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolling();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _trip == null) {
+      _loadTrip(isSilent: true);
+    }
+  }
+
+  void _startPollingIfEmpty() {
+    if (!widget.enableAutoPolling) return;
+    _stopPolling();
+    if (_trip == null && mounted) {
+      _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (!mounted || _trip != null || _isLoading) return;
+        _loadTrip(isSilent: true);
+      });
+    }
+  }
+
+  void _stopPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+  }
+
   TripsRepository get _repository =>
       widget.tripsRepository ?? context.read<TripsRepository>();
 
-  Future<void> _loadTrip() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadTrip({bool isSilent = false}) async {
+    if (!isSilent) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final activeTrip = await _repository.getDriverActiveTrip();
@@ -65,18 +106,27 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen> {
         _trip = activeTrip;
         _isLoading = false;
       });
+      if (activeTrip != null) {
+        _stopPolling();
+      } else {
+        _startPollingIfEmpty();
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = e.message;
-        _isLoading = false;
-      });
+      if (!isSilent) {
+        setState(() {
+          _errorMessage = e.message;
+          _isLoading = false;
+        });
+      }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _errorMessage = 'Failed to load assigned trip. Please try again.';
-        _isLoading = false;
-      });
+      if (!isSilent) {
+        setState(() {
+          _errorMessage = 'Failed to load assigned trip. Please try again.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -302,6 +352,10 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen> {
       key: const Key('active_trip_view'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (trip.isAssigned) ...[
+          _buildNewAssignmentBanner(trip),
+          const SizedBox(height: AppConstants.spaceLg),
+        ],
         _buildHeaderCard(trip),
         const SizedBox(height: AppConstants.spaceLg),
         _buildRouteCard(trip),
@@ -312,6 +366,83 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen> {
         const SizedBox(height: AppConstants.spaceXl),
         _buildActionCard(trip),
       ],
+    );
+  }
+
+  Widget _buildNewAssignmentBanner(TripResponse trip) {
+    return Container(
+      key: const Key('new_assignment_banner'),
+      padding: const EdgeInsets.all(AppConstants.spaceLg),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppConstants.radiusLg),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.assignment_turned_in_rounded,
+              color: AppColors.onPrimary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: AppConstants.spaceMd),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'New Assigned Trip (Post-Approval)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Admin approved AI match candidate. You have been assigned to transport this load. Review pickup window and cargo requirements below.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.ink,
+                    height: 1.35,
+                  ),
+                ),
+                if (trip.referenceCode != null && trip.referenceCode!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(
+                      'Assigned Load: ${trip.referenceCode}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.inkMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -694,23 +825,50 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen> {
   Widget _buildActionCard(TripResponse trip) {
     if (trip.isAssigned) {
       return Container(
-        padding: const EdgeInsets.all(AppConstants.spaceMd),
+        key: const Key('assigned_status_card'),
+        padding: const EdgeInsets.all(AppConstants.spaceLg),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppConstants.radiusMd),
           border: Border.all(color: AppColors.border),
         ),
-        child: const Row(
+        child: Row(
           children: [
-            Icon(Icons.hourglass_top_rounded, color: AppColors.inkMuted, size: 20),
-            SizedBox(width: AppConstants.spaceMd),
-            Expanded(
-              child: Text(
-                'Waiting for agency dispatcher to confirm loading and capture pickup proof.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.inkMuted,
-                ),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.statusMatchedBg,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hourglass_top_rounded,
+                color: AppColors.statusMatchedFg,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: AppConstants.spaceMd),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Awaiting Pickup Verification',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Trip finalized post-approval. Waiting for agency dispatcher to confirm cargo loading and record pickup photo proof.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.inkMuted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
