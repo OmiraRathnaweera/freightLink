@@ -5,9 +5,15 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using FreightLink.Api.Data;
+using FreightLink.Api.DTOs.Assignments;
 using FreightLink.Api.DTOs.Auth;
+using FreightLink.Api.DTOs.Common;
 using FreightLink.Api.DTOs.Trips;
+using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -31,10 +37,12 @@ namespace FreightLink.Api.Tests.Integration;
 public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly HttpClient _client;
+    private readonly CustomWebApplicationFactory _factory;
 
     /// <summary>Creates the test class with an HTTP client bound to the shared in-process test host.</summary>
     public TripsControllerTests(CustomWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -502,5 +510,238 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    private static string MintTokenForUser(Guid userId, UserRole role)
+    {
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("integration-test-signing-key-that-is-long-enough-1234567890"));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new(ClaimTypes.NameIdentifier, userId.ToString()),
+            new(ClaimTypes.Role, role.ToString())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: "FreightLinkApi",
+            audience: "FreightLinkClient",
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    [Fact]
+    public async Task Driver_SeesNewAssignedTrip_AfterAdminApprovesWorkflow()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var adminUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var driverUserId = Guid.NewGuid();
+        var agencyId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var adminUser = new User
+        {
+            UserId = adminUserId,
+            FullName = "Admin Operator",
+            Email = $"admin-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Admin,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(adminUser);
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Shipper One",
+            Email = $"shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var driverUser = new User
+        {
+            UserId = driverUserId,
+            FullName = "Assigned Driver Kamal",
+            Email = $"driver-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Driver,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(driverUser);
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Samagi Express Logistics",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Peliyagoda Yard",
+            YardLat = 6.95m,
+            YardLng = 79.88m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var vehicle = new Vehicle
+        {
+            VehicleId = vehicleId,
+            AgencyId = agencyId,
+            RegistrationNo = "WP-KA-4521",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 6000,
+            VolumeM3 = 25,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Vehicles.Add(vehicle);
+
+        var driver = new Driver
+        {
+            DriverId = driverId,
+            UserId = driverUserId,
+            AgencyId = agencyId,
+            LicenceNo = "LIC-KAMAL-99",
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
+            Status = DriverStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Drivers.Add(driver);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-{Guid.NewGuid():N}"[..11],
+            CargoDescription = "High-Capacity Solar Inverters & Batteries",
+            WeightKg = 2400,
+            VolumeM3 = 10,
+            PickupAddress = "Kelaniya Distribution Hub, Peliyagoda",
+            PickupLat = 6.96m,
+            PickupLng = 79.91m,
+            DropoffAddress = "Galle Port Warehouse Complex, Galle",
+            DropoffLat = 6.04m,
+            DropoffLng = 80.22m,
+            PickupWindowStart = DateTimeOffset.UtcNow.AddHours(2),
+            PickupWindowEnd = DateTimeOffset.UtcNow.AddHours(6),
+            EstimatedPrice = 50000m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.AwaitingApproval,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 50000m,
+            RoutedDistanceKm = 125m,
+            ProposedEtaMinutes = 150,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        // 1. Admin clicks "Approve" on React Console (Y3S01-96)
+        var adminToken = MintTokenForUser(adminUserId, UserRole.Admin);
+        var approveReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{assignmentId}/approve")
+        {
+            Content = JsonContent.Create(new ApproveAssignmentDto
+            {
+                VehicleId = vehicleId,
+                DriverId = driverId,
+                Notes = "Approved by Admin on React console."
+            })
+        };
+        approveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var approveRes = await _client.SendAsync(approveReq);
+        Assert.Equal(HttpStatusCode.OK, approveRes.StatusCode);
+
+        var approveBody = await approveRes.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(approveBody);
+        Assert.Equal("Accepted", approveBody.Status);
+        Assert.NotNull(approveBody.TripId);
+        var tripId = approveBody.TripId!.Value;
+
+        // 2. Driver checks assigned trips (GET /api/v1/trips) in Flutter view
+        var driverToken = MintTokenForUser(driverUserId, UserRole.Driver);
+        var driverListReq = new HttpRequestMessage(HttpMethod.Get, "/api/v1/trips");
+        driverListReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", driverToken);
+
+        var driverListRes = await _client.SendAsync(driverListReq);
+        Assert.Equal(HttpStatusCode.OK, driverListRes.StatusCode);
+
+        var driverList = await driverListRes.Content.ReadFromJsonAsync<PagedTripResponseDto>();
+        Assert.NotNull(driverList);
+        Assert.NotEmpty(driverList.Items);
+        var myTrip = driverList.Items.FirstOrDefault(t => t.TripId == tripId);
+        Assert.NotNull(myTrip);
+        Assert.Equal("Assigned", myTrip.Status);
+        Assert.Equal(driverId, myTrip.DriverId);
+        Assert.Equal("Assigned Driver Kamal", myTrip.DriverName);
+        Assert.Equal(vehicleId, myTrip.VehicleId);
+        Assert.Equal("Kelaniya Distribution Hub, Peliyagoda", myTrip.PickupAddress);
+        Assert.Equal("Galle Port Warehouse Complex, Galle", myTrip.DropoffAddress);
+
+        // 3. Driver opens trip detail (GET /api/v1/trips/{tripId})
+        var driverDetailReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/trips/{tripId}");
+        driverDetailReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", driverToken);
+
+        var driverDetailRes = await _client.SendAsync(driverDetailReq);
+        Assert.Equal(HttpStatusCode.OK, driverDetailRes.StatusCode);
+
+        var driverDetail = await driverDetailRes.Content.ReadFromJsonAsync<TripResponseDto>();
+        Assert.NotNull(driverDetail);
+        Assert.Equal(tripId, driverDetail.TripId);
+        Assert.Equal("Assigned", driverDetail.Status);
+        Assert.Equal("WP-KA-4521", driverDetail.VehicleRegistrationNo);
+        Assert.Equal("High-Capacity Solar Inverters & Batteries", driverDetail.CargoDescription);
+        Assert.Equal(2400m, driverDetail.WeightKg);
+        Assert.Equal(10m, driverDetail.VolumeM3);
+        Assert.Equal(125m, driverDetail.RoutedDistanceKm);
+        Assert.Equal(150, driverDetail.ProposedEtaMinutes);
     }
 }
