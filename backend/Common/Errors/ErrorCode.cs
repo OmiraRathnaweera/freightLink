@@ -88,10 +88,7 @@ public enum ErrorCode
 
     /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
     FILE_IN_USE,
-
-    /// <summary>The requested trip could not be found.</summary>
-    TRIP_NOT_FOUND,
-
+    
     /// <summary>Invoice generation on delivery requires the trip to be in Delivered status.</summary>
     TRIP_NOT_DELIVERED,
 
