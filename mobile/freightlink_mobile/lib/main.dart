@@ -6,6 +6,7 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/loads/data/loads_repository.dart';
+import 'features/notifications/providers/notification_provider.dart';
 import 'features/trips/data/trips_repository.dart';
 import 'shared/widgets/app_shell.dart';
 
@@ -21,6 +22,7 @@ class FreightLinkApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()..bootstrap()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
         // LoadsRepository wraps AuthProvider's single ApiClient instance, so
         // it always sees the current auth token without being rebuilt on
         // every request.
