@@ -43,7 +43,15 @@ function TripDetailPage() {
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const tripQuery = useTripDetailQuery(tripId);
+  const tripQuery = useTripDetailQuery(tripId, {
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "Assigned" || status === "PickedUp" || status === "InTransit") {
+        return 4000;
+      }
+      return false;
+    },
+  });
   const role = useAppSelector((state) => state.auth.role);
 
   if (tripQuery.isLoading) {
@@ -134,6 +142,16 @@ function TripDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => tripQuery.refetch()}
+            disabled={tripQuery.isFetching}
+            className="inline-flex items-center gap-1.5"
+            title="Refresh trip monitor"
+          >
+            <RefreshCw className={`h-4 w-4 ${tripQuery.isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           {canEdit && (
             <Button
               variant="secondary"

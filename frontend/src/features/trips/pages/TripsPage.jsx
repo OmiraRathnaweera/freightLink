@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Truck } from "lucide-react";
+import { Plus, RefreshCw, Truck } from "lucide-react";
 import PageHeader from "../../../components/PageHeader.jsx";
 import Button from "../../../components/Button.jsx";
 import Card from "../../../components/Card.jsx";
@@ -40,7 +40,7 @@ function TripsPage() {
     [page, pageSize, sortBy, sortDir, status]
   );
 
-  const tripsQuery = useTripsQuery(apiParams);
+  const tripsQuery = useTripsQuery(apiParams, { refetchInterval: 10000 });
 
   function updateParams(patch, { resetPage = true } = {}) {
     const next = new URLSearchParams(searchParams);
@@ -69,16 +69,28 @@ function TripsPage() {
         title="Active Trips"
         description="Monitor active and in-progress trips, track statuses, and view proof evidence."
         actions={
-          (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) && (
+          <div className="flex items-center gap-2">
             <Button
-              variant="primary"
-              onClick={() => setIsCreateDialogOpen(true)}
+              variant="secondary"
+              onClick={() => tripsQuery.refetch()}
+              disabled={tripsQuery.isFetching}
               className="inline-flex items-center gap-1.5"
+              title="Refresh active trips"
             >
-              <Plus className="h-4 w-4" />
-              Dispatch Trip
+              <RefreshCw className={`h-4 w-4 ${tripsQuery.isFetching ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
-          )
+            {(role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) && (
+              <Button
+                variant="primary"
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="inline-flex items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Dispatch Trip
+              </Button>
+            )}
+          </div>
         }
       />
 
