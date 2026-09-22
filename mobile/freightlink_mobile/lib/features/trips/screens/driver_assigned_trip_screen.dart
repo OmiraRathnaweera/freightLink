@@ -11,6 +11,8 @@ import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../notifications/models/in_app_notification.dart';
+import '../../notifications/providers/notification_provider.dart';
 import '../data/trips_repository.dart';
 import '../models/trip_models.dart';
 import 'proof_of_delivery_screen.dart';
@@ -46,6 +48,7 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
   bool _isAdvancing = false;
   String? _errorMessage;
   Timer? _pollTimer;
+  bool _isInitialFetch = true;
 
   @override
   void initState() {
@@ -53,6 +56,7 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
     WidgetsBinding.instance.addObserver(this);
     if (widget.initialTrip != null) {
       _trip = widget.initialTrip;
+      _isInitialFetch = false;
     } else {
       _loadTrip();
     }
@@ -102,6 +106,30 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
     try {
       final activeTrip = await _repository.getDriverActiveTrip();
       if (!mounted) return;
+
+      final wasInitial = _isInitialFetch;
+      _isInitialFetch = false;
+
+      if (!wasInitial && _trip?.tripId != activeTrip?.tripId && activeTrip != null && activeTrip.isAssigned) {
+        NotificationProvider? notifProvider;
+        try {
+          notifProvider = Provider.of<NotificationProvider>(context, listen: false);
+        } catch (_) {
+          notifProvider = null;
+        }
+
+        final tripCode = activeTrip.tripId.length > 8
+            ? activeTrip.tripId.substring(0, 8).toUpperCase()
+            : activeTrip.tripId.toUpperCase();
+
+        notifProvider?.pushNotification(
+          title: 'New Trip Assigned!',
+          message: 'Trip #$tripCode has been assigned to your vehicle.',
+          category: NotificationCategory.tripAssigned,
+          referenceId: activeTrip.tripId,
+        );
+      }
+
       setState(() {
         _trip = activeTrip;
         _isLoading = false;
@@ -193,6 +221,7 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
                   subtitle: driverName,
                   leading: const AppAvatar(),
                   actions: [
+                    const NotificationBellButton(),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded, color: AppColors.ink),
                       tooltip: 'Refresh',

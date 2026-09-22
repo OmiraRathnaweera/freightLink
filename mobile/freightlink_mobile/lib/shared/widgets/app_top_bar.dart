@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/notifications/providers/notification_provider.dart';
+import '../../features/notifications/widgets/notification_center_sheet.dart';
 
 /// The persistent top bar from the mockups: a leading avatar/back button, a
 /// bold title (with an optional subtitle line), and trailing actions (the
@@ -192,15 +194,45 @@ class NotificationBellButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    NotificationProvider? provider;
+    try {
+      provider = Provider.of<NotificationProvider>(context, listen: true);
+    } catch (_) {
+      provider = null;
+    }
+
+    final unreadCount = provider?.unreadCount ?? 0;
+
+    final bellIcon = unreadCount > 0
+        ? Badge(
+            key: const Key('notification_bell_badge'),
+            backgroundColor: AppColors.statusErrorFg,
+            label: Text(
+              '$unreadCount',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+            child: const Icon(Icons.notifications_rounded),
+          )
+        : const Icon(Icons.notifications_none_rounded);
+
     return IconButton(
-      icon: const Icon(Icons.notifications_none_rounded),
-      onPressed:
-          onPressed ??
+      key: const Key('notification_bell_button'),
+      icon: bellIcon,
+      onPressed: onPressed ??
           () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No new notifications')),
-            );
+            if (provider != null) {
+              NotificationCenterSheet.show(context);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('No new notifications')),
+              );
+            }
           },
     );
   }
 }
+

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
+import '../../features/notifications/widgets/in_app_push_banner.dart';
 import '../../features/trips/screens/driver_assigned_trip_screen.dart';
 import '../../features/trips/screens/job_proposals_screen.dart';
 import 'app_top_bar.dart';
@@ -63,7 +64,12 @@ class _AppShellState extends State<AppShell> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _index, children: tabs),
+      body: Stack(
+        children: [
+          IndexedStack(index: _index, children: tabs),
+          const InAppPushBanner(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _index,
         onTap: (value) => setState(() => _index = value),

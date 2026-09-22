@@ -7,6 +7,7 @@ import 'package:freightlink_mobile/features/auth/providers/auth_provider.dart';
 import 'package:freightlink_mobile/features/auth/screens/login_screen.dart';
 import 'package:freightlink_mobile/features/loads/data/loads_repository.dart';
 import 'package:freightlink_mobile/features/loads/screens/my_loads_screen.dart';
+import 'package:freightlink_mobile/features/notifications/providers/notification_provider.dart';
 import 'package:freightlink_mobile/features/trips/data/trips_repository.dart';
 import 'package:freightlink_mobile/features/trips/screens/driver_assigned_trip_screen.dart';
 import 'package:freightlink_mobile/main.dart';
@@ -78,6 +79,9 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
+          ChangeNotifierProvider<NotificationProvider>(
+            create: (_) => NotificationProvider(),
+          ),
           Provider<LoadsRepository>.value(value: repository),
           Provider<TripsRepository>.value(
             value: tripsRepository ?? MockTripsRepository(),

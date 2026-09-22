@@ -9,6 +9,8 @@ import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/status_pill.dart';
+import '../../notifications/models/in_app_notification.dart';
+import '../../notifications/providers/notification_provider.dart';
 import '../data/trips_repository.dart';
 import '../models/job_proposal.dart';
 import 'accept_load_assign_screen.dart';
@@ -27,6 +29,8 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
   List<JobProposal> _proposals = [];
   bool _isLoading = true;
   String? _errorMessage;
+
+  final Map<String, ProposalStatus> _knownProposalStatuses = {};
 
   final _currencyFormat = NumberFormat.currency(
     symbol: 'LKR ',
@@ -53,6 +57,30 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
         pageSize: 50,
       );
       if (!mounted) return;
+
+      for (final item in paged.items) {
+        final prev = _knownProposalStatuses[item.assignmentId];
+        if (prev != null && prev != item.status) {
+          NotificationProvider? notif;
+          try {
+            notif = Provider.of<NotificationProvider>(context, listen: false);
+          } catch (_) {
+            notif = null;
+          }
+          final statusLabel = item.status == ProposalStatus.declined ? 'declined/retried' : 'updated';
+          final code = item.assignmentId.length > 8
+              ? item.assignmentId.substring(0, 8).toUpperCase()
+              : item.assignmentId.toUpperCase();
+          notif?.pushNotification(
+            title: 'Job Proposal Update',
+            message: 'Proposal #$code status changed to $statusLabel.',
+            category: NotificationCategory.proposalUpdate,
+            referenceId: item.assignmentId,
+          );
+        }
+        _knownProposalStatuses[item.assignmentId] = item.status;
+      }
+
       setState(() {
         _proposals = paged.items;
         _isLoading = false;
@@ -92,6 +120,7 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
         subtitle: 'Review & assign agency fleet to AI-matched loads',
         leading: const AppAvatar(),
         actions: [
+          const NotificationBellButton(),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh Proposals',

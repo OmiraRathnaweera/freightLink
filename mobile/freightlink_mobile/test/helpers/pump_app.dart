@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:freightlink_mobile/core/theme/app_theme.dart';
 import 'package:freightlink_mobile/features/auth/providers/auth_provider.dart';
 import 'package:freightlink_mobile/features/loads/data/loads_repository.dart';
+import 'package:freightlink_mobile/features/notifications/providers/notification_provider.dart';
 import 'package:freightlink_mobile/features/trips/data/trips_repository.dart';
 import 'package:provider/provider.dart';
 
@@ -15,6 +16,7 @@ Future<void> pumpApp(
   LoadsRepository? repository,
   TripsRepository? tripsRepository,
   AuthProvider? authProvider,
+  NotificationProvider? notificationProvider,
 }) async {
   await tester.pumpWidget(
     MultiProvider(
@@ -25,9 +27,12 @@ Future<void> pumpApp(
         Provider<TripsRepository>.value(
           value: tripsRepository ?? MockTripsRepository(),
         ),
-        ChangeNotifierProvider<AuthProvider>.value(
-          value: authProvider ?? AuthProvider(),
-        ),
+        authProvider != null
+            ? ChangeNotifierProvider<AuthProvider>.value(value: authProvider)
+            : ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
+        notificationProvider != null
+            ? ChangeNotifierProvider<NotificationProvider>.value(value: notificationProvider)
+            : ChangeNotifierProvider<NotificationProvider>(create: (_) => NotificationProvider()),
       ],
       child: MaterialApp(theme: AppTheme.light, home: child),
     ),
