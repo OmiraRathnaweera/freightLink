@@ -744,4 +744,287 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(125m, driverDetail.RoutedDistanceKm);
         Assert.Equal(150, driverDetail.ProposedEtaMinutes);
     }
+
+    [Fact]
+    public async Task SecondaryWorkflow_AgencyStaffCapturesProofOfPickup_ReflectedInAdminTripMonitor()
+    {
+        // Arrange
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var adminUserId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var driverUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var agencyId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+
+        // 1. Seed database entities
+        db.Users.Add(new User
+        {
+            UserId = adminUserId,
+            FullName = "Admin Controller",
+            Email = $"admin-monitor-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Admin,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = staffUserId,
+            FullName = "Agency Dispatcher Nimal",
+            Email = $"staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = driverUserId,
+            FullName = "Assigned Driver Sunil",
+            Email = $"driver-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Driver,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = shipperUserId,
+            FullName = "Shipper Colombo",
+            Email = $"shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Lanka Fast Freight Logistics",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Peliyagoda Logistics Hub",
+            YardLat = 6.9600m,
+            YardLng = 79.9100m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            UserId = staffUserId,
+            AgencyId = agencyId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var vehicle = new Vehicle
+        {
+            VehicleId = vehicleId,
+            AgencyId = agencyId,
+            RegistrationNo = "WP-LY-7890",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 12000,
+            VolumeM3 = 45,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Vehicles.Add(vehicle);
+
+        var driver = new Driver
+        {
+            DriverId = driverId,
+            UserId = driverUserId,
+            AgencyId = agencyId,
+            LicenceNo = "LIC-SUNIL-007",
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(3)),
+            Status = DriverStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Drivers.Add(driver);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-{Guid.NewGuid():N}"[..11],
+            CargoDescription = "Industrial Transformer Equipment",
+            WeightKg = 8500,
+            VolumeM3 = 28,
+            PickupAddress = "Biyagama Export Processing Zone",
+            PickupLat = 6.9380m,
+            PickupLng = 79.9920m,
+            DropoffAddress = "Hambantota International Port",
+            DropoffLat = 6.1200m,
+            DropoffLng = 81.1200m,
+            PickupWindowStart = DateTimeOffset.UtcNow.AddHours(1),
+            PickupWindowEnd = DateTimeOffset.UtcNow.AddHours(5),
+            EstimatedPrice = 125000m,
+            Status = LoadStatus.Matched,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            ProposedPrice = 125000m,
+            RoutedDistanceKm = 240m,
+            ProposedEtaMinutes = 300,
+            Status = AssignmentStatus.Accepted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+
+        var trip = new Trip
+        {
+            TripId = tripId,
+            AssignmentId = assignmentId,
+            VehicleId = vehicleId,
+            DriverId = driverId,
+            Status = TripStatus.Assigned,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Trips.Add(trip);
+
+        // Initial Assigned event
+        db.TripEvents.Add(new TripEvent
+        {
+            TripEventId = Guid.NewGuid(),
+            TripId = tripId,
+            RecordedByUserId = staffUserId,
+            FromStatus = null,
+            ToStatus = TripStatus.Assigned,
+            Notes = "Trip assigned to driver Sunil Perera.",
+            OccurredAt = DateTimeOffset.UtcNow.AddMinutes(-30)
+        });
+
+        await db.SaveChangesAsync();
+
+        var staffToken = MintTokenForUser(staffUserId, UserRole.AgencyStaff);
+        var adminToken = MintTokenForUser(adminUserId, UserRole.Admin);
+
+        // Step 1: Enforce policy - Try advancing to PickedUp without evidence (must fail with 422 TRIP_EVIDENCE_REQUIRED)
+        var earlyStatusReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/trips/{tripId}/status")
+        {
+            Content = JsonContent.Create(new ChangeTripStatusDto
+            {
+                TargetStatus = TripStatus.PickedUp,
+                Notes = "Premature attempt before capturing photo evidence."
+            })
+        };
+        earlyStatusReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+
+        var earlyStatusRes = await _client.SendAsync(earlyStatusReq);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, earlyStatusRes.StatusCode);
+        Assert.Equal("TRIP_EVIDENCE_REQUIRED", await ReadErrorCodeAsync(earlyStatusRes));
+
+        // Step 2: Agency Staff captures Proof-of-Pickup on Flutter (Y3S01-75) and posts evidence
+        const string storageKey = "proof_pickup_biyagama_98214";
+        const decimal capturedLat = 6.938500m;
+        const decimal capturedLng = 79.992500m;
+
+        var evidenceReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/trips/{tripId}/evidence")
+        {
+            Content = JsonContent.Create(new UploadTripEvidenceDto
+            {
+                PublicId = storageKey,
+                EvidenceType = EvidenceType.PickupProof,
+                CapturedLat = capturedLat,
+                CapturedLng = capturedLng
+            })
+        };
+        evidenceReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+
+        var evidenceRes = await _client.SendAsync(evidenceReq);
+        Assert.Equal(HttpStatusCode.Created, evidenceRes.StatusCode);
+
+        var evidenceBody = await evidenceRes.Content.ReadFromJsonAsync<TripEvidenceResponseDto>();
+        Assert.NotNull(evidenceBody);
+        Assert.Equal("PickupProof", evidenceBody.EvidenceType);
+        Assert.Equal(storageKey, evidenceBody.StorageKey);
+        Assert.Equal(capturedLat, evidenceBody.CapturedLat);
+        Assert.Equal(capturedLng, evidenceBody.CapturedLng);
+        Assert.Equal(staffUserId, evidenceBody.CapturedByUserId);
+
+        // Step 3: Agency Staff advances status to PickedUp via Flutter (Y3S01-75)
+        const string transitionNotes = "Cargo loaded, strapped down, and inspected at Biyagama EPZ.";
+        var advanceStatusReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/trips/{tripId}/status")
+        {
+            Content = JsonContent.Create(new ChangeTripStatusDto
+            {
+                TargetStatus = TripStatus.PickedUp,
+                Notes = transitionNotes,
+                SnapshotLat = capturedLat,
+                SnapshotLng = capturedLng
+            })
+        };
+        advanceStatusReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+
+        var advanceStatusRes = await _client.SendAsync(advanceStatusReq);
+        Assert.Equal(HttpStatusCode.OK, advanceStatusRes.StatusCode);
+
+        var advanceBody = await advanceStatusRes.Content.ReadFromJsonAsync<TripResponseDto>();
+        Assert.NotNull(advanceBody);
+        Assert.Equal("PickedUp", advanceBody.Status);
+
+        // Step 4: Admin observes the React Trip Monitor (Y3S01-78, GET /api/v1/trips/{tripId})
+        var adminDetailReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/trips/{tripId}");
+        adminDetailReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var adminDetailRes = await _client.SendAsync(adminDetailReq);
+        Assert.Equal(HttpStatusCode.OK, adminDetailRes.StatusCode);
+
+        var tripMonitor = await adminDetailRes.Content.ReadFromJsonAsync<TripResponseDto>();
+        Assert.NotNull(tripMonitor);
+        Assert.Equal(tripId, tripMonitor.TripId);
+        Assert.Equal("PickedUp", tripMonitor.Status);
+        Assert.Equal("WP-LY-7890", tripMonitor.VehicleRegistrationNo);
+        Assert.Equal("Assigned Driver Sunil", tripMonitor.DriverName);
+
+        // Verify evidence is present and verified for React TripEvidenceCard
+        Assert.NotNull(tripMonitor.Evidence);
+        Assert.NotEmpty(tripMonitor.Evidence);
+        var pickupEvidence = tripMonitor.Evidence.FirstOrDefault(e => e.EvidenceType == "PickupProof");
+        Assert.NotNull(pickupEvidence);
+        Assert.Equal(storageKey, pickupEvidence.StorageKey);
+        Assert.NotNull(pickupEvidence.SecureUrl);
+        Assert.Equal(capturedLat, pickupEvidence.CapturedLat);
+        Assert.Equal(capturedLng, pickupEvidence.CapturedLng);
+        Assert.Equal(staffUserId, pickupEvidence.CapturedByUserId);
+
+        // Verify event timeline transition for React TripTimelineCard
+        Assert.NotNull(tripMonitor.Events);
+        Assert.NotEmpty(tripMonitor.Events);
+        var pickedUpEvent = tripMonitor.Events.FirstOrDefault(e => e.ToStatus == "PickedUp");
+        Assert.NotNull(pickedUpEvent);
+        Assert.Equal("Assigned", pickedUpEvent.FromStatus);
+        Assert.Equal(transitionNotes, pickedUpEvent.Notes);
+        Assert.Equal(staffUserId, pickedUpEvent.RecordedByUserId);
+        Assert.Equal(capturedLat, pickedUpEvent.SnapshotLat);
+        Assert.Equal(capturedLng, pickedUpEvent.SnapshotLng);
+    }
 }
