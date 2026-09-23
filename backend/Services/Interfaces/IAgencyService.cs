@@ -32,4 +32,14 @@ public interface IAgencyService
     /// Updates an existing agency's details.
     /// </summary>
     Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Approves/verifies a pending agency.
+    /// </summary>
+    Task VerifyAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Suspends an agency.
+    /// </summary>
+    Task SuspendAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }
