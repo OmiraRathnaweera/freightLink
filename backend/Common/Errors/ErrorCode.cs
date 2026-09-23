@@ -47,6 +47,9 @@ public enum ErrorCode
     /// <summary>An edit or cancel was attempted on a load whose current status doesn't allow it.</summary>
     INVALID_LOAD_STATUS_TRANSITION,
 
+    /// <summary>A state change was attempted on an agency whose current status doesn't allow it.</summary>
+    INVALID_AGENCY_STATUS_TRANSITION,
+
     /// <summary>A load cancellation was attempted without a reason.</summary>
     LOAD_CANCEL_REASON_REQUIRED,
 

@@ -81,6 +81,28 @@ public class AgenciesController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Approves/verifies a pending agency.
+    /// </summary>
+    [HttpPost("{id:guid}/verify")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> VerifyAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.VerifyAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
+    /// Suspends an agency.
+    /// </summary>
+    [HttpPost("{id:guid}/suspend")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> SuspendAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.SuspendAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);

@@ -1,72 +1,51 @@
 ﻿import { Navigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
+import { useAgenciesQuery, useVerifyAgencyMutation, useSuspendAgencyMutation } from '../api/agencyApi.js'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 
-// Hardcoded mock data to fulfill UI-only Sprint 3 requirements.
-// The real backend wiring (Y3S01-74, 77) happens in Sprint 4.
-const mockAgencies = [
-  {
-    agencyId: 'a1',
-    name: 'Fast Track Logistics',
-    businessRegNo: 'BR-901234',
-    status: 'Pending',
-    complianceDocs: [
-      {
-        complianceDocId: 'd1',
-        docType: 'Verification',
-        docNumber: 'V-10023',
-        storageKey: 'https://placehold.co/600x400/png?text=Verification+Doc+1',
-        status: 'Pending',
-        expiresOn: '2027-01-01',
-      },
-    ],
-  },
-  {
-    agencyId: 'a2',
-    name: 'Lanka Freight Movers',
-    businessRegNo: 'BR-882119',
-    status: 'Pending',
-    complianceDocs: [
-      {
-        complianceDocId: 'd2',
-        docType: 'Verification',
-        docNumber: 'V-99882',
-        storageKey: 'https://placehold.co/600x400/png?text=Verification+Doc+2',
-        status: 'Pending',
-        expiresOn: '2028-05-12',
-      },
-      {
-        complianceDocId: 'd3',
-        docType: 'Insurance',
-        docNumber: 'INS-4455',
-        storageKey: 'https://placehold.co/600x400/png?text=Insurance+Policy',
-        status: 'Verified',
-        expiresOn: '2026-12-31',
-      },
-    ],
-  },
-]
-
 export default function AgencyVerificationPage() {
   const role = useAppSelector((state) => state.auth.role)
+  const queryClient = useQueryClient()
 
-  // Enforce Admin-only access exactly as requested.
-  if (role !== UserRole.ADMIN) {
-    return <Navigate to="/unauthorized" replace />
-  }
+  const { data: pagedData, isLoading, isError } = useAgenciesQuery({ status: 'Pending' })
+  const agencies = pagedData?.items || []
+
+  const verifyMutation = useVerifyAgencyMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agencies'] })
+      alert('Agency successfully verified!')
+    },
+    onError: (err) => {
+      alert(`Failed to verify agency: ${err.message}`)
+    }
+  })
+
+  const suspendMutation = useSuspendAgencyMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agencies'] })
+      alert('Agency successfully suspended!')
+    },
+    onError: (err) => {
+      alert(`Failed to suspend agency: ${err.message}`)
+    }
+  })
 
   const handleApprove = (agencyId) => {
-    console.log(`Approve clicked for agency: ${agencyId}`)
-    alert(`Agency ${agencyId} approved (UI only)`)
+    verifyMutation.mutate(agencyId)
   }
 
   const handleSuspend = (agencyId) => {
-    console.log(`Suspend clicked for agency: ${agencyId}`)
-    alert(`Agency ${agencyId} suspended (UI only)`)
+    suspendMutation.mutate(agencyId)
+  }
+
+  // Enforce Admin-only access
+  if (role !== UserRole.ADMIN) {
+    return <Navigate to="/unauthorized" replace />
   }
 
   return (
@@ -76,11 +55,14 @@ export default function AgencyVerificationPage() {
         subtitle="Review and approve agencies pending verification." 
       />
 
-      {mockAgencies.length === 0 ? (
+      {isLoading && <p className="text-slate-500">Loading pending agencies...</p>}
+      {isError && <p className="text-red-500">Failed to load agencies.</p>}
+
+      {!isLoading && !isError && agencies.length === 0 ? (
         <p className="text-slate-500">No agencies pending verification.</p>
       ) : (
         <div className="grid gap-6">
-          {mockAgencies.map((agency) => (
+          {agencies.map((agency) => (
             <Card key={agency.agencyId} className="p-0 overflow-hidden">
               <Card.Header className="flex items-center justify-between border-b border-slate-200 bg-slate-50/50 p-4">
                 <div>
@@ -92,7 +74,7 @@ export default function AgencyVerificationPage() {
               
               <Card.Body className="p-4 space-y-4">
                 <h4 className="text-sm font-medium text-slate-700 uppercase tracking-wider">Compliance Documents</h4>
-                {agency.complianceDocs.length === 0 ? (
+                {!agency.complianceDocs || agency.complianceDocs.length === 0 ? (
                   <p className="text-sm text-slate-500 italic">No documents uploaded.</p>
                 ) : (
                   <div className="overflow-x-auto">
@@ -122,7 +104,7 @@ export default function AgencyVerificationPage() {
                                 rel="noreferrer"
                                 className="text-primary hover:underline font-medium"
                               >
-                                View Document ↗
+                                View Document &nearr;
                               </a>
                             </td>
                           </tr>
@@ -138,15 +120,17 @@ export default function AgencyVerificationPage() {
                   variant="status" 
                   status="red" 
                   onClick={() => handleSuspend(agency.agencyId)}
+                  disabled={suspendMutation.isPending || verifyMutation.isPending}
                 >
-                  Suspend Agency
+                  {suspendMutation.isPending && suspendMutation.variables === agency.agencyId ? 'Suspending...' : 'Suspend Agency'}
                 </Button>
                 <Button 
                   variant="status" 
                   status="green" 
                   onClick={() => handleApprove(agency.agencyId)}
+                  disabled={suspendMutation.isPending || verifyMutation.isPending}
                 >
-                  Approve Agency
+                  {verifyMutation.isPending && verifyMutation.variables === agency.agencyId ? 'Approving...' : 'Approve Agency'}
                 </Button>
               </Card.Footer>
             </Card>
@@ -156,6 +140,4 @@ export default function AgencyVerificationPage() {
     </div>
   )
 }
-
-
 

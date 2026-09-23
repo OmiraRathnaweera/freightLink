@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -194,6 +194,62 @@ public class AgencyService : IAgencyService
         return MapToResponse(agency);
     }
 
+    public async Task VerifyAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (agency.Status != AgencyStatus.Pending)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Only pending agencies can be verified.");
+        }
+
+        agency.Status = AgencyStatus.Verified;
+        agency.StatusHistory.Add(new AgencyStatusHistory
+        {
+            ToStatus = AgencyStatus.Verified,
+            ChangedByUserId = currentUserId,
+            Reason = "Verified by admin"
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SuspendAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (agency.Status == AgencyStatus.Suspended)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Agency is already suspended.");
+        }
+
+        agency.Status = AgencyStatus.Suspended;
+        agency.StatusHistory.Add(new AgencyStatusHistory
+        {
+            ToStatus = AgencyStatus.Suspended,
+            ChangedByUserId = currentUserId,
+            Reason = "Suspended by admin"
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {
         if (currentUserRole == UserRole.Admin)
@@ -233,3 +289,4 @@ public class AgencyService : IAgencyService
         };
     }
 }
+
