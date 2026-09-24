@@ -57,6 +57,13 @@ public class AssignmentService : IAssignmentService
             dbQuery = dbQuery.Where(a => a.Status == query.Status.Value);
         }
 
+        if (query.HasTrip.HasValue)
+        {
+            dbQuery = query.HasTrip.Value
+                ? dbQuery.Where(a => a.Trip != null)
+                : dbQuery.Where(a => a.Trip == null);
+        }
+
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim().ToLower();

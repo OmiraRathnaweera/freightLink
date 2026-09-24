@@ -104,13 +104,14 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
-    /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers).
+    /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers),
+    /// or for Admin to fetch an agency's fleet by specifying agencyId.
     /// </summary>
     [HttpGet("my/fleet")]
-    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
-    public async Task<ActionResult<AgencyFleetResponseDto>> GetMyFleet(CancellationToken cancellationToken)
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetMyFleet([FromQuery] Guid? agencyId, CancellationToken cancellationToken)
     {
-        var result = await _agencyService.GetFleetAsync(null, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        var result = await _agencyService.GetFleetAsync(agencyId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 

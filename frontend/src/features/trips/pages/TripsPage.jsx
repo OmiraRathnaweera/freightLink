@@ -20,7 +20,8 @@ const DEFAULT_PAGE_SIZE = 20;
 
 function TripsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const dispatchAssignmentId = searchParams.get("dispatch") || searchParams.get("assignmentId");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(Boolean(dispatchAssignmentId));
   const role = useAppSelector((state) => state.auth.role);
 
   const page = Number(searchParams.get("page") ?? "1");
@@ -143,6 +144,7 @@ function TripsPage() {
 
       {isCreateDialogOpen && (
         <CreateTripDialog
+          defaultAssignmentId={dispatchAssignmentId || ""}
           onClose={() => setIsCreateDialogOpen(false)}
           onCreated={() => tripsQuery.refetch()}
         />

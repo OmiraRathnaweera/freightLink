@@ -30,8 +30,8 @@ function FitRouteBounds({ pickupLat, pickupLng, dropoffLat, dropoffLng }) {
 
 function RouteMapCard({ origin, destination, originLat, originLng, destinationLat, destinationLng, distanceKm, remainingKm }) {
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="h-96 w-full">
+    <Card className="relative z-0 isolate overflow-hidden p-0">
+      <div className="relative z-0 isolate h-96 w-full">
         <MapContainer center={[originLat, originLng]} zoom={12} scrollWheelZoom={false} className="h-full w-full">
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

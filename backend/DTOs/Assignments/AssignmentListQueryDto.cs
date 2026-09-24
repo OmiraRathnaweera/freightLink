@@ -34,6 +34,9 @@ public class AssignmentListQueryDto
     [StringLength(100)]
     public string? Search { get; set; }
 
+    /// <summary>Optional filter for assignments that already have (true) or do not have (false) an associated trip.</summary>
+    public bool? HasTrip { get; set; }
+
     /// <summary>Sort column (defaults to "createdAt").</summary>
     public string SortBy { get; set; } = "createdAt";
 
