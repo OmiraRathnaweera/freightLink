@@ -1340,7 +1340,7 @@ public class TripService : ITripService
         var assignment1Id = Guid.Parse("b1000000-0000-0000-0000-000000000001");
         var assignment2Id = Guid.Parse("b2000000-0000-0000-0000-000000000002");
         var assignment3Id = Guid.Parse("b3000000-0000-0000-0000-000000000003");
-        var assignment4Id = Guid.Parse("b4000000-0000-0000-0000-000000000004");
+        assignment4Id = Guid.Parse("b4000000-0000-0000-0000-000000000004");
 
         if (!await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment1Id, cancellationToken))
         {
@@ -1508,18 +1508,24 @@ public class TripService : ITripService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // 10. Update Trip Statuses
-        var trip1 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip1Id, cancellationToken);
-        if (trip1 != null)
+        if (!existingTrips.Any(t => t.TripId == trip1Id))
         {
-            trip1.Status = TripStatus.InTransit;
-            trip1.UpdatedAt = now;
+            var trip1 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip1Id, cancellationToken);
+            if (trip1 != null)
+            {
+                trip1.Status = TripStatus.InTransit;
+                trip1.UpdatedAt = now;
+            }
         }
 
-        var trip3 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip3Id, cancellationToken);
-        if (trip3 != null)
+        if (!existingTrips.Any(t => t.TripId == trip3Id))
         {
-            trip3.Status = TripStatus.Delivered;
-            trip3.UpdatedAt = now;
+            var trip3 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip3Id, cancellationToken);
+            if (trip3 != null)
+            {
+                trip3.Status = TripStatus.Delivered;
+                trip3.UpdatedAt = now;
+            }
         }
 
         // 11. Timeline Events
