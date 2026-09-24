@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/token_storage.dart';
+import '../models/agency_lookup.dart';
 import '../models/auth_user.dart';
 
 enum AuthStatus {
@@ -109,6 +110,62 @@ class AuthProvider extends ChangeNotifier {
       }
       _user = user;
       _status = AuthStatus.authenticated;
+      return true;
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  void clearErrorMessage() {
+    _errorMessage = null;
+    notifyListeners();
+  }
+
+  /// Fetches the list of active agencies for driver registration selection.
+  Future<List<AgencyLookup>> fetchAgencies() async {
+    try {
+      final response = await _apiClient.get('/auth/agencies') as List<dynamic>;
+      return response
+          .map((item) => AgencyLookup.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Self-service driver registration from the mobile app.
+  Future<bool> registerDriver({
+    required String email,
+    required String password,
+    required String fullName,
+    required String? phoneE164,
+    required String licenceNo,
+    required String licenceExpiry,
+    required String agencyId,
+  }) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiClient.post(
+        '/auth/register/driver',
+        body: {
+          'email': email,
+          'password': password,
+          'fullName': fullName,
+          if (phoneE164 != null && phoneE164.isNotEmpty) 'phoneE164': phoneE164,
+          'licenceNo': licenceNo,
+          'licenceExpiry': licenceExpiry,
+          'agencyId': agencyId,
+        },
+      );
       return true;
     } on ApiException catch (error) {
       _errorMessage = error.message;

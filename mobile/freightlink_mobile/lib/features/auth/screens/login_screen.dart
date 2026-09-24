@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
+import 'driver_register_screen.dart';
 
 enum LoginRole {
   shipper('Shipper', 'Sign in to manage your loads', Icons.local_shipping_rounded),
@@ -244,6 +245,36 @@ class _LoginScreenState extends State<LoginScreen> {
                       isLoading: auth.isSubmitting,
                       onPressed: _submit,
                     ),
+                    if (_selectedRole == LoginRole.driver) ...[
+                      const SizedBox(height: AppConstants.spaceLg),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'New driver? ',
+                            style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
+                          ),
+                          GestureDetector(
+                            key: const Key('register_driver_link'),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const DriverRegisterScreen(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Register here',
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 );
               },
