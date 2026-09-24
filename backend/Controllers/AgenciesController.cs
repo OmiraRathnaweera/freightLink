@@ -93,6 +93,17 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Onboards/adds a driver to an agency.
+    /// </summary>
+    [HttpPost("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<DriverResponseDto>> AddDriver(Guid id, [FromBody] CreateDriverRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddDriverAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
     /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers).
     /// </summary>
     [HttpGet("my/fleet")]
