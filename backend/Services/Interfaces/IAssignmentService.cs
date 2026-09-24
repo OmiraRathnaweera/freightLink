@@ -31,6 +31,12 @@ public interface IAssignmentService
     Task<AssignmentResponseDto> ApproveAsync(Guid assignmentOrLoadId, ApproveAssignmentDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Accepts a proposed assignment or load, creating the real Assignment (Accepted),
+    /// recording an AssignmentResponse (Accepted), and creating the Trip in Assigned status (ADR-017 / Y3S01-143).
+    /// </summary>
+    Task<AssignmentResponseDto> AcceptAsync(Guid assignmentOrLoadId, ApproveAssignmentDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Approves an AI agent workflow run from the admin console (Y3S01-95/96),
     /// creating the real Assignment (Accepted) and creating/updating the Trip to Assigned status.
     /// </summary>

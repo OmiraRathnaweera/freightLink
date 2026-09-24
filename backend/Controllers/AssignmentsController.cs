@@ -52,6 +52,18 @@ public class AssignmentsController : ControllerBase
     }
 
     /// <summary>
+    /// Accepts a proposed load assignment, creating the real Assignment (Accepted)
+    /// and creating/updating the Trip to Assigned status (ADR-017 / Y3S01-143).
+    /// </summary>
+    [HttpPost("{loadId:guid}/accept")]
+    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    public async Task<ActionResult<AssignmentResponseDto>> Accept(Guid loadId, [FromBody] ApproveAssignmentDto? request, CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.AcceptAsync(loadId, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Declines a proposed load assignment (triggers auto-retry notification per ADR-018).
     /// </summary>
     [HttpPost("{loadId:guid}/decline")]

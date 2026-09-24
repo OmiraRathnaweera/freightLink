@@ -1055,4 +1055,1162 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         Assert.Equal(ApprovalDecisionType.Approve, decision.Decision);
         Assert.Equal("Approved from Agent Workflow console.", decision.Reason);
     }
+
+    [Fact]
+    public async Task Accept_ReturnsOk_AndCreatesTripAndAssignmentResponse_WhenProposed()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var driverUserId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Accept Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "10 Yard Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Accept Staff",
+            Email = $"accept-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Accept Shipper",
+            Email = $"accept-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-ACC-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Accept Test Cargo",
+            WeightKg = 2500,
+            VolumeM3 = 10,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            PickupWindowStart = DateTimeOffset.UtcNow.AddHours(1),
+            PickupWindowEnd = DateTimeOffset.UtcNow.AddHours(5),
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var vehicle = new Vehicle
+        {
+            VehicleId = vehicleId,
+            AgencyId = agencyId,
+            RegistrationNo = $"WP-ACC-{Guid.NewGuid():N}"[..8],
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000,
+            VolumeM3 = 20,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Vehicles.Add(vehicle);
+
+        var driverUser = new User
+        {
+            UserId = driverUserId,
+            FullName = "Accept Driver",
+            Email = $"accept-driver-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Driver,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(driverUser);
+
+        var driver = new Driver
+        {
+            DriverId = driverId,
+            AgencyId = agencyId,
+            UserId = driverUserId,
+            LicenceNo = $"B-{Guid.NewGuid():N}"[..8],
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
+            Status = DriverStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Drivers.Add(driver);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load to agency",
+            Status = WorkflowRunStatus.AwaitingApproval,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 35000m,
+            RoutedDistanceKm = 80m,
+            ProposedEtaMinutes = 120,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/accept")
+        {
+            Content = JsonContent.Create(new ApproveAssignmentDto
+            {
+                VehicleId = vehicleId,
+                DriverId = driverId,
+                Notes = "Agency accepted proposed job."
+            })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        var body = await res.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(body);
+        Assert.Equal("Accepted", body.Status);
+        Assert.NotNull(body.TripId);
+
+        // Verify in database
+        using var checkScope = _factory.Services.CreateScope();
+        var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var updatedAssignment = await checkDb.Assignments
+            .Include(a => a.Response)
+            .Include(a => a.Trip)
+            .FirstAsync(a => a.AssignmentId == assignmentId);
+
+        Assert.Equal(AssignmentStatus.Accepted, updatedAssignment.Status);
+        Assert.NotNull(updatedAssignment.Response);
+        Assert.Equal(AssignmentResponseType.Accepted, updatedAssignment.Response.Response);
+        Assert.Equal(staffUserId, updatedAssignment.Response.RespondedByUserId);
+        Assert.Null(updatedAssignment.Response.DeclineReason);
+
+        Assert.NotNull(updatedAssignment.Trip);
+        Assert.Equal(TripStatus.Assigned, updatedAssignment.Trip.Status);
+        Assert.Equal(vehicleId, updatedAssignment.Trip.VehicleId);
+        Assert.Equal(driverId, updatedAssignment.Trip.DriverId);
+
+        var updatedLoad = await checkDb.Loads.FirstAsync(l => l.LoadId == loadId);
+        Assert.Equal(LoadStatus.Matched, updatedLoad.Status);
+
+        var updatedRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunId);
+        Assert.Equal(WorkflowRunStatus.Completed, updatedRun.Status);
+    }
+
+    [Fact]
+    public async Task Accept_ReturnsOk_Idempotent_WhenAlreadyAccepted()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var driverUserId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Idempotent Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "11 Yard Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Idempotent Staff",
+            Email = $"idem-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Idempotent Shipper",
+            Email = $"idem-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-IDEM-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Idempotent Cargo",
+            WeightKg = 1500,
+            VolumeM3 = 6,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Matched,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var vehicle = new Vehicle
+        {
+            VehicleId = vehicleId,
+            AgencyId = agencyId,
+            RegistrationNo = $"WP-IDEM-{Guid.NewGuid():N}"[..8],
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000,
+            VolumeM3 = 20,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Vehicles.Add(vehicle);
+
+        var driverUser = new User
+        {
+            UserId = driverUserId,
+            FullName = "Idempotent Driver",
+            Email = $"idem-driver-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Driver,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(driverUser);
+
+        var driver = new Driver
+        {
+            DriverId = driverId,
+            AgencyId = agencyId,
+            UserId = driverUserId,
+            LicenceNo = $"B-{Guid.NewGuid():N}"[..8],
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
+            Status = DriverStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Drivers.Add(driver);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = Guid.NewGuid(),
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.Completed,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRun.WorkflowRunId,
+            ProposedPrice = 28000m,
+            Status = AssignmentStatus.Accepted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+
+        var trip = new Trip
+        {
+            TripId = tripId,
+            AssignmentId = assignmentId,
+            VehicleId = vehicleId,
+            DriverId = driverId,
+            Status = TripStatus.Assigned,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Trips.Add(trip);
+
+        var responseRecord = new AssignmentResponse
+        {
+            AssignmentId = assignmentId,
+            RespondedByUserId = staffUserId,
+            Response = AssignmentResponseType.Accepted,
+            RespondedAt = DateTimeOffset.UtcNow
+        };
+        db.AssignmentResponses.Add(responseRecord);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/accept");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        var body = await res.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(body);
+        Assert.Equal("Accepted", body.Status);
+        Assert.Equal(tripId, body.TripId);
+    }
+
+    [Fact]
+    public async Task Accept_ReturnsConflict_WhenAssignmentAlreadyDeclined()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Declined Conflict Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "12 Yard Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Declined Staff",
+            Email = $"dec-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Conflict Shipper",
+            Email = $"conf-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-CNF-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Conflict Cargo",
+            WeightKg = 1500,
+            VolumeM3 = 6,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = Guid.NewGuid(),
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.Running,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRun.WorkflowRunId,
+            ProposedPrice = 28000m,
+            Status = AssignmentStatus.Declined,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/accept");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Accept_ReturnsForbidden_WhenCallerIsStaffOfDifferentAgency()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyAId = Guid.NewGuid();
+        var agencyBId = Guid.NewGuid();
+        var staffBUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyAId,
+            Name = "Agency A",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Yard A",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyBId,
+            Name = "Agency B",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Yard B",
+            YardLat = 7.0m,
+            YardLng = 79.9m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var staffBUser = new User
+        {
+            UserId = staffBUserId,
+            FullName = "Staff B",
+            Email = $"staff-b-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffBUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyBId,
+            UserId = staffBUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Shipper",
+            Email = $"shipper-ab-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-AB-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "AB Cargo",
+            WeightKg = 1000,
+            VolumeM3 = 5,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = Guid.NewGuid(),
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.Running,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyAId,
+            WorkflowRunId = workflowRun.WorkflowRunId,
+            ProposedPrice = 25000m,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var tokenB = MintToken(staffBUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/accept");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenB);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Decline_ReturnsOk_AndPersistsAssignmentResponse_WhenProposed()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Decline Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "20 Decline Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Decline Staff",
+            Email = $"dec-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Shipper To Notify",
+            Email = $"shipper-notify-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-DEC-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Decline Cargo",
+            WeightKg = 2000,
+            VolumeM3 = 8,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.AwaitingApproval,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 40000m,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/decline")
+        {
+            Content = JsonContent.Create(new DeclineAssignmentDto
+            {
+                Reason = "No available heavy truck for this route."
+            })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        var body = await res.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(body);
+        Assert.Equal("Declined", body.Status);
+        Assert.Equal("No available heavy truck for this route.", body.DeclineReason);
+
+        // Verify database
+        using var checkScope = _factory.Services.CreateScope();
+        var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var updatedAssignment = await checkDb.Assignments
+            .Include(a => a.Response)
+            .Include(a => a.Trip)
+            .FirstAsync(a => a.AssignmentId == assignmentId);
+
+        Assert.Equal(AssignmentStatus.Declined, updatedAssignment.Status);
+        Assert.NotNull(updatedAssignment.Response);
+        Assert.Equal(AssignmentResponseType.Declined, updatedAssignment.Response.Response);
+        Assert.Equal("No available heavy truck for this route.", updatedAssignment.Response.DeclineReason);
+        Assert.Equal(staffUserId, updatedAssignment.Response.RespondedByUserId);
+        Assert.Null(updatedAssignment.Trip);
+
+        var updatedLoad = await checkDb.Loads.FirstAsync(l => l.LoadId == loadId);
+        Assert.Equal(LoadStatus.Posted, updatedLoad.Status);
+    }
+
+    [Fact]
+    public async Task Decline_ReturnsConflict_WhenAssignmentAlreadyDeclined()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Double Decline Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "21 Decline Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Double Decline Staff",
+            Email = $"dbl-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Double Shipper",
+            Email = $"dbl-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-DBL-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Double Cargo",
+            WeightKg = 1000,
+            VolumeM3 = 4,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = Guid.NewGuid(),
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.Running,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRun.WorkflowRunId,
+            ProposedPrice = 25000m,
+            Status = AssignmentStatus.Declined,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/decline")
+        {
+            Content = JsonContent.Create(new DeclineAssignmentDto { Reason = "Declining again" })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Decline_ReturnsConflict_WhenAssignmentAlreadyAccepted()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Accepted Decline Conflict Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "22 Decline Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Accepted Decline Staff",
+            Email = $"acc-dec-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Accepted Shipper",
+            Email = $"acc-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-ACCD-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Accepted Cargo",
+            WeightKg = 1000,
+            VolumeM3 = 4,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Matched,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = Guid.NewGuid(),
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.Running,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRun.WorkflowRunId,
+            ProposedPrice = 25000m,
+            Status = AssignmentStatus.Accepted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/decline")
+        {
+            Content = JsonContent.Create(new DeclineAssignmentDto { Reason = "Attempt to decline accepted load" })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+    }
+
+    [Fact]
+    public async Task Decline_MarksWorkflowRunFailed_AndSendsSafeFailureEmail_WhenAttemptAtCap()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        var agency = new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Cap Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "23 Cap Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Agencies.Add(agency);
+
+        var staffUser = new User
+        {
+            UserId = staffUserId,
+            FullName = "Cap Staff",
+            Email = $"cap-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(staffUser);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var shipperUser = new User
+        {
+            UserId = shipperUserId,
+            FullName = "Cap Shipper",
+            Email = $"cap-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(shipperUser);
+
+        var load = new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-CAP-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Cap Cargo",
+            WeightKg = 2000,
+            VolumeM3 = 8,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Loads.Add(load);
+
+        // AttemptNo = 3 represents the cap per ADR-018
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 3,
+            Objective = "Third matching attempt",
+            Status = WorkflowRunStatus.Running,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.AgentWorkflowRuns.Add(workflowRun);
+
+        var assignment = new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 42000m,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Assignments.Add(assignment);
+        await db.SaveChangesAsync();
+
+        var token = MintToken(staffUserId, UserRole.AgencyStaff);
+        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/decline")
+        {
+            Content = JsonContent.Create(new DeclineAssignmentDto
+            {
+                Reason = "Agency unable to service request."
+            })
+        };
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var res = await _client.SendAsync(req);
+        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+
+        // Verify in database: workflowRun status should transition to Failed (safe failure recorded)
+        using var checkScope = _factory.Services.CreateScope();
+        var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var updatedRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunId);
+        Assert.Equal(WorkflowRunStatus.Failed, updatedRun.Status);
+        Assert.NotNull(updatedRun.CompletedAt);
+
+        var updatedAssignment = await checkDb.Assignments
+            .Include(a => a.Response)
+            .FirstAsync(a => a.AssignmentId == assignmentId);
+        Assert.Equal(AssignmentStatus.Declined, updatedAssignment.Status);
+        Assert.NotNull(updatedAssignment.Response);
+        Assert.Equal(AssignmentResponseType.Declined, updatedAssignment.Response.Response);
+    }
 }

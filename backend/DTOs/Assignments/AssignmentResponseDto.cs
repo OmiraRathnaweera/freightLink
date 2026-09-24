@@ -75,6 +75,12 @@ public class AssignmentResponseDto
     /// <summary>Existing trip id if a trip has already been created for this assignment.</summary>
     public Guid? TripId { get; set; }
 
+    /// <summary>Decline reason recorded if this proposal was declined (ADR-017/018).</summary>
+    public string? DeclineReason { get; set; }
+
+    /// <summary>Timestamp when the agency staff responded (accepted or declined).</summary>
+    public DateTimeOffset? RespondedAt { get; set; }
+
     /// <summary>When the assignment was proposed.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 

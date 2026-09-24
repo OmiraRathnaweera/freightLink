@@ -572,6 +572,16 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.Conflict, ErrorCode.TRIP_ALREADY_EXISTS, "A trip has already been created for this assignment.");
         }
 
+        if (assignment.Status == AssignmentStatus.Declined)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Declined assignments cannot be dispatched into a trip.");
+        }
+
+        if (assignment.Status == AssignmentStatus.Cancelled)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Cancelled assignments cannot be dispatched into a trip.");
+        }
+
         // Validate vehicle
         var vehicle = await _dbContext.Vehicles
             .AsNoTracking()
@@ -639,6 +649,20 @@ public class TripService : ITripService
         {
             assignment.Status = AssignmentStatus.Accepted;
             assignment.UpdatedAt = now;
+
+            var existingResponse = await _dbContext.AssignmentResponses
+                .FirstOrDefaultAsync(r => r.AssignmentId == assignment.AssignmentId, cancellationToken);
+            if (existingResponse == null)
+            {
+                _dbContext.AssignmentResponses.Add(new AssignmentResponse
+                {
+                    AssignmentId = assignment.AssignmentId,
+                    RespondedByUserId = currentUserId,
+                    Response = AssignmentResponseType.Accepted,
+                    DeclineReason = null,
+                    RespondedAt = now
+                });
+            }
         }
 
         if (assignment.Load != null)

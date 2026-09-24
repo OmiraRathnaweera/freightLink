@@ -16,10 +16,12 @@ namespace FreightLink.Api.Services;
 public class AssignmentService : IAssignmentService
 {
     private readonly AppDbContext _dbContext;
+    private readonly IEmailService _emailService;
 
-    public AssignmentService(AppDbContext dbContext)
+    public AssignmentService(AppDbContext dbContext, IEmailService emailService)
     {
         _dbContext = dbContext;
+        _emailService = emailService;
     }
 
     /// <inheritdoc />
@@ -117,6 +119,7 @@ public class AssignmentService : IAssignmentService
                 .ThenInclude(l => l.ShipperUser)
             .Include(a => a.Agency)
             .Include(a => a.Trip)
+            .Include(a => a.Response)
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.AssignmentId == assignmentId, cancellationToken);
 
@@ -138,6 +141,8 @@ public class AssignmentService : IAssignmentService
                 .ThenInclude(l => l.ShipperUser)
             .Include(a => a.Agency)
             .Include(a => a.Trip)
+            .Include(a => a.WorkflowRun)
+            .Include(a => a.Response)
             .FirstOrDefaultAsync(a => a.LoadId == loadId || a.AssignmentId == loadId, cancellationToken);
 
         if (assignment == null)
@@ -152,12 +157,79 @@ public class AssignmentService : IAssignmentService
             throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Only proposed assignments may be declined.");
         }
 
+        var now = DateTimeOffset.UtcNow;
         assignment.Status = AssignmentStatus.Declined;
-        assignment.UpdatedAt = DateTimeOffset.UtcNow;
+        assignment.UpdatedAt = now;
+
+        var reason = string.IsNullOrWhiteSpace(request?.Reason) ? "Declined by agency staff" : request.Reason.Trim();
+        var assignmentResponse = new AssignmentResponse
+        {
+            AssignmentId = assignment.AssignmentId,
+            RespondedByUserId = currentUserId,
+            Response = AssignmentResponseType.Declined,
+            DeclineReason = reason,
+            RespondedAt = now
+        };
+        _dbContext.AssignmentResponses.Add(assignmentResponse);
+        assignment.Response = assignmentResponse;
+
+        // ADR-018 Retry Cascade and Email Notification
+        var shipperUser = assignment.Load?.ShipperUser;
+        var shipperEmail = shipperUser?.Email;
+        var shipperName = shipperUser?.FullName ?? "Shipper";
+        var loadRef = assignment.Load?.ReferenceCode ?? assignment.LoadId.ToString();
+        var agencyName = assignment.Agency?.Name ?? "Assigned Agency";
+
+        var workflowRun = assignment.WorkflowRun ?? await _dbContext.AgentWorkflowRuns
+            .FirstOrDefaultAsync(r => r.WorkflowRunId == assignment.WorkflowRunId || r.LoadId == assignment.LoadId, cancellationToken);
+
+        if (workflowRun != null)
+        {
+            if (workflowRun.AttemptNo < 3)
+            {
+                // Send immediate notification email to shipper (attempt 1 or 2)
+                if (!string.IsNullOrWhiteSpace(shipperEmail))
+                {
+                    await _emailService.SendAgencyDeclinedAsync(shipperEmail, shipperName, loadRef, agencyName, workflowRun.AttemptNo, cancellationToken);
+                }
+                // Load remains in Posted status for subsequent matching attempt
+            }
+            else
+            {
+                // Attempt cap reached (>= 3 attempts): record safe failure per ADR-018 / Section 9.1
+                workflowRun.Status = WorkflowRunStatus.Failed;
+                workflowRun.CompletedAt = now;
+                workflowRun.UpdatedAt = now;
+
+                if (!string.IsNullOrWhiteSpace(shipperEmail))
+                {
+                    await _emailService.SendNoAutomaticMatchFoundAsync(shipperEmail, shipperName, loadRef, cancellationToken);
+                }
+            }
+        }
+        else
+        {
+            // If no workflow run record exists (e.g. standalone proposal), still notify the shipper
+            if (!string.IsNullOrWhiteSpace(shipperEmail))
+            {
+                await _emailService.SendAgencyDeclinedAsync(shipperEmail, shipperName, loadRef, agencyName, 1, cancellationToken);
+            }
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return MapToDetail(assignment);
+    }
+
+    /// <inheritdoc />
+    public Task<AssignmentResponseDto> AcceptAsync(
+        Guid assignmentOrLoadId,
+        ApproveAssignmentDto? request,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        return ApproveAsync(assignmentOrLoadId, request, currentUserId, currentUserRole, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -174,6 +246,7 @@ public class AssignmentService : IAssignmentService
             .Include(a => a.Agency)
             .Include(a => a.WorkflowRun)
             .Include(a => a.Trip)
+            .Include(a => a.Response)
             .FirstOrDefaultAsync(a => a.AssignmentId == assignmentOrLoadId || a.LoadId == assignmentOrLoadId, cancellationToken);
 
         if (assignment == null)
@@ -214,6 +287,20 @@ public class AssignmentService : IAssignmentService
         var now = DateTimeOffset.UtcNow;
         assignment.Status = AssignmentStatus.Accepted;
         assignment.UpdatedAt = now;
+
+        if (assignment.Response == null)
+        {
+            var assignmentResponse = new AssignmentResponse
+            {
+                AssignmentId = assignment.AssignmentId,
+                RespondedByUserId = currentUserId,
+                Response = AssignmentResponseType.Accepted,
+                DeclineReason = null,
+                RespondedAt = now
+            };
+            _dbContext.AssignmentResponses.Add(assignmentResponse);
+            assignment.Response = assignmentResponse;
+        }
 
         if (assignment.Trip == null)
         {
@@ -395,6 +482,17 @@ public class AssignmentService : IAssignmentService
             UpdatedAt = now
         };
         _dbContext.Assignments.Add(assignment);
+
+        var assignmentResponse = new AssignmentResponse
+        {
+            AssignmentId = assignment.AssignmentId,
+            RespondedByUserId = currentUserId,
+            Response = AssignmentResponseType.Accepted,
+            DeclineReason = null,
+            RespondedAt = now
+        };
+        _dbContext.AssignmentResponses.Add(assignmentResponse);
+        assignment.Response = assignmentResponse;
 
         var tripId = Guid.NewGuid();
         var trip = new Trip
@@ -666,6 +764,8 @@ public class AssignmentService : IAssignmentService
             ShipperName = a.Load?.ShipperUser?.FullName,
             ReferenceCode = a.Load?.ReferenceCode,
             TripId = a.Trip?.TripId,
+            DeclineReason = a.Response?.DeclineReason,
+            RespondedAt = a.Response?.RespondedAt,
             CreatedAt = a.CreatedAt,
             UpdatedAt = a.UpdatedAt
         };
