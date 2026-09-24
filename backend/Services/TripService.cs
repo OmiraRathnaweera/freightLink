@@ -941,7 +941,8 @@ public class TripService : ITripService
         var staffUserId = Guid.Parse("2d276e2c-8ada-400d-b9f8-f5b49c1507af");
         var shipperUserId = Guid.Parse("c67e538b-3247-44a0-9362-09667ba6d97f");
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == driverUser1Id, cancellationToken))
+        var existingDriverUser1 = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == driverUser1Id || u.Email == "driver1@freightlink.lk", cancellationToken);
+        if (existingDriverUser1 == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -955,8 +956,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            driverUser1Id = existingDriverUser1.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == driverUser2Id, cancellationToken))
+        var existingDriverUser2 = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == driverUser2Id || u.Email == "driver2@freightlink.lk", cancellationToken);
+        if (existingDriverUser2 == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -970,8 +976,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            driverUser2Id = existingDriverUser2.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == driverUser3Id, cancellationToken))
+        var existingDriverUser3 = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == driverUser3Id || u.Email == "driver3@freightlink.lk", cancellationToken);
+        if (existingDriverUser3 == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -985,8 +996,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            driverUser3Id = existingDriverUser3.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == shipperUserId, cancellationToken))
+        var existingShipper = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == shipperUserId || u.Email == "user@example.com", cancellationToken);
+        if (existingShipper == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -1000,8 +1016,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            shipperUserId = existingShipper.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == staffUserId, cancellationToken))
+        var existingStaff = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == staffUserId || u.Email == "agency@freightlink.lk", cancellationToken);
+        if (existingStaff == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -1014,6 +1035,10 @@ public class TripService : ITripService
                 CreatedAt = now,
                 UpdatedAt = now
             });
+        }
+        else
+        {
+            staffUserId = existingStaff.UserId;
         }
 
         if (!await _dbContext.AgencyStaff.AnyAsync(s => s.UserId == staffUserId && s.AgencyId == agencyId, cancellationToken))
