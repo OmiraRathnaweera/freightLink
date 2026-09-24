@@ -339,7 +339,7 @@ class _DriverRegisterScreenState extends State<DriverRegisterScreen> {
                       else
                         DropdownButtonFormField<AgencyLookup>(
                           key: const Key('register_agency_dropdown'),
-                          value: _selectedAgency,
+                          initialValue: _selectedAgency,
                           decoration: InputDecoration(
                             hintText: 'Select your agency',
                             prefixIcon: const Icon(Icons.business_rounded, size: 20, color: AppColors.inkMuted),

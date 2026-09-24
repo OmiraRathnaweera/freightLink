@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:freightlink_mobile/core/theme/app_theme.dart';
 import 'package:freightlink_mobile/features/auth/providers/auth_provider.dart';
 import 'package:freightlink_mobile/features/auth/screens/driver_register_screen.dart';
 import 'package:freightlink_mobile/features/auth/screens/login_screen.dart';
