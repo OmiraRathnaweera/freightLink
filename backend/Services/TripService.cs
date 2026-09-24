@@ -902,7 +902,10 @@ public class TripService : ITripService
             .Where(t => t.TripId == trip1Id || t.TripId == trip2Id || t.TripId == trip3Id)
             .ToListAsync(cancellationToken);
 
-        if (existingTrips.Count == 3)
+        var assignment4Id = Guid.Parse("b4000000-0000-0000-0000-000000000004");
+        var hasAssignment4 = await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment4Id, cancellationToken);
+
+        if (existingTrips.Count == 3 && hasAssignment4)
         {
             return existingTrips.Select(MapToDetailResponse).ToList();
         }
