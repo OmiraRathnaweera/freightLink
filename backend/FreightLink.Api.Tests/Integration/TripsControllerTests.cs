@@ -502,6 +502,367 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task Delete_Returns200_AndCancelsTrip_WhenAuthorized_ForAdmin()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var adminUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var driverUserId = Guid.NewGuid();
+        var agencyId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+
+        db.Users.Add(new User
+        {
+            UserId = adminUserId,
+            FullName = "Admin Operator",
+            Email = $"admin-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Admin,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = shipperUserId,
+            FullName = "Shipper User",
+            Email = $"shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = driverUserId,
+            FullName = "Driver User",
+            Email = $"driver-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Driver,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Express Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Yard 1",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Vehicles.Add(new Vehicle
+        {
+            VehicleId = vehicleId,
+            AgencyId = agencyId,
+            RegistrationNo = $"WP-{Guid.NewGuid():N}"[..10],
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000,
+            VolumeM3 = 20,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Drivers.Add(new Driver
+        {
+            DriverId = driverId,
+            UserId = driverUserId,
+            AgencyId = agencyId,
+            LicenceNo = $"LIC-{Guid.NewGuid():N}"[..12],
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
+            Status = DriverStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Loads.Add(new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            PickupAddress = "Origin",
+            DropoffAddress = "Dest",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffLat = 7.0m,
+            DropoffLng = 79.9m,
+            WeightKg = 1000,
+            Status = LoadStatus.Matched,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.AgentWorkflowRuns.Add(new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.AwaitingApproval,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Assignments.Add(new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 5000,
+            Status = AssignmentStatus.Accepted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var trip = new Trip
+        {
+            TripId = tripId,
+            AssignmentId = assignmentId,
+            VehicleId = vehicleId,
+            DriverId = driverId,
+            Status = TripStatus.Assigned,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Trips.Add(trip);
+
+        db.TripEvents.Add(new TripEvent
+        {
+            TripEventId = Guid.NewGuid(),
+            TripId = tripId,
+            RecordedByUserId = adminUserId,
+            FromStatus = null,
+            ToStatus = TripStatus.Assigned,
+            Notes = "Dispatched trip created.",
+            OccurredAt = DateTimeOffset.UtcNow.AddMinutes(-5)
+        });
+
+        await db.SaveChangesAsync();
+
+        var adminToken = MintTokenForUser(adminUserId, UserRole.Admin);
+
+        using var deleteReq = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{tripId}", adminToken);
+        var deleteRes = await _client.SendAsync(deleteReq);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteRes.StatusCode);
+
+        // Verify database state: trip and events are fully removed
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var deletedTrip = await verifyDb.Trips.FirstOrDefaultAsync(t => t.TripId == tripId);
+        Assert.Null(deletedTrip);
+        var remainingEvents = await verifyDb.TripEvents.Where(e => e.TripId == tripId).ToListAsync();
+        Assert.Empty(remainingEvents);
+
+        // Verify assignment trip reference is unlinked
+        var assignmentInDb = await verifyDb.Assignments.Include(a => a.Trip).FirstOrDefaultAsync(a => a.AssignmentId == assignmentId);
+        Assert.NotNull(assignmentInDb);
+        Assert.Null(assignmentInDb.Trip);
+    }
+
+    [Fact]
+    public async Task Delete_Returns204_AndDeletesTripFully_AfterCancelled_ForAgencyStaff()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var driverUserId = Guid.NewGuid();
+        var agencyId = Guid.NewGuid();
+        var vehicleId = Guid.NewGuid();
+        var driverId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+        var tripId = Guid.NewGuid();
+
+        db.Users.Add(new User
+        {
+            UserId = staffUserId,
+            FullName = "Agency Staff Kamal",
+            Email = $"staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            UserId = staffUserId,
+            AgencyId = agencyId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = shipperUserId,
+            FullName = "Shipper User",
+            Email = $"shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = driverUserId,
+            FullName = "Driver User",
+            Email = $"driver-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Driver,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Samagi Logistics",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Yard 2",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Vehicles.Add(new Vehicle
+        {
+            VehicleId = vehicleId,
+            AgencyId = agencyId,
+            RegistrationNo = $"WP-{Guid.NewGuid():N}"[..10],
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000,
+            VolumeM3 = 20,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Drivers.Add(new Driver
+        {
+            DriverId = driverId,
+            UserId = driverUserId,
+            AgencyId = agencyId,
+            LicenceNo = $"LIC-{Guid.NewGuid():N}"[..12],
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
+            Status = DriverStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Loads.Add(new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            PickupAddress = "Origin",
+            DropoffAddress = "Dest",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffLat = 7.0m,
+            DropoffLng = 79.9m,
+            WeightKg = 1000,
+            Status = LoadStatus.Matched,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.AgentWorkflowRuns.Add(new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.AwaitingApproval,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Assignments.Add(new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 5000,
+            Status = AssignmentStatus.Accepted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        // The trip was already cancelled
+        var trip = new Trip
+        {
+            TripId = tripId,
+            AssignmentId = assignmentId,
+            VehicleId = vehicleId,
+            DriverId = driverId,
+            Status = TripStatus.Cancelled,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Trips.Add(trip);
+
+        db.TripEvents.Add(new TripEvent
+        {
+            TripEventId = Guid.NewGuid(),
+            TripId = tripId,
+            RecordedByUserId = staffUserId,
+            FromStatus = TripStatus.Assigned,
+            ToStatus = TripStatus.Cancelled,
+            Notes = "Trip cancelled prior to departure.",
+            OccurredAt = DateTimeOffset.UtcNow.AddMinutes(-10)
+        });
+
+        await db.SaveChangesAsync();
+
+        var staffToken = MintTokenForUser(staffUserId, UserRole.AgencyStaff);
+
+        // Delete the trip fully after cancelling it
+        using var deleteReq = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{tripId}", staffToken);
+        var deleteRes = await _client.SendAsync(deleteReq);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleteRes.StatusCode);
+
+        // Verify trip is permanently removed from DB
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var deletedTrip = await verifyDb.Trips.FirstOrDefaultAsync(t => t.TripId == tripId);
+        Assert.Null(deletedTrip);
+        var remainingEvents = await verifyDb.TripEvents.Where(e => e.TripId == tripId).ToListAsync();
+        Assert.Empty(remainingEvents);
+    }
+
+    [Fact]
     public async Task Cancel_Returns404_ForAdmin_WhenTripDoesNotExist()
     {
         using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/trips/{Guid.NewGuid()}/cancel", MintTokenWithRoles("Admin"));

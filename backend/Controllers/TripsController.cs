@@ -135,19 +135,18 @@ public class TripsController : ControllerBase
     }
 
     /// <summary>
-    /// Cancels an active trip (Assigned, PickedUp, or InTransit). Soft-delete / lifecycle cancellation per ADR-019.
+    /// Permanently deletes a trip record, its events, and its evidence from the system.
+    /// Can be used to delete a trip fully after cancelling it (or before departure if in Assigned status).
     /// </summary>
     /// <param name="id">The trip's id.</param>
-    /// <param name="reason">Optional cancellation reason query parameter.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 OK with the cancelled <see cref="TripResponseDto"/>.</returns>
+    /// <returns>204 NoContent upon successful deletion.</returns>
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = AgencyStaffOrDriverOrAdminRoles)]
-    public async Task<ActionResult<TripResponseDto>> Delete(Guid id, [FromQuery] string? reason, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var request = string.IsNullOrWhiteSpace(reason) ? null : new CancelTripDto { Reason = reason };
-        var result = await _tripService.CancelAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
-        return Ok(result);
+        await _tripService.DeleteAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return NoContent();
     }
 
     /// <summary>

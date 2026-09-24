@@ -17,7 +17,7 @@ public class TripEventConfiguration : IEntityTypeConfiguration<TripEvent>
         builder.HasOne(x => x.Trip)
             .WithMany(t => t.Events)
             .HasForeignKey(x => x.TripId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(x => x.RecordedByUser)
             .WithMany()

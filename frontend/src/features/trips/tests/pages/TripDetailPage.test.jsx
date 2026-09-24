@@ -15,6 +15,7 @@ vi.mock("../../api/tripsApi.js", async (importOriginal) => {
     useUploadTripEvidenceMutation: vi.fn(),
     useUpdateTripMutation: vi.fn(),
     useCancelTripMutation: vi.fn(),
+    useDeleteTripMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   };
 });
 
@@ -194,5 +195,25 @@ describe("TripDetailPage — render states", () => {
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText(/confirm cancellation/i)).toBeInTheDocument();
+  });
+
+  it("opens delete dialog when Delete Trip is clicked on a Cancelled trip", async () => {
+    const trip = sampleTripDetail({ status: "Cancelled" });
+    tripsApi.useTripDetailQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: trip,
+    });
+
+    renderTripDetailPage();
+
+    expect(screen.queryByRole("button", { name: /cancel trip/i })).not.toBeInTheDocument();
+
+    const deleteBtn = screen.getByRole("button", { name: /delete trip/i });
+    expect(deleteBtn).toBeInTheDocument();
+    await userEvent.click(deleteBtn);
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /permanently delete trip/i })).toBeInTheDocument();
   });
 });

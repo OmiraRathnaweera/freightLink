@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { toast } from "sonner";
 import Button from "../../../components/Button.jsx";
 import { useCancelTripMutation } from "../api/tripsApi.js";
 import { getTripErrorMessage } from "../lib/errorMessages.js";
 
-function CancelTripDialog({ tripId, onClose }) {
+function CancelTripDialog({ tripId, onClose, onCancelled }) {
   const [reason, setReason] = useState("");
 
   const cancelMutation = useCancelTripMutation({
     onSuccess: () => {
+      toast.success("Trip cancelled");
+      onCancelled?.();
       onClose();
     },
   });

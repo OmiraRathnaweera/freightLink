@@ -882,6 +882,87 @@ public class TripService : ITripService
     }
 
     /// <inheritdoc />
+    public async Task DeleteAsync(
+        Guid tripId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        var trip = await _dbContext.Trips
+            .Include(t => t.Assignment)
+            .Include(t => t.Events)
+            .Include(t => t.Evidence)
+            .Include(t => t.Invoice)
+            .Include(t => t.Disputes)
+            .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
+
+        if (trip == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
+        }
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var agencyStaff = await _dbContext.AgencyStaff
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
+            }
+        }
+        else if (currentUserRole == UserRole.Driver)
+        {
+            var driver = await _dbContext.Drivers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.UserId == currentUserId, cancellationToken);
+
+            if (driver == null || trip.DriverId != driver.DriverId)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
+            }
+        }
+        else if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
+        }
+
+        if (trip.Status == TripStatus.Delivered)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Cannot delete a trip that has already been delivered.");
+        }
+
+        if (trip.Status == TripStatus.PickedUp || trip.Status == TripStatus.InTransit)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Active trips in pickup or transit must be cancelled before they can be deleted.");
+        }
+
+        if (trip.Events.Count > 0)
+        {
+            _dbContext.TripEvents.RemoveRange(trip.Events);
+        }
+
+        if (trip.Evidence.Count > 0)
+        {
+            _dbContext.TripEvidences.RemoveRange(trip.Evidence);
+        }
+
+        if (trip.Invoice != null)
+        {
+            _dbContext.Invoices.Remove(trip.Invoice);
+        }
+
+        if (trip.Disputes.Count > 0)
+        {
+            _dbContext.Disputes.RemoveRange(trip.Disputes);
+        }
+
+        _dbContext.Trips.Remove(trip);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<List<TripResponseDto>> SeedExampleTripsAsync(CancellationToken cancellationToken = default)
     {
         var trip1Id = Guid.Parse("c1000000-0000-0000-0000-000000000001");

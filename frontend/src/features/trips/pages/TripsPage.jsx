@@ -15,6 +15,7 @@ import TripsTable from "../components/TripsTable.jsx";
 import TripFilterBar from "../components/TripFilterBar.jsx";
 import Pagination from "../components/Pagination.jsx";
 import CreateTripDialog from "../components/CreateTripDialog.jsx";
+import DeleteTripDialog from "../components/DeleteTripDialog.jsx";
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -22,6 +23,7 @@ function TripsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatchAssignmentId = searchParams.get("dispatch") || searchParams.get("assignmentId");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(Boolean(dispatchAssignmentId));
+  const [tripToDelete, setTripToDelete] = useState(null);
   const role = useAppSelector((state) => state.auth.role);
 
   const page = Number(searchParams.get("page") ?? "1");
@@ -116,6 +118,7 @@ function TripsPage() {
               sortBy={sortBy}
               sortDir={sortDir}
               onSortChange={handleSortChange}
+              onDeleteTrip={(trip) => setTripToDelete(trip)}
             />
           </div>
         ) : (
@@ -147,6 +150,18 @@ function TripsPage() {
           defaultAssignmentId={dispatchAssignmentId || ""}
           onClose={() => setIsCreateDialogOpen(false)}
           onCreated={() => tripsQuery.refetch()}
+        />
+      )}
+
+      {tripToDelete && (
+        <DeleteTripDialog
+          tripId={tripToDelete.tripId}
+          trip={tripToDelete}
+          onClose={() => setTripToDelete(null)}
+          onDeleted={() => {
+            setTripToDelete(null);
+            tripsQuery.refetch();
+          }}
         />
       )}
     </div>

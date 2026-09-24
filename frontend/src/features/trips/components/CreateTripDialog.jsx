@@ -3,7 +3,6 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
-  DollarSign,
   MapPin,
   Package,
   PlusCircle,
