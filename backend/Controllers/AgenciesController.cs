@@ -93,6 +93,17 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Activates a verified agency.
+    /// </summary>
+    [HttpPost("{id:guid}/activate")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> ActivateAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.ActivateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
     /// Suspends an agency.
     /// </summary>
     [HttpPost("{id:guid}/suspend")]
