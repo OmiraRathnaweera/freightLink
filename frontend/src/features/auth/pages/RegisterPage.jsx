@@ -1,6 +1,6 @@
-﻿import { useSearchParams, Link, useNavigate } from 'react-router-dom'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
-import { useRegisterAgencyMutation } from '../api/authApi.js'
+import { useRegisterAgencyMutation, useRegisterShipperMutation } from '../api/authApi.js'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import Input from '../../../components/Input.jsx'
@@ -11,6 +11,10 @@ export default function RegisterPage() {
 
   if (role === 'agency') {
     return <AgencyRegisterForm />
+  }
+
+  if (role === 'shipper') {
+    return <ShipperRegisterForm />
   }
 
   // Placeholder for other roles or role selection
@@ -24,6 +28,111 @@ export default function RegisterPage() {
         <Button as={Link} to="/register?role=shipper" variant="secondary" className="w-full">
           Register as Shipper
         </Button>
+      </Card>
+    </div>
+  )
+}
+
+function ShipperRegisterForm() {
+  const navigate = useNavigate()
+  const registerMutation = useRegisterShipperMutation({
+    onSuccess: () => {
+      alert('Registration successful! Please login.')
+      navigate('/login')
+    },
+    onError: (err) => {
+      alert(`Registration failed: ${err.message || 'Check your inputs and try again.'}`)
+    }
+  })
+
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    phoneE164: '',
+    companyName: '',
+    businessRegNo: '',
+    billingAddress: ''
+  })
+
+  const handleChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({ ...prev, [name]: value }))
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const payload = { ...formData }
+    
+    if (!payload.phoneE164) {
+      delete payload.phoneE164
+    }
+    if (!payload.businessRegNo) {
+      delete payload.businessRegNo
+    }
+    
+    registerMutation.mutate(payload)
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4 py-12">
+      <Card className="max-w-2xl w-full">
+        <Card.Header className="p-6 border-b border-slate-200">
+          <h1 className="text-2xl font-bold text-slate-900">Register as Shipper</h1>
+          <p className="text-sm text-slate-500 mt-1">Create your shipping company profile and your user account.</p>
+        </Card.Header>
+        <Card.Body className="p-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-slate-800 border-b pb-2">User Details</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
+                  <Input name="fullName" required value={formData.fullName} onChange={handleChange} placeholder="Jane Doe" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <Input type="email" name="email" required value={formData.email} onChange={handleChange} placeholder="jane@example.com" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
+                  <Input type="password" name="password" required value={formData.password} onChange={handleChange} placeholder="Strong password" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone (Optional)</label>
+                  <Input type="tel" name="phoneE164" value={formData.phoneE164} onChange={handleChange} placeholder="+14155552671" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h2 className="text-lg font-semibold text-slate-800 border-b pb-2">Company Details</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
+                  <Input name="companyName" required value={formData.companyName} onChange={handleChange} placeholder="Acme Shipping Corp" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Business Registration No (Optional)</label>
+                  <Input name="businessRegNo" value={formData.businessRegNo} onChange={handleChange} placeholder="BR-98765" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Billing Address</label>
+                  <Input name="billingAddress" required value={formData.billingAddress} onChange={handleChange} placeholder="456 Commerce St, City" />
+                </div>
+              </div>
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full py-2.5 text-base"
+              disabled={registerMutation.isPending}
+            >
+              {registerMutation.isPending ? 'Registering...' : 'Complete Registration'}
+            </Button>
+          </form>
+        </Card.Body>
       </Card>
     </div>
   )
