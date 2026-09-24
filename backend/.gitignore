@@ -6,6 +6,12 @@
 # dotenv files
 .env
 
+# Local agent instructions
+AGENTS.md
+
+# Local file storage
+storage/
+
 # User-specific files
 *.rsuser
 *.suo

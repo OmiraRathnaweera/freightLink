@@ -96,12 +96,11 @@ builder.Services.AddSwaggerGen(options =>
 // key â€” deliberately keeping C# lookups in the PascalCase that matches the bound POCO property
 // names (e.g. JwtOptions.Issuer below), rather than forcing ALL-CAPS C# to visually match the env
 // var spelling, which the "__"-to-":" translation would make misleading anyway.
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// JWT settings (Jwt:* / JWT__* env vars) used both to bind JwtOptions for DI and, immediately
-// below, to configure the JwtBearer handler's signing-key/issuer/audience validation. Same
-// case-insensitive "__"-to-":" mapping as the connection string above.
+
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtOptions>(jwtSection);
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
@@ -136,6 +135,17 @@ builder.Services.Configure<InternalApiOptions>(options =>
 // Cloudinary settings (Cloudinary:* / CLOUDINARY__* env vars). Same case-insensitive "__"-to-":"
 // mapping as the other sections above.
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
+
+// Email settings (Email:* / EMAIL__* env vars) for GmailEmailService. Only validated when
+// EMAIL__ENABLED is true — mirrors the JWT key-length fail-fast above, but is itself opt-in since
+// email sending (unlike JWT) is an optional feature that's allowed to be entirely unconfigured.
+var emailSection = builder.Configuration.GetSection("Email");
+builder.Services.Configure<EmailOptions>(emailSection);
+var emailOptions = emailSection.Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.Enabled)
+{
+    emailOptions.Validate();
+}
 
 // The Cloudinary SDK client is stateless aside from its credentials, so it's built once as a
 // singleton rather than re-constructed per request/scope.
@@ -205,12 +215,18 @@ builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPricingConfigService, PricingConfigService>();
 builder.Services.AddScoped<IPricingEstimatorService, PricingEstimatorService>();
+builder.Services.AddScoped<IAgentWorkflowService, AgentWorkflowService>();
 builder.Services.AddScoped<ILoadService, LoadService>();
 builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IDisputeService, DisputeService>();
+builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
+builder.Services.AddScoped<ITripService, TripService>();
+builder.Services.AddScoped<IRouteService, RouteService>();
 
 var app = builder.Build();
 

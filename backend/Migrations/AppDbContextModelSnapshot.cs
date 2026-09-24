@@ -663,7 +663,7 @@ namespace FreightLink.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset>("IssuedAt")
+                    b.Property<DateTimeOffset?>("IssuedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
@@ -685,7 +685,8 @@ namespace FreightLink.Api.Migrations
                         .HasDatabaseName("uq_invoice_number");
 
                     b.HasIndex("TripId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("uq_invoice_trip_id");
 
                     b.ToTable("Invoices", t =>
                         {
@@ -693,7 +694,7 @@ namespace FreightLink.Api.Migrations
 
                             t.HasCheckConstraint("ck_invoice_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
 
-                            t.HasCheckConstraint("ck_invoice_due", "\"DueDate\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
+                            t.HasCheckConstraint("ck_invoice_due", "\"DueDate\" IS NULL OR \"IssuedAt\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
                         });
                 });
 

@@ -91,7 +91,58 @@ public enum ErrorCode
 
     /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
     FILE_IN_USE,
+    
+    /// <summary>Invoice generation on delivery requires the trip to be in Delivered status.</summary>
+    TRIP_NOT_DELIVERED,
 
+    /// <summary>The requested invoice could not be found.</summary>
+    INVOICE_NOT_FOUND,
+
+    /// <summary>The invoice exists but does not belong to the caller's organization/role.</summary>
+    INVOICE_NOT_OWNED,
+
+    /// <summary>An invoice already exists for this trip (1-to-1 relationship enforced).</summary>
+    INVOICE_ALREADY_EXISTS_FOR_TRIP,
+
+    /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_INVOICE_STATUS_TRANSITION,
+
+    /// <summary>
+    /// A status transition targeting <c>Paid</c> or <c>Failed</c> was attempted via the public
+    /// user-facing status endpoint. Those statuses are exclusively managed by the
+    /// signature-verified payment-gateway webhook and may never be set directly by an
+    /// authenticated application user.
+    /// </summary>
+    INVOICE_STATUS_GATEWAY_OWNED,
+
+    /// <summary>An invalid invoice amount was supplied.</summary>
+    INVALID_INVOICE_AMOUNT,
+
+    /// <summary>
+    /// The supplied <c>DueDate</c> falls before the invoice's issuance date.
+    /// The database constraint <c>ck_invoice_due</c> requires
+    /// <c>DueDate &gt;= (IssuedAt AT TIME ZONE 'UTC')::date</c>.
+    /// </summary>
+    INVALID_INVOICE_DUE_DATE,
+
+    /// <summary>The requested dispute could not be found.</summary>
+    DISPUTE_NOT_FOUND,
+
+    /// <summary>The dispute exists but does not belong to the authenticated caller.</summary>
+    DISPUTE_NOT_OWNED,
+
+    /// <summary>A dispute mutation or resolution was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_DISPUTE_STATUS_TRANSITION,
+
+    /// <summary>The dispute has already been resolved or rejected.</summary>
+    DISPUTE_ALREADY_RESOLVED,
+
+    /// <summary>
+    /// A dispute in status <c>Open</c> or <c>UnderReview</c> already exists for this
+    /// (TripId, Category) combination. The database unique partial index
+    /// <c>ux_dispute_open</c> enforces at most one live dispute per trip per category.
+    /// </summary>
+    DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
     /// <summary>An attach was attempted referencing an UploadedFile publicId that does not exist.</summary>
     LOAD_FILE_UPLOAD_NOT_FOUND,
 
@@ -159,5 +210,89 @@ public enum ErrorCode
     FORBIDDEN,
 
     /// <summary>An unhandled exception was caught by the global exception-handling middleware.</summary>
-    INTERNAL_SERVER_ERROR
+    INTERNAL_SERVER_ERROR,
+
+    /// <summary>The SMTP send failed (network/auth/provider failure, not a validation failure) — thrown by <c>GmailEmailService</c>.</summary>
+    EMAIL_SEND_FAILED,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>LoadId</c> that doesn't exist.
+    /// Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    LOAD_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>TriggeredByUserId</c> that
+    /// doesn't exist. Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    USER_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>(LoadId, AttemptNo)</c> pair
+    /// that already has a run (mirrors <c>uq_awr_load_attempt</c>). Each attempt number for a given
+    /// load must be started at most once.
+    /// </summary>
+    WORKFLOW_RUN_DUPLICATE_ATTEMPT,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called with a
+    /// <c>workflowRunId</c> that doesn't exist. Thrown by <c>AgentWorkflowService.ReportStepAsync</c>.
+    /// </summary>
+    WORKFLOW_RUN_NOT_FOUND,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called twice for the same
+    /// <c>(WorkflowRunId, StepNo)</c> pair (mirrors <c>uq_agentstep_order</c>). Each step number for a
+    /// given run may be reported at most once.
+    /// </summary>
+    AGENT_STEP_DUPLICATE,
+
+    /// <summary>The requested trip could not be found.</summary>
+    TRIP_NOT_FOUND,
+
+    /// <summary>The caller does not have access to the requested trip.</summary>
+    TRIP_ACCESS_DENIED,
+
+    /// <summary>The requested trip status transition is not permitted from its current status.</summary>
+    INVALID_TRIP_STATUS_TRANSITION,
+
+    /// <summary>Pickup or delivery evidence is required before transitioning to PickedUp or Delivered.</summary>
+    TRIP_EVIDENCE_REQUIRED,
+
+    /// <summary>Evidence of this type already exists for this trip.</summary>
+    TRIP_EVIDENCE_ALREADY_EXISTS,
+
+    /// <summary>The caller's role does not match the required role for this evidence type.</summary>
+    TRIP_EVIDENCE_ROLE_MISMATCH,
+
+    /// <summary>The requested assignment could not be found.</summary>
+    ASSIGNMENT_NOT_FOUND,
+
+    /// <summary>The assignment exists but does not belong to the caller's agency.</summary>
+    ASSIGNMENT_NOT_OWNED,
+
+    /// <summary>A trip has already been created for this assignment.</summary>
+    TRIP_ALREADY_EXISTS,
+
+    /// <summary>The requested vehicle could not be found.</summary>
+    VEHICLE_NOT_FOUND,
+
+    /// <summary>The vehicle does not belong to the executing agency.</summary>
+    VEHICLE_NOT_OWNED,
+
+    /// <summary>The vehicle is inactive or already committed to an active trip.</summary>
+    VEHICLE_UNAVAILABLE,
+
+    /// <summary>The requested driver could not be found.</summary>
+    DRIVER_NOT_FOUND,
+
+    /// <summary>The driver does not belong to the executing agency.</summary>
+    DRIVER_NOT_OWNED,
+
+    /// <summary>The driver is inactive or already committed to an active trip.</summary>
+    DRIVER_UNAVAILABLE,
+
+    /// <summary>The trip cannot be modified because it has already progressed past the Assigned state.</summary>
+    TRIP_CANNOT_BE_MODIFIED
 }
+

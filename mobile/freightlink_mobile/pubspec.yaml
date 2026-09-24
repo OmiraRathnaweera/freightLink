@@ -36,6 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
   http: ^1.6.0
+  flutter_secure_storage: ^11.0.0
+  flutter_map: ^8.3.2
+  latlong2: ^0.10.1
+  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:
@@ -47,6 +51,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  mocktail: ^1.0.5
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
