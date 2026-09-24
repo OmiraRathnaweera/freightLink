@@ -325,4 +325,106 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>GET /auth/agencies is public and returns list of agencies.</summary>
+    [Fact]
+    public async Task GetAgencies_Returns200_Public()
+    {
+        var regAgency = await _client.PostAsJsonAsync("/api/v1/auth/register/agency", new RegisterAgencyRequestDto
+        {
+            Email = $"agency-lookup-{Guid.NewGuid():N}@example.com",
+            Password = "Sup3r$ecret1",
+            FullName = "Agency Boss",
+            AgencyName = "Lookup Agency Test",
+            BusinessRegNo = $"BRN-LOOKUP-{Guid.NewGuid():N}",
+            YardAddress = "123 Port Road",
+            YardLat = 6.9m,
+            YardLng = 79.8m
+        });
+        regAgency.EnsureSuccessStatusCode();
+
+        var response = await _client.GetAsync("/api/v1/auth/agencies");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var agencies = await response.Content.ReadFromJsonAsync<List<AgencyLookupDto>>();
+        Assert.NotNull(agencies);
+        Assert.Contains(agencies, a => a.Name == "Lookup Agency Test");
+    }
+
+    /// <summary>POST /auth/register/driver registers a driver and allows subsequent login as Driver role.</summary>
+    [Fact]
+    public async Task RegisterDriver_Returns201_AndCanLoginAsDriver()
+    {
+        // 1. Create agency
+        var agencyRegNo = $"BRN-DRV-{Guid.NewGuid():N}";
+        var regAgency = await _client.PostAsJsonAsync("/api/v1/auth/register/agency", new RegisterAgencyRequestDto
+        {
+            Email = $"agency-driver-{Guid.NewGuid():N}@example.com",
+            Password = "Sup3r$ecret1",
+            FullName = "Agency Owner",
+            AgencyName = "Driver Employing Agency",
+            BusinessRegNo = agencyRegNo,
+            YardAddress = "789 Freight Ave",
+            YardLat = 6.9271m,
+            YardLng = 79.8612m
+        });
+        regAgency.EnsureSuccessStatusCode();
+
+        var agenciesRes = await _client.GetAsync("/api/v1/auth/agencies");
+        var agencies = await agenciesRes.Content.ReadFromJsonAsync<List<AgencyLookupDto>>();
+        var agency = agencies!.First(a => a.Name == "Driver Employing Agency");
+
+        // 2. Register driver
+        var driverEmail = $"driver-{Guid.NewGuid():N}@example.com";
+        var licenceNo = $"DL-{Guid.NewGuid():N}".Substring(0, 15);
+        const string driverPassword = "Sup3r$ecret1";
+
+        var driverRegReq = new RegisterDriverRequestDto
+        {
+            AgencyId = agency.AgencyId,
+            Email = driverEmail,
+            Password = driverPassword,
+            FullName = "David Driver",
+            PhoneE164 = "+94771234567",
+            LicenceNo = licenceNo,
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(3))
+        };
+
+        var regRes = await _client.PostAsJsonAsync("/api/v1/auth/register/driver", driverRegReq);
+        Assert.Equal(HttpStatusCode.Created, regRes.StatusCode);
+
+        // 3. Login as driver
+        var loginRes = await _client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequestDto
+        {
+            Email = driverEmail,
+            Password = driverPassword
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+        var tokens = await loginRes.Content.ReadFromJsonAsync<TokenResponseDto>();
+        Assert.NotNull(tokens);
+
+        // 4. Verify /auth/me returns Driver role
+        using var meReq = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
+        meReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var meRes = await _client.SendAsync(meReq);
+        Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
+        var me = await meRes.Content.ReadFromJsonAsync<CurrentUserResponseDto>();
+        Assert.NotNull(me);
+        Assert.Equal("Driver", me.Role);
+
+        // 5. Duplicate licence returns 409 DRIVER_LICENCE_ALREADY_REGISTERED
+        var dupDriverReq = new RegisterDriverRequestDto
+        {
+            AgencyId = agency.AgencyId,
+            Email = $"another-{Guid.NewGuid():N}@example.com",
+            Password = driverPassword,
+            FullName = "Another Driver",
+            LicenceNo = licenceNo,
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(3))
+        };
+        var dupRes = await _client.PostAsJsonAsync("/api/v1/auth/register/driver", dupDriverReq);
+        Assert.Equal(HttpStatusCode.Conflict, dupRes.StatusCode);
+        var raw = await dupRes.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(raw);
+        Assert.Equal("DRIVER_LICENCE_ALREADY_REGISTERED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
 }

@@ -245,5 +245,8 @@ public enum ErrorCode
     NO_ELIGIBLE_MATCH_CANDIDATE,
 
     /// <summary>The workflow run has already been approved.</summary>
-    WORKFLOW_RUN_ALREADY_APPROVED
+    WORKFLOW_RUN_ALREADY_APPROVED,
+
+    /// <summary>Registration was attempted with a driving licence number already on file.</summary>
+    DRIVER_LICENCE_ALREADY_REGISTERED
 }
