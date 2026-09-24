@@ -25,6 +25,16 @@ export async function verifyAgency(agencyId) {
 /**
  * POST /agencies/{id}/suspend
  */
+/**
+ * POST /agencies/{id}/activate
+ */
+export async function activateAgency(agencyId) {
+  return api.post('/agencies/' + agencyId + '/activate')
+}
+
+/**
+ * POST /agencies/{id}/suspend
+ */
 export async function suspendAgency(agencyId) {
   return api.post(`/agencies/${agencyId}/suspend`)
 }
@@ -44,9 +54,17 @@ export function useVerifyAgencyMutation(options) {
   })
 }
 
+export function useActivateAgencyMutation(options) {
+  return useMutation({
+    mutationFn: activateAgency,
+    ...options,
+  })
+}
+
 export function useSuspendAgencyMutation(options) {
   return useMutation({
     mutationFn: suspendAgency,
     ...options,
   })
 }
+

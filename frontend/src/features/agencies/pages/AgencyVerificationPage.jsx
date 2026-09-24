@@ -2,7 +2,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
-import { useAgenciesQuery, useVerifyAgencyMutation, useSuspendAgencyMutation } from '../api/agencyApi.js'
+import { useAgenciesQuery, useVerifyAgencyMutation, useSuspendAgencyMutation, useActivateAgencyMutation } from '../api/agencyApi.js'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
@@ -12,8 +12,16 @@ export default function AgencyVerificationPage() {
   const role = useAppSelector((state) => state.auth.role)
   const queryClient = useQueryClient()
 
-  const { data: pagedData, isLoading, isError } = useAgenciesQuery({ status: 'Pending' })
-  const agencies = pagedData?.items || []
+  const pendingQuery = useAgenciesQuery({ status: 'Pending' })
+  const verifiedQuery = useAgenciesQuery({ status: 'Verified' })
+
+  const isLoading = pendingQuery.isLoading || verifiedQuery.isLoading
+  const isError = pendingQuery.isError || verifiedQuery.isError
+
+  const agencies = [
+    ...(pendingQuery.data?.items || []),
+    ...(verifiedQuery.data?.items || [])
+  ]
 
   const verifyMutation = useVerifyAgencyMutation({
     onSuccess: () => {
@@ -22,6 +30,16 @@ export default function AgencyVerificationPage() {
     },
     onError: (err) => {
       alert(`Failed to verify agency: ${err.message}`)
+    }
+  })
+
+  const activateMutation = useActivateAgencyMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agencies'] })
+      alert('Agency successfully activated!')
+    },
+    onError: (err) => {
+      alert(`Failed to activate agency: ${err.message}`)
     }
   })
 
@@ -39,6 +57,10 @@ export default function AgencyVerificationPage() {
     verifyMutation.mutate(agencyId)
   }
 
+  const handleActivate = (agencyId) => {
+    activateMutation.mutate(agencyId)
+  }
+
   const handleSuspend = (agencyId) => {
     suspendMutation.mutate(agencyId)
   }
@@ -52,14 +74,14 @@ export default function AgencyVerificationPage() {
     <div className="space-y-6">
       <PageHeader 
         title="Agency Verification Queue" 
-        subtitle="Review and approve agencies pending verification." 
+        subtitle="Review, approve, and activate agencies." 
       />
 
-      {isLoading && <p className="text-slate-500">Loading pending agencies...</p>}
+      {isLoading && <p className="text-slate-500">Loading agencies...</p>}
       {isError && <p className="text-red-500">Failed to load agencies.</p>}
 
       {!isLoading && !isError && agencies.length === 0 ? (
-        <p className="text-slate-500">No agencies pending verification.</p>
+        <p className="text-slate-500">No agencies pending verification or activation.</p>
       ) : (
         <div className="grid gap-6">
           {agencies.map((agency) => (
@@ -69,7 +91,7 @@ export default function AgencyVerificationPage() {
                   <h3 className="text-lg font-semibold text-slate-900">{agency.name}</h3>
                   <p className="text-sm text-slate-500">Reg No: {agency.businessRegNo}</p>
                 </div>
-                <StatusBadge status={agency.status} />
+                <StatusBadge tone={agency.status === 'Pending' ? 'amber' : agency.status === 'Verified' ? 'blue' : 'neutral'}>{agency.status}</StatusBadge>
               </Card.Header>
               
               <Card.Body className="p-4 space-y-4">
@@ -95,7 +117,7 @@ export default function AgencyVerificationPage() {
                             <td className="px-4 py-3 text-slate-600">{doc.docNumber}</td>
                             <td className="px-4 py-3 text-slate-600">{doc.expiresOn ?? 'N/A'}</td>
                             <td className="px-4 py-3">
-                              <StatusBadge status={doc.status} />
+                              <StatusBadge tone={doc.status === 'Valid' ? 'green' : doc.status === 'Expiring' ? 'amber' : 'red'}>{doc.status}</StatusBadge>
                             </td>
                             <td className="px-4 py-3 text-right">
                               <a
@@ -120,18 +142,32 @@ export default function AgencyVerificationPage() {
                   variant="status" 
                   status="red" 
                   onClick={() => handleSuspend(agency.agencyId)}
-                  disabled={suspendMutation.isPending || verifyMutation.isPending}
+                  disabled={suspendMutation.isPending || verifyMutation.isPending || activateMutation.isPending}
                 >
                   {suspendMutation.isPending && suspendMutation.variables === agency.agencyId ? 'Suspending...' : 'Suspend Agency'}
                 </Button>
-                <Button 
-                  variant="status" 
-                  status="green" 
-                  onClick={() => handleApprove(agency.agencyId)}
-                  disabled={suspendMutation.isPending || verifyMutation.isPending}
-                >
-                  {verifyMutation.isPending && verifyMutation.variables === agency.agencyId ? 'Approving...' : 'Approve Agency'}
-                </Button>
+                
+                {agency.status === 'Pending' && (
+                  <Button 
+                    variant="status" 
+                    status="yellow" 
+                    onClick={() => handleApprove(agency.agencyId)}
+                    disabled={suspendMutation.isPending || verifyMutation.isPending || activateMutation.isPending}
+                  >
+                    {verifyMutation.isPending && verifyMutation.variables === agency.agencyId ? 'Approving...' : 'Approve Agency'}
+                  </Button>
+                )}
+                
+                {agency.status === 'Verified' && (
+                  <Button 
+                    variant="status" 
+                    status="green" 
+                    onClick={() => handleActivate(agency.agencyId)}
+                    disabled={suspendMutation.isPending || verifyMutation.isPending || activateMutation.isPending}
+                  >
+                    {activateMutation.isPending && activateMutation.variables === agency.agencyId ? 'Activating...' : 'Activate Agency'}
+                  </Button>
+                )}
               </Card.Footer>
             </Card>
           ))}
@@ -140,4 +176,5 @@ export default function AgencyVerificationPage() {
     </div>
   )
 }
+
 

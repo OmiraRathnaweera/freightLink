@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -217,6 +217,34 @@ public class AgencyService : IAgencyService
             ToStatus = AgencyStatus.Verified,
             ChangedByUserId = currentUserId,
             Reason = "Verified by admin"
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ActivateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (agency.Status != AgencyStatus.Verified)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Only verified agencies can be activated.");
+        }
+
+        agency.Status = AgencyStatus.Active;
+        agency.StatusHistory.Add(new AgencyStatusHistory
+        {
+            ToStatus = AgencyStatus.Active,
+            ChangedByUserId = currentUserId,
+            Reason = "Activated by admin"
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
