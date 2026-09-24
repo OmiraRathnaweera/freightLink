@@ -15,11 +15,13 @@ namespace FreightLink.Api.Services;
 public class AgencyService : IAgencyService
 {
     private readonly AppDbContext _dbContext;
+    private readonly IPasswordHasher _passwordHasher;
 
-    /// <summary>Creates the agency service with its DB context.</summary>
-    public AgencyService(AppDbContext dbContext)
+    /// <summary>Creates the agency service with its DB context and password hasher.</summary>
+    public AgencyService(AppDbContext dbContext, IPasswordHasher passwordHasher)
     {
         _dbContext = dbContext;
+        _passwordHasher = passwordHasher;
     }
 
     /// <inheritdoc />
@@ -231,6 +233,95 @@ public class AgencyService : IAgencyService
             CreatedAt = d.CreatedAt,
             UpdatedAt = d.UpdatedAt
         }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CreateDriverRequestDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (request.LicenceExpiry <= DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Licence expiry date must be in the future.");
+        }
+
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+        }
+
+        if (await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var user = new User
+        {
+            UserId = Guid.NewGuid(),
+            Role = UserRole.Driver,
+            Email = normalizedEmail,
+            PasswordHash = _passwordHasher.Hash(request.Password),
+            FullName = request.FullName,
+            PhoneE164 = request.PhoneE164,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        var driver = new Driver
+        {
+            DriverId = Guid.NewGuid(),
+            UserId = user.UserId,
+            AgencyId = agencyId,
+            LicenceNo = request.LicenceNo,
+            LicenceExpiry = request.LicenceExpiry,
+            Status = DriverStatus.Active,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _dbContext.Users.Add(user);
+        _dbContext.Drivers.Add(driver);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            if (pg.ConstraintName == "uq_user_email")
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+            }
+            if (pg.ConstraintName == "IX_Drivers_LicenceNo")
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists.");
+            }
+            throw;
+        }
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = user.UserId,
+            AgencyId = driver.AgencyId,
+            FullName = user.FullName,
+            Email = user.Email,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status.ToString(),
+            IsActive = true,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
     }
 
     /// <inheritdoc />

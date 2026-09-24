@@ -26,6 +26,22 @@ public interface IAuthService
     /// <exception cref="Common.Exceptions.ApiException">409 if the email or business registration number is already registered.</exception>
     Task<RegisterResponseDto> RegisterAgencyAsync(RegisterAgencyRequestDto request, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Registers a new Driver under an existing agency: creates the <c>User</c> row and its <c>Driver</c> profile atomically.
+    /// </summary>
+    /// <param name="request">Validated driver registration payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A success message with the new user's id and email.</returns>
+    /// <exception cref="Common.Exceptions.ApiException">404 if the agency does not exist; 409 if email or licence number is already registered.</exception>
+    Task<RegisterResponseDto> RegisterDriverAsync(RegisterDriverRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns a list of active agencies available for driver registration selection.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>List of agency lookup items.</returns>
+    Task<List<AgencyLookupDto>> GetAgenciesLookupAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Authenticates a user by email/password, shared across every role.</summary>
     /// <param name="request">Login credentials.</param>
     /// <param name="userAgent">Optional client user-agent, recorded against the issued refresh token.</param>
