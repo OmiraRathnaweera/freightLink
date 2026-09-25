@@ -1,13 +1,240 @@
-// Placeholder — protected route (Admin only).
-// Will surface WorkflowStatus / AgentRole / ApprovalDecisionType from
-// src/lib/enums.js once workflow monitoring + approval is implemented.
-function AgentWorkflowConsolePage() {
+import { useState, useEffect } from 'react'
+import { useSearchParams, Link } from 'react-router-dom'
+import {
+  Sparkles,
+  Bot,
+  ArrowLeft,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  Package,
+} from 'lucide-react'
+import PageHeader from '../../../components/PageHeader.jsx'
+import Card from '../../../components/Card.jsx'
+import Skeleton from '../../../components/Skeleton.jsx'
+import ErrorState from '../../../components/ErrorState.jsx'
+import EmptyState from '../../../components/EmptyState.jsx'
+import Button from '../../../components/Button.jsx'
+import { useLoadsQuery, useLoadDetailQuery } from '../../loads/api/loadsApi.js'
+import {
+  useLoadMatchQuery,
+  useConfirmMatchMutation,
+} from '../api/agentWorkflowsApi.js'
+import WorkflowStepper from '../components/WorkflowStepper.jsx'
+import MatchRecommendationCard from '../components/MatchRecommendationCard.jsx'
+import ValidationChecklist from '../components/ValidationChecklist.jsx'
+import AlternateCandidatesList from '../components/AlternateCandidatesList.jsx'
+import LoadSelectorBar from '../components/LoadSelectorBar.jsx'
+
+export default function AgentWorkflowConsolePage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const loadIdParam = searchParams.get('loadId')
+
+  // Fetch loads for selection (Posted and Matched loads are primary candidates)
+  const loadsQuery = useLoadsQuery({ page: 1, pageSize: 50 })
+  const availableLoads = loadsQuery.data?.items || []
+
+  // Determine active load id: from query param or fallback to first available load
+  const activeLoadId = loadIdParam || availableLoads[0]?.loadId
+
+  // Fetch full details of the active load
+  const loadDetailQuery = useLoadDetailQuery(activeLoadId, {
+    enabled: Boolean(activeLoadId),
+  })
+  const currentLoad = loadDetailQuery.data
+
+  // Fetch AI match recommendation for active load
+  const matchQuery = useLoadMatchQuery(activeLoadId, {
+    enabled: Boolean(activeLoadId),
+  })
+  const matchData = matchQuery.data
+
+  // Confirm match mutation
+  const confirmMutation = useConfirmMatchMutation()
+
+  // Track candidate selection override
+  const [selectedAgencyId, setSelectedAgencyId] = useState(null)
+  const [actionSuccessMessage, setActionSuccessMessage] = useState(null)
+  const [actionErrorMessage, setActionErrorMessage] = useState(null)
+
+  // Sync selected agency with recommended agency when data arrives
+  useEffect(() => {
+    if (matchData?.recommendedAgency?.agencyId) {
+      setSelectedAgencyId(matchData.recommendedAgency.agencyId)
+    }
+  }, [matchData?.recommendedAgency?.agencyId])
+
+  // Handle switching active load
+  const handleSelectLoad = (newLoadId) => {
+    setActionSuccessMessage(null)
+    setActionErrorMessage(null)
+    setSelectedAgencyId(null)
+    setSearchParams({ loadId: newLoadId })
+  }
+
+  // Handle match confirmation
+  const handleApproveMatch = async ({ loadId, agencyId }) => {
+    setActionErrorMessage(null)
+    setActionSuccessMessage(null)
+
+    try {
+      await confirmMutation.mutateAsync({ loadId, agencyId })
+      setActionSuccessMessage(
+        'Match approved successfully! An operational assignment has been proposed and sent to the carrier.'
+      )
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to confirm match. The assignment may already have been accepted or modified.'
+      setActionErrorMessage(msg)
+    }
+  }
+
+  // Handle retry match
+  const handleRetryMatch = async () => {
+    setActionErrorMessage(null)
+    setActionSuccessMessage(null)
+    await matchQuery.refetch()
+  }
+
   return (
-    <div>
-      <h1>Agent Workflow Monitoring & Approval</h1>
-      <p>Placeholder page — not implemented yet.</p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <Link
+            to="/loads"
+            className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-secondary hover:text-primary transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" /> Back to My Loads
+          </Link>
+          <div className="flex items-center gap-3">
+            <h1 className="font-heading text-headline-lg font-bold text-primary">
+              AI Agent Matching & Approval Console
+            </h1>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              <Sparkles className="h-3.5 w-3.5 fill-primary/30" />
+              LangGraph Multi-Agent
+            </span>
+          </div>
+          <p className="mt-1 text-body-md text-on-surface-variant">
+            Review Agent 3's optimal carrier match recommendation, verify safety compliance, and confirm dispatch.
+          </p>
+        </div>
+      </div>
+
+      {/* Load Selector Bar */}
+      <LoadSelectorBar
+        currentLoad={currentLoad}
+        availableLoads={availableLoads}
+        onSelectLoad={handleSelectLoad}
+        isLoading={loadsQuery.isLoading}
+      />
+
+      {/* Notifications Banner */}
+      {actionSuccessMessage && (
+        <div
+          id="action-success-banner"
+          data-testid="action-success-banner"
+          className="flex items-start gap-3 rounded-lg border border-status-green-text/30 bg-status-green-bg p-4 text-status-green-text shadow-sm"
+        >
+          <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-bold">Proposal Approved</p>
+            <p className="text-xs">{actionSuccessMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {actionErrorMessage && (
+        <div
+          id="action-error-banner"
+          data-testid="action-error-banner"
+          className="flex items-start gap-3 rounded-lg border border-status-red-text/30 bg-status-red-bg p-4 text-status-red-text shadow-sm"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-bold">Action Failed</p>
+            <p className="text-xs">{actionErrorMessage}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {matchQuery.isLoading && (
+        <div className="space-y-6">
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-96 w-full rounded-lg" />
+        </div>
+      )}
+
+      {/* Error State */}
+      {matchQuery.isError && (
+        <Card>
+          <ErrorState
+            title="Failed to Load AI Recommendations"
+            description={
+              matchQuery.error?.response?.data?.message ||
+              matchQuery.error?.message ||
+              'Could not retrieve agent matching results for this load.'
+            }
+            onRetry={matchQuery.refetch}
+          />
+        </Card>
+      )}
+
+      {/* Empty State: No active load found */}
+      {!activeLoadId && !loadsQuery.isLoading && (
+        <Card>
+          <EmptyState
+            title="No Active Loads Found"
+            description="Create or publish a load in your account to trigger autonomous agent matching."
+            actionLabel="Create New Load"
+            onAction={() => {
+              window.location.href = '/loads/new'
+            }}
+          />
+        </Card>
+      )}
+
+      {/* Main Content: Workflow Pipeline, Recommendation, and Validation */}
+      {matchData && (
+        <div className="space-y-6">
+          {/* 1. 4-Agent LangGraph Stepper */}
+          <WorkflowStepper
+            steps={matchData.steps}
+            workflowStatus={matchData.workflowStatus}
+          />
+
+          {/* 2. Spotlight Recommendation Card (Agent 3) */}
+          <MatchRecommendationCard
+            loadId={activeLoadId}
+            loadStatus={matchData.loadStatus}
+            recommendedAgency={matchData.recommendedAgency}
+            selectedAgencyId={selectedAgencyId}
+            existingAssignment={matchData.existingAssignment}
+            onApproveMatch={handleApproveMatch}
+            onRetryMatch={handleRetryMatch}
+            isApproving={confirmMutation.isPending}
+            isRetrying={matchQuery.isFetching}
+          />
+
+          {/* 3. Side-by-Side: Agent 4 Safety Gate & Alternate Candidates */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Agent 4 Validation Checklist */}
+            <ValidationChecklist validation={matchData.validation} />
+
+            {/* Alternate Candidates List */}
+            <AlternateCandidatesList
+              candidates={matchData.alternateCandidates}
+              selectedAgencyId={selectedAgencyId}
+              onSelectAgency={(agencyId) => setSelectedAgencyId(agencyId)}
+              isMatched={matchData.loadStatus === 'Matched' || Boolean(matchData.existingAssignment)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
-export default AgentWorkflowConsolePage
