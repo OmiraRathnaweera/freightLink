@@ -4,6 +4,7 @@ using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Internal;
+using FreightLink.Api.DTOs.Internal.ToolCalls;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
@@ -88,22 +89,41 @@ public class AgentWorkflowService : IAgentWorkflowService
         }
 
         var agentRole = request.AgentRole!.Value;
-        var step = new AgentStep
-        {
-            AgentStepId = Guid.NewGuid(),
-            WorkflowRunId = workflowRunId,
-            StepNo = request.StepNo!.Value,
-            AgentRole = agentRole,
-            Status = status,
-            InputJson = request.InputJson,
-            OutputJson = request.OutputJson,
-            ErrorMessage = request.ErrorMessage,
-            DurationMs = request.DurationMs,
-            StartedAt = request.StartedAt!.Value,
-            CompletedAt = request.CompletedAt
-        };
 
-        _dbContext.AgentSteps.Add(step);
+        var existingStep = await _dbContext.AgentSteps
+            .FirstOrDefaultAsync(s => s.WorkflowRunId == workflowRunId && s.StepNo == request.StepNo!.Value, cancellationToken);
+
+        AgentStep step;
+        if (existingStep != null)
+        {
+            step = existingStep;
+            step.AgentRole = agentRole;
+            step.Status = status;
+            step.InputJson = request.InputJson;
+            step.OutputJson = request.OutputJson;
+            step.ErrorMessage = request.ErrorMessage;
+            step.DurationMs = request.DurationMs;
+            step.StartedAt = request.StartedAt!.Value;
+            step.CompletedAt = request.CompletedAt;
+        }
+        else
+        {
+            step = new AgentStep
+            {
+                AgentStepId = Guid.NewGuid(),
+                WorkflowRunId = workflowRunId,
+                StepNo = request.StepNo!.Value,
+                AgentRole = agentRole,
+                Status = status,
+                InputJson = request.InputJson,
+                OutputJson = request.OutputJson,
+                ErrorMessage = request.ErrorMessage,
+                DurationMs = request.DurationMs,
+                StartedAt = request.StartedAt!.Value,
+                CompletedAt = request.CompletedAt
+            };
+            _dbContext.AgentSteps.Add(step);
+        }
 
         // A Failed step at any stage is a safe, recorded failure for the whole run (ADR-018) - no
         // other agent exists yet to define a further outcome for its own success, so a Succeeded
@@ -135,4 +155,96 @@ public class AgentWorkflowService : IAgentWorkflowService
 
         return new ReportAgentStepResponseDto { AgentStepId = step.AgentStepId, Status = step.Status };
     }
+
+    /// <inheritdoc />
+    public async Task<ToolCallResponseDto> RecordToolCallAsync(Guid workflowRunId, CreateToolCallRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var runExists = await _dbContext.AgentWorkflowRuns
+            .AnyAsync(r => r.WorkflowRunId == workflowRunId, cancellationToken);
+
+        if (!runExists)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.WORKFLOW_RUN_NOT_FOUND, "The requested workflow run could not be found.");
+        }
+
+        if (!request.Success && string.IsNullOrWhiteSpace(request.ErrorMessage))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "ErrorMessage is required when Success is false.");
+        }
+
+        Guid agentStepId;
+        if (request.AgentStepId.HasValue && request.AgentStepId.Value != Guid.Empty)
+        {
+            var stepExists = await _dbContext.AgentSteps
+                .AnyAsync(s => s.AgentStepId == request.AgentStepId.Value && s.WorkflowRunId == workflowRunId, cancellationToken);
+            if (!stepExists)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENT_STEP_NOT_FOUND, "The specified agent step could not be found for this workflow run.");
+            }
+            agentStepId = request.AgentStepId.Value;
+        }
+        else
+        {
+            // Auto-resolve or create the step for MatchingPricing (Agent 3)
+            var step = await _dbContext.AgentSteps
+                .FirstOrDefaultAsync(s => s.WorkflowRunId == workflowRunId && s.AgentRole == AgentRole.MatchingPricing, cancellationToken);
+
+            if (step == null)
+            {
+                step = new AgentStep
+                {
+                    AgentStepId = Guid.NewGuid(),
+                    WorkflowRunId = workflowRunId,
+                    StepNo = 3,
+                    AgentRole = AgentRole.MatchingPricing,
+                    Status = AgentStepStatus.Running,
+                    StartedAt = request.CalledAt ?? DateTimeOffset.UtcNow
+                };
+                _dbContext.AgentSteps.Add(step);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            agentStepId = step.AgentStepId;
+        }
+
+        var toolCall = new ToolCall
+        {
+            ToolCallId = Guid.NewGuid(),
+            AgentStepId = agentStepId,
+            ToolName = request.ToolName!.Value,
+            AttemptNo = request.AttemptNo,
+            RequestJson = request.RequestJson,
+            ResponseJson = request.ResponseJson,
+            Success = request.Success,
+            HttpStatusCode = request.HttpStatusCode,
+            DurationMs = request.DurationMs,
+            ErrorMessage = request.ErrorMessage,
+            CalledAt = request.CalledAt ?? DateTimeOffset.UtcNow
+        };
+
+        _dbContext.ToolCalls.Add(toolCall);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_toolcall_attempt" })
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.TOOL_CALL_DUPLICATE_ATTEMPT, "A tool call with this attempt number already exists for this step.");
+        }
+
+        return new ToolCallResponseDto
+        {
+            ToolCallId = toolCall.ToolCallId,
+            AgentStepId = toolCall.AgentStepId,
+            ToolName = toolCall.ToolName,
+            AttemptNo = toolCall.AttemptNo,
+            Success = toolCall.Success,
+            HttpStatusCode = toolCall.HttpStatusCode,
+            DurationMs = toolCall.DurationMs,
+            ErrorMessage = toolCall.ErrorMessage,
+            CalledAt = toolCall.CalledAt
+        };
+    }
 }
+
