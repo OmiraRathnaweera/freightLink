@@ -1,25 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../data/agencies_repository.dart';
+import '../providers/fleet_provider.dart';
 
 class FleetListScreen extends StatelessWidget {
   const FleetListScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Fleet Management'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+    return ChangeNotifierProvider(
+      create: (context) => FleetProvider(context.read<AgenciesRepository>())..load(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Fleet Management'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go('/dashboard'),
+          ),
         ),
-      ),
-      body: const Center(
-        child: Text('List of vehicles goes here.'),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.go('/fleet/add'),
-        child: const Icon(Icons.add),
+        body: Consumer<FleetProvider>(
+          builder: (context, provider, child) {
+            if (provider.state == FleetState.loading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (provider.state == FleetState.empty) {
+              return const Center(child: Text('No vehicles found.'));
+            }
+            if (provider.state == FleetState.error) {
+              return Center(child: Text(provider.errorMessage ?? 'Error'));
+            }
+            return ListView.builder(
+              itemCount: provider.vehicles.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text('Vehicle ${index + 1}'),
+                );
+              },
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => context.go('/dashboard/fleet/add'),
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }

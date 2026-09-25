@@ -1,35 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../data/agencies_repository.dart';
+import '../providers/agency_dashboard_provider.dart';
 
 class AgencyDashboardScreen extends StatelessWidget {
   const AgencyDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          const Text('Welcome, Agency Staff!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          _buildDashboardCard(context, 'Fleet Management', 'Manage your vehicles and availability', Icons.directions_car, '/fleet'),
-          _buildDashboardCard(context, 'Driver Onboarding', 'Add and manage drivers', Icons.person_add, '/driver-onboarding'),
-          _buildDashboardCard(context, 'Compliance Documents', 'Upload and verify documents', Icons.verified_user, '/compliance-docs'),
-        ],
-      ),
-    );
-  }
+    return ChangeNotifierProvider(
+      create: (context) => AgencyDashboardProvider(context.read<AgenciesRepository>())..loadStats(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Agency Dashboard'),
+        ),
+        body: Consumer<AgencyDashboardProvider>(
+          builder: (context, provider, child) {
+            if (provider.state == DashboardState.loading) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (provider.state == DashboardState.error) {
+              return Center(child: Text(provider.errorMessage ?? 'Error'));
+            }
 
-  Widget _buildDashboardCard(BuildContext context, String title, String subtitle, IconData icon, String route) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      child: ListTile(
-        leading: Icon(icon, size: 40),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.arrow_forward_ios),
-        onTap: () => context.go(route),
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('Total Vehicles: ${provider.stats?['totalVehicles'] ?? 0}'),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => context.go('/dashboard/fleet'),
+                    child: const Text('Fleet Management'),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () => context.go('/dashboard/driver-onboarding'),
+                    child: const Text('Driver Onboarding'),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: () => context.go('/dashboard/compliance-docs'),
+                    child: const Text('Compliance Documents'),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }

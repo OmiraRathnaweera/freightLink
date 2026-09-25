@@ -11,7 +11,7 @@ class AddVehicleScreen extends StatelessWidget {
         title: const Text('Add Vehicle'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/fleet'),
+          onPressed: () => context.go('/dashboard/fleet'),
         ),
       ),
       body: const Center(
