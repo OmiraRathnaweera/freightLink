@@ -33,6 +33,11 @@ class PlanOutput(BaseModel):
     steps: list[PipelineStage]
 
 
+class SelectionJustificationOutput(BaseModel):
+    headline: str
+    detailed_reasoning: str
+
+
 class AgentLLM:
     def __init__(self) -> None:
         self._settings = get_settings()
@@ -70,6 +75,28 @@ class AgentLLM:
             result = await model.ainvoke(messages)  # type: ignore[assignment]
 
         return result.model_dump()
+
+    async def justify_selection(self, system_prompt: str, context: dict[str, Any]) -> dict:
+        messages = [
+            ("system", system_prompt),
+            ("human", json.dumps(context, default=str)),
+        ]
+
+        if self._settings.llm_provider == "ollama":
+            model = self._ollama().with_structured_output(SelectionJustificationOutput)
+            result: SelectionJustificationOutput = await model.ainvoke(messages)  # type: ignore[assignment]
+            return result.model_dump()
+
+        try:
+            model = self._gemini().with_structured_output(SelectionJustificationOutput)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
+        except Exception:
+            logger.warning("Primary LLM (Gemini) failed for selection justification, falling back to Ollama", exc_info=True)
+            model = self._ollama().with_structured_output(SelectionJustificationOutput)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
+
+        return result.model_dump()
+
 
 
 @lru_cache
