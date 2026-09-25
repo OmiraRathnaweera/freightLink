@@ -78,7 +78,7 @@ class CreateToolCallRequest(CamelModel):
     (ck_toolcall_allowlist, ck_toolcall_attempt, ck_toolcall_failure).
     """
 
-    agent_step_id: UUID
+    agent_step_id: UUID | None = None
     tool_name: ToolName
     attempt_no: int = Field(ge=1, default=1)
     request_json: str | None = None

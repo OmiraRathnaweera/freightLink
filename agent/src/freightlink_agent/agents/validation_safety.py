@@ -111,10 +111,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     }
 
     input_data = {
+        "loadId": str(state.load_id),
         "selectedAgencyId": str(selected_agency_id) if selected_agency_id else None,
+        "selectedAgencyName": state.selected_agency_name,
         "proposedPrice": proposed_price,
         "cargoDistanceKm": cargo_distance_km,
+        "positioningDistanceKm": state.positioning_distance_km,
+        "etaMinutes": eta_minutes,
         "vehicleClass": vehicle_class,
+        "weightKg": weight_kg,
+        "volumeM3": volume_m3,
     }
 
     steps.append({

@@ -178,3 +178,79 @@ async def test_matching_pricing_empty_candidates():
 
     assert result.get("failed") is True
     assert "No eligible candidate agencies" in result.get("failure_reason", "")
+
+
+@pytest.mark.anyio
+async def test_tool_failure_routing_safe_hold_for_review():
+    """Verifies that when routing tool calls fail after retry, safe 'hold for review' is recorded."""
+    load_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    shipper_id = uuid.uuid4()
+
+    agency = CandidateAgency(
+        agency_id=uuid.uuid4(),
+        name="Broken Route Logistics",
+        yard_lat=6.9667,
+        yard_lng=79.8917,
+        yard_address="123 Road",
+        available_vehicle_classes=["MediumLorry"],
+    )
+
+    state = WorkflowState(
+        load_id=load_id,
+        triggered_by_user_id=shipper_id,
+        attempt_no=1,
+        workflow_run_id=run_id,
+        load_context={
+            "pickupLat": 6.9271,
+            "pickupLng": 79.8612,
+            "dropoffLat": 7.2906,
+            "dropoffLng": 80.6337,
+        },
+        candidate_shortlist=[agency],
+    )
+
+    # Mock routing tool to simulate permanent failure after retries
+    failing_route = (
+        matching_pricing.RouteAndEtaResponse(
+            distance_km=None,
+            eta_minutes=None,
+            success=False,
+            error_message="hold for review: routing lookup failed after retry: timeout",
+        ),
+        {"httpStatusCode": 504, "durationMs": 450, "error": "timeout"},
+    )
+
+    with (
+        patch(
+            "freightlink_agent.agents.matching_pricing.get_route_and_eta",
+            new=AsyncMock(return_value=failing_route),
+        ),
+        patch(
+            "freightlink_agent.agents.matching_pricing.report",
+            new=AsyncMock(),
+        ),
+        patch(
+            "freightlink_agent.agents.matching_pricing.record_tool_call",
+            new=AsyncMock(),
+        ) as mock_record_call,
+    ):
+        result = await matching_pricing.run(state)
+
+    # Pipeline must stop cleanly rather than crash
+    assert result.get("failed") is True
+    assert "hold for review" in result.get("failure_reason", "").lower()
+
+    # ToolCall row must record safe "hold for review" state
+    tool_calls = result.get("tool_calls", [])
+    assert len(tool_calls) >= 1
+    assert tool_calls[0]["success"] is False
+    assert "hold for review" in tool_calls[0]["errorMessage"].lower()
+    assert "hold for review" in tool_calls[0]["responseJson"].lower()
+
+    # Step must be recorded as Failed with hold for review
+    steps = result.get("steps", [])
+    assert len(steps) >= 1
+    assert steps[-1]["status"] == "Failed"
+    assert "hold for review" in steps[-1]["errorMessage"].lower()
+

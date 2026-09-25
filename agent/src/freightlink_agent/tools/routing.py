@@ -8,6 +8,7 @@ crashing the pipeline. Includes a Haversine fallback for offline development
 and testing when an ORS API key is not configured.
 """
 
+import asyncio
 import logging
 import math
 import time
@@ -174,22 +175,28 @@ async def get_route_and_eta(
                 }
 
             last_error = f"HTTP {res.status_code}: {res.text[:200]}"
+        except httpx.TimeoutException:
+            last_error = "OpenRouteService request timed out"
+            http_status = 504
         except Exception as exc:  # noqa: BLE001
             last_error = str(exc)
 
         if attempt == 0:
-            logger.warning("OpenRouteService call failed (%s), retrying once", last_error)
+            logger.warning("OpenRouteService call failed (%s), retrying once with backoff...", last_error)
+            await asyncio.sleep(0.5)
 
-    # Failed after 1 retry: return in-band success=False per IRouteService reliability rule
+    # Failed after 1 retry: record safe "hold for review" state per reliability rule
     duration_ms = int((time.monotonic() - start_time) * 1000)
+    error_msg = f"hold for review: routing lookup failed after retry: {last_error}"
     return RouteAndEtaResponse(
         distance_km=None,
         eta_minutes=None,
         success=False,
-        error_message=f"Routing lookup failed after retry: {last_error}",
+        error_message=error_msg,
     ), {
         "durationMs": duration_ms,
-        "httpStatusCode": http_status or 502,
+        "httpStatusCode": http_status or 504,
         "request": request.model_dump(by_alias=True),
-        "error": last_error,
+        "response": {"status": "hold for review", "error": last_error},
+        "error": error_msg,
     }

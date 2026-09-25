@@ -96,6 +96,18 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "candidatesCount": len(state.candidate_shortlist),
         "pickup": {"lat": pickup_lat, "lng": pickup_lng},
         "dropoff": {"lat": dropoff_lat, "lng": dropoff_lng},
+        "weightKg": weight_kg,
+        "volumeM3": volume_m3,
+        "cargoDescription": cargo_desc,
+        "candidateAgencies": [
+            {
+                "agencyId": str(c.agency_id),
+                "name": c.name,
+                "yardAddress": c.yard_address,
+                "availableVehicleClasses": c.available_vehicle_classes,
+            }
+            for c in state.candidate_shortlist
+        ],
     }
 
     candidates = state.candidate_shortlist
@@ -141,7 +153,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
 
         # In-memory ToolCall audit record
         req_json = json.dumps(telemetry.get("request"), default=str)
-        res_json = json.dumps(route_res.model_dump(by_alias=True), default=str)
+        err_msg = route_res.error_message
+        if not route_res.success:
+            if not err_msg:
+                err_msg = "hold for review: routing lookup failed after retry"
+            elif "hold for review" not in err_msg.lower():
+                err_msg = f"hold for review: {err_msg}"
+            res_json = json.dumps({"status": "hold for review", "error": err_msg}, default=str)
+        else:
+            res_json = json.dumps(route_res.model_dump(by_alias=True), default=str)
+
         tool_call_dict = {
             "toolCallId": str(uuid4()),
             "toolName": "get_route_and_eta",
@@ -151,7 +172,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             "success": route_res.success,
             "httpStatusCode": telemetry.get("httpStatusCode"),
             "durationMs": telemetry.get("durationMs"),
-            "errorMessage": route_res.error_message,
+            "errorMessage": err_msg if not route_res.success else None,
             "calledAt": now().isoformat(),
         }
         tool_calls.append(tool_call_dict)
@@ -159,7 +180,6 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         # Attempt reporting to backend if online
         try:
             tool_call_req = CreateToolCallRequest(
-                agent_step_id=workflow_run_id,
                 tool_name="get_route_and_eta",
                 attempt_no=idx,
                 request_json=req_json,
@@ -167,7 +187,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 success=route_res.success,
                 http_status_code=telemetry.get("httpStatusCode"),
                 duration_ms=telemetry.get("durationMs"),
-                error_message=route_res.error_message,
+                error_message=err_msg if not route_res.success else None,
                 called_at=now(),
             )
             await record_tool_call(workflow_run_id, tool_call_req)
@@ -180,14 +200,14 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             logger.warning("Routing failed for candidate %s: %s", candidate.name, route_res.error_message)
 
     if not routed_candidates:
-        msg = "All candidate agency routing lookups failed"
+        msg = "hold for review: all candidate agency routing lookups failed after retry"
         logger.error(msg)
         steps.append({
             "stepNo": _STEP_NO,
             "agentRole": _AGENT_ROLE,
             "status": "Failed",
             "inputJson": input_data,
-            "outputJson": None,
+            "outputJson": {"status": "hold for review", "reason": msg},
             "errorMessage": msg,
             "startedAt": started.isoformat(),
             "completedAt": now().isoformat(),
@@ -238,7 +258,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     cargo_route, cargo_telemetry = await get_route_and_eta(cargo_req)
 
     cargo_req_json = json.dumps(cargo_telemetry.get("request"), default=str)
-    cargo_res_json = json.dumps(cargo_route.model_dump(by_alias=True), default=str)
+    cargo_err_msg = cargo_route.error_message
+    if not cargo_route.success:
+        if not cargo_err_msg:
+            cargo_err_msg = "hold for review: cargo routing lookup failed after retry"
+        elif "hold for review" not in cargo_err_msg.lower():
+            cargo_err_msg = f"hold for review: {cargo_err_msg}"
+        cargo_res_json = json.dumps({"status": "hold for review", "error": cargo_err_msg}, default=str)
+    else:
+        cargo_res_json = json.dumps(cargo_route.model_dump(by_alias=True), default=str)
+
     cargo_tool_call_dict = {
         "toolCallId": str(uuid4()),
         "toolName": "get_route_and_eta",
@@ -248,7 +277,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "success": cargo_route.success,
         "httpStatusCode": cargo_telemetry.get("httpStatusCode"),
         "durationMs": cargo_telemetry.get("durationMs"),
-        "errorMessage": cargo_route.error_message,
+        "errorMessage": cargo_err_msg if not cargo_route.success else None,
         "calledAt": now().isoformat(),
     }
     tool_calls.append(cargo_tool_call_dict)
@@ -257,7 +286,6 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         await record_tool_call(
             workflow_run_id,
             CreateToolCallRequest(
-                agent_step_id=workflow_run_id,
                 tool_name="get_route_and_eta",
                 attempt_no=len(shortlist_to_eval) + 1,
                 request_json=cargo_req_json,
@@ -265,7 +293,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 success=cargo_route.success,
                 http_status_code=cargo_telemetry.get("httpStatusCode"),
                 duration_ms=cargo_telemetry.get("durationMs"),
-                error_message=cargo_route.error_message,
+                error_message=cargo_err_msg if not cargo_route.success else None,
                 called_at=now(),
             ),
         )
@@ -273,14 +301,14 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         pass
 
     if not cargo_route.success or cargo_route.distance_km is None or cargo_route.distance_km <= 0:
-        msg = f"Cargo leg routing lookup failed: {cargo_route.error_message}"
+        msg = f"hold for review: cargo leg routing lookup failed: {cargo_err_msg}"
         logger.error(msg)
         steps.append({
             "stepNo": _STEP_NO,
             "agentRole": _AGENT_ROLE,
             "status": "Failed",
             "inputJson": input_data,
-            "outputJson": None,
+            "outputJson": {"status": "hold for review", "reason": msg},
             "errorMessage": msg,
             "startedAt": started.isoformat(),
             "completedAt": now().isoformat(),
@@ -316,7 +344,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     pricing_res, pricing_telemetry = await get_price_estimate(pricing_req)
 
     pricing_req_json = json.dumps(pricing_req.model_dump(by_alias=True), default=str)
-    pricing_res_json = json.dumps(pricing_res.model_dump(by_alias=True) if pricing_res else {}, default=str)
+    pricing_err_msg = pricing_telemetry.get("error")
+    if not pricing_res:
+        if not pricing_err_msg:
+            pricing_err_msg = "hold for review: pricing estimation failed after retry"
+        elif "hold for review" not in pricing_err_msg.lower():
+            pricing_err_msg = f"hold for review: {pricing_err_msg}"
+        pricing_res_json = json.dumps({"status": "hold for review", "error": pricing_err_msg}, default=str)
+    else:
+        pricing_res_json = json.dumps(pricing_res.model_dump(by_alias=True), default=str)
+
     pricing_tool_call_dict = {
         "toolCallId": str(uuid4()),
         "toolName": "estimate_price",
@@ -326,20 +363,20 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "success": pricing_res is not None,
         "httpStatusCode": pricing_telemetry.get("httpStatusCode"),
         "durationMs": pricing_telemetry.get("durationMs"),
-        "errorMessage": pricing_telemetry.get("error"),
+        "errorMessage": pricing_err_msg if not pricing_res else None,
         "calledAt": now().isoformat(),
     }
     tool_calls.append(pricing_tool_call_dict)
 
     if not pricing_res:
-        msg = f"Pricing estimation failed: {pricing_telemetry.get('error')}"
+        msg = f"hold for review: pricing estimation failed: {pricing_err_msg}"
         logger.error(msg)
         steps.append({
             "stepNo": _STEP_NO,
             "agentRole": _AGENT_ROLE,
             "status": "Failed",
             "inputJson": input_data,
-            "outputJson": None,
+            "outputJson": {"status": "hold for review", "reason": msg},
             "errorMessage": msg,
             "startedAt": started.isoformat(),
             "completedAt": now().isoformat(),
@@ -419,6 +456,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "proposedPrice": float(pricing_res.estimated_price),
         "pricingBreakdown": pricing_res.model_dump(by_alias=True),
         "selectionJustification": justification,
+        "rankedCandidates": ranked_five,
     }
 
     # vehicleClass integer mapping: 0=MiniTruck, 1=MediumLorry, 2=ContainerTruck

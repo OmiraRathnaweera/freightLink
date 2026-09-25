@@ -88,6 +88,11 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
         base_fare=2000.0,
     )
 
+    mock_step1_report = AsyncMock()
+    mock_step2_report = AsyncMock()
+    mock_step3_report = AsyncMock()
+    mock_step4_report = AsyncMock()
+
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
         patch("freightlink_agent.agents.matching_pricing.get_llm", return_value=mock_planner_llm),
@@ -95,9 +100,10 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
             "freightlink_agent.agents.matching_pricing.get_price_estimate",
             new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200, "durationMs": 45})),
         ),
-        patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
-        patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
-        patch("freightlink_agent.agents.validation_safety.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.planner.report", new=mock_step1_report),
+        patch("freightlink_agent.agents.domain_analysis.report", new=mock_step2_report),
+        patch("freightlink_agent.agents.matching_pricing.report", new=mock_step3_report),
+        patch("freightlink_agent.agents.validation_safety.report", new=mock_step4_report),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
     ):
         pipeline = get_pipeline()
@@ -106,6 +112,34 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
     assert result.get("failed") is False
     assert result.get("plan") is not None
     assert "objective" in result["plan"]
+
+    # Verify that EVERY agent explicitly reported its own AgentStep row with audit data
+    assert mock_step1_report.await_count == 1
+    assert mock_step1_report.call_args.kwargs["step_no"] == 1
+    assert mock_step1_report.call_args.kwargs["agent_role"] == "Planner"
+    assert mock_step1_report.call_args.kwargs["status"] == "Succeeded"
+    assert mock_step1_report.call_args.kwargs["input_data"] is not None
+    assert mock_step1_report.call_args.kwargs["output_data"] is not None
+
+    assert mock_step2_report.await_count == 1
+    assert mock_step2_report.call_args.kwargs["step_no"] == 2
+    assert mock_step2_report.call_args.kwargs["agent_role"] == "DomainAnalysis"
+    assert mock_step2_report.call_args.kwargs["status"] == "Succeeded"
+    assert mock_step2_report.call_args.kwargs["input_data"]["candidatesEvaluatedCount"] == 2
+    assert mock_step2_report.call_args.kwargs["output_data"]["shortlistCount"] == 2
+
+    assert mock_step3_report.await_count == 1
+    assert mock_step3_report.call_args.kwargs["step_no"] == 3
+    assert mock_step3_report.call_args.kwargs["agent_role"] == "MatchingPricing"
+    assert mock_step3_report.call_args.kwargs["status"] == "Succeeded"
+    assert mock_step3_report.call_args.kwargs["input_data"]["candidatesCount"] == 2
+    assert mock_step3_report.call_args.kwargs["output_data"]["selectedAgencyId"] is not None
+
+    assert mock_step4_report.await_count == 1
+    assert mock_step4_report.call_args.kwargs["step_no"] == 4
+    assert mock_step4_report.call_args.kwargs["agent_role"] == "ValidationSafety"
+    assert mock_step4_report.call_args.kwargs["status"] == "Succeeded"
+    assert mock_step4_report.call_args.kwargs["output_data"]["recommendation"] == "Approve"
 
     steps = result.get("steps", [])
     assert len(steps) == 4
@@ -204,6 +238,7 @@ async def test_short_circuit_agent_2_zero_eligible_agencies(mock_planner_llm):
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
     ):
         pipeline = get_pipeline()
         result = await pipeline.ainvoke(state)
@@ -254,6 +289,7 @@ async def test_short_circuit_agent_3_routing_failure(mock_planner_llm, sample_ca
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
         patch(
             "freightlink_agent.agents.matching_pricing.get_route_and_eta",
             new=AsyncMock(return_value=(failed_route, {"httpStatusCode": 504, "request": {}})),
@@ -328,6 +364,7 @@ async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates
             new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200, "durationMs": 30})),
         ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
         patch("freightlink_agent.agents.validation_safety.report", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),

@@ -11,8 +11,9 @@ import logging
 from typing import Any
 from uuid import UUID, uuid4
 
+from freightlink_agent.core.backend_client import BackendClientError
 from freightlink_agent.graph.state import WorkflowState
-from freightlink_agent.graph.step_reporter import now
+from freightlink_agent.graph.step_reporter import now, report
 from freightlink_agent.schemas.matching import CandidateAgency
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     started = now()
     steps = list(state.steps)
     candidates_list: list[dict[str, Any]] = list(state.candidates)
+    workflow_run_id = state.workflow_run_id
 
     ctx = state.load_context or {}
     weight_kg = float(ctx.get("weightKg") or ctx.get("weight_kg") or 1000.0)
@@ -54,6 +56,22 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 )
         raw_candidates = parsed
 
+    input_data = {
+        "loadId": str(state.load_id),
+        "weightKg": weight_kg,
+        "pickup": {"lat": pickup_lat, "lng": pickup_lng},
+        "candidatesEvaluatedCount": len(raw_candidates),
+        "candidates": [
+            {
+                "agencyId": str(c.agency_id),
+                "name": c.name,
+                "yardAddress": c.yard_address,
+                "availableVehicleClasses": c.available_vehicle_classes,
+            }
+            for c in raw_candidates
+        ],
+    }
+
     eligible_shortlist: list[CandidateAgency] = []
 
     for rank, cand in enumerate(raw_candidates, start=1):
@@ -71,6 +89,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             "agencyName": cand.name,
             "rank": rank,
             "eligible": is_eligible,
+            "eligibilityScore": round(max(0.0, 100.0 - (rank - 1) * 10.0), 2) if is_eligible else 0.0,
             "rejectionReason": rejection_reason,
             "evaluatedAt": now().isoformat(),
         }
@@ -87,12 +106,25 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             "stepNo": _STEP_NO,
             "agentRole": _AGENT_ROLE,
             "status": "Failed",
-            "inputJson": {"candidatesEvaluated": len(raw_candidates)},
+            "inputJson": input_data,
             "outputJson": None,
             "errorMessage": msg,
             "startedAt": started.isoformat(),
             "completedAt": now().isoformat(),
         })
+        if workflow_run_id:
+            try:
+                await report(
+                    workflow_run_id=workflow_run_id,
+                    step_no=_STEP_NO,
+                    agent_role=_AGENT_ROLE,
+                    status="Failed",
+                    started_at=started,
+                    input_data=input_data,
+                    error_message=msg,
+                )
+            except BackendClientError:
+                logger.warning("Failed to report step %s for run %s", _STEP_NO, workflow_run_id)
         return {
             "failed": True,
             "failure_reason": msg,
@@ -103,15 +135,44 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     # Pass forward up to top 5 eligible candidates
     final_shortlist = eligible_shortlist[:5]
 
+    output_data = {
+        "shortlistCount": len(final_shortlist),
+        "eligibleCount": len(eligible_shortlist),
+        "shortlist": [
+            {
+                "agencyId": str(c.agency_id),
+                "name": c.name,
+                "yardAddress": c.yard_address,
+                "availableVehicleClasses": c.available_vehicle_classes,
+            }
+            for c in final_shortlist
+        ],
+        "candidates": candidates_list,
+    }
+
     steps.append({
         "stepNo": _STEP_NO,
         "agentRole": _AGENT_ROLE,
         "status": "Succeeded",
-        "inputJson": {"candidatesEvaluated": len(raw_candidates)},
-        "outputJson": {"shortlistCount": len(final_shortlist)},
+        "inputJson": input_data,
+        "outputJson": output_data,
         "startedAt": started.isoformat(),
         "completedAt": now().isoformat(),
     })
+
+    if workflow_run_id:
+        try:
+            await report(
+                workflow_run_id=workflow_run_id,
+                step_no=_STEP_NO,
+                agent_role=_AGENT_ROLE,
+                status="Succeeded",
+                started_at=started,
+                input_data=input_data,
+                output_data=output_data,
+            )
+        except BackendClientError:
+            logger.warning("Failed to report step %s for run %s", _STEP_NO, workflow_run_id)
 
     return {
         "candidate_shortlist": final_shortlist,
