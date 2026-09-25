@@ -252,4 +252,141 @@ void main() {
           reason: 'Fleet fully occupied with prior haul',
         )).called(1);
   });
+
+  testWidgets('AcceptLoadAssignScreen renders read-only state when proposal is already Accepted',
+      (tester) async {
+    final acceptedProposal = JobProposal(
+      assignmentId: 'b4000000-0000-0000-0000-000000000004',
+      loadId: 'a4000000-0000-0000-0000-000000000004',
+      agencyId: 'ba000000-0000-0000-0000-000000000001',
+      agencyName: 'WP Express Logistics',
+      proposedPrice: 78500.0,
+      routedDistanceKm: 395.5,
+      proposedEtaMinutes: 420,
+      status: ProposalStatus.accepted,
+      cargoDescription: 'Fresh Northern Agricultural Produce & Dry Goods',
+      weightKg: 4200.0,
+      volumeM3: 18.0,
+      pickupAddress: 'Jaffna Central Wholesale Market, Jaffna',
+      dropoffAddress: 'Manning Market Wholesale Complex, Peliyagoda',
+      pickupWindowStart: DateTime(2026, 9, 20, 8, 0),
+      pickupWindowEnd: DateTime(2026, 9, 21, 18, 0),
+      shipperName: 'Northern Agro Farmers Co.',
+      referenceCode: 'LD-JAF-CMB-04',
+      createdAt: DateTime(2026, 9, 19, 10, 0),
+      respondedAt: DateTime(2026, 9, 19, 11, 30),
+    );
+
+    await pumpApp(
+      tester,
+      AcceptLoadAssignScreen(
+        proposal: acceptedProposal,
+        initialVehicles: sampleVehicles,
+        initialDrivers: sampleDrivers,
+      ),
+      tripsRepository: mockTripsRepo,
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify Title and Banner
+    expect(find.text('Job Proposal (Accepted)'), findsOneWidget);
+    expect(find.text('Job Proposal Accepted'), findsOneWidget);
+
+    // Verify Action buttons are hidden, replaced by Back button
+    expect(find.byKey(const Key('accept_assign_button')), findsNothing);
+    expect(find.byKey(const Key('decline_button')), findsNothing);
+    expect(find.byKey(const Key('back_button')), findsOneWidget);
+    expect(find.text('Back to Trips'), findsOneWidget);
+  });
+
+  testWidgets('AcceptLoadAssignScreen renders read-only state with reason when proposal is already Declined',
+      (tester) async {
+    final declinedProposal = JobProposal(
+      assignmentId: 'b4000000-0000-0000-0000-000000000004',
+      loadId: 'a4000000-0000-0000-0000-000000000004',
+      agencyId: 'ba000000-0000-0000-0000-000000000001',
+      agencyName: 'WP Express Logistics',
+      proposedPrice: 78500.0,
+      routedDistanceKm: 395.5,
+      proposedEtaMinutes: 420,
+      status: ProposalStatus.declined,
+      cargoDescription: 'Fresh Northern Agricultural Produce & Dry Goods',
+      weightKg: 4200.0,
+      volumeM3: 18.0,
+      pickupAddress: 'Jaffna Central Wholesale Market, Jaffna',
+      dropoffAddress: 'Manning Market Wholesale Complex, Peliyagoda',
+      pickupWindowStart: DateTime(2026, 9, 20, 8, 0),
+      pickupWindowEnd: DateTime(2026, 9, 21, 18, 0),
+      shipperName: 'Northern Agro Farmers Co.',
+      referenceCode: 'LD-JAF-CMB-04',
+      createdAt: DateTime(2026, 9, 19, 10, 0),
+      respondedAt: DateTime(2026, 9, 19, 11, 45),
+      declineReason: 'No refrigerated lorry available this week',
+    );
+
+    await pumpApp(
+      tester,
+      AcceptLoadAssignScreen(
+        proposal: declinedProposal,
+        initialVehicles: sampleVehicles,
+        initialDrivers: sampleDrivers,
+      ),
+      tripsRepository: mockTripsRepo,
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify Title, Banner and Reason
+    expect(find.text('Job Proposal (Declined)'), findsOneWidget);
+    expect(find.text('Job Proposal Declined'), findsOneWidget);
+    expect(find.text('Reason: "No refrigerated lorry available this week"'), findsOneWidget);
+
+    // Verify ADR-018 re-assignment notice
+    expect(
+      find.text('In accordance with ADR-018, this load was returned to the matching engine for automatic re-assignment to the next qualified agency.'),
+      findsOneWidget,
+    );
+
+    // Verify Action buttons are hidden, replaced by Back button
+    expect(find.byKey(const Key('accept_assign_button')), findsNothing);
+    expect(find.byKey(const Key('decline_button')), findsNothing);
+    expect(find.byKey(const Key('back_button')), findsOneWidget);
+    expect(find.text('Back to Proposals'), findsOneWidget);
+  });
+
+  testWidgets('AcceptLoadAssignScreen displays error banner when declining fails',
+      (tester) async {
+    when(() => mockTripsRepo.declineProposal(any(), reason: any(named: 'reason'))).thenThrow(
+      const ApiException(
+        statusCode: 409,
+        code: 'PROPOSAL_CONFLICT',
+        message: 'This proposal has already expired or been cancelled.',
+      ),
+    );
+
+    await pumpApp(
+      tester,
+      AcceptLoadAssignScreen(
+        proposal: sampleProposal,
+        initialVehicles: sampleVehicles,
+        initialDrivers: sampleDrivers,
+      ),
+      tripsRepository: mockTripsRepo,
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap Decline
+    await tester.tap(find.byKey(const Key('decline_button')));
+    await tester.pumpAndSettle();
+
+    // Tap Confirm Decline
+    await tester.tap(find.text('Confirm Decline'));
+    await tester.pumpAndSettle();
+
+    // Error banner should appear
+    expect(find.text('This proposal has already expired or been cancelled.'), findsOneWidget);
+  });
 }
+

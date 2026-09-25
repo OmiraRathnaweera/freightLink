@@ -47,6 +47,8 @@ class JobProposal {
     this.shipperName,
     this.referenceCode,
     this.tripId,
+    this.declineReason,
+    this.respondedAt,
     required this.createdAt,
     this.updatedAt,
   });
@@ -93,6 +95,8 @@ class JobProposal {
       shipperName: json['shipperName'] as String?,
       referenceCode: json['referenceCode'] as String?,
       tripId: json['tripId'] as String?,
+      declineReason: json['declineReason'] as String?,
+      respondedAt: parseDate(json['respondedAt']),
       createdAt: parseDate(json['createdAt']) ?? DateTime.now(),
       updatedAt: parseDate(json['updatedAt']),
     );
@@ -120,6 +124,8 @@ class JobProposal {
   final String? shipperName;
   final String? referenceCode;
   final String? tripId;
+  final String? declineReason;
+  final DateTime? respondedAt;
   final DateTime createdAt;
   final DateTime? updatedAt;
 

@@ -284,7 +284,13 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Accept & Assign Load'),
+        title: Text(
+          _proposal?.isAccepted == true
+              ? 'Job Proposal (Accepted)'
+              : _proposal?.isDeclined == true
+                  ? 'Job Proposal (Declined)'
+                  : 'Accept & Assign Load',
+        ),
         actions: [
           if (_proposal != null)
             Padding(
@@ -329,17 +335,32 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
                               const SizedBox(height: AppConstants.spaceLg),
                             ],
 
+                            if (_proposal!.isProposed) ...[
+                              _buildDecisionSupportCard(),
+                              const SizedBox(height: AppConstants.spaceLg),
+                            ],
+                            if (_proposal!.isDeclined) ...[
+                              _buildDeclinedInfoCard(),
+                              const SizedBox(height: AppConstants.spaceLg),
+                            ],
+                            if (_proposal!.isAccepted) ...[
+                              _buildAcceptedInfoCard(),
+                              const SizedBox(height: AppConstants.spaceLg),
+                            ],
+
                             _buildPricingHeroCard(),
                             const SizedBox(height: AppConstants.spaceLg),
 
                             _buildCargoAndRouteCard(),
                             const SizedBox(height: AppConstants.spaceLg),
 
-                            _buildFleetAssignmentCard(),
-                            const SizedBox(height: AppConstants.spaceLg),
+                            if (_proposal!.isProposed) ...[
+                              _buildFleetAssignmentCard(),
+                              const SizedBox(height: AppConstants.spaceLg),
 
-                            _buildNotesCard(),
-                            const SizedBox(height: AppConstants.spaceXl),
+                              _buildNotesCard(),
+                              const SizedBox(height: AppConstants.spaceXl),
+                            ],
                           ],
                         ),
                       ),
@@ -371,6 +392,196 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDecisionSupportCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spaceMd),
+      decoration: BoxDecoration(
+        color: AppColors.statusMatchedBg,
+        borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+        border: Border.all(
+          color: AppColors.statusMatchedFg.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.auto_awesome,
+            color: AppColors.statusMatchedFg,
+            size: 20,
+          ),
+          const SizedBox(width: AppConstants.spaceSm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Text(
+                      'AI Match Confirmation',
+                      style: TextStyle(
+                        color: AppColors.statusMatchedFg,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '(ADR-017)',
+                      style: TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'FreightLink AI matched this load with your agency\'s operating route and verified capacity. Review the rate, assign an available driver and vehicle from your fleet, and confirm dispatch.',
+                  style: TextStyle(
+                    color: AppColors.ink.withValues(alpha: 0.85),
+                    fontSize: 12,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeclinedInfoCard() {
+    final respondedStr = _proposal?.respondedAt != null
+        ? DateFormat('MMM dd, yyyy • hh:mm a').format(_proposal!.respondedAt!)
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spaceMd),
+      decoration: BoxDecoration(
+        color: AppColors.statusErrorBg,
+        borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+        border: Border.all(
+          color: AppColors.statusErrorFg.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.cancel_outlined,
+                color: AppColors.statusErrorFg,
+                size: 20,
+              ),
+              const SizedBox(width: AppConstants.spaceSm),
+              const Expanded(
+                child: Text(
+                  'Job Proposal Declined',
+                  style: TextStyle(
+                    color: AppColors.statusErrorFg,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (respondedStr != null)
+                Text(
+                  respondedStr,
+                  style: const TextStyle(
+                    color: AppColors.inkMuted,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _proposal?.declineReason != null && _proposal!.declineReason!.isNotEmpty
+                ? 'Reason: "${_proposal!.declineReason}"'
+                : 'No specific decline reason was provided.',
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'In accordance with ADR-018, this load was returned to the matching engine for automatic re-assignment to the next qualified agency.',
+            style: TextStyle(
+              color: AppColors.inkMuted,
+              fontSize: 11,
+              height: 1.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAcceptedInfoCard() {
+    final respondedStr = _proposal?.respondedAt != null
+        ? DateFormat('MMM dd, yyyy • hh:mm a').format(_proposal!.respondedAt!)
+        : null;
+
+    return Container(
+      padding: const EdgeInsets.all(AppConstants.spaceMd),
+      decoration: BoxDecoration(
+        color: AppColors.statusSuccessBg,
+        borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+        border: Border.all(
+          color: AppColors.statusSuccessFg.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.check_circle_outline,
+                color: AppColors.statusSuccessFg,
+                size: 20,
+              ),
+              const SizedBox(width: AppConstants.spaceSm),
+              const Expanded(
+                child: Text(
+                  'Job Proposal Accepted',
+                  style: TextStyle(
+                    color: AppColors.statusSuccessFg,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (respondedStr != null)
+                Text(
+                  respondedStr,
+                  style: const TextStyle(
+                    color: AppColors.inkMuted,
+                    fontSize: 11,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'This job proposal has already been accepted and assigned to your agency fleet. Driver dispatch and trip execution are currently active or completed.',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontSize: 12,
+              height: 1.35,
             ),
           ),
         ],
@@ -717,6 +928,80 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
   }
 
   Widget _buildBottomActionBar() {
+    if (_proposal?.isAccepted == true) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.spaceLg),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: const Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('back_button'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Back to Trips'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_proposal?.isDeclined == true) {
+      return Container(
+        padding: const EdgeInsets.all(AppConstants.spaceLg),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          border: const Border(top: BorderSide(color: AppColors.border)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  key: const Key('back_button'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+                    ),
+                  ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Back to Proposals'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final canSubmit = _selectedVehicle != null &&
         _selectedDriver != null &&
         !_isSubmitting &&

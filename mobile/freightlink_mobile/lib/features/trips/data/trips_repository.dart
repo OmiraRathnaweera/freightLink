@@ -67,6 +67,25 @@ class TripsRepository {
     return (vehicles: vList, drivers: dList);
   }
 
+  /// Accepts a proposed load assignment (POST /api/v1/assignments/{loadId}/accept).
+  Future<JobProposal> acceptProposal(
+    String loadId, {
+    String? vehicleId,
+    String? driverId,
+    String? notes,
+  }) async {
+    final body = <String, dynamic>{};
+    if (vehicleId != null) body['vehicleId'] = vehicleId;
+    if (driverId != null) body['driverId'] = driverId;
+    if (notes != null && notes.isNotEmpty) body['notes'] = notes;
+
+    final json = await _client.post(
+      '/assignments/$loadId/accept',
+      body: body.isNotEmpty ? body : null,
+    ) as Map<String, dynamic>;
+    return JobProposal.fromJson(json);
+  }
+
   /// Declines a proposed load assignment (POST /api/v1/assignments/{loadId}/decline).
   Future<JobProposal> declineProposal(String loadId, {String? reason}) async {
     final json = await _client.post(
