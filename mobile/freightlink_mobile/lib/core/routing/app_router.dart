@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/coming_soon_placeholder.dart';
@@ -26,17 +27,18 @@ GoRouter createAppRouter(AuthProvider authProvider) {
     redirect: (context, state) {
       final status = authProvider.status;
       final isGoingToLogin = state.matchedLocation == '/login';
+      final isGoingToRegister = state.matchedLocation == '/register';
 
       if (status == AuthStatus.unknown) {
         // App is still bootstrapping
         return null;
       }
 
-      if (status == AuthStatus.guest && !isGoingToLogin) {
+      if (status == AuthStatus.guest && !isGoingToLogin && !isGoingToRegister) {
         return '/login';
       }
 
-      if (status == AuthStatus.authenticated && isGoingToLogin) {
+      if (status == AuthStatus.authenticated && (isGoingToLogin || isGoingToRegister)) {
         return '/dashboard';
       }
 
@@ -46,6 +48,10 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

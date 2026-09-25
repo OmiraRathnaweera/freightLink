@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -132,6 +133,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       label: 'Sign in',
                       isLoading: auth.isSubmitting,
                       onPressed: _submit,
+                    ),
+                    const SizedBox(height: AppConstants.spaceXxl),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Don't have an account?",
+                          style: TextStyle(color: AppColors.inkMuted),
+                        ),
+                        TextButton(
+                          onPressed: () => context.go('/register'),
+                          child: const Text('Sign up'),
+                        ),
+                      ],
                     ),
                   ],
                 );
