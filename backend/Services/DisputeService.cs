@@ -13,7 +13,8 @@ using Npgsql;
 namespace FreightLink.Api.Services;
 
 /// <summary>
-/// Service implementing <see cref="IDisputeService"/> for Dispute lifecycle management.
+/// Service implementing <see cref="IDisputeService"/> enforcing the strict linear dispute lifecycle:
+/// Raised -> UnderReview -> Resolved.
 /// </summary>
 public class DisputeService : IDisputeService
 {
@@ -28,6 +29,12 @@ public class DisputeService : IDisputeService
     /// <inheritdoc />
     public async Task<DisputeResponseDto> CreateAsync(Guid currentUserId, UserRole role, CreateDisputeDto request, CancellationToken cancellationToken = default)
     {
+        // Business Rule 1: Created exclusively by a Shipper or an Agency
+        if (role != UserRole.Shipper && role != UserRole.AgencyStaff)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Disputes can be created exclusively by a Shipper or an Agency.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.Description) || request.Description.Trim().Length < 10)
         {
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Dispute description must be at least 10 characters long.");
@@ -49,11 +56,8 @@ public class DisputeService : IDisputeService
 
         EnforceTripPartyAuthorization(trip, currentUserId, role);
 
-        // Application-level pre-check: gives a readable 409 on the normal (non-concurrent) path
-        // and avoids a round-trip to SaveChanges when the caller can clearly see the conflict.
-        // This check is NOT a substitute for the catch below — two concurrent requests that both
-        // pass this check can still race to SaveChanges and hit ux_dispute_open simultaneously.
-        var liveStatuses = new[] { DisputeStatus.Open, DisputeStatus.UnderReview };
+        // Check for active dispute on this trip & category (Raised or UnderReview)
+        var liveStatuses = new[] { DisputeStatus.Raised, DisputeStatus.UnderReview };
         var liveDuplicateExists = await _dbContext.Disputes.AnyAsync(
             d => d.TripId == request.TripId
               && d.Category == request.Category
@@ -64,7 +68,7 @@ public class DisputeService : IDisputeService
         {
             throw new ApiException(HttpStatusCode.Conflict,
                 ErrorCode.DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
-                $"An open dispute for category '{request.Category}' already exists for trip '{request.TripId}'.");
+                $"An active dispute for category '{request.Category}' already exists for trip '{request.TripId}'.");
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -75,7 +79,7 @@ public class DisputeService : IDisputeService
             RaisedByUserId = currentUserId,
             Category = request.Category,
             Description = request.Description.Trim(),
-            Status = DisputeStatus.Open,
+            Status = DisputeStatus.Raised,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -88,15 +92,11 @@ public class DisputeService : IDisputeService
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException pgEx && pgEx.SqlState == "23505")
         {
-            // 23505 = unique_violation. The only unique index on Disputes that a CreateAsync
-            // call can violate is ux_dispute_open (TripId, Category) filtered to Open/UnderReview.
-            // Any other constraint name is unexpected — re-throw so it surfaces as a real 500
-            // rather than silently masking the cause.
             if (pgEx.ConstraintName == "ux_dispute_open")
             {
                 throw new ApiException(HttpStatusCode.Conflict,
                     ErrorCode.DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
-                    $"An open dispute for category '{request.Category}' already exists for trip '{request.TripId}'.");
+                    $"An active dispute for category '{request.Category}' already exists for trip '{request.TripId}'.");
             }
 
             throw;
@@ -151,7 +151,6 @@ public class DisputeService : IDisputeService
             .Include(d => d.Resolution)
             .AsQueryable();
 
-        // Scope to caller's role
         if (role == UserRole.Shipper)
         {
             baseQuery = baseQuery.Where(d => d.RaisedByUserId == currentUserId || d.Trip.Assignment.Load.ShipperUserId == currentUserId);
@@ -168,7 +167,6 @@ public class DisputeService : IDisputeService
         {
             baseQuery = baseQuery.Where(d => d.RaisedByUserId == currentUserId || d.Trip.Driver.UserId == currentUserId);
         }
-        // Admin sees all disputes
 
         if (query.Status.HasValue)
         {
@@ -253,8 +251,37 @@ public class DisputeService : IDisputeService
     }
 
     /// <inheritdoc />
+    public async Task<DisputeResponseDto> MoveToReviewAsync(Guid disputeId, Guid currentUserId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        // Business Rule 2: Authorized actor: Admin only
+        if (role != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators may move disputes to under review.");
+        }
+
+        var dispute = await _dbContext.Disputes
+            .Include(d => d.Resolution)
+            .FirstOrDefaultAsync(d => d.DisputeId == disputeId, cancellationToken);
+
+        if (dispute is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DISPUTE_NOT_FOUND, $"Dispute '{disputeId}' was not found.");
+        }
+
+        // Strict state machine validation: Raised -> UnderReview
+        DisputeStatusTransitionRules.ValidateTransition(dispute.Status, DisputeStatus.UnderReview);
+
+        dispute.Status = DisputeStatus.UnderReview;
+        dispute.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToResponse(dispute);
+    }
+
+    /// <inheritdoc />
     public async Task<DisputeResponseDto> ResolveAsync(Guid disputeId, Guid currentUserId, UserRole role, ResolveDisputeDto request, CancellationToken cancellationToken = default)
     {
+        // Business Rule 3: Authorized actor: Admin only
         if (role != UserRole.Admin)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators may resolve disputes.");
@@ -269,24 +296,18 @@ public class DisputeService : IDisputeService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DISPUTE_NOT_FOUND, $"Dispute '{disputeId}' was not found.");
         }
 
-        if (!DisputeStatusTransitionRules.CanResolve(dispute.Status))
+        // Strict state machine validation: UnderReview -> Resolved
+        DisputeStatusTransitionRules.ValidateTransition(dispute.Status, DisputeStatus.Resolved);
+
+        // Business Rule 3: Mandatory payload - Requires a non-empty resolutionNote (string, trimmed)
+        var resolutionNote = request?.GetEffectiveResolutionNote();
+        if (string.IsNullOrWhiteSpace(resolutionNote))
         {
-            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.DISPUTE_ALREADY_RESOLVED, $"Dispute is already in terminal status '{dispute.Status}'.");
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "A non-empty resolutionNote is required to resolve a dispute.");
         }
 
-        // Map outcome → terminal dispute status explicitly so that every defined DisputeOutcome
-        // member has a deliberate mapping and any undefined numeric value that bypasses DTO
-        // model-binding (e.g. a direct service call) is rejected here rather than silently
-        // falling into the Resolved branch via the former "!= Rejected ⇒ Resolved" ternary.
-        var nextStatus = request.Outcome switch
-        {
-            DisputeOutcome.Upheld          => DisputeStatus.Resolved,
-            DisputeOutcome.PartiallyUpheld => DisputeStatus.Resolved,
-            DisputeOutcome.Rejected        => DisputeStatus.Rejected,
-            _ => throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR,
-                     $"'{request.Outcome}' is not a valid dispute outcome.")
-        };
         var now = DateTimeOffset.UtcNow;
+        var outcome = request?.Outcome ?? DisputeOutcome.Upheld;
 
         var resolution = dispute.Resolution;
         if (resolution is null)
@@ -295,8 +316,8 @@ public class DisputeService : IDisputeService
             {
                 DisputeId = dispute.DisputeId,
                 ResolvedByUserId = currentUserId,
-                Outcome = request.Outcome,
-                Notes = request.Notes,
+                Outcome = outcome,
+                Notes = resolutionNote,
                 ResolvedAt = now
             };
             _dbContext.DisputeResolutions.Add(resolution);
@@ -305,25 +326,53 @@ public class DisputeService : IDisputeService
         else
         {
             resolution.ResolvedByUserId = currentUserId;
-            resolution.Outcome = request.Outcome;
-            resolution.Notes = request.Notes;
+            resolution.Outcome = outcome;
+            resolution.Notes = resolutionNote;
             resolution.ResolvedAt = now;
         }
 
-        dispute.Status = nextStatus;
+        dispute.Status = DisputeStatus.Resolved;
         dispute.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
         return MapToResponse(dispute);
     }
 
-    private static void EnforceTripPartyAuthorization(Trip trip, Guid currentUserId, UserRole role)
+    /// <inheritdoc />
+    public async Task<DisputeResponseDto> TransitionStatusAsync(Guid disputeId, Guid currentUserId, UserRole role, TransitionDisputeStatusDto request, CancellationToken cancellationToken = default)
     {
-        if (role == UserRole.Admin)
+        if (role != UserRole.Admin)
         {
-            return;
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators may transition dispute statuses.");
         }
 
+        if (request.Status == DisputeStatus.UnderReview)
+        {
+            return await MoveToReviewAsync(disputeId, currentUserId, role, cancellationToken);
+        }
+
+        if (request.Status == DisputeStatus.Resolved)
+        {
+            return await ResolveAsync(disputeId, currentUserId, role, new ResolveDisputeDto
+            {
+                Outcome = request.Outcome ?? DisputeOutcome.Upheld,
+                ResolutionNote = request.ResolutionNote,
+                Notes = request.Notes
+            }, cancellationToken);
+        }
+
+        var dispute = await _dbContext.Disputes.FirstOrDefaultAsync(d => d.DisputeId == disputeId, cancellationToken);
+        if (dispute is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DISPUTE_NOT_FOUND, $"Dispute '{disputeId}' was not found.");
+        }
+
+        DisputeStatusTransitionRules.ValidateTransition(dispute.Status, request.Status);
+        throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_DISPUTE_STATUS_TRANSITION, $"Unsupported status transition target '{request.Status}'.");
+    }
+
+    private static void EnforceTripPartyAuthorization(Trip trip, Guid currentUserId, UserRole role)
+    {
         if (role == UserRole.Shipper && trip.Assignment?.Load?.ShipperUserId == currentUserId)
         {
             return;
@@ -334,12 +383,7 @@ public class DisputeService : IDisputeService
             return;
         }
 
-        if (role == UserRole.Driver && trip.Driver?.UserId == currentUserId)
-        {
-            return;
-        }
-
-        throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "You do not have permission to raise a dispute for this trip.");
+        throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only the shipper or assigned agency staff may raise a dispute for this trip.");
     }
 
     private static void EnforceDisputeAccessAuthorization(Dispute dispute, Guid currentUserId, UserRole role)

@@ -229,7 +229,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         var dispute = await response.Content.ReadFromJsonAsync<DisputeResponseDto>();
         Assert.NotNull(dispute);
         Assert.Equal(trip.TripId, dispute.TripId);
-        Assert.Equal(DisputeStatus.Open, dispute.Status);
+        Assert.Equal(DisputeStatus.Raised, dispute.Status);
     }
 
     [Fact]
@@ -251,13 +251,23 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
         var createRes = await _client.SendAsync(createReq);
         var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        Assert.Equal(DisputeStatus.Raised, created.Status);
 
-        var resolveReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/disputes/{created.DisputeId}/resolve")
+        // Move to UnderReview first
+        var reviewReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/review");
+        reviewReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var reviewRes = await _client.SendAsync(reviewReq);
+        Assert.Equal(HttpStatusCode.OK, reviewRes.StatusCode);
+        var reviewed = (await reviewRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        Assert.Equal(DisputeStatus.UnderReview, reviewed.Status);
+
+        // Then resolve
+        var resolveReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/resolve")
         {
             Content = JsonContent.Create(new ResolveDisputeDto
             {
                 Outcome = DisputeOutcome.Upheld,
-                Notes = "Evidence reviewed and approved."
+                ResolutionNote = "Evidence reviewed and approved."
             })
         };
         resolveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
@@ -269,5 +279,126 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.Equal(DisputeStatus.Resolved, resolved.Status);
         Assert.NotNull(resolved.Resolution);
         Assert.Equal(DisputeOutcome.Upheld, resolved.Resolution.Outcome);
+    }
+
+    [Fact]
+    public async Task PatchResolve_DirectFromRaised_Returns400BadRequest()
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/disputes")
+        {
+            Content = JsonContent.Create(new CreateDisputeDto
+            {
+                TripId = trip.TripId,
+                Category = DisputeCategory.Damage,
+                Description = "Cargo damaged in transit."
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+
+        // Attempting direct jump Raised -> Resolved must return 400 Bad Request
+        var resolveReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/disputes/{created.DisputeId}/resolve")
+        {
+            Content = JsonContent.Create(new ResolveDisputeDto
+            {
+                Outcome = DisputeOutcome.Upheld,
+                ResolutionNote = "Skipping review."
+            })
+        };
+        resolveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var resolveRes = await _client.SendAsync(resolveReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resolveRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchResolve_MissingResolutionNote_Returns400BadRequest()
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/disputes")
+        {
+            Content = JsonContent.Create(new CreateDisputeDto
+            {
+                TripId = trip.TripId,
+                Category = DisputeCategory.Damage,
+                Description = "Cargo damaged in transit."
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+
+        // Move to review
+        var reviewReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/review");
+        reviewReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        await _client.SendAsync(reviewReq);
+
+        // Attempting resolution with null/empty resolutionNote
+        var resolveReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/resolve")
+        {
+            Content = JsonContent.Create(new ResolveDisputeDto
+            {
+                Outcome = DisputeOutcome.Upheld,
+                ResolutionNote = "   "
+            })
+        };
+        resolveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var resolveRes = await _client.SendAsync(resolveReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resolveRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchReview_FromResolved_Returns400BadRequest()
+    {
+        var (shipper, _, _, trip) = await SeedTripDataAsync();
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/disputes")
+        {
+            Content = JsonContent.Create(new CreateDisputeDto
+            {
+                TripId = trip.TripId,
+                Category = DisputeCategory.Damage,
+                Description = "Cargo damaged in transit."
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+
+        // Move to review
+        var reviewReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/review");
+        reviewReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        await _client.SendAsync(reviewReq);
+
+        // Resolve
+        var resolveReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/resolve")
+        {
+            Content = JsonContent.Create(new ResolveDisputeDto
+            {
+                Outcome = DisputeOutcome.Upheld,
+                ResolutionNote = "Legitimate claim settled."
+            })
+        };
+        resolveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var resolveRes = await _client.SendAsync(resolveReq);
+        Assert.Equal(HttpStatusCode.OK, resolveRes.StatusCode);
+
+        // Attempt backward jump Resolved -> UnderReview must return 400 Bad Request
+        var reopenReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/review");
+        reopenReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var reopenRes = await _client.SendAsync(reopenReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, reopenRes.StatusCode);
     }
 }

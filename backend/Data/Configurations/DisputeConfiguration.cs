@@ -30,7 +30,7 @@ public class DisputeConfiguration : IEntityTypeConfiguration<Dispute>
         builder.HasIndex(x => new { x.TripId, x.Category })
             .IsUnique()
             .HasDatabaseName("ux_dispute_open")
-            .HasFilter("\"Status\" IN ('Open','UnderReview')");
+            .HasFilter("\"Status\" IN ('Open','UnderReview','Raised')");
 
         builder.ToTable(t => t.HasCheckConstraint("ck_dispute_description",
             "length(trim(\"Description\")) >= 10"));
