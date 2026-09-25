@@ -4,6 +4,7 @@ using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Internal;
+using FreightLink.Api.DTOs.Internal.Candidates;
 using FreightLink.Api.DTOs.Internal.ToolCalls;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
@@ -125,9 +126,7 @@ public class AgentWorkflowService : IAgentWorkflowService
             _dbContext.AgentSteps.Add(step);
         }
 
-        // A Failed step at any stage is a safe, recorded failure for the whole run (ADR-018) - no
-        // other agent exists yet to define a further outcome for its own success, so a Succeeded
-        // step only updates the run for Agent 1 (Planner) specifically, and only its own columns.
+        // A Failed step at any stage is a safe, recorded failure for the whole run (ADR-018)
         if (status == AgentStepStatus.Failed)
         {
             run.Status = WorkflowRunStatus.Failed;
@@ -138,6 +137,50 @@ public class AgentWorkflowService : IAgentWorkflowService
             using var plan = JsonDocument.Parse(request.OutputJson ?? "{}");
             run.Objective = plan.RootElement.TryGetProperty("objective", out var objectiveProperty) ? objectiveProperty.GetString() ?? string.Empty : string.Empty;
             run.PlanJson = request.OutputJson;
+        }
+        else if (status == AgentStepStatus.Succeeded && agentRole == AgentRole.DomainAnalysis && !string.IsNullOrWhiteSpace(request.OutputJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(request.OutputJson);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("candidates", out var candidatesProp) && candidatesProp.ValueKind == JsonValueKind.Array)
+                {
+                    var dtos = new List<MatchCandidateDto>();
+                    foreach (var c in candidatesProp.EnumerateArray())
+                    {
+                        if (c.TryGetProperty("agencyId", out var aProp) && Guid.TryParse(aProp.GetString(), out var agencyId))
+                        {
+                            var rank = c.TryGetProperty("rank", out var rProp) ? rProp.GetInt32() : 1;
+                            var eligible = c.TryGetProperty("eligible", out var eProp) && eProp.GetBoolean();
+                            var rejection = c.TryGetProperty("rejectionReason", out var rejProp) && rejProp.ValueKind == JsonValueKind.String ? rejProp.GetString() : null;
+                            var score = c.TryGetProperty("eligibilityScore", out var sProp) ? sProp.GetDecimal() : (eligible ? 100m : 0m);
+
+                            dtos.Add(new MatchCandidateDto
+                            {
+                                AgencyId = agencyId,
+                                Rank = rank,
+                                Eligible = eligible,
+                                EligibilityScore = score,
+                                RejectionReason = rejection
+                            });
+                        }
+                    }
+
+                    if (dtos.Count > 0)
+                    {
+                        await UpsertMatchCandidatesInternalAsync(workflowRunId, dtos, cancellationToken);
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Non-blocking fallback if JSON parsing fails
+            }
+        }
+        else if (status == AgentStepStatus.Succeeded && agentRole == AgentRole.ValidationSafety)
+        {
+            run.Status = WorkflowRunStatus.AwaitingApproval;
         }
 
         // UpdatedAt is not set here - trg_set_updated_at_agentworkflowruns (see
@@ -245,6 +288,72 @@ public class AgentWorkflowService : IAgentWorkflowService
             ErrorMessage = toolCall.ErrorMessage,
             CalledAt = toolCall.CalledAt
         };
+    }
+
+    private async Task UpsertMatchCandidatesInternalAsync(Guid workflowRunId, IEnumerable<MatchCandidateDto> candidates, CancellationToken cancellationToken)
+    {
+        foreach (var c in candidates)
+        {
+            if (!c.AgencyId.HasValue || c.AgencyId.Value == Guid.Empty)
+            {
+                continue;
+            }
+
+            var agencyId = c.AgencyId.Value;
+            var agencyExists = await _dbContext.Agencies.AnyAsync(a => a.AgencyId == agencyId, cancellationToken);
+            if (!agencyExists)
+            {
+                continue;
+            }
+
+            var rejectionReason = c.RejectionReason;
+            if (!c.Eligible && string.IsNullOrWhiteSpace(rejectionReason))
+            {
+                rejectionReason = "Carrier fleet does not meet criteria";
+            }
+
+            var score = Math.Clamp(c.EligibilityScore, 0m, 100m);
+
+            var existingCandidate = await _dbContext.MatchCandidates
+                .FirstOrDefaultAsync(mc => mc.WorkflowRunId == workflowRunId && mc.AgencyId == agencyId, cancellationToken);
+
+            if (existingCandidate != null)
+            {
+                existingCandidate.Rank = c.Rank;
+                existingCandidate.Eligible = c.Eligible;
+                existingCandidate.EligibilityScore = score;
+                existingCandidate.RejectionReason = rejectionReason;
+            }
+            else
+            {
+                _dbContext.MatchCandidates.Add(new MatchCandidate
+                {
+                    MatchCandidateId = Guid.NewGuid(),
+                    WorkflowRunId = workflowRunId,
+                    AgencyId = agencyId,
+                    Rank = c.Rank,
+                    Eligible = c.Eligible,
+                    EligibilityScore = score,
+                    RejectionReason = rejectionReason,
+                    EvaluatedAt = DateTimeOffset.UtcNow
+                });
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task RecordMatchCandidatesAsync(Guid workflowRunId, IEnumerable<MatchCandidateDto> candidates, CancellationToken cancellationToken = default)
+    {
+        var runExists = await _dbContext.AgentWorkflowRuns
+            .AnyAsync(r => r.WorkflowRunId == workflowRunId, cancellationToken);
+
+        if (!runExists)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.WORKFLOW_RUN_NOT_FOUND, "The requested workflow run could not be found.");
+        }
+
+        await UpsertMatchCandidatesInternalAsync(workflowRunId, candidates, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 }
 

@@ -58,5 +58,13 @@ public interface IAgentWorkflowService
     /// 409 <see cref="Common.Errors.ErrorCode.TOOL_CALL_DUPLICATE_ATTEMPT"/> if this (AgentStep, ToolName, AttemptNo) was already recorded.
     /// </exception>
     Task<FreightLink.Api.DTOs.Internal.ToolCalls.ToolCallResponseDto> RecordToolCallAsync(Guid workflowRunId, FreightLink.Api.DTOs.Internal.ToolCalls.CreateToolCallRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records or updates candidate agencies evaluated by Agent 2 (DomainAnalysis) under the given run.
+    /// </summary>
+    /// <param name="workflowRunId">The run these candidates belong to.</param>
+    /// <param name="candidates">List of evaluated candidate agencies.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task RecordMatchCandidatesAsync(Guid workflowRunId, IEnumerable<FreightLink.Api.DTOs.Internal.Candidates.MatchCandidateDto> candidates, CancellationToken cancellationToken = default);
 }
 

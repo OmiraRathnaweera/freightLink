@@ -65,5 +65,19 @@ public class AgentWorkflowRunsController : ControllerBase
         var result = await _agentWorkflowService.RecordToolCallAsync(workflowRunId, request, cancellationToken);
         return CreatedAtAction(nameof(RecordToolCall), new { workflowRunId }, result);
     }
+
+    /// <summary>
+    /// Records candidate agencies evaluated by Agent 2 (DomainAnalysis) under an existing workflow run.
+    /// </summary>
+    /// <param name="workflowRunId">The run these candidates belong to.</param>
+    /// <param name="candidates">The list of evaluated candidate agencies.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK.</returns>
+    [HttpPost("{workflowRunId:guid}/candidates")]
+    public async Task<ActionResult> RecordMatchCandidates(Guid workflowRunId, [FromBody] List<FreightLink.Api.DTOs.Internal.Candidates.MatchCandidateDto> candidates, CancellationToken cancellationToken)
+    {
+        await _agentWorkflowService.RecordMatchCandidatesAsync(workflowRunId, candidates, cancellationToken);
+        return Ok(new { message = "Candidates recorded successfully" });
+    }
 }
 

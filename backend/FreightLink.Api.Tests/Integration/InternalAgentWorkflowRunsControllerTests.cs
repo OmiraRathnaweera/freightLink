@@ -4,9 +4,12 @@ using System.Net.Http.Json;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.DTOs.Internal;
+using FreightLink.Api.DTOs.Internal.Candidates;
 using FreightLink.Api.DTOs.Internal.ToolCalls;
 using FreightLink.Api.DTOs.Loads;
+using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
@@ -158,5 +161,248 @@ public class InternalAgentWorkflowRunsControllerTests
 
         var toolCallRes = await client.SendAsync(toolCallMsg);
         Assert.Equal(HttpStatusCode.BadRequest, toolCallRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task ReportStep_PlannerStep1_UpdatesObjectiveAndPlanJson()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var (load, userId) = await SeedLoadAsync(client);
+
+        // 1. Create a workflow run
+        using var createRunMsg = new HttpRequestMessage(HttpMethod.Post, "/internal/agent-workflow-runs");
+        createRunMsg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        createRunMsg.Content = JsonContent.Create(new CreateAgentWorkflowRunRequestDto
+        {
+            LoadId = load.LoadId,
+            TriggeredByUserId = userId,
+            AttemptNo = 1
+        });
+        var createRunRes = await client.SendAsync(createRunMsg);
+        createRunRes.EnsureSuccessStatusCode();
+        var run = (await createRunRes.Content.ReadFromJsonAsync<CreateAgentWorkflowRunResponseDto>())!;
+
+        // 2. Report Step 1 (Planner)
+        using var step1Msg = new HttpRequestMessage(HttpMethod.Post, $"/internal/agent-workflow-runs/{run.WorkflowRunId}/steps");
+        step1Msg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        step1Msg.Content = JsonContent.Create(new ReportAgentStepRequestDto
+        {
+            StepNo = 1,
+            AgentRole = AgentRole.Planner,
+            Status = AgentStepStatus.Succeeded,
+            InputJson = "{\"loadId\":\"" + load.LoadId + "\"}",
+            OutputJson = "{\"objective\":\"Find and assign optimal carrier for transformer\",\"steps\":[\"Evaluate candidate agencies\"]}",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-2),
+            CompletedAt = DateTimeOffset.UtcNow,
+            DurationMs = 2000
+        });
+
+        var step1Res = await client.SendAsync(step1Msg);
+        Assert.Equal(HttpStatusCode.Created, step1Res.StatusCode);
+
+        var stepData = await step1Res.Content.ReadFromJsonAsync<ReportAgentStepResponseDto>();
+        Assert.NotNull(stepData);
+        Assert.NotEqual(Guid.Empty, stepData.AgentStepId);
+        Assert.Equal(AgentStepStatus.Succeeded, stepData.Status);
+
+        // Verify in DB
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var dbRun = await db.AgentWorkflowRuns.Include(r => r.Steps).FirstAsync(r => r.WorkflowRunId == run.WorkflowRunId);
+        Assert.Equal("Find and assign optimal carrier for transformer", dbRun.Objective);
+        Assert.NotNull(dbRun.PlanJson);
+        Assert.Single(dbRun.Steps);
+        Assert.Equal(1, dbRun.Steps.First().StepNo);
+        Assert.Equal(AgentRole.Planner, dbRun.Steps.First().AgentRole);
+    }
+
+    [Fact]
+    public async Task ReportStep_DomainAnalysisStep2_SyncsCandidatesToDatabase()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var (load, userId) = await SeedLoadAsync(client);
+
+        // Seed an active agency in DB
+        var agencyId = Guid.NewGuid();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Agencies.Add(new Agency
+            {
+                AgencyId = agencyId,
+                Name = "Apex Freight Terminal",
+                BusinessRegNo = $"APX-{Guid.NewGuid():N}"[..12],
+                YardAddress = "12 Industrial Road, Colombo",
+                YardLat = 6.9319m,
+                YardLng = 79.8478m,
+                Status = AgencyStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 1. Create a workflow run
+        using var createRunMsg = new HttpRequestMessage(HttpMethod.Post, "/internal/agent-workflow-runs");
+        createRunMsg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        createRunMsg.Content = JsonContent.Create(new CreateAgentWorkflowRunRequestDto
+        {
+            LoadId = load.LoadId,
+            TriggeredByUserId = userId,
+            AttemptNo = 1
+        });
+        var createRunRes = await client.SendAsync(createRunMsg);
+        createRunRes.EnsureSuccessStatusCode();
+        var run = (await createRunRes.Content.ReadFromJsonAsync<CreateAgentWorkflowRunResponseDto>())!;
+
+        // 2. Report Step 2 (DomainAnalysis) with candidate array in OutputJson
+        var step2Output = "{\"shortlistCount\":1,\"candidates\":[{\"agencyId\":\"" + agencyId + "\",\"agencyName\":\"Apex Freight Terminal\",\"rank\":1,\"eligible\":true,\"eligibilityScore\":95.0}]}";
+
+        using var step2Msg = new HttpRequestMessage(HttpMethod.Post, $"/internal/agent-workflow-runs/{run.WorkflowRunId}/steps");
+        step2Msg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        step2Msg.Content = JsonContent.Create(new ReportAgentStepRequestDto
+        {
+            StepNo = 2,
+            AgentRole = AgentRole.DomainAnalysis,
+            Status = AgentStepStatus.Succeeded,
+            InputJson = "{\"loadId\":\"" + load.LoadId + "\",\"candidatesEvaluatedCount\":1}",
+            OutputJson = step2Output,
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            DurationMs = 1000
+        });
+
+        var step2Res = await client.SendAsync(step2Msg);
+        Assert.Equal(HttpStatusCode.Created, step2Res.StatusCode);
+
+        // Verify in DB that MatchCandidate was synced
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var candidates = await db.MatchCandidates.Where(mc => mc.WorkflowRunId == run.WorkflowRunId).ToListAsync();
+            Assert.Single(candidates);
+            Assert.Equal(agencyId, candidates[0].AgencyId);
+            Assert.Equal(1, candidates[0].Rank);
+            Assert.True(candidates[0].Eligible);
+            Assert.Equal(95.0m, candidates[0].EligibilityScore);
+        }
+    }
+
+    [Fact]
+    public async Task ReportStep_ValidationSafetyStep4_TransitionsWorkflowRunToAwaitingApproval()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var (load, userId) = await SeedLoadAsync(client);
+
+        // 1. Create a workflow run
+        using var createRunMsg = new HttpRequestMessage(HttpMethod.Post, "/internal/agent-workflow-runs");
+        createRunMsg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        createRunMsg.Content = JsonContent.Create(new CreateAgentWorkflowRunRequestDto
+        {
+            LoadId = load.LoadId,
+            TriggeredByUserId = userId,
+            AttemptNo = 1
+        });
+        var createRunRes = await client.SendAsync(createRunMsg);
+        createRunRes.EnsureSuccessStatusCode();
+        var run = (await createRunRes.Content.ReadFromJsonAsync<CreateAgentWorkflowRunResponseDto>())!;
+
+        // 2. Report Step 4 (ValidationSafety) as Succeeded
+        using var step4Msg = new HttpRequestMessage(HttpMethod.Post, $"/internal/agent-workflow-runs/{run.WorkflowRunId}/steps");
+        step4Msg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        step4Msg.Content = JsonContent.Create(new ReportAgentStepRequestDto
+        {
+            StepNo = 4,
+            AgentRole = AgentRole.ValidationSafety,
+            Status = AgentStepStatus.Succeeded,
+            InputJson = "{\"loadId\":\"" + load.LoadId + "\"}",
+            OutputJson = "{\"recommendation\":\"Approve\",\"checks\":[]}",
+            StartedAt = DateTimeOffset.UtcNow.AddSeconds(-1),
+            CompletedAt = DateTimeOffset.UtcNow,
+            DurationMs = 500
+        });
+
+        var step4Res = await client.SendAsync(step4Msg);
+        Assert.Equal(HttpStatusCode.Created, step4Res.StatusCode);
+
+        // Verify in DB that run transitioned to AwaitingApproval
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var dbRun = await db.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == run.WorkflowRunId);
+        Assert.Equal(WorkflowRunStatus.AwaitingApproval, dbRun.Status);
+    }
+
+    [Fact]
+    public async Task RecordMatchCandidates_WithValidApiKey_PersistsCandidatesDirectly()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        using var client = factory.CreateClient();
+
+        var (load, userId) = await SeedLoadAsync(client);
+
+        var agencyId = Guid.NewGuid();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Agencies.Add(new Agency
+            {
+                AgencyId = agencyId,
+                Name = "Direct Candidate Agency",
+                BusinessRegNo = $"DIR-{Guid.NewGuid():N}"[..12],
+                YardAddress = "50 Ocean Ave, Colombo",
+                YardLat = 6.9271m,
+                YardLng = 79.8612m,
+                Status = AgencyStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // 1. Create a workflow run
+        using var createRunMsg = new HttpRequestMessage(HttpMethod.Post, "/internal/agent-workflow-runs");
+        createRunMsg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        createRunMsg.Content = JsonContent.Create(new CreateAgentWorkflowRunRequestDto
+        {
+            LoadId = load.LoadId,
+            TriggeredByUserId = userId,
+            AttemptNo = 1
+        });
+        var createRunRes = await client.SendAsync(createRunMsg);
+        createRunRes.EnsureSuccessStatusCode();
+        var run = (await createRunRes.Content.ReadFromJsonAsync<CreateAgentWorkflowRunResponseDto>())!;
+
+        // 2. POST candidates directly
+        using var candMsg = new HttpRequestMessage(HttpMethod.Post, $"/internal/agent-workflow-runs/{run.WorkflowRunId}/candidates");
+        candMsg.Headers.Add("X-Internal-Api-Key", ValidKey);
+        candMsg.Content = JsonContent.Create(new List<MatchCandidateDto>
+        {
+            new MatchCandidateDto
+            {
+                AgencyId = agencyId,
+                Rank = 1,
+                Eligible = true,
+                EligibilityScore = 98.5m
+            }
+        });
+
+        var candRes = await client.SendAsync(candMsg);
+        Assert.Equal(HttpStatusCode.OK, candRes.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var candidate = await db.MatchCandidates.FirstOrDefaultAsync(mc => mc.WorkflowRunId == run.WorkflowRunId && mc.AgencyId == agencyId);
+            Assert.NotNull(candidate);
+            Assert.Equal(1, candidate.Rank);
+            Assert.True(candidate.Eligible);
+            Assert.Equal(98.5m, candidate.EligibilityScore);
+        }
     }
 }
