@@ -118,6 +118,81 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+  Future<bool> registerShipper({
+    required String email,
+    required String password,
+    required String fullName,
+    String? phoneE164,
+    required String companyName,
+  }) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiClient.post(
+        '/auth/register/shipper',
+        body: {
+          'email': email,
+          'password': password,
+          'fullName': fullName,
+          if (phoneE164 != null && phoneE164.isNotEmpty) 'phoneE164': phoneE164,
+          'companyName': companyName,
+        },
+      );
+      // Registration successful, now login
+      return await login(email: email, password: password);
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> registerAgency({
+    required String email,
+    required String password,
+    required String fullName,
+    String? phoneE164,
+    String? jobTitle,
+    required String agencyName,
+    required String businessRegNo,
+    required String yardAddress,
+    required double yardLat,
+    required double yardLng,
+  }) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiClient.post(
+        '/auth/register/agency',
+        body: {
+          'email': email,
+          'password': password,
+          'fullName': fullName,
+          if (phoneE164 != null && phoneE164.isNotEmpty) 'phoneE164': phoneE164,
+          if (jobTitle != null && jobTitle.isNotEmpty) 'jobTitle': jobTitle,
+          'agencyName': agencyName,
+          'businessRegNo': businessRegNo,
+          'yardAddress': yardAddress,
+          'yardLat': yardLat,
+          'yardLng': yardLng,
+        },
+      );
+      // Registration successful, now login
+      return await login(email: email, password: password);
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> logout() async {
     _accessToken = null;
