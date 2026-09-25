@@ -41,4 +41,11 @@ public interface IAssignmentService
     /// creating the real Assignment (Accepted) and creating/updating the Trip to Assigned status.
     /// </summary>
     Task<AssignmentResponseDto> ApproveWorkflowRunAsync(Guid workflowRunId, ApproveWorkflowRunDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Confirms a matched agency proposal for a load by the shipper (concurrency-safe, ADR-013 / ADR-016).
+    /// Creates an Assignment in Proposed status, records ApprovalDecision, sends agency proposal email,
+    /// and completes the workflow run.
+    /// </summary>
+    Task<AssignmentResponseDto> ConfirmMatchAsync(Guid loadId, FreightLink.Api.DTOs.Loads.ConfirmMatchDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

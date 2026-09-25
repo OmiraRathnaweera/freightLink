@@ -1,8 +1,11 @@
 using System.Net;
+using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Assignments;
+using FreightLink.Api.DTOs.Internal;
+using FreightLink.Api.DTOs.Loads;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
@@ -17,11 +20,16 @@ public class AssignmentService : IAssignmentService
 {
     private readonly AppDbContext _dbContext;
     private readonly IEmailService _emailService;
+    private readonly IPricingEstimatorService _pricingEstimatorService;
 
-    public AssignmentService(AppDbContext dbContext, IEmailService emailService)
+    public AssignmentService(
+        AppDbContext dbContext,
+        IEmailService emailService,
+        IPricingEstimatorService pricingEstimatorService)
     {
         _dbContext = dbContext;
         _emailService = emailService;
+        _pricingEstimatorService = pricingEstimatorService;
     }
 
     /// <inheritdoc />
@@ -559,6 +567,261 @@ public class AssignmentService : IAssignmentService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return await GetByIdAsync(assignment.AssignmentId, currentUserId, currentUserRole, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<AssignmentResponseDto> ConfirmMatchAsync(
+        Guid loadId,
+        ConfirmMatchDto request,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        if (request?.AgencyId == null || request.AgencyId.Value == Guid.Empty)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "AgencyId is required.");
+        }
+
+        var chosenAgencyId = request.AgencyId.Value;
+
+        var load = await _dbContext.Loads
+            .Include(l => l.ShipperUser)
+            .FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+
+        if (load == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
+        }
+
+        if (currentUserRole != UserRole.Admin && load.ShipperUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "You do not own this load.");
+        }
+
+        // Look up latest workflow run for this load
+        var run = await _dbContext.AgentWorkflowRuns
+            .Include(r => r.MatchCandidates)
+                .ThenInclude(c => c.Agency)
+                    .ThenInclude(a => a.Staff)
+                        .ThenInclude(s => s.User)
+            .Include(r => r.Steps)
+            .Include(r => r.Assignments)
+            .Include(r => r.ApprovalDecisions)
+            .OrderByDescending(r => r.AttemptNo)
+            .FirstOrDefaultAsync(r => r.LoadId == loadId, cancellationToken);
+
+        if (run == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.WORKFLOW_RUN_NOT_FOUND, "No agent workflow run found for this load.");
+        }
+
+        // Concurrency Guard: guard against double-confirm (shipper double-clicks, or run already moved past AwaitingApproval)
+        if (run.Status != WorkflowRunStatus.AwaitingApproval)
+        {
+            throw new ApiException(
+                HttpStatusCode.Conflict,
+                ErrorCode.WORKFLOW_RUN_ALREADY_APPROVED,
+                $"The workflow run cannot be confirmed because it is in '{run.Status}' status (expected AwaitingApproval).");
+        }
+
+        var existingAssignment = run.Assignments
+            .FirstOrDefault(a => a.Status == AssignmentStatus.Proposed || a.Status == AssignmentStatus.Accepted);
+        if (existingAssignment != null)
+        {
+            throw new ApiException(
+                HttpStatusCode.Conflict,
+                ErrorCode.WORKFLOW_RUN_ALREADY_APPROVED,
+                "An assignment has already been created for this workflow run.");
+        }
+
+        var alreadyApproved = run.ApprovalDecisions.Any(d => d.Decision == ApprovalDecisionType.Approve);
+        if (alreadyApproved)
+        {
+            throw new ApiException(
+                HttpStatusCode.Conflict,
+                ErrorCode.WORKFLOW_RUN_ALREADY_APPROVED,
+                "This workflow run has already been approved.");
+        }
+
+        // Verify chosen agency exists
+        var agency = await _dbContext.Agencies
+            .Include(a => a.Staff)
+                .ThenInclude(s => s.User)
+            .FirstOrDefaultAsync(a => a.AgencyId == chosenAgencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The chosen agency could not be found.");
+        }
+
+        // Step 1 & 2: Determine if agencyId matches #1 candidate or another of the candidates
+        var topCandidate = run.MatchCandidates
+            .Where(c => c.Eligible)
+            .OrderBy(c => c.Rank)
+            .FirstOrDefault();
+
+        // Extract Step 3 telemetry (MatchingPricing) if available
+        var step3 = run.Steps.FirstOrDefault(s => s.StepNo == 3 || s.AgentRole == AgentRole.MatchingPricing);
+        decimal? cargoDistanceKm = null;
+        int? etaMinutes = null;
+        VehicleClass suggestedVehicleClass = ResolveVehicleClassFromLoad(load.WeightKg, load.VolumeM3);
+        decimal? step3ProposedPrice = null;
+        Guid? step3WinnerAgencyId = null;
+
+        if (!string.IsNullOrEmpty(step3?.OutputJson))
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(step3.OutputJson);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("selectedAgencyId", out var selProp) && Guid.TryParse(selProp.GetString(), out var selVal))
+                    step3WinnerAgencyId = selVal;
+                if (root.TryGetProperty("cargoDistanceKm", out var cdProp) && cdProp.TryGetDecimal(out var cdVal))
+                    cargoDistanceKm = cdVal;
+                if (root.TryGetProperty("etaMinutes", out var etaProp) && etaProp.TryGetInt32(out var etaVal))
+                    etaMinutes = etaVal;
+                if (root.TryGetProperty("proposedPrice", out var prProp) && prProp.TryGetDecimal(out var prVal))
+                    step3ProposedPrice = prVal;
+                if (root.TryGetProperty("suggestedVehicleClass", out var vcProp) && Enum.TryParse<VehicleClass>(vcProp.GetString(), out var vcVal))
+                    suggestedVehicleClass = vcVal;
+            }
+            catch
+            {
+                // Fallback gracefully
+            }
+        }
+
+        bool isRankOne = (topCandidate != null && topCandidate.AgencyId == chosenAgencyId)
+            || (step3WinnerAgencyId.HasValue && step3WinnerAgencyId.Value == chosenAgencyId)
+            || (topCandidate == null && step3WinnerAgencyId == null);
+
+        decimal proposedPrice;
+        if (isRankOne)
+        {
+            // 2. If agencyId matches the #1 candidate: price is already computed (from Agent 3's run) — use it as-is
+            proposedPrice = load.EstimatedPrice ?? step3ProposedPrice ?? 50000m;
+        }
+        else
+        {
+            // 3. If agencyId is a different one of the 5: re-call POST /internal/pricing/estimate with that candidate's
+            // already-known distanceKm (from the original run's data — no new ORS call needed)
+            decimal distance = cargoDistanceKm.HasValue && cargoDistanceKm.Value > 0 ? cargoDistanceKm.Value : 100m;
+
+            var estimateResult = await _pricingEstimatorService.EstimateAsync(new EstimatePricingRequestDto
+            {
+                LoadId = load.LoadId,
+                SuggestedVehicleClass = suggestedVehicleClass,
+                DistanceKm = distance
+            }, cancellationToken);
+
+            proposedPrice = estimateResult.EstimatedPrice;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+
+        // 4. Create Assignment (status Proposed)
+        var assignment = new Assignment
+        {
+            AssignmentId = Guid.NewGuid(),
+            LoadId = load.LoadId,
+            AgencyId = chosenAgencyId,
+            WorkflowRunId = run.WorkflowRunId,
+            ProposedPrice = proposedPrice,
+            RoutedDistanceKm = cargoDistanceKm,
+            ProposedEtaMinutes = etaMinutes,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        _dbContext.Assignments.Add(assignment);
+
+        if (load.Status != LoadStatus.Matched)
+        {
+            var prevStatus = load.Status;
+            load.Status = LoadStatus.Matched;
+            load.UpdatedAt = now;
+            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            {
+                LoadStatusHistoryId = Guid.NewGuid(),
+                LoadId = load.LoadId,
+                FromStatus = prevStatus,
+                ToStatus = LoadStatus.Matched,
+                ChangedByUserId = currentUserId,
+                Reason = $"Shipper confirmed agency match: {agency.Name}.",
+                ChangedAt = now
+            });
+        }
+
+        // 5. Write ApprovalDecision (shipper, chosen agency, timestamp)
+        var seqNo = await _dbContext.ApprovalDecisions
+            .CountAsync(d => d.WorkflowRunId == run.WorkflowRunId, cancellationToken) + 1;
+
+        var decision = new ApprovalDecision
+        {
+            ApprovalDecisionId = Guid.NewGuid(),
+            WorkflowRunId = run.WorkflowRunId,
+            DecidedByUserId = currentUserId,
+            SequenceNo = Math.Max(1, seqNo),
+            Decision = ApprovalDecisionType.Approve,
+            Reason = $"Shipper confirmed match and selected agency {agency.Name}.",
+            DecidedAt = now
+        };
+        _dbContext.ApprovalDecisions.Add(decision);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // 6. Trigger personalized agency email (reuse IEmailService) — only after this point, never before
+        var agencyEmail = agency.Staff.Select(s => s.User.Email).FirstOrDefault(e => !string.IsNullOrEmpty(e))
+            ?? $"dispatch@{agency.Name.ToLower().Replace(" ", "")}.com";
+
+        var emailMessage = new EmailMessage
+        {
+            To = agencyEmail,
+            Subject = $"FreightLink — New Job Proposal for Load #{load.ReferenceCode}",
+            HtmlBody = $@"
+                <p>Dear {agency.Name},</p>
+                <p>A new freight load proposal has been matched and assigned to your agency on FreightLink.</p>
+                <ul>
+                    <li><strong>Load Reference:</strong> {load.ReferenceCode}</li>
+                    <li><strong>Cargo:</strong> {load.CargoDescription} ({load.WeightKg:N0} kg)</li>
+                    <li><strong>Pickup Location:</strong> {load.PickupAddress}</li>
+                    <li><strong>Dropoff Location:</strong> {load.DropoffAddress}</li>
+                    <li><strong>Proposed Price:</strong> LKR {proposedPrice:N2}</li>
+                </ul>
+                <p>Please log in to your FreightLink Agency portal to accept or decline this proposal.</p>",
+            TextBody = $"Dear {agency.Name},\n\nA new freight load proposal has been assigned to your agency.\nLoad Reference: {load.ReferenceCode}\nProposed Price: LKR {proposedPrice:N2}\nPlease log in to review and accept or decline.",
+            TemplateKey = NotificationCategory.NewMatchFound,
+            Metadata = new Dictionary<string, string>
+            {
+                ["LoadReference"] = load.ReferenceCode,
+                ["AgencyName"] = agency.Name,
+                ["ProposedPrice"] = proposedPrice.ToString("F2")
+            }
+        };
+
+        await _emailService.SendAsync(emailMessage, cancellationToken);
+
+        // 7. Set AgentWorkflowRun.Status = Completed once the email send succeeds
+        run.Status = WorkflowRunStatus.Completed;
+        run.CompletedAt = DateTimeOffset.UtcNow;
+        run.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        assignment.Agency = agency;
+        assignment.Load = load;
+        assignment.WorkflowRun = run;
+
+        return MapToDetail(assignment);
+    }
+
+    private static VehicleClass ResolveVehicleClassFromLoad(decimal weightKg, decimal? volumeM3)
+    {
+        var vol = volumeM3 ?? 1.0m;
+        if (weightKg <= 1000m && vol <= 5.0m)
+            return VehicleClass.MiniTruck;
+        if (weightKg <= 5000m && vol <= 20.0m)
+            return VehicleClass.MediumLorry;
+        return VehicleClass.ContainerTruck;
     }
 
     private async Task<(Guid VehicleId, Guid DriverId)> ResolveVehicleAndDriverAsync(

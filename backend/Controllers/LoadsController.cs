@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Claims;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
+using FreightLink.Api.DTOs.Assignments;
 using FreightLink.Api.DTOs.Loads;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
@@ -33,11 +34,13 @@ public class LoadsController : ControllerBase
     private const string ShipperOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.Admin);
 
     private readonly ILoadService _loadService;
+    private readonly IAssignmentService _assignmentService;
 
-    /// <summary>Creates the controller with its injected load service.</summary>
-    public LoadsController(ILoadService loadService)
+    /// <summary>Creates the controller with its injected services.</summary>
+    public LoadsController(ILoadService loadService, IAssignmentService assignmentService)
     {
         _loadService = loadService;
+        _assignmentService = assignmentService;
     }
 
     /// <summary>Creates a new load owned by the authenticated Shipper.</summary>
@@ -109,6 +112,32 @@ public class LoadsController : ControllerBase
     public async Task<ActionResult<LoadResponseDto>> ChangeStatus(Guid id, [FromBody] ChangeLoadStatusDto request, CancellationToken cancellationToken)
     {
         var result = await _loadService.ChangeStatusAsync(id, GetCurrentUserId(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Confirms a matched agency proposal for a load (concurrency-safe, ADR-013 / ADR-016).
+    /// Creates an Assignment in Proposed status, records ApprovalDecision, sends agency proposal email,
+    /// and completes the workflow run.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="request">The agency chosen by the shipper.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the created <see cref="AssignmentResponseDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/confirm")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<AssignmentResponseDto>> ConfirmMatch(
+        Guid loadId,
+        [FromBody] ConfirmMatchDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.ConfirmMatchAsync(
+            loadId,
+            request,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
         return Ok(result);
     }
 
