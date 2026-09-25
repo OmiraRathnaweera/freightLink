@@ -1,0 +1,37 @@
+import 'package:flutter/foundation.dart';
+import '../data/agencies_repository.dart';
+
+class DriverOnboardingProvider extends ChangeNotifier {
+  DriverOnboardingProvider(this._repository);
+
+  final AgenciesRepository _repository;
+
+  bool _isSubmitting = false;
+  String? _errorMessage;
+  bool _isSuccess = false;
+
+  bool get isSubmitting => _isSubmitting;
+  String? get errorMessage => _errorMessage;
+  bool get isSuccess => _isSuccess;
+
+  Future<void> submitDriver(Map<String, dynamic> driverData) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    _isSuccess = false;
+    notifyListeners();
+
+    try {
+      // Simulate API call for now
+      await Future.delayed(const Duration(seconds: 1));
+      
+      // await _repository.onboardDriver(driverData);
+      _isSuccess = true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _isSuccess = false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+}

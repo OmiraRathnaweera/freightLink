@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/loads/data/loads_repository.dart';
+import 'features/agencies/data/agencies_repository.dart';
 
 void main() {
   final authProvider = AuthProvider()..bootstrap();
@@ -35,6 +36,9 @@ class FreightLinkApp extends StatelessWidget {
         // every request.
         ProxyProvider<AuthProvider, LoadsRepository>(
           update: (_, auth, _) => LoadsRepository(auth.apiClient),
+        ),
+        ProxyProvider<AuthProvider, AgenciesRepository>(
+          update: (_, auth, _) => AgenciesRepository(auth.apiClient),
         ),
       ],
       child: MaterialApp.router(

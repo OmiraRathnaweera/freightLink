@@ -11,7 +11,7 @@ class ComplianceDocsScreen extends StatelessWidget {
         title: const Text('Compliance Documents'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () => context.go('/dashboard'),
         ),
       ),
       body: const Center(
