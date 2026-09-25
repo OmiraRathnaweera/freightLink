@@ -26,6 +26,9 @@ _ROAD_DETOUR_FACTOR = 1.25
 # Average heavy freight transport speed in Sri Lanka (km/h):
 _AVERAGE_FREIGHT_SPEED_KMH = 40.0
 
+# In-memory route cache to conserve ORS free-tier request quota
+_route_cache: dict[tuple[float, float, float, float], RouteAndEtaResponse] = {}
+
 
 def calculate_haversine_distance_km(
     origin_lat: float, origin_lng: float, destination_lat: float, destination_lng: float
@@ -79,6 +82,23 @@ async def get_route_and_eta(
             "request": request.model_dump(by_alias=True),
         }
 
+    # Check cache to avoid burning ORS quota
+    cache_key = (
+        round(request.origin_lat, 4),
+        round(request.origin_lng, 4),
+        round(request.destination_lat, 4),
+        round(request.destination_lng, 4),
+    )
+    if cache_key in _route_cache:
+        cached_res = _route_cache[cache_key]
+        duration_ms = int((time.monotonic() - start_time) * 1000)
+        return cached_res, {
+            "durationMs": duration_ms,
+            "httpStatusCode": 200,
+            "request": request.model_dump(by_alias=True),
+            "cached": True,
+        }
+
     api_key = (settings.openrouteservice_api_key or "").strip()
 
     # If no real OpenRouteService API key configured (or default placeholder), use simulated road route
@@ -98,6 +118,7 @@ async def get_route_and_eta(
             eta_minutes=eta_minutes,
             success=True,
         )
+        _route_cache[cache_key] = response
         telemetry = {
             "durationMs": duration_ms,
             "httpStatusCode": 200,

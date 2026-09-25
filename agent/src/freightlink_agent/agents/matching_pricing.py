@@ -11,7 +11,7 @@ Gemini/Ollama, records ToolCall audit records, and reports step 3 back to the ba
 import json
 import logging
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from freightlink_agent.core.backend_client import BackendClientError, record_tool_call
 from freightlink_agent.core.llm import get_llm
@@ -76,17 +76,12 @@ def _determine_vehicle_class(
 
 async def run(state: WorkflowState) -> dict[str, Any]:
     started = now()
-    workflow_run_id = state.workflow_run_id
-
-    if not workflow_run_id:
-        logger.error("Agent 3 invoked without workflow_run_id for load %s", state.load_id)
-        return {
-            "failed": True,
-            "failure_reason": "workflow_run_id_missing",
-        }
+    steps = list(state.steps)
+    tool_calls = list(state.tool_calls)
+    workflow_run_id = state.workflow_run_id or uuid4()
 
     # Extract coordinates and load details
-    ctx = state.load_context
+    ctx = state.load_context or {}
     pickup_lat = float(ctx.get("pickupLat") or ctx.get("pickup_lat") or 0.0)
     pickup_lng = float(ctx.get("pickupLng") or ctx.get("pickup_lng") or 0.0)
     dropoff_lat = float(ctx.get("dropoffLat") or ctx.get("dropoff_lat") or 0.0)
@@ -107,6 +102,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     if not candidates:
         msg = "No eligible candidate agencies available in shortlist"
         logger.warning(msg)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": input_data,
+            "outputJson": None,
+            "errorMessage": msg,
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
         try:
             await report(
                 workflow_run_id=workflow_run_id,
@@ -119,10 +124,10 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             )
         except BackendClientError:
             logger.exception("Failed to report step failure")
-        return {"failed": True, "failure_reason": msg}
+        return {"failed": True, "failure_reason": msg, "tool_calls": tool_calls, "steps": steps}
 
-    # Step 1: Route positioning leg (Yard -> Pickup) for up to top 3 candidates
-    shortlist_to_eval = candidates[:3]
+    # Step 1: Route positioning leg (Yard -> Pickup) for up to top 5 candidates
+    shortlist_to_eval = candidates[:5]
     routed_candidates: list[tuple[CandidateAgency, RouteAndEtaResponse]] = []
 
     for idx, candidate in enumerate(shortlist_to_eval, start=1):
@@ -134,20 +139,40 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         )
         route_res, telemetry = await get_route_and_eta(req)
 
-        # Log ToolCall audit record
-        tool_call_req = CreateToolCallRequest(
-            agent_step_id=workflow_run_id,
-            tool_name="get_route_and_eta",
-            attempt_no=idx,
-            request_json=json.dumps(telemetry.get("request"), default=str),
-            response_json=json.dumps(route_res.model_dump(by_alias=True), default=str),
-            success=route_res.success,
-            http_status_code=telemetry.get("httpStatusCode"),
-            duration_ms=telemetry.get("durationMs"),
-            error_message=route_res.error_message,
-            called_at=now(),
-        )
-        await record_tool_call(workflow_run_id, tool_call_req)
+        # In-memory ToolCall audit record
+        req_json = json.dumps(telemetry.get("request"), default=str)
+        res_json = json.dumps(route_res.model_dump(by_alias=True), default=str)
+        tool_call_dict = {
+            "toolCallId": str(uuid4()),
+            "toolName": "get_route_and_eta",
+            "attemptNo": idx,
+            "requestJson": req_json,
+            "responseJson": res_json,
+            "success": route_res.success,
+            "httpStatusCode": telemetry.get("httpStatusCode"),
+            "durationMs": telemetry.get("durationMs"),
+            "errorMessage": route_res.error_message,
+            "calledAt": now().isoformat(),
+        }
+        tool_calls.append(tool_call_dict)
+
+        # Attempt reporting to backend if online
+        try:
+            tool_call_req = CreateToolCallRequest(
+                agent_step_id=workflow_run_id,
+                tool_name="get_route_and_eta",
+                attempt_no=idx,
+                request_json=req_json,
+                response_json=res_json,
+                success=route_res.success,
+                http_status_code=telemetry.get("httpStatusCode"),
+                duration_ms=telemetry.get("durationMs"),
+                error_message=route_res.error_message,
+                called_at=now(),
+            )
+            await record_tool_call(workflow_run_id, tool_call_req)
+        except BackendClientError:
+            pass
 
         if route_res.success and route_res.eta_minutes is not None:
             routed_candidates.append((candidate, route_res))
@@ -157,6 +182,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     if not routed_candidates:
         msg = "All candidate agency routing lookups failed"
         logger.error(msg)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": input_data,
+            "outputJson": None,
+            "errorMessage": msg,
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
         try:
             await report(
                 workflow_run_id=workflow_run_id,
@@ -169,13 +204,23 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             )
         except BackendClientError:
             pass
-        return {"failed": True, "failure_reason": msg}
+        return {"failed": True, "failure_reason": msg, "tool_calls": tool_calls, "steps": steps}
 
-    # Step 2: Select best candidate on real routed ETA/distance
-    winner, winner_route = min(
+    # Step 2: Rank routed candidates by ETA & distance (top 5)
+    sorted_routed = sorted(
         routed_candidates,
         key=lambda pair: (pair[1].eta_minutes or 999999, pair[1].distance_km or 999999),
     )
+    ranked_five = [
+        {
+            "agencyId": str(cand.agency_id),
+            "etaMinutes": r.eta_minutes or 0,
+            "distanceKm": r.distance_km or 0.0,
+        }
+        for cand, r in sorted_routed[:5]
+    ]
+
+    winner, winner_route = sorted_routed[0]
     suggested_vehicle_class = _determine_vehicle_class(
         weight_kg=weight_kg,
         volume_m3=volume_m3,
@@ -192,26 +237,54 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     )
     cargo_route, cargo_telemetry = await get_route_and_eta(cargo_req)
 
-    # Log ToolCall for cargo leg routing
-    await record_tool_call(
-        workflow_run_id,
-        CreateToolCallRequest(
-            agent_step_id=workflow_run_id,
-            tool_name="get_route_and_eta",
-            attempt_no=len(shortlist_to_eval) + 1,
-            request_json=json.dumps(cargo_telemetry.get("request"), default=str),
-            response_json=json.dumps(cargo_route.model_dump(by_alias=True), default=str),
-            success=cargo_route.success,
-            http_status_code=cargo_telemetry.get("httpStatusCode"),
-            duration_ms=cargo_telemetry.get("durationMs"),
-            error_message=cargo_route.error_message,
-            called_at=now(),
-        ),
-    )
+    cargo_req_json = json.dumps(cargo_telemetry.get("request"), default=str)
+    cargo_res_json = json.dumps(cargo_route.model_dump(by_alias=True), default=str)
+    cargo_tool_call_dict = {
+        "toolCallId": str(uuid4()),
+        "toolName": "get_route_and_eta",
+        "attemptNo": len(shortlist_to_eval) + 1,
+        "requestJson": cargo_req_json,
+        "responseJson": cargo_res_json,
+        "success": cargo_route.success,
+        "httpStatusCode": cargo_telemetry.get("httpStatusCode"),
+        "durationMs": cargo_telemetry.get("durationMs"),
+        "errorMessage": cargo_route.error_message,
+        "calledAt": now().isoformat(),
+    }
+    tool_calls.append(cargo_tool_call_dict)
+
+    try:
+        await record_tool_call(
+            workflow_run_id,
+            CreateToolCallRequest(
+                agent_step_id=workflow_run_id,
+                tool_name="get_route_and_eta",
+                attempt_no=len(shortlist_to_eval) + 1,
+                request_json=cargo_req_json,
+                response_json=cargo_res_json,
+                success=cargo_route.success,
+                http_status_code=cargo_telemetry.get("httpStatusCode"),
+                duration_ms=cargo_telemetry.get("durationMs"),
+                error_message=cargo_route.error_message,
+                called_at=now(),
+            ),
+        )
+    except BackendClientError:
+        pass
 
     if not cargo_route.success or cargo_route.distance_km is None or cargo_route.distance_km <= 0:
         msg = f"Cargo leg routing lookup failed: {cargo_route.error_message}"
         logger.error(msg)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": input_data,
+            "outputJson": None,
+            "errorMessage": msg,
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
         try:
             await report(
                 workflow_run_id=workflow_run_id,
@@ -224,7 +297,13 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             )
         except BackendClientError:
             pass
-        return {"failed": True, "failure_reason": msg}
+        return {
+            "failed": True,
+            "failure_reason": msg,
+            "tool_calls": tool_calls,
+            "ranked_five": ranked_five,
+            "steps": steps,
+        }
 
     cargo_distance_km = cargo_route.distance_km
 
@@ -236,9 +315,35 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     )
     pricing_res, pricing_telemetry = await get_price_estimate(pricing_req)
 
+    pricing_req_json = json.dumps(pricing_req.model_dump(by_alias=True), default=str)
+    pricing_res_json = json.dumps(pricing_res.model_dump(by_alias=True) if pricing_res else {}, default=str)
+    pricing_tool_call_dict = {
+        "toolCallId": str(uuid4()),
+        "toolName": "estimate_price",
+        "attemptNo": 1,
+        "requestJson": pricing_req_json,
+        "responseJson": pricing_res_json,
+        "success": pricing_res is not None,
+        "httpStatusCode": pricing_telemetry.get("httpStatusCode"),
+        "durationMs": pricing_telemetry.get("durationMs"),
+        "errorMessage": pricing_telemetry.get("error"),
+        "calledAt": now().isoformat(),
+    }
+    tool_calls.append(pricing_tool_call_dict)
+
     if not pricing_res:
         msg = f"Pricing estimation failed: {pricing_telemetry.get('error')}"
         logger.error(msg)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": input_data,
+            "outputJson": None,
+            "errorMessage": msg,
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
         try:
             await report(
                 workflow_run_id=workflow_run_id,
@@ -251,7 +356,13 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             )
         except BackendClientError:
             pass
-        return {"failed": True, "failure_reason": msg}
+        return {
+            "failed": True,
+            "failure_reason": msg,
+            "tool_calls": tool_calls,
+            "ranked_five": ranked_five,
+            "steps": steps,
+        }
 
     # Step 4: LLM justification call (Gemini 2.5 Flash / Ollama)
     llm_context = {
@@ -310,7 +421,26 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "selectionJustification": justification,
     }
 
+    # vehicleClass integer mapping: 0=MiniTruck, 1=MediumLorry, 2=ContainerTruck
+    v_class_map = {"MiniTruck": 0, "MediumLorry": 1, "ContainerTruck": 2}
+    most_suitable = {
+        "agencyId": str(winner.agency_id),
+        "estimatedPrice": float(pricing_res.estimated_price),
+        "distanceKm": float(cargo_distance_km),
+        "vehicleClass": v_class_map.get(suggested_vehicle_class, 0),
+    }
+
     # Step 5: Report step 3 outcome to backend
+    steps.append({
+        "stepNo": _STEP_NO,
+        "agentRole": _AGENT_ROLE,
+        "status": "Succeeded",
+        "inputJson": input_data,
+        "outputJson": output_data,
+        "startedAt": started.isoformat(),
+        "completedAt": now().isoformat(),
+    })
+
     try:
         await report(
             workflow_run_id=workflow_run_id,
@@ -321,13 +451,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             input_data=input_data,
             output_data=output_data,
         )
-    except BackendClientError as exc:
-        logger.exception("Failed to report step %s success for run %s", _STEP_NO, workflow_run_id)
-        return {
-            **output_data,
-            "failed": True,
-            "failure_reason": f"report_step_failed: {exc}",
-        }
+    except BackendClientError:
+        logger.warning("Failed to report step %s success for run %s", _STEP_NO, workflow_run_id)
 
     return {
         "selected_agency_id": winner.agency_id,
@@ -339,4 +464,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "proposed_price": float(pricing_res.estimated_price),
         "pricing_breakdown": pricing_res.model_dump(by_alias=True),
         "selection_justification": justification,
+        "ranked_five": ranked_five,
+        "most_suitable": most_suitable,
+        "tool_calls": tool_calls,
+        "steps": steps,
     }

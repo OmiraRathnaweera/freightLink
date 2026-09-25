@@ -17,15 +17,24 @@ class WorkflowState(BaseModel):
 
     # --- Agent 1: Planner / Coordinator ---
     workflow_run_id: UUID | None = None
-    """Null until Agent 1 creates the AgentWorkflowRun row on the backend and gets the real id back."""
+    """Null until Agent 1 creates the AgentWorkflowRun row or generated for offline match."""
     objective: str | None = None
     plan_json: str | None = None
+    plan: dict[str, Any] | None = None
+
+    # Consolidated audit records persisted by backend in one transaction
+    steps: list[dict[str, Any]] = Field(default_factory=list)
 
     # --- Agent 2: Domain Analysis ---
+    candidates: list[dict[str, Any]] = Field(default_factory=list)
     candidate_shortlist: list[CandidateAgency] = Field(default_factory=list)
-    """Eligible active agencies passing compliance, capacity, and proximity checks (capped at top 3)."""
+    """Eligible active agencies passing compliance, capacity, and proximity checks (top 5)."""
 
     # --- Agent 3: Matching & Pricing ---
+    tool_calls: list[dict[str, Any]] = Field(default_factory=list)
+    ranked_five: list[dict[str, Any]] = Field(default_factory=list)
+    most_suitable: dict[str, Any] | None = None
+
     selected_agency_id: UUID | None = None
     selected_agency_name: str | None = None
     suggested_vehicle_class: VehicleClass | None = None
@@ -35,6 +44,9 @@ class WorkflowState(BaseModel):
     proposed_price: float | None = None
     pricing_breakdown: dict[str, Any] | None = None
     selection_justification: str | None = None
+
+    # --- Agent 4: Validation & Safety ---
+    validation: dict[str, Any] | None = None
 
     # --- Pipeline Status & Failure Tracking ---
     failed: bool = False

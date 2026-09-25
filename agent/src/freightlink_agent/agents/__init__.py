@@ -1,3 +1,3 @@
-from . import matching_pricing, planner
+from . import domain_analysis, matching_pricing, planner, validation_safety
 
-__all__ = ["matching_pricing", "planner"]
+__all__ = ["domain_analysis", "matching_pricing", "planner", "validation_safety"]
