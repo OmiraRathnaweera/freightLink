@@ -51,7 +51,10 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             ),
         ],
       ),
-      actions: actions,
+      actions: [
+        ...actions,
+        const AppAvatar(),
+      ],
     );
   }
 

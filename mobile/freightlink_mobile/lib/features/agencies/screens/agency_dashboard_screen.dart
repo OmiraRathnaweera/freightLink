@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../data/agencies_repository.dart';
 import '../providers/agency_dashboard_provider.dart';
+import '../../../shared/widgets/app_top_bar.dart';
 
 class AgencyDashboardScreen extends StatelessWidget {
   const AgencyDashboardScreen({super.key});
@@ -13,8 +14,8 @@ class AgencyDashboardScreen extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => AgencyDashboardProvider(context.read<AgenciesRepository>())..loadStats(),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Agency Dashboard'),
+        appBar: const AppTopBar(
+          title: 'Agency Dashboard',
         ),
         body: Consumer<AgencyDashboardProvider>(
           builder: (context, provider, child) {

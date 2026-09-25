@@ -46,10 +46,9 @@ class _MyLoadsBody extends StatelessWidget {
     final provider = context.watch<LoadsListProvider>();
 
     return Scaffold(
-      appBar: AppTopBar(
+      appBar: const AppTopBar(
         title: 'My Loads',
-        leading: const AppAvatar(),
-        actions: const [NotificationBellButton()],
+        actions: [NotificationBellButton()],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openPostLoad(context),
