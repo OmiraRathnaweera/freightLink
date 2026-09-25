@@ -1,49 +1,32 @@
 import 'package:flutter/material.dart';
-
-import '../../features/loads/screens/my_loads_screen.dart';
-import 'app_top_bar.dart';
-import 'coming_soon_placeholder.dart';
+import 'package:go_router/go_router.dart';
 
 /// The app's persistent 4-tab shell (Dashboard / Loads / Payments / Reports)
 /// from the mockups. Only the Loads tab is fully built; the rest render a
 /// placeholder — see the implementation plan's "App shell" scope decision.
-class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+class AppShell extends StatelessWidget {
+  const AppShell({
+    super.key,
+    required this.navigationShell,
+  });
 
-  @override
-  State<AppShell> createState() => _AppShellState();
-}
+  final StatefulNavigationShell navigationShell;
 
-class _AppShellState extends State<AppShell> {
-  int _index = 1; // Loads tab is the app's real home for now.
+  void _onTap(BuildContext context, int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Admin accounts are rejected at login (see AuthProvider) and never
-    // reach this shell, so there's no Admin-only entry point here anymore.
-    final tabs = [
-      ComingSoonPlaceholder(
-        title: 'Dashboard',
-        icon: Icons.dashboard_outlined,
-        bottomLeading: const AppAvatar(),
-        actions: const [NotificationBellButton()],
-      ),
-      const MyLoadsScreen(),
-      const ComingSoonPlaceholder(
-        title: 'Payments',
-        icon: Icons.payments_outlined,
-      ),
-      const ComingSoonPlaceholder(
-        title: 'Reports',
-        icon: Icons.bar_chart_rounded,
-      ),
-    ];
-
     return Scaffold(
-      body: IndexedStack(index: _index, children: tabs),
+      body: navigationShell,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (value) => setState(() => _index = value),
+        currentIndex: navigationShell.currentIndex,
+        onTap: (index) => _onTap(context, index),
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),

@@ -60,6 +60,17 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves a list of agencies with compliance documents expiring soon.
+    /// </summary>
+    [HttpGet("expiring-compliance")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IEnumerable<AgencyExpiringComplianceDto>>> GetExpiringCompliance([FromQuery] int days = 30, CancellationToken cancellationToken = default)
+    {
+        var result = await _agencyService.GetAgenciesWithExpiringComplianceAsync(days, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Updates an existing agency's profile details.
     /// </summary>
     [HttpPut("{id:guid}")]
@@ -68,6 +79,39 @@ public class AgenciesController : ControllerBase
     {
         var result = await _agencyService.UpdateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Approves/verifies a pending agency.
+    /// </summary>
+    [HttpPost("{id:guid}/verify")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> VerifyAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.VerifyAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
+    /// Activates a verified agency.
+    /// </summary>
+    [HttpPost("{id:guid}/activate")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> ActivateAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.ActivateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
+    /// Suspends an agency.
+    /// </summary>
+    [HttpPost("{id:guid}/suspend")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> SuspendAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.SuspendAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
     }
 
     private Guid GetCurrentUserId()

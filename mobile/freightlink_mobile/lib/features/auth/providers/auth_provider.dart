@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
@@ -20,9 +21,14 @@ enum AuthStatus {
 /// required scaffolding: every Loads endpoint needs a JWT, and none of this
 /// existed before.
 class AuthProvider extends ChangeNotifier {
-  AuthProvider({TokenStorage? tokenStorage})
+  /// [httpClient] is a test seam only — production always lets [ApiClient]
+  /// build its own `http.Client`. Passing one in (e.g. a `MockClient` from
+  /// `package:http/testing.dart`) makes `login()`/`bootstrap()` testable
+  /// without a real backend.
+  AuthProvider({TokenStorage? tokenStorage, http.Client? httpClient})
     : _tokenStorage = tokenStorage ?? TokenStorage() {
     _apiClient = ApiClient(
+      httpClient: httpClient,
       authToken: () => _accessToken,
       onUnauthorized: _handleUnauthorized,
     );
