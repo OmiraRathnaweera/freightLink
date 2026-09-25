@@ -288,12 +288,16 @@ public class DisputeServiceTests
             Category = DisputeCategory.Damage,
             Description = "Cargo received with broken seals."
         });
+        Assert.Equal(DisputeStatus.Raised, created.Status);
 
         var adminUserId = Guid.NewGuid();
+        var underReview = await sut.MoveToReviewAsync(created.DisputeId, adminUserId, UserRole.Admin);
+        Assert.Equal(DisputeStatus.UnderReview, underReview.Status);
+
         var resolved = await sut.ResolveAsync(created.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
         {
             Outcome = DisputeOutcome.Upheld,
-            Notes = "Damage confirmed by inspection logs; shipper credited."
+            ResolutionNote = "Damage confirmed by inspection logs; shipper credited."
         });
 
         Assert.Equal(DisputeStatus.Resolved, resolved.Status);
@@ -377,6 +381,152 @@ public class DisputeServiceTests
         });
 
         Assert.Equal(DisputeCategory.Billing, result.Category);
-        Assert.Equal(DisputeStatus.Open, result.Status);
+        Assert.Equal(DisputeStatus.Raised, result.Status);
+    }
+
+    [Fact]
+    public async Task DisputeLifecycle_ValidSequence_RaisedToUnderReviewToResolved_Succeeds()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+        var adminUserId = Guid.NewGuid();
+
+        // 1. Raised (Initial state)
+        var dispute = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Goods were damaged during transit on truck."
+        });
+        Assert.Equal(DisputeStatus.Raised, dispute.Status);
+
+        // 2. UnderReview (Transition 1)
+        var underReview = await sut.MoveToReviewAsync(dispute.DisputeId, adminUserId, UserRole.Admin);
+        Assert.Equal(DisputeStatus.UnderReview, underReview.Status);
+
+        // 3. Resolved (Transition 2 - Terminal state)
+        var resolved = await sut.ResolveAsync(dispute.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
+        {
+            Outcome = DisputeOutcome.Upheld,
+            ResolutionNote = "Investigation complete. Damages verified and refunded."
+        });
+        Assert.Equal(DisputeStatus.Resolved, resolved.Status);
+        Assert.NotNull(resolved.Resolution);
+        Assert.Equal("Investigation complete. Damages verified and refunded.", resolved.Resolution.Notes);
+    }
+
+    [Fact]
+    public async Task DisputeLifecycle_InvalidJump_RaisedToResolved_ThrowsBadRequest()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+        var adminUserId = Guid.NewGuid();
+
+        var dispute = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Goods were damaged during transit on truck."
+        });
+        Assert.Equal(DisputeStatus.Raised, dispute.Status);
+
+        // Attempting direct jump Raised -> Resolved without UnderReview must fail
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.ResolveAsync(dispute.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
+        {
+            Outcome = DisputeOutcome.Upheld,
+            ResolutionNote = "Attempting to skip UnderReview."
+        }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVALID_DISPUTE_STATUS_TRANSITION, ex.Code);
+        Assert.Contains("must first transition to 'UnderReview'", ex.Message);
+    }
+
+    [Fact]
+    public async Task DisputeLifecycle_BackwardJump_ResolvedToUnderReview_ThrowsBadRequest()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+        var adminUserId = Guid.NewGuid();
+
+        var dispute = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Goods were damaged during transit on truck."
+        });
+
+        await sut.MoveToReviewAsync(dispute.DisputeId, adminUserId, UserRole.Admin);
+        await sut.ResolveAsync(dispute.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
+        {
+            Outcome = DisputeOutcome.Upheld,
+            ResolutionNote = "Valid resolution."
+        });
+
+        // Attempting to move backwards from Resolved to UnderReview must fail
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.MoveToReviewAsync(dispute.DisputeId, adminUserId, UserRole.Admin));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Equal(ErrorCode.DISPUTE_ALREADY_RESOLVED, ex.Code);
+        Assert.Contains("terminal status", ex.Message);
+    }
+
+    [Fact]
+    public async Task DisputeLifecycle_MissingResolutionNote_OnResolutionAttempt_ThrowsBadRequest()
+    {
+        using var db = CreateContext();
+        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+        var adminUserId = Guid.NewGuid();
+
+        var dispute = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Goods were damaged during transit on truck."
+        });
+
+        await sut.MoveToReviewAsync(dispute.DisputeId, adminUserId, UserRole.Admin);
+
+        // Attempting to resolve with null or whitespace resolutionNote must fail
+        var ex1 = await Assert.ThrowsAsync<ApiException>(() => sut.ResolveAsync(dispute.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
+        {
+            Outcome = DisputeOutcome.Upheld,
+            ResolutionNote = null
+        }));
+        Assert.Equal(HttpStatusCode.BadRequest, ex1.StatusCode);
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, ex1.Code);
+        Assert.Contains("non-empty resolutionNote is required", ex1.Message);
+
+        var ex2 = await Assert.ThrowsAsync<ApiException>(() => sut.ResolveAsync(dispute.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
+        {
+            Outcome = DisputeOutcome.Upheld,
+            ResolutionNote = "   "
+        }));
+        Assert.Equal(HttpStatusCode.BadRequest, ex2.StatusCode);
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, ex2.Code);
+    }
+
+    [Fact]
+    public async Task DisputeLifecycle_CreateDispute_NonShipperNonAgency_ThrowsForbidden()
+    {
+        using var db = CreateContext();
+        var (_, _, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        // Attempting to create dispute as Driver or Admin directly must fail
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.CreateAsync(Guid.NewGuid(), UserRole.Driver, new CreateDisputeDto
+        {
+            TripId = trip.TripId,
+            Category = DisputeCategory.Damage,
+            Description = "Driver attempting to create dispute."
+        }));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
+        Assert.Contains("exclusively by a Shipper or an Agency", ex.Message);
     }
 }
