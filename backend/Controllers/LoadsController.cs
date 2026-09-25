@@ -116,16 +116,38 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets the match recommendation, candidates, validation checks, and workflow steps for a load.
+    /// Accessible by Shippers (who own the load) and Admins.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="LoadMatchRecommendationDto"/>.</returns>
+    [HttpGet("{loadId:guid}/match")]
+    [Authorize(Roles = ShipperOrAdminRoles)]
+    public async Task<ActionResult<LoadMatchRecommendationDto>> GetMatchRecommendation(
+        Guid loadId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.GetMatchRecommendationAsync(
+            loadId,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Confirms a matched agency proposal for a load (concurrency-safe, ADR-013 / ADR-016).
     /// Creates an Assignment in Proposed status, records ApprovalDecision, sends agency proposal email,
-    /// and completes the workflow run.
+    /// and completes the workflow run. Accessible by Shippers (who own the load) and Admins.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="request">The agency chosen by the shipper.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the created <see cref="AssignmentResponseDto"/>.</returns>
     [HttpPost("{loadId:guid}/match/confirm")]
-    [Authorize(Roles = ShipperRole)]
+    [Authorize(Roles = ShipperOrAdminRoles)]
     public async Task<ActionResult<AssignmentResponseDto>> ConfirmMatch(
         Guid loadId,
         [FromBody] ConfirmMatchDto request,

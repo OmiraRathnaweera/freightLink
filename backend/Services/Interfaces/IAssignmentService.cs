@@ -48,4 +48,9 @@ public interface IAssignmentService
     /// and completes the workflow run.
     /// </summary>
     Task<AssignmentResponseDto> ConfirmMatchAsync(Guid loadId, FreightLink.Api.DTOs.Loads.ConfirmMatchDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches the AI workflow match recommendation, candidates, validation, and steps for a load.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

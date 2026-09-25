@@ -1,6 +1,9 @@
+using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Assignments;
@@ -10,6 +13,7 @@ using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
 namespace FreightLink.Api.Tests.Integration;
@@ -386,5 +390,164 @@ public class MatchConfirmControllerTests
             Assert.Equal(agency2Id, dbRun.Assignments.First().AgencyId);
             Assert.Equal(AssignmentStatus.Proposed, dbRun.Assignments.First().Status);
         }
+    }
+
+    [Fact]
+    public async Task ConfirmMatch_ByAdmin_Returns200Ok_AndCompletesWorkflowRun()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var tokens = await RegisterAndLoginShipperAsync(client, "shipper-admin-test");
+        var load = await SeedLoadAsync(client, tokens);
+        var agencyId = await SeedAgencyAsync(factory, "Admin Approved Carrier");
+
+        var workflowRunId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var dbLoad = await db.Loads.FirstAsync(l => l.LoadId == load.LoadId);
+            dbLoad.EstimatedPrice = 22000m;
+
+            var run = new AgentWorkflowRun
+            {
+                WorkflowRunId = workflowRunId,
+                LoadId = load.LoadId,
+                TriggeredByUserId = load.ShipperUserId,
+                AttemptNo = 1,
+                Objective = "Find best carrier and price load",
+                Status = WorkflowRunStatus.AwaitingApproval,
+                StartedAt = now.AddMinutes(-5),
+                CreatedAt = now.AddMinutes(-5),
+                UpdatedAt = now.AddMinutes(-1)
+            };
+            db.AgentWorkflowRuns.Add(run);
+
+            db.MatchCandidates.Add(new MatchCandidate
+            {
+                MatchCandidateId = Guid.NewGuid(),
+                WorkflowRunId = workflowRunId,
+                AgencyId = agencyId,
+                Rank = 1,
+                EligibilityScore = 0.98m,
+                Eligible = true,
+                EvaluatedAt = now.AddMinutes(-4)
+            });
+
+            var step3 = new AgentStep
+            {
+                AgentStepId = Guid.NewGuid(),
+                WorkflowRunId = workflowRunId,
+                StepNo = 3,
+                AgentRole = AgentRole.MatchingPricing,
+                Status = AgentStepStatus.Succeeded,
+                OutputJson = JsonSerializer.Serialize(new
+                {
+                    selectedAgencyId = agencyId.ToString(),
+                    suggestedVehicleClass = "MiniTruck",
+                    etaMinutes = 30,
+                    cargoDistanceKm = 100.0,
+                    proposedPrice = 22000.0
+                }),
+                StartedAt = now.AddMinutes(-3),
+                CompletedAt = now.AddMinutes(-2)
+            };
+            db.AgentSteps.Add(step3);
+
+            await db.SaveChangesAsync();
+        }
+
+        // Admin confirms the match (not the owner shipper)
+        var adminToken = MintAdminToken();
+        using var confirmRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/match/confirm");
+        confirmRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        confirmRequest.Content = JsonContent.Create(new ConfirmMatchDto { AgencyId = agencyId });
+
+        var response = await client.SendAsync(confirmRequest);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var assignment = await response.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(assignment);
+        Assert.Equal(agencyId, assignment.AgencyId);
+        Assert.Equal(AssignmentStatus.Proposed.ToString(), assignment.Status);
+
+        // Verify DB state
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var dbRun = await db.AgentWorkflowRuns
+                .Include(r => r.ApprovalDecisions)
+                .Include(r => r.Assignments)
+                .FirstAsync(r => r.WorkflowRunId == workflowRunId);
+
+            Assert.Equal(WorkflowRunStatus.Completed, dbRun.Status);
+            Assert.Single(dbRun.ApprovalDecisions);
+            Assert.Equal(ApprovalDecisionType.Approve, dbRun.ApprovalDecisions.First().Decision);
+        }
+    }
+
+    [Fact]
+    public async Task ConfirmMatch_WhenNoPriorWorkflowRun_SynthesizesRunAndConfirmsMatch()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var tokens = await RegisterAndLoginShipperAsync(client, "shipper-no-prior-run");
+        var load = await SeedLoadAsync(client, tokens);
+        var agencyId = await SeedAgencyAsync(factory, "Auto Matched Carrier");
+
+        // Note: No AgentWorkflowRun seeded in DB!
+        using var confirmRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/match/confirm");
+        confirmRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        confirmRequest.Content = JsonContent.Create(new ConfirmMatchDto { AgencyId = agencyId });
+
+        var response = await client.SendAsync(confirmRequest);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var assignment = await response.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(assignment);
+        Assert.Equal(agencyId, assignment.AgencyId);
+        Assert.Equal(AssignmentStatus.Proposed.ToString(), assignment.Status);
+
+        // Verify DB state: WorkflowRun and ApprovalDecision were synthesized and completed
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var dbRun = await db.AgentWorkflowRuns
+                .Include(r => r.ApprovalDecisions)
+                .Include(r => r.Assignments)
+                .Include(r => r.Steps)
+                .FirstOrDefaultAsync(r => r.LoadId == load.LoadId);
+
+            Assert.NotNull(dbRun);
+            Assert.Equal(WorkflowRunStatus.Completed, dbRun.Status);
+            Assert.Single(dbRun.ApprovalDecisions);
+            Assert.Equal(ApprovalDecisionType.Approve, dbRun.ApprovalDecisions.First().Decision);
+            Assert.Equal(4, dbRun.Steps.Count);
+        }
+    }
+
+    private static string MintAdminToken()
+    {
+        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("integration-test-signing-key-that-is-long-enough-1234567890"));
+        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: "FreightLinkApi",
+            audience: "FreightLinkClient",
+            claims: new[]
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.Role, "Admin")
+            },
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
