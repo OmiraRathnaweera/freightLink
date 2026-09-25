@@ -222,7 +222,8 @@ builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 builder.Services.AddScoped<ITripService, TripService>();
-builder.Services.AddScoped<IRouteService, RouteService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IRouteService, RouteService>();
 
 var app = builder.Build();
 
