@@ -47,4 +47,16 @@ public interface IRouteService
     /// one retry fails — never throws for an OpenRouteService-side failure.
     /// </returns>
     Task<RouteEtaResponseDto> GetRouteEtaAsync(RouteEtaRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes the routed distance and estimated travel time between two coordinates via
+    /// OpenRouteService (convenience alias used by Agent 3).
+    /// </summary>
+    Task<RouteEtaResponseDto> GetRouteAndEtaAsync(RouteEtaRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes the routed distance and estimated travel time between two coordinate pairs via
+    /// OpenRouteService (convenience overload used by Agent 3).
+    /// </summary>
+    Task<RouteEtaResponseDto> GetRouteAndEtaAsync(decimal originLat, decimal originLng, decimal destinationLat, decimal destinationLng, CancellationToken cancellationToken = default);
 }

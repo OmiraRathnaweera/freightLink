@@ -158,20 +158,32 @@ public class RouteService : IRouteService
                     var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
                     _logger.LogWarning("OpenRouteService HTTP {StatusCode} on attempt {Attempt}: {Error}",
                         (int)response.StatusCode, attempt, errorContent);
+
+                    if (attempt < MaxAttempts && !cancellationToken.IsCancellationRequested)
+                    {
+                        _logger.LogWarning("OpenRouteService call attempt {Attempt} non-success, retrying once with short backoff...", attempt);
+                        await Task.Delay(300 * attempt, cancellationToken);
+                        continue;
+                    }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex) when (attempt < MaxAttempts && !cancellationToken.IsCancellationRequested)
             {
-                _logger.LogWarning(ex, "OpenRouteService call attempt {Attempt} failed, retrying once...", attempt);
-                await Task.Delay(250, cancellationToken);
+                _logger.LogWarning(ex, "OpenRouteService call attempt {Attempt} failed/timed out, retrying once with short backoff...", attempt);
+                await Task.Delay(300 * attempt, cancellationToken);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "OpenRouteService call failed permanently after {Attempt} attempt(s).", attempt);
+                _logger.LogError(ex, "OpenRouteService call failed permanently after {Attempt} attempt(s). Entering safe hold for review state.", attempt);
             }
         }
 
-        // Returning in-band failure per reliability rule (never throws)
+        // Returning in-band failure per reliability rule (never throws): safe "hold for review"
+        _logger.LogWarning("OpenRouteService permanently unavailable after retries. Yielding in-band failure for safe hold for review state.");
         return new RouteEtaResponseDto
         {
             Success = false,
@@ -199,4 +211,18 @@ public class RouteService : IRouteService
         var etaMinutes = Math.Max(5, (int)Math.Round(((double)roadDistanceKm / AverageFreightSpeedKmh) * 60.0));
         return (roadDistanceKm, etaMinutes);
     }
+
+    /// <inheritdoc />
+    public Task<RouteEtaResponseDto> GetRouteAndEtaAsync(RouteEtaRequestDto request, CancellationToken cancellationToken = default)
+        => GetRouteEtaAsync(request, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<RouteEtaResponseDto> GetRouteAndEtaAsync(decimal originLat, decimal originLng, decimal destinationLat, decimal destinationLng, CancellationToken cancellationToken = default)
+        => GetRouteEtaAsync(new RouteEtaRequestDto
+        {
+            OriginLat = originLat,
+            OriginLng = originLng,
+            DestinationLat = destinationLat,
+            DestinationLng = destinationLng
+        }, cancellationToken);
 }
