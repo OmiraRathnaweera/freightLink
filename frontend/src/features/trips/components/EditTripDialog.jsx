@@ -14,8 +14,8 @@ function EditTripDialog({ trip, onClose }) {
 
   // Fetch agency fleet (vehicles & drivers)
   const fleetQuery = useAgencyFleetQuery(trip.agencyId, { staleTime: 60000 });
-  const vehicles = fleetQuery.data?.vehicles ?? [];
-  const drivers = fleetQuery.data?.drivers ?? [];
+  const vehicles = useMemo(() => fleetQuery.data?.vehicles ?? [], [fleetQuery.data?.vehicles]);
+  const drivers = useMemo(() => fleetQuery.data?.drivers ?? [], [fleetQuery.data?.drivers]);
 
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => v.vehicleId === vehicleId),

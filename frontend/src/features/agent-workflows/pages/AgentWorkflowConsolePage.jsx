@@ -1,20 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
   Sparkles,
-  Bot,
   ArrowLeft,
   CheckCircle2,
   AlertTriangle,
-  RotateCcw,
-  Package,
 } from 'lucide-react'
-import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
-import Button from '../../../components/Button.jsx'
 import { useLoadsQuery, useLoadDetailQuery } from '../../loads/api/loadsApi.js'
 import {
   useLoadMatchQuery,
@@ -57,12 +52,7 @@ export default function AgentWorkflowConsolePage() {
   const [actionSuccessMessage, setActionSuccessMessage] = useState(null)
   const [actionErrorMessage, setActionErrorMessage] = useState(null)
 
-  // Sync selected agency with recommended agency when data arrives
-  useEffect(() => {
-    if (matchData?.recommendedAgency?.agencyId) {
-      setSelectedAgencyId(matchData.recommendedAgency.agencyId)
-    }
-  }, [matchData?.recommendedAgency?.agencyId])
+  const activeSelectedAgencyId = selectedAgencyId || matchData?.recommendedAgency?.agencyId
 
   // Handle switching active load
   const handleSelectLoad = (newLoadId) => {
@@ -212,7 +202,7 @@ export default function AgentWorkflowConsolePage() {
             loadId={activeLoadId}
             loadStatus={matchData.loadStatus}
             recommendedAgency={matchData.recommendedAgency}
-            selectedAgencyId={selectedAgencyId}
+            selectedAgencyId={activeSelectedAgencyId}
             existingAssignment={matchData.existingAssignment}
             onApproveMatch={handleApproveMatch}
             onRetryMatch={handleRetryMatch}
@@ -228,7 +218,7 @@ export default function AgentWorkflowConsolePage() {
             {/* Alternate Candidates List */}
             <AlternateCandidatesList
               candidates={matchData.alternateCandidates}
-              selectedAgencyId={selectedAgencyId}
+              selectedAgencyId={activeSelectedAgencyId}
               onSelectAgency={(agencyId) => setSelectedAgencyId(agencyId)}
               isMatched={matchData.loadStatus === 'Matched' || Boolean(matchData.existingAssignment)}
             />

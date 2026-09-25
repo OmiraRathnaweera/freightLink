@@ -1,4 +1,4 @@
-import { Building2, MapPin, Clock, CheckCircle2, ChevronRight, Check } from 'lucide-react'
+import { MapPin, Clock, ChevronRight, Check } from 'lucide-react'
 
 export default function AlternateCandidatesList({
   candidates = [],

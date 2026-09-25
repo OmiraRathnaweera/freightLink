@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Package, ExternalLink, ArrowRight, ChevronDown, Check } from 'lucide-react'
+import { Package, ExternalLink, ArrowRight } from 'lucide-react'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import { getLoadStatusTone } from '../../loads/lib/statusTone.js'
 import { formatWeight } from '../../loads/lib/format.js'

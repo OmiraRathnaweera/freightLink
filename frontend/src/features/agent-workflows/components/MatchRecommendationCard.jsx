@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   Sparkles,
   Truck,
@@ -10,8 +9,6 @@ import {
   CheckCircle2,
   Building2,
   TrendingDown,
-  Info,
-  ExternalLink,
 } from 'lucide-react'
 import { formatCurrency } from '../../loads/lib/format.js'
 import Button from '../../../components/Button.jsx'
@@ -56,7 +53,6 @@ export default function MatchRecommendationCard({
   }
 
   const isMatched = loadStatus === 'Matched' || Boolean(existingAssignment)
-  const isSelected = !selectedAgencyId || selectedAgencyId === recommendedAgency.agencyId
 
   const vehicleClassDisplay =
     VEHICLE_CLASS_LABELS[recommendedAgency.suggestedVehicleClass] ||

@@ -74,11 +74,10 @@ export default function WorkflowStepper({ steps = [], workflowStatus = 'PendingR
       </div>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        {AGENT_METADATA.map((meta, index) => {
+        {AGENT_METADATA.map((meta) => {
           const stepData = getStepData(meta.stepNo, meta.role)
           const isSuccess = stepData.status === 'Completed' || stepData.status === 'Succeeded'
           const isFailed = stepData.status === 'Failed'
-          const IconComponent = meta.icon
 
           return (
             <div

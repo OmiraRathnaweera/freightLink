@@ -31,7 +31,10 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
     { staleTime: 30000 }
   );
 
-  const assignments = assignmentsQuery.data?.items ?? [];
+  const assignments = useMemo(
+    () => assignmentsQuery.data?.items ?? [],
+    [assignmentsQuery.data?.items]
+  );
 
   // Group assignments into dispatchable (no trip yet) vs already dispatched
   const { dispatchableAssignments, alreadyDispatchedAssignments } = useMemo(() => {
@@ -63,8 +66,14 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
     staleTime: 60000,
   });
 
-  const vehicles = fleetQuery.data?.vehicles ?? [];
-  const drivers = fleetQuery.data?.drivers ?? [];
+  const vehicles = useMemo(
+    () => fleetQuery.data?.vehicles ?? [],
+    [fleetQuery.data?.vehicles]
+  );
+  const drivers = useMemo(
+    () => fleetQuery.data?.drivers ?? [],
+    [fleetQuery.data?.drivers]
+  );
 
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => v.vehicleId === vehicleId),
