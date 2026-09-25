@@ -1,11 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-    </PropertyGroup>
+      <UserSecretsId>ff2e5dcc-bc6d-4420-a270-874a8e31fec1</UserSecretsId>
+  </PropertyGroup>
 
     <ItemGroup>
         <Compile Remove="FreightLink.Api.Tests/**/*.cs" />

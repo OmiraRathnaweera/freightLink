@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertCircle, Camera, Loader2, MapPin, Upload, X } from "lucide-react";
+import { AlertCircle, Camera, CheckCircle2, Loader2, MapPin, Upload, X } from "lucide-react";
 import Button from "../../../components/Button.jsx";
 import Input from "../../../components/Input.jsx";
 import { EvidenceType, UserRole } from "../../../lib/enums.js";

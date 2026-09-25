@@ -138,6 +138,40 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
+    public async Task<IEnumerable<AgencyExpiringComplianceDto>> GetAgenciesWithExpiringComplianceAsync(int days, CancellationToken cancellationToken = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var thresholdDate = today.AddDays(days);
+
+        var agencies = await _dbContext.Agencies
+            .Include(a => a.ComplianceDocs)
+            .Where(a => a.ComplianceDocs.Any(d => 
+                d.Status == ComplianceDocStatus.Verified &&
+                d.ExpiresOn.HasValue &&
+                d.ExpiresOn.Value <= thresholdDate &&
+                d.ExpiresOn.Value >= today))
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        return agencies.Select(a => new AgencyExpiringComplianceDto
+        {
+            Agency = MapToResponse(a),
+            ExpiringDocs = a.ComplianceDocs
+                .Where(d => d.Status == ComplianceDocStatus.Verified && d.ExpiresOn.HasValue && d.ExpiresOn.Value <= thresholdDate && d.ExpiresOn.Value >= today)
+                .Select(d => new ComplianceDocResponseDto
+                {
+                    ComplianceDocId = d.ComplianceDocId,
+                    DocType = d.DocType,
+                    DocNumber = d.DocNumber,
+                    StorageKey = d.StorageKey,
+                    IssuedOn = d.IssuedOn,
+                    ExpiresOn = d.ExpiresOn,
+                    Status = d.Status
+                })
+        });
+    }
+
+    /// <inheritdoc />
     public async Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
@@ -158,6 +192,90 @@ public class AgencyService : IAgencyService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return MapToResponse(agency);
+    }
+
+    public async Task VerifyAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (agency.Status != AgencyStatus.Pending)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Only pending agencies can be verified.");
+        }
+
+        agency.Status = AgencyStatus.Verified;
+        agency.StatusHistory.Add(new AgencyStatusHistory
+        {
+            ToStatus = AgencyStatus.Verified,
+            ChangedByUserId = currentUserId,
+            Reason = "Verified by admin"
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task ActivateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (agency.Status != AgencyStatus.Verified)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Only verified agencies can be activated.");
+        }
+
+        agency.Status = AgencyStatus.Active;
+        agency.StatusHistory.Add(new AgencyStatusHistory
+        {
+            ToStatus = AgencyStatus.Active,
+            ChangedByUserId = currentUserId,
+            Reason = "Activated by admin"
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SuspendAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (agency.Status == AgencyStatus.Suspended)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Agency is already suspended.");
+        }
+
+        agency.Status = AgencyStatus.Suspended;
+        agency.StatusHistory.Add(new AgencyStatusHistory
+        {
+            ToStatus = AgencyStatus.Suspended,
+            ChangedByUserId = currentUserId,
+            Reason = "Suspended by admin"
+        });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
@@ -199,3 +317,4 @@ public class AgencyService : IAgencyService
         };
     }
 }
+
