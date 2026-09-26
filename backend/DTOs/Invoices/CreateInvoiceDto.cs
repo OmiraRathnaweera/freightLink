@@ -1,0 +1,35 @@
+using System.ComponentModel.DataAnnotations;
+using FreightLink.Api.Common.Validation;
+
+namespace FreightLink.Api.DTOs.Invoices;
+
+/// <summary>
+/// Request body for POST /api/v1/invoices.
+/// </summary>
+public class CreateInvoiceDto
+{
+    /// <summary>The ID of the trip this invoice is generated for.</summary>
+    [Required]
+    public Guid TripId { get; set; }
+
+    /// <summary>The monetary amount for the invoice (must be strictly greater than 0).</summary>
+    [Required]
+    [Range(0.01, 100_000_000, ErrorMessage = "Amount must be greater than zero.")]
+    public decimal Amount { get; set; }
+
+    /// <summary>ISO-4217 currency code (exactly three uppercase letters, e.g. LKR, USD). Defaults to LKR.</summary>
+    [Required]
+    [RegularExpression(InvoicePatterns.CurrencyCodePattern,
+        ErrorMessage = "Currency must be a valid ISO-4217 code: exactly three uppercase letters (e.g. LKR, USD).")]
+    public string Currency { get; set; } = "LKR";
+
+    /// <summary>
+    /// Optional due date for the invoice. When supplied, must not be earlier than today (UTC),
+    /// as the invoice's <c>IssuedAt</c> is set to the current UTC date on creation
+    /// (<c>ck_invoice_due</c>: <c>DueDate &gt;= (IssuedAt AT TIME ZONE 'UTC')::date</c>).
+    /// </summary>
+    public DateOnly? DueDate { get; set; }
+
+    /// <summary>If true, creates the invoice directly in 'Issued' status instead of 'Draft'.</summary>
+    public bool IssueImmediately { get; set; } = false;
+}

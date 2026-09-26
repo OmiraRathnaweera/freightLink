@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freightlink_mobile/core/theme/app_theme.dart';
+import 'package:freightlink_mobile/core/routing/app_router.dart';
 import 'package:freightlink_mobile/features/auth/providers/auth_provider.dart';
 import 'package:freightlink_mobile/features/auth/screens/login_screen.dart';
 import 'package:freightlink_mobile/features/loads/data/loads_repository.dart';
@@ -10,7 +11,6 @@ import 'package:freightlink_mobile/features/loads/screens/my_loads_screen.dart';
 import 'package:freightlink_mobile/features/notifications/providers/notification_provider.dart';
 import 'package:freightlink_mobile/features/trips/data/trips_repository.dart';
 import 'package:freightlink_mobile/features/trips/screens/driver_assigned_trip_screen.dart';
-import 'package:freightlink_mobile/main.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
@@ -87,7 +87,10 @@ void main() {
             value: tripsRepository ?? MockTripsRepository(),
           ),
         ],
-        child: MaterialApp(theme: AppTheme.light, home: const RootScreen()),
+        child: MaterialApp.router(
+          theme: AppTheme.light,
+          routerConfig: createAppRouter(authProvider),
+        ),
       ),
     );
   }

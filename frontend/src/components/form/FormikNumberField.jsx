@@ -18,7 +18,7 @@ import { useFieldMeta } from '../../hooks/useFieldMeta.js'
  *   `Input`'s existing convention for money/weight/distance fields (DESIGN.md
  *   "Monospace Fields").
  */
-function FormikNumberField({ name, label, placeholder, disabled, className, helperText, mono = false, ...rest }) {
+function FormikNumberField({ name, label, placeholder, disabled, className, helperText, mono = false, required = false, ...rest }) {
   const { field, meta, showError, id } = useFieldMeta(name)
   const errorId = showError ? `${id}-error` : undefined
 
@@ -28,7 +28,7 @@ function FormikNumberField({ name, label, placeholder, disabled, className, help
   }
 
   return (
-    <FormField id={id} label={label} hint={helperText} error={showError ? meta.error : undefined}>
+    <FormField id={id} label={label} hint={helperText} error={showError ? meta.error : undefined} required={required}>
       <Input
         {...rest}
         id={id}

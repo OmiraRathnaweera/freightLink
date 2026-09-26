@@ -1,37 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
-import '../../features/loads/screens/my_loads_screen.dart';
 import '../../features/notifications/widgets/in_app_push_banner.dart';
-import '../../features/trips/screens/driver_assigned_trip_screen.dart';
-import '../../features/trips/screens/job_proposals_screen.dart';
-import 'app_top_bar.dart';
-import 'coming_soon_placeholder.dart';
 
-/// The app's persistent 4-tab shell (Dashboard / Loads, Proposals, or My Trip / Payments / Reports).
-/// Renders [DriverAssignedTripScreen] for Drivers, [JobProposalsScreen] for AgencyStaff, and [MyLoadsScreen] for Shippers.
-class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+/// The app's persistent bottom-nav shell, driven by go_router's
+/// [StatefulShellRoute] (see `core/routing/app_router.dart`): each branch
+/// owns its own navigation stack, and this widget only renders whichever
+/// branch is active (`navigationShell`) plus the bottom nav bar around it.
+///
+/// The 2nd tab's icon/label is role-dependent (Driver: "My Trip", AgencyStaff:
+/// "Proposals", Shipper: "Loads") since each role sees a different screen at
+/// that branch's route — chosen by the branch's own `GoRoute.builder` in
+/// app_router.dart, not here; this widget only needs to know the label/icon.
+class AppShell extends StatelessWidget {
+  const AppShell({
+    super.key,
+    required this.navigationShell,
+  });
 
-  @override
-  State<AppShell> createState() => _AppShellState();
-}
+  final StatefulNavigationShell navigationShell;
 
-class _AppShellState extends State<AppShell> {
-  int _index = 1; // Loads / Proposals / My Trip tab is the primary operational view.
+  void _onTap(BuildContext context, int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final isAgencyStaff = user?.isAgencyStaff ?? false;
     final isDriver = user?.isDriver ?? false;
-
-    final primaryOperationalScreen = isDriver
-        ? const DriverAssignedTripScreen()
-        : isAgencyStaff
-            ? const JobProposalsScreen()
-            : const MyLoadsScreen();
 
     final operationalTabLabel = isDriver
         ? 'My Trip'
@@ -45,34 +47,17 @@ class _AppShellState extends State<AppShell> {
             ? Icons.assignment_outlined
             : Icons.local_shipping_outlined;
 
-    final tabs = [
-      ComingSoonPlaceholder(
-        title: 'Dashboard',
-        icon: Icons.dashboard_outlined,
-        bottomLeading: const AppAvatar(),
-        actions: const [NotificationBellButton()],
-      ),
-      primaryOperationalScreen,
-      const ComingSoonPlaceholder(
-        title: 'Payments',
-        icon: Icons.payments_outlined,
-      ),
-      const ComingSoonPlaceholder(
-        title: 'Reports',
-        icon: Icons.bar_chart_rounded,
-      ),
-    ];
-
     return Scaffold(
       body: Stack(
         children: [
-          IndexedStack(index: _index, children: tabs),
+          navigationShell,
           const InAppPushBanner(),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _index,
-        onTap: (value) => setState(() => _index = value),
+        currentIndex: navigationShell.currentIndex,
+        onTap: (index) => _onTap(context, index),
+        type: BottomNavigationBarType.fixed,
         items: [
           const BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),

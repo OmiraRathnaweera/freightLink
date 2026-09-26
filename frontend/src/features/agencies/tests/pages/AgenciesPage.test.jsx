@@ -4,9 +4,9 @@ import userEvent from "@testing-library/user-event";
 import AgenciesPage from "../../pages/AgenciesPage.jsx";
 import { UserRole } from "../../../../lib/enums.js";
 import { renderWithProviders } from "../../../../test/testUtils.jsx";
-import * as agenciesApi from "../../../trips/api/agenciesApi.js";
+import * as agencyApi from "../../api/agencyApi.js";
 
-vi.mock("../../../trips/api/agenciesApi.js", async (importOriginal) => {
+vi.mock("../../api/agencyApi.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
@@ -14,6 +14,14 @@ vi.mock("../../../trips/api/agenciesApi.js", async (importOriginal) => {
     useAgencyFleetQuery: vi.fn(),
   };
 });
+
+// AgencyStaff's branch renders the full AgencyProfilePage (compliance docs,
+// vehicles, profile editing) — that page has its own dedicated test suite
+// (AgencyProfilePage.test.jsx), so it's stubbed here to isolate this file's
+// concern: does AgenciesPage route each role to the right screen.
+vi.mock("../../pages/AgencyProfilePage.jsx", () => ({
+  default: () => <div>Agency Profile Page</div>,
+}));
 
 function sampleAgency(overrides = {}) {
   return {
@@ -41,21 +49,21 @@ function renderAgenciesPage(role = UserRole.ADMIN) {
 }
 
 afterEach(() => {
-  vi.mocked(agenciesApi.useAgenciesQuery).mockReset();
-  vi.mocked(agenciesApi.useAgencyFleetQuery).mockReset();
+  vi.mocked(agencyApi.useAgenciesQuery).mockReset();
+  vi.mocked(agencyApi.useAgencyFleetQuery).mockReset();
   cleanup();
 });
 
 describe("AgenciesPage — Admin View", () => {
   it("renders loading skeletons while fetching agencies", () => {
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: true,
       isError: false,
       data: undefined,
       isFetching: false,
       refetch: vi.fn(),
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
       data: undefined,
@@ -69,14 +77,14 @@ describe("AgenciesPage — Admin View", () => {
 
   it("renders ErrorState when agencies query fails", async () => {
     const refetch = vi.fn();
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: false,
       isError: true,
       error: new Error("Network timeout"),
       isFetching: false,
       refetch,
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
       data: undefined,
@@ -89,14 +97,14 @@ describe("AgenciesPage — Admin View", () => {
   });
 
   it("renders empty state when no agencies are registered", () => {
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [],
+      data: { items: [] },
       isFetching: false,
       refetch: vi.fn(),
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
       data: undefined,
@@ -126,14 +134,14 @@ describe("AgenciesPage — Admin View", () => {
       status: "Active",
     });
 
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [agency1, agency2],
+      data: { items: [agency1, agency2] },
       isFetching: false,
       refetch: vi.fn(),
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
       data: undefined,
@@ -162,14 +170,14 @@ describe("AgenciesPage — Admin View", () => {
   });
 
   it("displays dispatch rule indicating trip dispatch authority belongs only to agencies", () => {
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [],
+      data: { items: [] },
       isFetching: false,
       refetch: vi.fn(),
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
       data: undefined,
@@ -189,14 +197,14 @@ describe("AgenciesPage — Admin View", () => {
     const agency1 = sampleAgency({ agencyId: "ag-1", name: "Colombo Express Logistics" });
     const agency2 = sampleAgency({ agencyId: "ag-2", name: "Galle Freight Lines" });
 
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [agency1, agency2],
+      data: { items: [agency1, agency2] },
       isFetching: false,
       refetch: vi.fn(),
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
       data: undefined,
@@ -217,35 +225,25 @@ describe("AgenciesPage — Admin View", () => {
 });
 
 describe("AgenciesPage — AgencyStaff View", () => {
-  it("renders agency fleet overview for AgencyStaff", () => {
-    agenciesApi.useAgenciesQuery.mockReturnValue({
+  it("routes AgencyStaff to AgencyProfilePage (compliance docs, vehicles, profile)", () => {
+    agencyApi.useAgenciesQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: [],
+      data: { items: [] },
       isFetching: false,
       refetch: vi.fn(),
     });
-    agenciesApi.useAgencyFleetQuery.mockReturnValue({
+    agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
-      data: {
-        agencyId: "ag-my",
-        agencyName: "Lanka Freight Agency",
-        drivers: [
-          { driverId: "d-1", fullName: "Sunil Silva", licenceNo: "B12345", status: "Active" },
-        ],
-        vehicles: [
-          { vehicleId: "v-1", registrationNo: "WP-CAB-1234", vehicleType: "Heavy Truck", status: "Available" },
-        ],
-      },
+      data: undefined,
       isFetching: false,
       refetch: vi.fn(),
     });
 
     renderAgenciesPage(UserRole.AGENCY_STAFF);
 
-    expect(screen.getByText(/Lanka Freight Agency — Fleet Roster/i)).toBeInTheDocument();
-    expect(screen.getByText("Sunil Silva")).toBeInTheDocument();
-    expect(screen.getByText("WP-CAB-1234")).toBeInTheDocument();
+    expect(screen.getByText("Agency Profile Page")).toBeInTheDocument();
+    expect(screen.queryByText("Registered Agencies & Fleet")).not.toBeInTheDocument();
   });
 });

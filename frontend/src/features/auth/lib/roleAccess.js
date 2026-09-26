@@ -19,7 +19,7 @@ export const ROLE_ALLOWED_PREFIXES = {
   [UserRole.SHIPPER]: ['/loads', '/billing', '/agent-workflows'],
   [UserRole.AGENCY_STAFF]: ['/loads', '/agencies', '/trips', '/billing'],
   [UserRole.DRIVER]: [], // Requirement 1: drivers only have access to mobile application UI
-  [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/agent-workflows', '/pricing-config'],
+  [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/agent-workflows', '/pricing-config', '/disputes'],
 }
 
 function isPathGated(pathname) {

@@ -10,7 +10,7 @@ public class Invoice
     public decimal Amount { get; set; }
     public string Currency { get; set; } = string.Empty;
     public InvoiceStatus Status { get; set; }
-    public DateTimeOffset IssuedAt { get; set; }
+    public DateTimeOffset? IssuedAt { get; set; }
     public DateOnly? DueDate { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }

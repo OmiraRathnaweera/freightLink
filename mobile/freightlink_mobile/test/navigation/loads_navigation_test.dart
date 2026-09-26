@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:freightlink_mobile/features/loads/screens/load_detail_screen.dart';
 import 'package:freightlink_mobile/features/loads/screens/my_loads_screen.dart';
 import 'package:freightlink_mobile/features/loads/widgets/load_card.dart';
-import 'package:freightlink_mobile/shared/widgets/app_shell.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../helpers/fakes.dart';
@@ -33,7 +32,7 @@ void main() {
       (_) async => buildLoad(loadId: 'load-1', referenceCode: 'FM-2001'),
     );
 
-    await pumpApp(tester, const AppShell(), repository: repository);
+    await pumpApp(tester, const MyLoadsScreen(), repository: repository);
     await tester.pumpAndSettle();
 
     expect(find.byType(MyLoadsScreen), findsOneWidget);

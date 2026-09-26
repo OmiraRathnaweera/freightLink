@@ -47,3 +47,5 @@ app.*.map.json
 
 /.claude/
 CLAUDE.md
+# Widget Preview related
+.widget_preview/

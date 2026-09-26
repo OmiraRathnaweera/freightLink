@@ -41,6 +41,7 @@ dependencies:
   latlong2: ^0.10.1
   intl: ^0.20.3
   image_picker: ^1.1.2
+  go_router: ^18.0.1
 
 dev_dependencies:
   flutter_test:

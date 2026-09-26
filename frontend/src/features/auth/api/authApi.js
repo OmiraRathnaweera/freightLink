@@ -14,6 +14,14 @@ export const authKeys = {
  * `getCurrentUser` below).
  * @param {{ email: string, password: string }} credentials
  */
+export async function registerShipper(payload) {
+  return api.post('/auth/register/shipper', payload)
+}
+
+export async function registerAgency(payload) {
+  return api.post('/auth/register/agency', payload)
+}
+
 export async function login(credentials) {
   return api.post('/auth/login', credentials)
 }
@@ -43,6 +51,14 @@ export async function logout(refreshToken) {
  * call too; wiring that end-to-end is left for when a real Login page
  * consumes this (matches `LoginPage.jsx`'s current placeholder submit).
  */
+export function useRegisterShipperMutation(options) {
+  return useMutation({ mutationFn: registerShipper, ...options })
+}
+
+export function useRegisterAgencyMutation(options) {
+  return useMutation({ mutationFn: registerAgency, ...options })
+}
+
 export function useLoginMutation(options) {
   return useMutation({ mutationFn: login, ...options })
 }
@@ -51,3 +67,5 @@ export function useLoginMutation(options) {
 export function useCurrentUserQuery(options) {
   return useQuery({ queryKey: authKeys.me(), queryFn: getCurrentUser, ...options })
 }
+
+
