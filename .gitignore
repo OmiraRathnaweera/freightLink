@@ -46,3 +46,4 @@ mobile/**/android/app/google-services.json
 Thumbs.db
 /.claude/
 .DS_Store
+*.md
