@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CloudinaryDotNet;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
@@ -32,6 +33,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Override MVC's default validation-failure response so DTO validation errors match the
 // project-wide error envelope shape instead of the default ValidationProblemDetails.
 builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Global fallback so every enum property serializes/deserializes as its string name
+        // (e.g. "Pending") rather than the default numeric value, matching the frontend/mobile
+        // clients' expectations everywhere — DTOs that already carry an explicit
+        // [JsonConverter(typeof(JsonStringEnumConverter))] attribute are unaffected either way.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    })
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
@@ -217,6 +226,8 @@ builder.Services.AddScoped<ILoadService, LoadService>();
 builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
@@ -273,7 +284,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Disabled: local/sandbox clients (e.g. the PayHere webhook callback) hit this API over plain
+// HTTP, and the redirect was breaking that flow — see the PayHere sandbox checkout integration.
+// app.UseHttpsRedirection();
 
 app.UseCors(corsPolicyName);
 

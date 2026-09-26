@@ -1,4 +1,5 @@
 using System.Net;
+using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -194,6 +195,8 @@ public class TripService : ITripService
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to advance status on this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
         else if (actingUserRole == UserRole.Driver)
         {
@@ -273,6 +276,7 @@ public class TripService : ITripService
     {
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -310,6 +314,8 @@ public class TripService : ITripService
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
         else if (actingUserRole == UserRole.Driver)
         {
@@ -567,6 +573,11 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ASSIGNMENT_NOT_OWNED, "You do not have access to dispatch this assignment.");
         }
 
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(assignment.Agency.Status);
+        }
+
         if (assignment.Trip != null)
         {
             throw new ApiException(HttpStatusCode.Conflict, ErrorCode.TRIP_ALREADY_EXISTS, "A trip has already been created for this assignment.");
@@ -716,6 +727,7 @@ public class TripService : ITripService
 
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -733,6 +745,8 @@ public class TripService : ITripService
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
 
         if (trip.Status != TripStatus.Assigned)
@@ -843,6 +857,7 @@ public class TripService : ITripService
     {
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -860,6 +875,8 @@ public class TripService : ITripService
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
         else if (currentUserRole == UserRole.Driver)
         {

@@ -6,6 +6,7 @@ using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FreightLink.Api.Controllers;
@@ -60,6 +61,29 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves a list of agencies with compliance documents expiring soon.
+    /// </summary>
+    [HttpGet("expiring-compliance")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IEnumerable<AgencyExpiringComplianceDto>>> GetExpiringCompliance([FromQuery] int days = 30, CancellationToken cancellationToken = default)
+    {
+        var result = await _agencyService.GetAgenciesWithExpiringComplianceAsync(days, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Retrieves every Pending agency together with the compliance documents it has uploaded so far,
+    /// for the admin verification queue.
+    /// </summary>
+    [HttpGet("verification-queue")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IEnumerable<AgencyVerificationQueueItemDto>>> GetVerificationQueue(CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetVerificationQueueAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Updates an existing agency's profile details.
     /// </summary>
     [HttpPut("{id:guid}")]
@@ -68,6 +92,95 @@ public class AgenciesController : ControllerBase
     {
         var result = await _agencyService.UpdateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Approves/verifies a pending agency.
+    /// </summary>
+    [HttpPost("{id:guid}/verify")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> VerifyAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.VerifyAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
+    /// Activates a verified agency.
+    /// </summary>
+    [HttpPost("{id:guid}/activate")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> ActivateAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.ActivateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    /// <summary>
+    /// Suspends an agency.
+    /// </summary>
+    [HttpPost("{id:guid}/suspend")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult> SuspendAgency(Guid id, CancellationToken cancellationToken)
+    {
+        await _agencyService.SuspendAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok();
+    }
+
+    [HttpPost("{id:guid}/compliance-docs")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> AddComplianceDoc(Guid id, [FromBody] ComplianceDocCreateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddComplianceDocAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpGet("{id:guid}/compliance-docs")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<IEnumerable<ComplianceDocResponseDto>>> GetComplianceDocs(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetComplianceDocsAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Replaces an existing compliance document's file/number/dates in place (e.g. re-uploading after
+    /// a rejection, or renewing an expiring document). Resets the document back to Pending for
+    /// re-verification. Distinct from <see cref="AddComplianceDoc"/>, which always inserts a new row
+    /// and would collide with the one-live-document-per-type constraint if reused for replacement.
+    /// </summary>
+    [HttpPut("{id:guid}/compliance-docs/{docId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> UpdateComplianceDoc(Guid id, Guid docId, [FromBody] ComplianceDocUpdateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only: marks a Pending compliance document as Verified.</summary>
+    [HttpPost("{id:guid}/compliance-docs/{docId:guid}/verify")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> VerifyComplianceDoc(Guid id, Guid docId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.VerifyComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only: marks a Pending compliance document as Rejected.</summary>
+    [HttpPost("{id:guid}/compliance-docs/{docId:guid}/reject")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> RejectComplianceDoc(Guid id, Guid docId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.RejectComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/vehicles")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<VehicleResponseDto>> AddVehicle(Guid id, [FromBody] VehicleCreateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddVehicleAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
     /// <summary>

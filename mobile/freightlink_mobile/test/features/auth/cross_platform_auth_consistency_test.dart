@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freightlink_mobile/core/models/paged_result.dart';
+import 'package:freightlink_mobile/core/routing/app_router.dart';
 import 'package:freightlink_mobile/core/theme/app_theme.dart';
 import 'package:freightlink_mobile/features/auth/models/auth_user.dart';
 import 'package:freightlink_mobile/features/auth/providers/auth_provider.dart';
@@ -13,7 +14,6 @@ import 'package:freightlink_mobile/features/trips/data/trips_repository.dart';
 import 'package:freightlink_mobile/features/trips/models/job_proposal.dart';
 import 'package:freightlink_mobile/features/trips/screens/driver_assigned_trip_screen.dart';
 import 'package:freightlink_mobile/features/trips/screens/job_proposals_screen.dart';
-import 'package:freightlink_mobile/shared/widgets/app_shell.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
@@ -77,9 +77,14 @@ void main() {
           Provider<LoadsRepository>.value(value: mockLoadsRepo),
           Provider<TripsRepository>.value(value: mockTripsRepo),
         ],
-        child: MaterialApp(
+        // AppShell no longer picks the role-specific screen itself — that's
+        // now decided by the '/loads' branch's GoRoute.builder in
+        // app_router.dart (StatefulShellRoute.indexedStack builds every
+        // branch up front), so this must go through the real router rather
+        // than constructing AppShell directly.
+        child: MaterialApp.router(
           theme: AppTheme.light,
-          home: const AppShell(),
+          routerConfig: createAppRouter(authProvider),
         ),
       );
     }

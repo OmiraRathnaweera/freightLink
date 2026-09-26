@@ -17,12 +17,12 @@ import { useFieldMeta } from '../../hooks/useFieldMeta.js'
  *   For passwords use `FormikPasswordField` (adds a show/hide toggle); for
  *   numbers use `FormikNumberField` (stores a real Number in Formik state).
  */
-function FormikTextField({ name, label, placeholder, disabled, className, helperText, type = 'text', ...rest }) {
+function FormikTextField({ name, label, placeholder, disabled, className, helperText, type = 'text', required = false, ...rest }) {
   const { field, meta, showError, id } = useFieldMeta(name)
   const errorId = showError ? `${id}-error` : undefined
 
   return (
-    <FormField id={id} label={label} hint={helperText} error={showError ? meta.error : undefined}>
+    <FormField id={id} label={label} hint={helperText} error={showError ? meta.error : undefined} required={required}>
       <Input
         {...field}
         {...rest}
