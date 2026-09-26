@@ -6,6 +6,9 @@ namespace FreightLink.Api.Common.Options;
 /// </summary>
 public class EmailOptions
 {
+    /// <summary>Public React application URL used in account-action links sent by email.</summary>
+    public string FrontendBaseUrl { get; set; } = string.Empty;
+
     /// <summary>SMTP server host, e.g. <c>smtp.gmail.com</c>.</summary>
     public string SmtpHost { get; set; } = string.Empty;
 
@@ -40,6 +43,19 @@ public class EmailOptions
     public bool SandboxMode { get; set; }
 
     /// <summary>
+    /// Whether newly registered accounts must verify their email before receiving JWTs. Defaults to
+    /// true so a missing configuration value does not weaken account verification in production.
+    /// </summary>
+    public bool RequireEmailVerification { get; set; } = true;
+
+    /// <summary>
+    /// Allows a development machine to bypass SMTP certificate validation when its network cannot
+    /// complete certificate-revocation checks. This is ignored outside the Development environment
+    /// and must never be enabled for staging or production.
+    /// </summary>
+    public bool AllowInvalidCertificateForDevelopment { get; set; }
+
+    /// <summary>
     /// Validates that every setting required to actually send mail is present. Only meaningful — and
     /// only called — when <see cref="Enabled"/> is <c>true</c>; a disabled email feature is allowed to
     /// have empty settings (mirrors the existing no-op-when-unset precedent for
@@ -72,6 +88,12 @@ public class EmailOptions
         if (string.IsNullOrWhiteSpace(FromAddress))
         {
             throw new InvalidOperationException("EMAIL__FROMADDRESS is required when EMAIL__ENABLED is true.");
+        }
+
+        if (!Uri.TryCreate(FrontendBaseUrl, UriKind.Absolute, out var frontendUrl)
+            || (frontendUrl.Scheme != Uri.UriSchemeHttp && frontendUrl.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException("EMAIL__FRONTENDBASEURL must be an absolute HTTP(S) URL when EMAIL__ENABLED is true.");
         }
     }
 }

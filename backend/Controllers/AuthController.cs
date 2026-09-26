@@ -79,6 +79,47 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Requests a password-reset message. Always returns the same response so callers cannot use
+    /// this endpoint to discover which email addresses have FreightLink accounts.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    public async Task<ActionResult<AccountActionResponseDto>> ForgotPassword([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.RequestPasswordResetAsync(request, cancellationToken);
+        return Accepted(new AccountActionResponseDto
+        {
+            Message = "If an active account exists for that email address, a password-reset link has been sent."
+        });
+    }
+
+    /// <summary>Consumes a one-time password-reset token, then revokes all existing sessions for that account.</summary>
+    [HttpPost("reset-password")]
+    public async Task<ActionResult<AccountActionResponseDto>> ResetPassword([FromBody] ResetPasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.ResetPasswordAsync(request, cancellationToken);
+        return Ok(new AccountActionResponseDto { Message = "Your password has been reset. Please sign in with your new password." });
+    }
+
+    /// <summary>Consumes a one-time email-verification token.</summary>
+    [HttpPost("verify-email")]
+    public async Task<ActionResult<AccountActionResponseDto>> VerifyEmail([FromBody] VerifyEmailRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.VerifyEmailAsync(request, cancellationToken);
+        return Ok(new AccountActionResponseDto { Message = "Your email address has been verified. You can now sign in." });
+    }
+
+    /// <summary>Resends an email-verification message without disclosing account existence or verification state.</summary>
+    [HttpPost("resend-verification")]
+    public async Task<ActionResult<AccountActionResponseDto>> ResendVerification([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.ResendEmailVerificationAsync(request, cancellationToken);
+        return Accepted(new AccountActionResponseDto
+        {
+            Message = "If an unverified active account exists for that email address, a verification link has been sent."
+        });
+    }
+
     /// <summary>Exchanges a refresh token for a new access/refresh pair, revoking the old one (rotation).</summary>
     /// <param name="request">The raw refresh token to rotate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

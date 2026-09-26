@@ -47,3 +47,5 @@ Thumbs.db
 /.claude/
 .DS_Store
 *.md
+!AGENTS.md
+*.md

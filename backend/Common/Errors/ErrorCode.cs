@@ -17,6 +17,12 @@ public enum ErrorCode
     /// <summary>Credentials were correct but the account is marked inactive.</summary>
     ACCOUNT_INACTIVE,
 
+    /// <summary>Credentials were correct but the email address has not yet been verified.</summary>
+    EMAIL_NOT_VERIFIED,
+
+    /// <summary>An email-verification or password-reset token is unknown, expired, or already consumed.</summary>
+    INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+
     /// <summary>Registration was attempted with an email that already has an account.</summary>
     EMAIL_ALREADY_REGISTERED,
 
@@ -336,4 +342,3 @@ public enum ErrorCode
     /// <summary>Registration was attempted with a driving licence number already on file.</summary>
     DRIVER_LICENCE_ALREADY_REGISTERED
 }
-

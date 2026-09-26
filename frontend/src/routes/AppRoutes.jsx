@@ -6,6 +6,9 @@ import PublicRoute from './PublicRoute.jsx'
 import LandingPage from '../features/marketing/pages/LandingPage.jsx'
 import LoginPage from '../features/auth/pages/LoginPage.jsx'
 import RegisterPage from '../features/auth/pages/RegisterPage.jsx'
+import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage.jsx'
+import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage.jsx'
+import VerifyEmailPage from '../features/auth/pages/VerifyEmailPage.jsx'
 import UnauthorizedPage from '../features/auth/pages/UnauthorizedPage.jsx'
 import LoadsPage from '../features/loads/pages/LoadsPage.jsx'
 import PostLoadPage from '../features/loads/pages/PostLoadPage.jsx'
@@ -44,6 +47,9 @@ const router = createBrowserRouter(
       <Route element={<PublicRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
 
       {/* --- Everything below requires a signed-in session, role-checked by path --- */}
@@ -80,4 +86,3 @@ const router = createBrowserRouter(
 )
 
 export default router
-

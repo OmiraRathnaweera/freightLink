@@ -43,6 +43,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         // Disabled so Program.cs's EmailOptions.Validate() fail-fast never fires during integration
         // tests — no test here exercises real email sending, so no EMAIL__* settings are needed.
         Environment.SetEnvironmentVariable("EMAIL__ENABLED", "false");
+        Environment.SetEnvironmentVariable("EMAIL__REQUIREEMAILVERIFICATION", "false");
     }
 
     /// <summary>The known <c>INTERNAL_API_KEY</c> value set by this factory, for tests to send as <c>X-Internal-Api-Key</c>.</summary>

@@ -35,6 +35,18 @@ public interface IAuthService
     /// <exception cref="Common.Exceptions.ApiException">404 if the agency does not exist; 409 if email or licence number is already registered.</exception>
     Task<RegisterResponseDto> RegisterDriverAsync(RegisterDriverRequestDto request, CancellationToken cancellationToken = default);
 
+    /// <summary>Requests a password-reset email without revealing whether the address belongs to an account.</summary>
+    Task RequestPasswordResetAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Consumes a one-time reset token, changes the password, and revokes all active sessions.</summary>
+    Task ResetPasswordAsync(ResetPasswordRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Consumes a one-time email-verification token.</summary>
+    Task VerifyEmailAsync(VerifyEmailRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Resends an email-verification message without revealing account existence.</summary>
+    Task ResendEmailVerificationAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Returns a list of active agencies available for driver registration selection.
     /// </summary>

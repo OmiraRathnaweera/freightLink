@@ -1513,6 +1513,16 @@ namespace FreightLink.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("EmailVerificationTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailVerificationTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1523,6 +1533,13 @@ namespace FreightLink.Api.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("PhoneE164")
                         .HasColumnType("text");
@@ -1541,6 +1558,14 @@ namespace FreightLink.Api.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("uq_user_email");
+
+                    b.HasIndex("EmailVerificationTokenHash", "EmailVerificationTokenExpiresAt")
+                        .HasDatabaseName("ix_user_email_verification_token")
+                        .HasFilter("\"EmailVerificationTokenHash\" IS NOT NULL");
+
+                    b.HasIndex("PasswordResetTokenHash", "PasswordResetTokenExpiresAt")
+                        .HasDatabaseName("ix_user_password_reset_token")
+                        .HasFilter("\"PasswordResetTokenHash\" IS NOT NULL");
 
                     b.ToTable("Users", t =>
                         {

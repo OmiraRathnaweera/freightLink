@@ -11,6 +11,11 @@ public class User
     public string FullName { get; set; } = string.Empty;
     public string? PhoneE164 { get; set; }
     public bool IsActive { get; set; } = true;
+    public DateTimeOffset? EmailVerifiedAt { get; set; }
+    public string? EmailVerificationTokenHash { get; set; }
+    public DateTimeOffset? EmailVerificationTokenExpiresAt { get; set; }
+    public string? PasswordResetTokenHash { get; set; }
+    public DateTimeOffset? PasswordResetTokenExpiresAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 

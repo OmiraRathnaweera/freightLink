@@ -21,6 +21,9 @@ public class CurrentUserResponseDto
     /// <summary>Whether the account is active; inactive accounts cannot log in.</summary>
     public bool IsActive { get; set; }
 
+    /// <summary>Whether the account's email address has completed the one-time verification flow.</summary>
+    public bool IsEmailVerified { get; set; }
+
     /// <summary>When the account was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 

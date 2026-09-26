@@ -9,6 +9,34 @@ namespace FreightLink.Api.Common.Email;
 /// </summary>
 public static class EmailTemplates
 {
+    /// <summary>Builds a one-time email-address verification message.</summary>
+    public static (string Subject, string HtmlBody, string TextBody) BuildEmailVerification(string fullName, string verificationUrl)
+    {
+        const string subject = "Verify your FreightLink email address";
+        var bodyHtml = $"""
+            <p>Hi {Encode(fullName)},</p>
+            <p>Welcome to FreightLink. Verify your email address to activate your account.</p>
+            <p><a href="{Encode(verificationUrl)}">Verify email address</a></p>
+            <p>This link expires in 24 hours. If you did not create this account, you can safely ignore this email.</p>
+            """;
+        var bodyText = $"Hi {fullName},\n\nVerify your FreightLink email address: {verificationUrl}\n\nThis link expires in 24 hours. If you did not create this account, you can safely ignore this email.";
+        return (subject, Wrap(subject, bodyHtml), bodyText);
+    }
+
+    /// <summary>Builds a one-time password-reset message.</summary>
+    public static (string Subject, string HtmlBody, string TextBody) BuildPasswordReset(string fullName, string resetUrl)
+    {
+        const string subject = "Reset your FreightLink password";
+        var bodyHtml = $"""
+            <p>Hi {Encode(fullName)},</p>
+            <p>We received a request to reset your FreightLink password.</p>
+            <p><a href="{Encode(resetUrl)}">Choose a new password</a></p>
+            <p>This link expires in one hour. If you did not request a password reset, you can safely ignore this email.</p>
+            """;
+        var bodyText = $"Hi {fullName},\n\nReset your FreightLink password: {resetUrl}\n\nThis link expires in one hour. If you did not request a password reset, you can safely ignore this email.";
+        return (subject, Wrap(subject, bodyHtml), bodyText);
+    }
+
     /// <summary>Builds the "agency declined, we're finding another" email.</summary>
     /// <param name="shipperName">The recipient Shipper's display name.</param>
     /// <param name="loadReference">The declined load's reference code.</param>

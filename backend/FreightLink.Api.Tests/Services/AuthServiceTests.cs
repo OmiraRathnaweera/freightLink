@@ -38,7 +38,10 @@ public class AuthServiceTests
     };
 
     /// <summary>Builds a real <see cref="AuthService"/> wired to the given DB context and admin-seed options.</summary>
-    private static AuthService CreateSut(AppDbContext dbContext, AdminSeedOptions? adminSeedOptions = null)
+    private static AuthService CreateSut(
+        AppDbContext dbContext,
+        AdminSeedOptions? adminSeedOptions = null,
+        bool requireEmailVerification = false)
     {
         var passwordHasher = new PasswordHasher();
         var tokenService = new TokenService(dbContext, Options.Create(CreateJwtOptions()));
@@ -46,8 +49,22 @@ public class AuthServiceTests
             dbContext,
             passwordHasher,
             tokenService,
+            new GmailEmailService(Options.Create(new EmailOptions { Enabled = false }), NullLogger<GmailEmailService>.Instance),
             Options.Create(adminSeedOptions ?? new AdminSeedOptions { Email = "admin@freightlink.test", Password = "Adm1n$trongPass!" }),
+            Options.Create(new EmailOptions
+            {
+                Enabled = false,
+                FrontendBaseUrl = "http://localhost:5173",
+                RequireEmailVerification = requireEmailVerification
+            }),
             NullLogger<AuthService>.Instance);
+    }
+
+    private static async Task MarkEmailVerifiedAsync(AppDbContext dbContext, Guid userId)
+    {
+        var user = await dbContext.Users.FindAsync(userId);
+        user!.EmailVerifiedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync();
     }
 
     /// <summary>A valid Shipper registration payload, with an overridable email/business reg no for uniqueness tests.</summary>
@@ -314,12 +331,31 @@ public class AuthServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
-        await sut.RegisterShipperAsync(request);
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
 
         var tokens = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, "test-agent");
 
         Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(tokens.RefreshToken));
+    }
+
+    /// <summary>When enabled, email verification prevents token issuance until the account owner verifies the one-time link.</summary>
+    [Fact]
+    public async Task LoginAsync_Throws_WhenEmailIsNotVerified()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext, requireEmailVerification: true);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+
+        var user = await dbContext.Users.FindAsync(registration.UserId);
+        Assert.NotNull(user!.EmailVerificationTokenHash);
+        Assert.NotNull(user.EmailVerificationTokenExpiresAt);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null));
+        Assert.Equal(ErrorCode.EMAIL_NOT_VERIFIED, exception.Code);
     }
 
     /// <summary>Logging in with the wrong password throws INVALID_CREDENTIALS.</summary>
@@ -375,7 +411,8 @@ public class AuthServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
-        await sut.RegisterShipperAsync(request);
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         var refreshed = await sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null);
@@ -403,6 +440,7 @@ public class AuthServiceTests
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
         var registerResult = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registerResult.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         var user = await dbContext.Users.FindAsync(registerResult.UserId);
@@ -421,7 +459,8 @@ public class AuthServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
-        await sut.RegisterShipperAsync(request);
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         await sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null);
@@ -440,6 +479,7 @@ public class AuthServiceTests
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
         var registerResult = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registerResult.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         await sut.LogoutAsync(registerResult.UserId, new RefreshRequestDto { RefreshToken = loginResult.RefreshToken });

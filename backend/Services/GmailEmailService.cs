@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.Hosting;
 using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -17,12 +18,17 @@ public class GmailEmailService : IEmailService
 {
     private readonly EmailOptions _options;
     private readonly ILogger<GmailEmailService> _logger;
+    private readonly IHostEnvironment? _hostEnvironment;
 
     /// <summary>Creates the service with its DI-provided <see cref="EmailOptions"/> and logger.</summary>
-    public GmailEmailService(IOptions<EmailOptions> options, ILogger<GmailEmailService> logger)
+    public GmailEmailService(
+        IOptions<EmailOptions> options,
+        ILogger<GmailEmailService> logger,
+        IHostEnvironment? hostEnvironment = null)
     {
         _options = options.Value;
         _logger = logger;
+        _hostEnvironment = hostEnvironment;
     }
 
     /// <inheritdoc />
@@ -55,6 +61,17 @@ public class GmailEmailService : IEmailService
         try
         {
             using var client = new SmtpClient();
+            if (_options.AllowInvalidCertificateForDevelopment && IsDevelopmentEnvironment())
+            {
+                // Some local networks/macOS configurations cannot complete the certificate
+                // revocation check Gmail presents during STARTTLS. This is opt-in and physically
+                // restricted to Development; production continues to reject every invalid or
+                // unverifiable certificate.
+                client.ServerCertificateValidationCallback = (_, _, _, _) => true;
+                _logger.LogWarning(
+                    "Development-only SMTP certificate validation bypass is enabled for {Host}. Do not enable this outside local development.",
+                    _options.SmtpHost);
+            }
             var secureSocketOptions = _options.EnableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.None;
             await client.ConnectAsync(_options.SmtpHost, _options.SmtpPort, secureSocketOptions, cancellationToken);
             await client.AuthenticateAsync(_options.Username, _options.Password, cancellationToken);
@@ -71,6 +88,10 @@ public class GmailEmailService : IEmailService
 
         _logger.LogInformation("Sent {TemplateKey} email to {To}.", message.TemplateKey, message.To);
     }
+
+    private bool IsDevelopmentEnvironment() => _hostEnvironment?.IsDevelopment() == true
+        || string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), Environments.Development, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT"), Environments.Development, StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
     public Task SendAgencyDeclinedAsync(string toEmail, string shipperName, string loadReference, string agencyName, int attemptNo, CancellationToken cancellationToken = default)

@@ -44,6 +44,26 @@ export async function logout(refreshToken) {
   return api.post('/auth/logout', { refreshToken })
 }
 
+/** Requests a password-reset email. The API intentionally does not disclose account existence. */
+export async function forgotPassword(email) {
+  return api.post('/auth/forgot-password', { email })
+}
+
+/** Sets a new password using the one-time token delivered by email. */
+export async function resetPassword({ token, newPassword }) {
+  return api.post('/auth/reset-password', { token, newPassword })
+}
+
+/** Verifies an email address using the one-time token delivered by email. */
+export async function verifyEmail(token) {
+  return api.post('/auth/verify-email', { token })
+}
+
+/** Requests another verification email without disclosing account existence. */
+export async function resendVerification(email) {
+  return api.post('/auth/resend-verification', { email })
+}
+
 /**
  * Example login mutation. Deliberately does not dispatch into
  * `authSlice.js` — `POST /auth/login` only returns tokens, so writing a
@@ -67,5 +87,4 @@ export function useLoginMutation(options) {
 export function useCurrentUserQuery(options) {
   return useQuery({ queryKey: authKeys.me(), queryFn: getCurrentUser, ...options })
 }
-
 

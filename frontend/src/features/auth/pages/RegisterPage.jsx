@@ -139,9 +139,9 @@ function ShipperRegisterForm() {
         payload.businessRegNo = values.businessRegNo.trim()
       }
 
-      await registerMutation.mutateAsync(payload)
-      toast.success('Registration successful! Please sign in with your credentials.')
-      navigate('/login')
+      const result = await registerMutation.mutateAsync(payload)
+      toast.success('Registration successful! Check your email for the verification link.')
+      navigate(`/verify-email?email=${encodeURIComponent(result.email)}`)
     } catch (error) {
       if (error?.code === 'VALIDATION_ERROR' && error?.details) {
         setErrors(mapValidationDetailsToFormik(error.details))
@@ -300,9 +300,9 @@ function AgencyRegisterForm() {
         payload.jobTitle = values.jobTitle.trim()
       }
 
-      await registerMutation.mutateAsync(payload)
-      toast.success('Registration successful! Please sign in to access your agency workspace.')
-      navigate('/login')
+      const result = await registerMutation.mutateAsync(payload)
+      toast.success('Registration successful! Check your email for the verification link.')
+      navigate(`/verify-email?email=${encodeURIComponent(result.email)}`)
     } catch (error) {
       if (error?.code === 'VALIDATION_ERROR' && error?.details) {
         setErrors(mapValidationDetailsToFormik(error.details))

@@ -1,7 +1,9 @@
 ﻿using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using FreightLink.Api.Common.Errors;
+using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Common.Options;
 using FreightLink.Api.Common.Validation;
@@ -22,7 +24,9 @@ public class AuthService : IAuthService
     private readonly AppDbContext _dbContext;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
+    private readonly IEmailService _emailService;
     private readonly AdminSeedOptions _adminSeedOptions;
+    private readonly EmailOptions _emailOptions;
     private readonly ILogger<AuthService> _logger;
 
     /// <summary>Creates the auth service with its DB context, password hasher, token service, and admin-seed settings.</summary>
@@ -30,13 +34,17 @@ public class AuthService : IAuthService
         AppDbContext dbContext,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
+        IEmailService emailService,
         IOptions<AdminSeedOptions> adminSeedOptions,
+        IOptions<EmailOptions> emailOptions,
         ILogger<AuthService> logger)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _emailService = emailService;
         _adminSeedOptions = adminSeedOptions.Value;
+        _emailOptions = emailOptions.Value;
         _logger = logger;
     }
 
@@ -61,6 +69,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var verificationToken = CreateAccountToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -70,6 +79,8 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            EmailVerificationTokenHash = HashAccountToken(verificationToken),
+            EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -99,9 +110,11 @@ public class AuthService : IAuthService
             throw MapUniqueViolationToApiException(pg);
         }
 
+        await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+
         return new RegisterResponseDto
         {
-            Message = "Shipper registered successfully.",
+            Message = "Registration successful. Check your email to verify your account before signing in.",
             UserId = user.UserId,
             Email = user.Email
         };
@@ -123,6 +136,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var verificationToken = CreateAccountToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -132,6 +146,8 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            EmailVerificationTokenHash = HashAccountToken(verificationToken),
+            EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -174,9 +190,11 @@ public class AuthService : IAuthService
             throw MapUniqueViolationToApiException(pg);
         }
 
+        await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+
         return new RegisterResponseDto
         {
-            Message = "Agency registered successfully.",
+            Message = "Registration successful. Check your email to verify your account before signing in.",
             UserId = user.UserId,
             Email = user.Email
         };
@@ -214,6 +232,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var verificationToken = CreateAccountToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -223,6 +242,8 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            EmailVerificationTokenHash = HashAccountToken(verificationToken),
+            EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -251,9 +272,11 @@ public class AuthService : IAuthService
             throw MapUniqueViolationToApiException(pg);
         }
 
+        await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+
         return new RegisterResponseDto
         {
-            Message = "Driver registered successfully.",
+            Message = "Registration successful. Check your email to verify your account before signing in.",
             UserId = user.UserId,
             Email = user.Email
         };
@@ -274,6 +297,106 @@ public class AuthService : IAuthService
     }
 
     /// <inheritdoc />
+    public async Task RequestPasswordResetAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.Email == NormalizeEmail(request.Email), cancellationToken);
+
+        // Always return success to the controller. This endpoint must not disclose whether a
+        // particular email address is registered, active, or eligible for login.
+        if (user is null || !user.IsActive)
+        {
+            return;
+        }
+
+        var rawToken = CreateAccountToken();
+        user.PasswordResetTokenHash = HashAccountToken(rawToken);
+        user.PasswordResetTokenExpiresAt = DateTimeOffset.UtcNow.AddHours(1);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await TrySendPasswordResetAsync(user, rawToken, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task ResetPasswordAsync(ResetPasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var tokenHash = HashAccountToken(request.Token);
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.PasswordResetTokenHash == tokenHash
+                 && u.PasswordResetTokenExpiresAt != null
+                 && u.PasswordResetTokenExpiresAt > now,
+            cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+                "This password-reset link is invalid or has expired.");
+        }
+
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        user.PasswordResetTokenHash = null;
+        user.PasswordResetTokenExpiresAt = null;
+        user.UpdatedAt = now;
+
+        // A reset invalidates every browser/device session, including the requester’s own session.
+        var activeRefreshTokens = await _dbContext.RefreshTokens
+            .Where(token => token.UserId == user.UserId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var refreshToken in activeRefreshTokens)
+        {
+            refreshToken.RevokedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task VerifyEmailAsync(VerifyEmailRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var tokenHash = HashAccountToken(request.Token);
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.EmailVerificationTokenHash == tokenHash
+                 && u.EmailVerificationTokenExpiresAt != null
+                 && u.EmailVerificationTokenExpiresAt > now,
+            cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+                "This email-verification link is invalid or has expired.");
+        }
+
+        user.EmailVerifiedAt = now;
+        user.EmailVerificationTokenHash = null;
+        user.EmailVerificationTokenExpiresAt = null;
+        user.UpdatedAt = now;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task ResendEmailVerificationAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.Email == NormalizeEmail(request.Email), cancellationToken);
+
+        if (user is null || !user.IsActive || user.EmailVerifiedAt is not null)
+        {
+            return;
+        }
+
+        var rawToken = CreateAccountToken();
+        user.EmailVerificationTokenHash = HashAccountToken(rawToken);
+        user.EmailVerificationTokenExpiresAt = DateTimeOffset.UtcNow.AddHours(24);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await TrySendEmailVerificationAsync(user, rawToken, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<TokenResponseDto> LoginAsync(LoginRequestDto request, string? userAgent, CancellationToken cancellationToken = default)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
@@ -288,6 +411,12 @@ public class AuthService : IAuthService
         if (!user.IsActive)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ACCOUNT_INACTIVE, "This account is inactive.");
+        }
+
+        if (_emailOptions.RequireEmailVerification && user.EmailVerifiedAt is null)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.EMAIL_NOT_VERIFIED,
+                "Verify your email address before signing in. You can request a new verification email from the sign-in page.");
         }
 
         return await IssueTokenPairAsync(user, userAgent, cancellationToken);
@@ -306,6 +435,12 @@ public class AuthService : IAuthService
         if (!refreshToken.User.IsActive)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ACCOUNT_INACTIVE, "This account is inactive.");
+        }
+
+        if (_emailOptions.RequireEmailVerification && refreshToken.User.EmailVerifiedAt is null)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.EMAIL_NOT_VERIFIED,
+                "Verify your email address before continuing.");
         }
 
         // Atomic revoke-old + issue-successor (single transaction, concurrency-checked) — see
@@ -394,6 +529,7 @@ public class AuthService : IAuthService
             PasswordHash = _passwordHasher.Hash(_adminSeedOptions.Password),
             FullName = "System Administrator",
             IsActive = true,
+            EmailVerifiedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -417,6 +553,64 @@ public class AuthService : IAuthService
         };
     }
 
+    /// <summary>Creates a URL-safe, high-entropy one-time account-action token.</summary>
+    private static string CreateAccountToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+        .TrimEnd('=')
+        .Replace('+', '-')
+        .Replace('/', '_');
+
+    /// <summary>Stores only a deterministic SHA-256 hash of one-time tokens, never the raw value.</summary>
+    private static string HashAccountToken(string rawToken) => Convert.ToBase64String(
+        SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+
+    private async Task TrySendEmailVerificationAsync(User user, string rawToken, CancellationToken cancellationToken)
+    {
+        var url = BuildFrontendActionUrl("/verify-email", rawToken);
+        var (subject, htmlBody, textBody) = EmailTemplates.BuildEmailVerification(user.FullName, url);
+        await TrySendAccountEmailAsync(user.Email, subject, htmlBody, textBody, "email-verification", cancellationToken);
+    }
+
+    private async Task TrySendPasswordResetAsync(User user, string rawToken, CancellationToken cancellationToken)
+    {
+        var url = BuildFrontendActionUrl("/reset-password", rawToken);
+        var (subject, htmlBody, textBody) = EmailTemplates.BuildPasswordReset(user.FullName, url);
+        await TrySendAccountEmailAsync(user.Email, subject, htmlBody, textBody, "password-reset", cancellationToken);
+    }
+
+    private async Task TrySendAccountEmailAsync(
+        string email,
+        string subject,
+        string htmlBody,
+        string textBody,
+        string templateKey,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _emailService.SendAsync(new EmailMessage
+            {
+                To = email,
+                Subject = subject,
+                HtmlBody = htmlBody,
+                TextBody = textBody,
+                Metadata = new Dictionary<string, string> { ["template"] = templateKey }
+            }, cancellationToken);
+        }
+        catch (ApiException exception) when (exception.Code == ErrorCode.EMAIL_SEND_FAILED)
+        {
+            // The account action is persisted even if SMTP is temporarily unavailable. Returning
+            // success prevents reset/resend endpoints from becoming account-enumeration oracles;
+            // the caller can safely request another message later.
+            _logger.LogError(exception, "Unable to send {TemplateKey} email to {Email}.", templateKey, email);
+        }
+    }
+
+    private string BuildFrontendActionUrl(string path, string rawToken)
+    {
+        var baseUrl = _emailOptions.FrontendBaseUrl.TrimEnd('/');
+        return $"{baseUrl}{path}?token={Uri.EscapeDataString(rawToken)}";
+    }
+
     /// <summary>Maps a <see cref="User"/> entity to its safe, wire-facing representation (no password hash).</summary>
     private static CurrentUserResponseDto MapToCurrentUserResponse(User user) => new()
     {
@@ -426,6 +620,7 @@ public class AuthService : IAuthService
         PhoneE164 = user.PhoneE164,
         Role = user.Role.ToString(),
         IsActive = user.IsActive,
+        IsEmailVerified = user.EmailVerifiedAt is not null,
         CreatedAt = user.CreatedAt,
         AgencyId = user.AgencyStaff?.AgencyId
     };
