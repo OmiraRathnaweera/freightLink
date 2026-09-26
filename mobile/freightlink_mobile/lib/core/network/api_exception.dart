@@ -24,6 +24,7 @@ class ApiException implements Exception {
     required this.code,
     required this.message,
     this.fieldErrors = const [],
+    this.cause,
   });
 
   /// Thrown when the response body isn't the expected JSON error envelope at
@@ -45,12 +46,14 @@ class ApiException implements Exception {
       code: 'NETWORK_ERROR',
       message:
           'Unable to reach the server. Check your connection and try again.',
+      cause: cause,
     );
   }
 
   final int statusCode;
   final String code;
   final String message;
+  final Object? cause;
 
   /// Field-level validation failures. Only non-empty when [isValidationError].
   final List<ApiFieldError> fieldErrors;
@@ -60,5 +63,8 @@ class ApiException implements Exception {
   bool get isValidationError => code == 'VALIDATION_ERROR';
 
   @override
-  String toString() => 'ApiException($statusCode, $code, $message)';
+  String toString() =>
+      cause != null
+          ? 'ApiException($statusCode, $code, $message, cause: $cause)'
+          : 'ApiException($statusCode, $code, $message)';
 }

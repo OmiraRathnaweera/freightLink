@@ -347,4 +347,44 @@ void main() {
     expect(find.text('Galle Port Warehouse Complex, Galle'), findsOneWidget);
     expect(find.text('WP-DA-8920'), findsOneWidget);
   });
+
+  testWidgets(
+      'Driver has zero authority or controls to cancel or delete trips across all lifecycle states',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    // 1. In Assigned state: Driver sees awaiting pickup verification; no cancel/delete options exist.
+    when(() => mockTripsRepo.getDriverActiveTrip()).thenAnswer((_) async => sampleAssignedTrip);
+
+    await pumpApp(
+      tester,
+      const DriverAssignedTripScreen(enableAutoPolling: false),
+      tripsRepository: mockTripsRepo,
+      authProvider: mockAuthProvider,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Awaiting Pickup Verification'), findsOneWidget);
+    expect(find.textContaining('Cancel', findRichText: true), findsNothing);
+    expect(find.textContaining('Delete', findRichText: true), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.byIcon(Icons.cancel_outlined), findsNothing);
+
+    // 2. In InTransit state: Driver sees transit progress & proof capture; zero cancel/delete buttons exist.
+    when(() => mockTripsRepo.getDriverActiveTrip()).thenAnswer((_) async => sampleInTransitTrip);
+    await tester.tap(find.byTooltip('Refresh'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('IN TRANSIT'), findsOneWidget);
+    expect(find.text('Trip In Transit'), findsOneWidget);
+    expect(find.byKey(const Key('capture_delivery_proof_button')), findsOneWidget);
+    expect(find.textContaining('Cancel', findRichText: true), findsNothing);
+    expect(find.textContaining('Delete', findRichText: true), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.byIcon(Icons.cancel_outlined), findsNothing);
+  });
 }
+
