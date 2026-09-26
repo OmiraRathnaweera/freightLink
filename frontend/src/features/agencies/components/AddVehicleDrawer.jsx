@@ -1,78 +1,64 @@
-import { useState } from 'react'
+import { Formik, Form } from 'formik'
 import { AlertCircle, Loader2, Truck, X } from 'lucide-react'
 import { toast } from 'sonner'
 import Button from '../../../components/Button.jsx'
-import Input from '../../../components/Input.jsx'
+import { FormikNumberField, FormikTextField } from '../../../components/form/index.js'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
 import { useAddVehicleMutation } from '../api/agencyApi.js'
+import { addVehicleSchema } from '../lib/validationSchemas.js'
+import { getAgencyErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
+import { VEHICLE_CLASS_CONFIG, VEHICLE_TYPES } from '../lib/vehicleClasses.js'
 
-const VEHICLE_TYPES = [
-  { value: 'MiniTruck', label: 'Mini Truck', desc: 'Light urban cargo (up to 2,500 kg)' },
-  { value: 'MediumLorry', label: 'Medium Lorry', desc: 'Regional transit (2,500 – 10,000 kg)' },
-  { value: 'ContainerTruck', label: 'Container Truck', desc: 'Heavy container & long haul (10,000+ kg)' },
-]
+const INITIAL_VALUES = {
+  vehicleType: 'MiniTruck',
+  registrationNo: '',
+  capacityKg: '',
+  volumeM3: '',
+}
 
 /**
- * Slide-over right drawer / modal for adding a new vehicle to an agency's fleet.
+ * Slide-over right drawer for adding a new vehicle to an agency's fleet.
+ * Validates with Formik + Yup and maps backend error details directly onto fields.
  *
  * @param {string} agencyId
  * @param {boolean} isOpen
  * @param {() => void} onClose
  */
 function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
-  const [vehicleType, setVehicleType] = useState('MiniTruck')
-  const [registrationNo, setRegistrationNo] = useState('')
-  const [capacityKg, setCapacityKg] = useState('')
-  const [volumeM3, setVolumeM3] = useState('')
-  const [error, setError] = useState(null)
-
   const addVehicleMutation = useAddVehicleMutation()
 
   useEscapeKey(isOpen, onClose)
 
   if (!isOpen) return null
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    setError(null)
-
-    const trimmedReg = registrationNo.trim().toUpperCase()
-    const numCapacity = Number(capacityKg)
-    const numVolume = Number(volumeM3)
-
-    if (!trimmedReg || trimmedReg.length < 3) {
-      setError('Registration number must be at least 3 characters.')
-      return
-    }
-
-    if (!numCapacity || numCapacity <= 0) {
-      setError('Capacity must be a positive number greater than 0.')
-      return
-    }
-
-    if (!numVolume || numVolume <= 0) {
-      setError('Volume must be a positive number greater than 0.')
-      return
-    }
+  async function handleSubmit(values, { setErrors, setStatus, setSubmitting, resetForm }) {
+    setStatus(null)
 
     try {
+      const payload = {
+        vehicleType: values.vehicleType,
+        registrationNo: values.registrationNo.trim().toUpperCase(),
+        capacityKg: Number(values.capacityKg),
+        volumeM3: Number(values.volumeM3),
+      }
+
       await addVehicleMutation.mutateAsync({
         agencyId,
-        vehicle: {
-          registrationNo: trimmedReg,
-          vehicleType,
-          capacityKg: numCapacity,
-          volumeM3: numVolume,
-        },
+        vehicle: payload,
       })
 
-      toast.success(`Vehicle ${trimmedReg} registered successfully!`)
-      setRegistrationNo('')
-      setCapacityKg('')
-      setVolumeM3('')
+      toast.success(`Vehicle ${payload.registrationNo} registered successfully!`)
+      resetForm()
       onClose()
-    } catch (err) {
-      setError(err?.response?.data?.message || err?.message || 'Failed to add vehicle. Please try again.')
+    } catch (error) {
+      if (error?.code === 'VALIDATION_ERROR' && error?.details) {
+        setErrors(mapValidationDetailsToFormik(error.details))
+      }
+      const message = getAgencyErrorMessage(error)
+      setStatus(message)
+      toast.error(message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -116,117 +102,126 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
         </div>
 
         {/* Content */}
-        <form onSubmit={handleSubmit} className="flex flex-1 flex-col justify-between overflow-y-auto p-6">
-          <div className="space-y-5">
-            {error && (
-              <div className="flex items-start gap-2 rounded-md border border-status-red-text bg-status-red-bg px-3.5 py-2.5 text-body-sm text-status-red-text">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+        <Formik
+          initialValues={INITIAL_VALUES}
+          validationSchema={addVehicleSchema}
+          onSubmit={handleSubmit}
+        >
+          {({ values, errors, touched, status, isSubmitting, setFieldValue }) => {
+            const activeClassConfig =
+              VEHICLE_CLASS_CONFIG[values.vehicleType] || VEHICLE_CLASS_CONFIG.MiniTruck
 
-            <div>
-              <label className="mb-2 block text-body-md font-semibold text-primary">
-                Vehicle Class
-              </label>
-              <div className="space-y-2">
-                {VEHICLE_TYPES.map((type) => (
-                  <label
-                    key={type.value}
-                    className={`flex cursor-pointer items-start space-x-3 rounded-lg border p-3 transition-colors ${
-                      vehicleType === type.value
-                        ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
-                        : 'border-slate-border hover:bg-slate-50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="vehicleType"
-                      value={type.value}
-                      checked={vehicleType === type.value}
-                      onChange={(e) => setVehicleType(e.target.value)}
-                      className="mt-1 text-primary focus:ring-primary"
-                    />
-                    <div>
-                      <p className="text-body-md font-medium text-on-surface">{type.label}</p>
-                      <p className="text-body-xs text-on-surface-variant">{type.desc}</p>
+            return (
+              <Form className="flex flex-1 flex-col justify-between overflow-y-auto p-6" noValidate>
+                <div className="space-y-5">
+                  {status && (
+                    <div
+                      role="alert"
+                      className="flex items-start gap-2 rounded-md border border-status-red-text bg-status-red-bg px-3.5 py-2.5 text-body-sm text-status-red-text"
+                    >
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{status}</span>
                     </div>
-                  </label>
-                ))}
+                  )}
+
+                  <div>
+                    <label className="mb-2 block text-body-md font-semibold text-primary">
+                      Vehicle Class <span className="text-status-red-text">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {VEHICLE_TYPES.map((type) => (
+                        <label
+                          key={type.value}
+                          className={`flex cursor-pointer items-start space-x-3 rounded-lg border p-3 transition-colors ${
+                            values.vehicleType === type.value
+                              ? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+                              : 'border-slate-border hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="vehicleType"
+                            value={type.value}
+                            checked={values.vehicleType === type.value}
+                            onChange={() => setFieldValue('vehicleType', type.value)}
+                            className="mt-1 text-primary focus:ring-primary"
+                          />
+                          <div>
+                            <p className="text-body-md font-medium text-on-surface">{type.label}</p>
+                            <p className="text-body-xs text-on-surface-variant">{type.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    {touched.vehicleType && errors.vehicleType && (
+                      <p role="alert" className="mt-1 text-body-xs text-status-red-text">
+                        {errors.vehicleType}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <FormikTextField
+                      name="registrationNo"
+                      label="Registration Number"
+                      required
+                      mono
+                      placeholder="e.g. WP AB-1234 or CAB-5678"
+                      helperText="Sri Lankan registration format (e.g. WP-CAB-1234, WP-CAD-1020, or CAB-5678)"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormikNumberField
+                      name="capacityKg"
+                      label="Capacity (Kg)"
+                      required
+                      mono
+                      min={activeClassConfig.minCapacityKg}
+                      max={activeClassConfig.maxCapacityKg}
+                      step="any"
+                      placeholder={activeClassConfig.placeholderCapacity}
+                      helperText={activeClassConfig.capacityHint}
+                    />
+
+                    <FormikNumberField
+                      name="volumeM3"
+                      label="Volume (m³)"
+                      required
+                      mono
+                      min="0.1"
+                      step="any"
+                      placeholder="12.5"
+                    />
+                  </div>
+                </div>
+
+              {/* Footer buttons */}
+              <div className="mt-8 border-t border-slate-border pt-4">
+                <div className="flex items-center justify-end space-x-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={onClose}
+                    disabled={isSubmitting || addVehicleMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting || addVehicleMutation.isPending}
+                    className="inline-flex items-center gap-1.5"
+                  >
+                    {(isSubmitting || addVehicleMutation.isPending) && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                    {isSubmitting || addVehicleMutation.isPending ? 'Registering...' : 'Add to Fleet'}
+                  </Button>
+                </div>
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="veh-reg" className="mb-1.5 block text-body-md font-semibold text-primary">
-                Registration Number <span className="text-status-red-text">*</span>
-              </label>
-              <Input
-                id="veh-reg"
-                required
-                mono
-                value={registrationNo}
-                onChange={(e) => setRegistrationNo(e.target.value)}
-                placeholder="e.g. WP AB-1234 or CAB-5678"
-              />
-              <p className="mt-1 text-body-xs text-on-surface-variant">
-                Official Department of Motor Traffic registration number
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="veh-cap" className="mb-1.5 block text-body-md font-semibold text-primary">
-                  Capacity (Kg) <span className="text-status-red-text">*</span>
-                </label>
-                <Input
-                  id="veh-cap"
-                  type="number"
-                  required
-                  mono
-                  min="1"
-                  step="any"
-                  value={capacityKg}
-                  onChange={(e) => setCapacityKg(e.target.value)}
-                  placeholder="2500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="veh-vol" className="mb-1.5 block text-body-md font-semibold text-primary">
-                  Volume (m³) <span className="text-status-red-text">*</span>
-                </label>
-                <Input
-                  id="veh-vol"
-                  type="number"
-                  required
-                  mono
-                  min="0.1"
-                  step="any"
-                  value={volumeM3}
-                  onChange={(e) => setVolumeM3(e.target.value)}
-                  placeholder="12.5"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Footer buttons */}
-          <div className="mt-8 border-t border-slate-border pt-4">
-            <div className="flex items-center justify-end space-x-3">
-              <Button type="button" variant="secondary" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={addVehicleMutation.isPending}
-                className="inline-flex items-center gap-1.5"
-              >
-                {addVehicleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {addVehicleMutation.isPending ? 'Registering...' : 'Add to Fleet'}
-              </Button>
-            </div>
-          </div>
-        </form>
+            </Form>
+          )}}
+        </Formik>
       </div>
     </div>
   )
