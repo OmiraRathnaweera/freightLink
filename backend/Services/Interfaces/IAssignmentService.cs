@@ -52,5 +52,5 @@ public interface IAssignmentService
     /// <summary>
     /// Fetches the AI workflow match recommendation, candidates, validation, and steps for a load.
     /// </summary>
-    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, bool rerun = false, CancellationToken cancellationToken = default);
 }

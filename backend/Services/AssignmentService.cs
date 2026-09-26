@@ -22,17 +22,23 @@ public class AssignmentService : IAssignmentService
     private readonly IEmailService _emailService;
     private readonly IPricingEstimatorService _pricingEstimatorService;
     private readonly IRouteService? _routeService;
+    private readonly IConfiguration? _configuration;
+    private readonly ILogger<AssignmentService>? _logger;
 
     public AssignmentService(
         AppDbContext dbContext,
         IEmailService emailService,
         IPricingEstimatorService pricingEstimatorService,
-        IRouteService? routeService = null)
+        IRouteService? routeService = null,
+        IConfiguration? configuration = null,
+        ILogger<AssignmentService>? logger = null)
     {
         _dbContext = dbContext;
         _emailService = emailService;
         _pricingEstimatorService = pricingEstimatorService;
         _routeService = routeService;
+        _configuration = configuration;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -273,6 +279,137 @@ public class AssignmentService : IAssignmentService
                 }, currentUserId, currentUserRole, cancellationToken);
             }
 
+            // Check if this is a direct load in Posted status being accepted by an agency from the marketplace
+            var load = await _dbContext.Loads
+                .Include(l => l.ShipperUser)
+                .FirstOrDefaultAsync(l => l.LoadId == assignmentOrLoadId, cancellationToken);
+
+            if (load != null && load.Status == LoadStatus.Posted)
+            {
+                if (currentUserRole != UserRole.AgencyStaff)
+                {
+                    throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only Agency Staff can accept marketplace loads.");
+                }
+
+                var staff = await _dbContext.AgencyStaff
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+                if (staff == null)
+                {
+                    throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "No agency staff record found.");
+                }
+
+                var alreadyAccepted = await _dbContext.Assignments
+                    .AnyAsync(a => a.LoadId == load.LoadId && a.Status == AssignmentStatus.Accepted, cancellationToken);
+
+                if (alreadyAccepted)
+                {
+                    throw new ApiException(HttpStatusCode.Conflict, ErrorCode.ASSIGNMENT_NOT_FOUND, "This load has already been accepted by another agency.");
+                }
+
+                var agency = await _dbContext.Agencies
+                    .FirstOrDefaultAsync(a => a.AgencyId == staff.AgencyId, cancellationToken);
+
+                var nowUtc = DateTimeOffset.UtcNow;
+
+                // Ensure an AgentWorkflowRun exists for foreign key constraint
+                var wfRun = await _dbContext.AgentWorkflowRuns
+                    .FirstOrDefaultAsync(r => r.LoadId == load.LoadId, cancellationToken);
+
+                if (wfRun == null)
+                {
+                    wfRun = new AgentWorkflowRun
+                    {
+                        WorkflowRunId = Guid.NewGuid(),
+                        LoadId = load.LoadId,
+                        TriggeredByUserId = currentUserId,
+                        AttemptNo = 1,
+                        Objective = $"Carrier marketplace match for load {load.ReferenceCode}",
+                        Status = WorkflowRunStatus.Completed,
+                        StartedAt = nowUtc,
+                        CompletedAt = nowUtc,
+                        CreatedAt = nowUtc,
+                        UpdatedAt = nowUtc
+                    };
+                    _dbContext.AgentWorkflowRuns.Add(wfRun);
+                }
+
+                assignment = new Assignment
+                {
+                    AssignmentId = Guid.NewGuid(),
+                    LoadId = load.LoadId,
+                    AgencyId = staff.AgencyId,
+                    WorkflowRunId = wfRun.WorkflowRunId,
+                    ProposedPrice = load.EstimatedPrice ?? 25000m,
+                    Status = AssignmentStatus.Accepted,
+                    CreatedAt = nowUtc,
+                    UpdatedAt = nowUtc,
+                    Load = load,
+                    Agency = agency!,
+                    WorkflowRun = wfRun
+                };
+                _dbContext.Assignments.Add(assignment);
+
+                var resp = new AssignmentResponse
+                {
+                    AssignmentId = assignment.AssignmentId,
+                    RespondedByUserId = currentUserId,
+                    Response = AssignmentResponseType.Accepted,
+                    DeclineReason = null,
+                    RespondedAt = nowUtc
+                };
+                _dbContext.AssignmentResponses.Add(resp);
+                assignment.Response = resp;
+
+                var prevStatus = load.Status;
+                load.Status = LoadStatus.Matched;
+                load.UpdatedAt = nowUtc;
+
+                _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+                {
+                    LoadStatusHistoryId = Guid.NewGuid(),
+                    LoadId = load.LoadId,
+                    FromStatus = prevStatus,
+                    ToStatus = LoadStatus.Matched,
+                    Reason = $"Accepted from marketplace by agency {agency?.Name ?? staff.AgencyId.ToString()}.",
+                    ChangedByUserId = currentUserId,
+                    ChangedAt = nowUtc
+                });
+
+                if (request?.DriverId.HasValue == true && request?.VehicleId.HasValue == true)
+                {
+                    var (vehId, drvId) = await ResolveVehicleAndDriverAsync(staff.AgencyId, request.VehicleId, request.DriverId, cancellationToken);
+                    var tripId = Guid.NewGuid();
+                    var trip = new Trip
+                    {
+                        TripId = tripId,
+                        AssignmentId = assignment.AssignmentId,
+                        VehicleId = vehId,
+                        DriverId = drvId,
+                        Status = TripStatus.Assigned,
+                        CreatedAt = nowUtc,
+                        UpdatedAt = nowUtc
+                    };
+                    _dbContext.Trips.Add(trip);
+                    assignment.Trip = trip;
+
+                    _dbContext.TripEvents.Add(new TripEvent
+                    {
+                        TripEventId = Guid.NewGuid(),
+                        TripId = tripId,
+                        RecordedByUserId = currentUserId,
+                        FromStatus = null,
+                        ToStatus = TripStatus.Assigned,
+                        Notes = string.IsNullOrWhiteSpace(request.Notes) ? "Trip created upon marketplace load acceptance." : request.Notes.Trim(),
+                        OccurredAt = nowUtc
+                    });
+                }
+
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                return MapToDetail(assignment);
+            }
+
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.ASSIGNMENT_NOT_FOUND, "The requested assignment could not be found.");
         }
 
@@ -293,8 +430,6 @@ public class AssignmentService : IAssignmentService
             return MapToDetail(assignment);
         }
 
-        var (vehicleId, driverId) = await ResolveVehicleAndDriverAsync(assignment.AgencyId, request?.VehicleId, request?.DriverId, cancellationToken);
-
         var now = DateTimeOffset.UtcNow;
         assignment.Status = AssignmentStatus.Accepted;
         assignment.UpdatedAt = now;
@@ -313,57 +448,59 @@ public class AssignmentService : IAssignmentService
             assignment.Response = assignmentResponse;
         }
 
-        if (assignment.Trip == null)
-        {
-            var tripId = Guid.NewGuid();
-            var trip = new Trip
-            {
-                TripId = tripId,
-                AssignmentId = assignment.AssignmentId,
-                VehicleId = vehicleId,
-                DriverId = driverId,
-                Status = TripStatus.Assigned,
-                CreatedAt = now,
-                UpdatedAt = now
-            };
-            _dbContext.Trips.Add(trip);
-            assignment.Trip = trip;
+        var (vehicleId, driverId) = await ResolveVehicleAndDriverAsync(assignment.AgencyId, request?.VehicleId, request?.DriverId, cancellationToken);
 
-            var tripEvent = new TripEvent
+        if (assignment.Trip == null)
             {
-                TripEventId = Guid.NewGuid(),
-                TripId = tripId,
-                RecordedByUserId = currentUserId,
-                FromStatus = null,
-                ToStatus = TripStatus.Assigned,
-                Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip created and vehicle/driver assigned upon approval." : request.Notes.Trim(),
-                OccurredAt = now
-            };
-            _dbContext.TripEvents.Add(tripEvent);
-        }
-        else
-        {
-            if (assignment.Trip.Status != TripStatus.Assigned)
-            {
-                var prevStatus = assignment.Trip.Status;
-                assignment.Trip.Status = TripStatus.Assigned;
-                assignment.Trip.VehicleId = vehicleId;
-                assignment.Trip.DriverId = driverId;
-                assignment.Trip.UpdatedAt = now;
+                var tripId = Guid.NewGuid();
+                var trip = new Trip
+                {
+                    TripId = tripId,
+                    AssignmentId = assignment.AssignmentId,
+                    VehicleId = vehicleId,
+                    DriverId = driverId,
+                    Status = TripStatus.Assigned,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                };
+                _dbContext.Trips.Add(trip);
+                assignment.Trip = trip;
 
                 var tripEvent = new TripEvent
                 {
                     TripEventId = Guid.NewGuid(),
-                    TripId = assignment.Trip.TripId,
+                    TripId = tripId,
                     RecordedByUserId = currentUserId,
-                    FromStatus = prevStatus,
+                    FromStatus = null,
                     ToStatus = TripStatus.Assigned,
-                    Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip updated to Assigned status upon approval." : request.Notes.Trim(),
+                    Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip created and vehicle/driver assigned upon approval." : request.Notes.Trim(),
                     OccurredAt = now
                 };
                 _dbContext.TripEvents.Add(tripEvent);
             }
-        }
+            else
+            {
+                if (assignment.Trip.Status != TripStatus.Assigned)
+                {
+                    var prevStatus = assignment.Trip.Status;
+                    assignment.Trip.Status = TripStatus.Assigned;
+                    assignment.Trip.VehicleId = vehicleId;
+                    assignment.Trip.DriverId = driverId;
+                    assignment.Trip.UpdatedAt = now;
+
+                    var tripEvent = new TripEvent
+                    {
+                        TripEventId = Guid.NewGuid(),
+                        TripId = assignment.Trip.TripId,
+                        RecordedByUserId = currentUserId,
+                        FromStatus = prevStatus,
+                        ToStatus = TripStatus.Assigned,
+                        Notes = string.IsNullOrWhiteSpace(request?.Notes) ? "Trip updated to Assigned status upon approval." : request.Notes.Trim(),
+                        OccurredAt = now
+                    };
+                    _dbContext.TripEvents.Add(tripEvent);
+                }
+            }
 
         if (assignment.Load != null)
         {
@@ -533,6 +670,7 @@ public class AssignmentService : IAssignmentService
 
         if (run.Load != null)
         {
+            run.Load.EstimatedPrice = assignment.ProposedPrice;
             var prevLoadStatus = run.Load.Status;
             run.Load.Status = LoadStatus.Matched;
             run.Load.UpdatedAt = now;
@@ -809,6 +947,8 @@ public class AssignmentService : IAssignmentService
             UpdatedAt = now
         };
         _dbContext.Assignments.Add(assignment);
+
+        load.EstimatedPrice = proposedPrice;
 
         if (load.Status != LoadStatus.Matched)
         {
@@ -1121,6 +1261,7 @@ public class AssignmentService : IAssignmentService
         Guid loadId,
         Guid currentUserId,
         UserRole currentUserRole,
+        bool rerun = false,
         CancellationToken cancellationToken = default)
     {
         var load = await _dbContext.Loads
@@ -1175,6 +1316,109 @@ public class AssignmentService : IAssignmentService
             .ThenByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
+        var hasValidStep3 = run?.Steps.Any(s => s.AgentRole == AgentRole.MatchingPricing && s.Status == AgentStepStatus.Succeeded) == true;
+
+        // If explicitly requested to rerun, or if no prior workflow run exists, or if prior run did not finish Step 3,
+        // automatically trigger the live Python Agentic AI pipeline (Agent 1-4)
+        if (rerun || run == null || !hasValidStep3)
+        {
+            try
+            {
+                var activeAgenciesForAgent = await _dbContext.Agencies
+                    .Include(a => a.Vehicles)
+                    .Include(a => a.Drivers)
+                        .ThenInclude(d => d.User)
+                    .Where(a => (a.Status == AgencyStatus.Active || a.Status == AgencyStatus.Verified)
+                             && a.Vehicles.Any(v => v.Status == VehicleStatus.Available)
+                             && a.Drivers.Any(d => d.Status == DriverStatus.Active))
+                    .OrderBy(a => a.CreatedAt)
+                    .Take(7)
+                    .ToListAsync(cancellationToken);
+
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(35) };
+                var agentApiKey = _configuration?["AGENT_SERVICE_API_KEY"] ?? "FreightLink-Agent-Secret-9384758239";
+                httpClient.DefaultRequestHeaders.Add("X-Internal-Api-Key", agentApiKey);
+
+                var agentUrl = _configuration?["AGENT_API_BASE_URL"] ?? "http://localhost:8001";
+                var candidatePayloadList = activeAgenciesForAgent.Select(a => new
+                {
+                    agencyId = a.AgencyId,
+                    name = a.Name,
+                    yardAddress = a.YardAddress,
+                    yardLat = a.YardLat,
+                    yardLng = a.YardLng,
+                    availableVehicleClasses = a.Vehicles
+                        .Where(v => v.Status == VehicleStatus.Available)
+                        .Select(v => v.CapacityKg > 10000m ? "ContainerTruck" : (v.CapacityKg > 1500m ? "MediumLorry" : "MiniTruck"))
+                        .Distinct()
+                        .ToList(),
+                    availableVehicles = a.Vehicles.Where(v => v.Status == VehicleStatus.Available).Select(v => new
+                    {
+                        vehicleId = v.VehicleId,
+                        registrationNo = v.RegistrationNo,
+                        vehicleType = v.VehicleType.ToString(),
+                        capacityKg = v.CapacityKg,
+                        volumeM3 = v.VolumeM3
+                    }).ToList(),
+                    activeDrivers = a.Drivers.Where(d => d.Status == DriverStatus.Active).Select(d => new
+                    {
+                        driverId = d.DriverId,
+                        name = d.User != null && !string.IsNullOrWhiteSpace(d.User.FullName) ? d.User.FullName : "Licensed Carrier Driver",
+                        licenceNo = d.LicenceNo
+                    }).ToList()
+                }).ToList();
+
+                var nextAttemptNo = (run?.AttemptNo ?? 0) + 1;
+                var workflowPayload = new
+                {
+                    load_id = load.LoadId,
+                    triggered_by_user_id = currentUserId != Guid.Empty ? currentUserId : (load.ShipperUserId != Guid.Empty ? load.ShipperUserId : Guid.NewGuid()),
+                    attempt_no = nextAttemptNo,
+                    candidate_agencies = candidatePayloadList,
+                    load_context = new
+                    {
+                        weightKg = load.WeightKg,
+                        volumeM3 = load.VolumeM3,
+                        cargoDescription = load.CargoDescription ?? "General Cargo",
+                        pickupAddress = load.PickupAddress,
+                        dropoffAddress = load.DropoffAddress,
+                        pickupLat = load.PickupLat,
+                        pickupLng = load.PickupLng,
+                        dropoffLat = load.DropoffLat,
+                        dropoffLng = load.DropoffLng,
+                        candidateAgencies = candidatePayloadList
+                    }
+                };
+
+                var jsonContent = new StringContent(
+                    System.Text.Json.JsonSerializer.Serialize(workflowPayload),
+                    System.Text.Encoding.UTF8,
+                    "application/json");
+
+                var agentResponse = await httpClient.PostAsync($"{agentUrl.TrimEnd('/')}/workflows/run", jsonContent, cancellationToken);
+                if (agentResponse.IsSuccessStatusCode)
+                {
+                    run = await _dbContext.AgentWorkflowRuns
+                        .Include(r => r.Steps)
+                        .Include(r => r.MatchCandidates)
+                            .ThenInclude(mc => mc.Agency)
+                        .Where(r => r.LoadId == loadId)
+                        .OrderByDescending(r => r.AttemptNo)
+                        .ThenByDescending(r => r.CreatedAt)
+                        .FirstOrDefaultAsync(cancellationToken);
+                }
+                else
+                {
+                    var errorBody = await agentResponse.Content.ReadAsStringAsync(cancellationToken);
+                    _logger?.LogWarning("Agent /workflows/run returned status {StatusCode}: {ErrorBody}", agentResponse.StatusCode, errorBody);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to invoke Python Agentic AI pipeline; falling back to local calculation");
+            }
+        }
+
         if (run != null)
         {
             result.WorkflowRunId = run.WorkflowRunId;
@@ -1216,7 +1460,46 @@ public class AssignmentService : IAssignmentService
                     var price = root.TryGetProperty("proposedPrice", out var pPrice) ? pPrice.GetDecimal() : (load.EstimatedPrice ?? 25000m);
                     var justification = root.TryGetProperty("selectionJustification", out var just) ? just.GetString() ?? "" : "";
 
-                    var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == selAgencyId, cancellationToken);
+                    Guid? assignedVehicleId = null;
+                    string? assignedVehicleRegNo = null;
+                    if (root.TryGetProperty("assignedVehicle", out var avProp) && avProp.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        if (avProp.TryGetProperty("vehicleId", out var vi) && Guid.TryParse(vi.GetString(), out var vig)) assignedVehicleId = vig;
+                        if (avProp.TryGetProperty("registrationNo", out var vr)) assignedVehicleRegNo = vr.GetString();
+                    }
+
+                    Guid? assignedDriverId = null;
+                    string? assignedDriverName = null;
+                    if (root.TryGetProperty("assignedDriver", out var adProp) && adProp.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        if (adProp.TryGetProperty("driverId", out var di) && Guid.TryParse(di.GetString(), out var dig)) assignedDriverId = dig;
+                        if (adProp.TryGetProperty("name", out var dn)) assignedDriverName = dn.GetString();
+                    }
+
+                    var agency = await _dbContext.Agencies
+                        .Include(a => a.Vehicles)
+                        .Include(a => a.Drivers)
+                            .ThenInclude(d => d.User)
+                        .FirstOrDefaultAsync(a => a.AgencyId == selAgencyId, cancellationToken);
+
+                    if (assignedVehicleId == null && agency != null)
+                    {
+                        var dbVeh = agency.Vehicles?.FirstOrDefault(v => v.Status == VehicleStatus.Available);
+                        if (dbVeh != null)
+                        {
+                            assignedVehicleId = dbVeh.VehicleId;
+                            assignedVehicleRegNo = dbVeh.RegistrationNo;
+                        }
+                    }
+                    if (assignedDriverId == null && agency != null)
+                    {
+                        var dbDr = agency.Drivers?.FirstOrDefault(d => d.Status == DriverStatus.Active);
+                        if (dbDr != null)
+                        {
+                            assignedDriverId = dbDr.DriverId;
+                            assignedDriverName = dbDr.User?.FullName ?? "Licensed Carrier Driver";
+                        }
+                    }
 
                     result.RecommendedAgency = new FreightLink.Api.DTOs.Loads.RecommendedAgencyDto
                     {
@@ -1230,12 +1513,121 @@ public class AssignmentService : IAssignmentService
                         PositioningDistanceKm = posDist,
                         CargoDistanceKm = cargoDist,
                         EstimatedPrice = price,
-                        SelectionJustification = justification
+                        SelectionJustification = justification,
+                        AssignedVehicleId = assignedVehicleId,
+                        AssignedVehicleRegNo = assignedVehicleRegNo,
+                        AssignedDriverId = assignedDriverId,
+                        AssignedDriverName = assignedDriverName
                     };
                 }
                 catch
                 {
                     // Fall back to entity queries below
+                }
+            }
+
+            // Extract ranked alternate candidates from Step 3 if available
+            if (result.RecommendedAgency != null && step3?.OutputJson != null)
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(step3.OutputJson);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("rankedCandidates", out var rankedEl) && rankedEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                    {
+                        var rankIdx = 2;
+                        foreach (var rCand in rankedEl.EnumerateArray())
+                        {
+                            var rAgencyId = rCand.TryGetProperty("agencyId", out var raid) && Guid.TryParse(raid.GetString(), out var rg) ? rg : Guid.Empty;
+                            if (rAgencyId != Guid.Empty && rAgencyId != result.RecommendedAgency.AgencyId)
+                            {
+                                var rEta = rCand.TryGetProperty("etaMinutes", out var reta) ? reta.GetInt32() : (int?)null;
+                                var rDist = rCand.TryGetProperty("distanceKm", out var rdist) ? rdist.GetDecimal() : (decimal?)null;
+                                var altAgency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == rAgencyId, cancellationToken);
+                                if (altAgency != null && !result.AlternateCandidates.Any(ac => ac.AgencyId == altAgency.AgencyId))
+                                {
+                                    result.AlternateCandidates.Add(new FreightLink.Api.DTOs.Loads.AlternateCandidateAgencyDto
+                                    {
+                                        AgencyId = altAgency.AgencyId,
+                                        Name = altAgency.Name,
+                                        YardAddress = altAgency.YardAddress,
+                                        Rank = rankIdx++,
+                                        PositioningDistanceKm = rDist,
+                                        PositioningEtaMinutes = rEta,
+                                        Eligible = true
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fall back to MatchCandidates
+                }
+            }
+
+            // Fallback from run.MatchCandidates if AlternateCandidates is empty
+            if (result.AlternateCandidates.Count == 0 && run.MatchCandidates.Count > 0 && result.RecommendedAgency != null)
+            {
+                var altCandidates = run.MatchCandidates
+                    .Where(mc => mc.AgencyId != result.RecommendedAgency.AgencyId)
+                    .OrderBy(mc => mc.Rank)
+                    .Take(4)
+                    .ToList();
+
+                foreach (var alt in altCandidates)
+                {
+                    result.AlternateCandidates.Add(new FreightLink.Api.DTOs.Loads.AlternateCandidateAgencyDto
+                    {
+                        AgencyId = alt.AgencyId,
+                        Name = alt.Agency?.Name ?? "Alternate Carrier",
+                        YardAddress = alt.Agency?.YardAddress ?? "Carrier Logistics Yard",
+                        Rank = alt.Rank > 1 ? alt.Rank : result.AlternateCandidates.Count + 2,
+                        PositioningDistanceKm = null,
+                        PositioningEtaMinutes = null,
+                        Eligible = alt.Eligible
+                    });
+                }
+            }
+
+            // Fallback from active agencies in DB if AlternateCandidates is still empty
+            if (result.AlternateCandidates.Count == 0 && result.RecommendedAgency != null)
+            {
+                var otherAgencies = await _dbContext.Agencies
+                    .Where(a => (a.Status == AgencyStatus.Active || a.Status == AgencyStatus.Verified) && a.AgencyId != result.RecommendedAgency.AgencyId)
+                    .OrderBy(a => a.CreatedAt)
+                    .Take(4)
+                    .ToListAsync(cancellationToken);
+
+                var altRank = 2;
+                foreach (var other in otherAgencies)
+                {
+                    decimal altDist = 14.0m + ((altRank - 2) * 12.0m);
+                    int altEta = 22 + ((altRank - 2) * 15);
+                    if (_routeService != null)
+                    {
+                        var route = await _routeService.GetRouteAndEtaAsync(
+                            other.YardLat, other.YardLng,
+                            load.PickupLat, load.PickupLng,
+                            cancellationToken);
+                        if (route.Success && route.DistanceKm.HasValue && route.EtaMinutes.HasValue)
+                        {
+                            altDist = route.DistanceKm.Value;
+                            altEta = route.EtaMinutes.Value;
+                        }
+                    }
+
+                    result.AlternateCandidates.Add(new FreightLink.Api.DTOs.Loads.AlternateCandidateAgencyDto
+                    {
+                        AgencyId = other.AgencyId,
+                        Name = other.Name,
+                        YardAddress = other.YardAddress,
+                        Rank = altRank++,
+                        PositioningDistanceKm = altDist,
+                        PositioningEtaMinutes = altEta,
+                        Eligible = true
+                    });
                 }
             }
 

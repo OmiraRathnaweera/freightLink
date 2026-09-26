@@ -126,6 +126,17 @@ public class AgenciesController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>
+    /// Seeds default active carrier agencies across Sri Lanka for testing and demonstration.
+    /// </summary>
+    [HttpPost("seed-defaults")]
+    [AllowAnonymous]
+    public async Task<ActionResult> SeedDefaultAgencies(CancellationToken cancellationToken)
+    {
+        await _agencyService.SeedDefaultAgenciesIfNotExistsAsync(cancellationToken);
+        return Ok(new { message = "Default active carrier agencies seeded successfully." });
+    }
+
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);

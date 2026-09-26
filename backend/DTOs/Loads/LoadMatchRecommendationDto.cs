@@ -34,6 +34,10 @@ public class RecommendedAgencyDto
     public decimal? CargoDistanceKm { get; set; }
     public decimal EstimatedPrice { get; set; }
     public string SelectionJustification { get; set; } = string.Empty;
+    public Guid? AssignedVehicleId { get; set; }
+    public string? AssignedVehicleRegNo { get; set; }
+    public Guid? AssignedDriverId { get; set; }
+    public string? AssignedDriverName { get; set; }
 }
 
 public class AlternateCandidateAgencyDto

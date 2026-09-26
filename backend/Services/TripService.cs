@@ -532,24 +532,20 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.Admin && currentUserRole != UserRole.AgencyStaff)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff or Admin may create and dispatch trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may create and dispatch trips.");
         }
 
-        Guid? callerAgencyId = null;
-        if (currentUserRole == UserRole.AgencyStaff)
-        {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "No agency staff record found for caller.");
-            }
-            callerAgencyId = agencyStaff.AgencyId;
+        if (agencyStaff == null)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "No agency staff record found for caller.");
         }
+        var callerAgencyId = agencyStaff.AgencyId;
 
         var assignment = await _dbContext.Assignments
             .Include(a => a.Load)
@@ -562,7 +558,7 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.ASSIGNMENT_NOT_FOUND, "The requested assignment could not be found.");
         }
 
-        if (callerAgencyId.HasValue && assignment.AgencyId != callerAgencyId.Value)
+        if (assignment.AgencyId != callerAgencyId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ASSIGNMENT_NOT_OWNED, "You do not have access to dispatch this assignment.");
         }
@@ -709,9 +705,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.Admin && currentUserRole != UserRole.AgencyStaff)
+        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff or Admin may update trip assignments.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may update trip assignments. Drivers are not permitted to update trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -729,7 +725,7 @@ public class TripService : ITripService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null || trip.Assignment.AgencyId != agencyStaff.AgencyId)
+            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
             }
@@ -841,8 +837,14 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
+        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may cancel trips. Drivers are not permitted to cancel trips.");
+        }
+
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -856,25 +858,10 @@ public class TripService : ITripService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null || trip.Assignment.AgencyId != agencyStaff.AgencyId)
+            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
             }
-        }
-        else if (currentUserRole == UserRole.Driver)
-        {
-            var driver = await _dbContext.Drivers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(d => d.UserId == currentUserId, cancellationToken);
-
-            if (driver == null || trip.DriverId != driver.DriverId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
-            }
-        }
-        else if (currentUserRole != UserRole.Admin)
-        {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
         }
 
         if (trip.Status == TripStatus.Delivered || trip.Status == TripStatus.Cancelled)
@@ -883,7 +870,7 @@ public class TripService : ITripService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var reason = string.IsNullOrWhiteSpace(request?.Reason) ? "Trip cancelled." : request.Reason.Trim();
+        var reason = string.IsNullOrWhiteSpace(request?.Reason) ? "Trip cancelled by agency." : request.Reason.Trim();
 
         var tripEvent = new TripEvent
         {
@@ -900,6 +887,31 @@ public class TripService : ITripService
         trip.UpdatedAt = now;
 
         _dbContext.TripEvents.Add(tripEvent);
+
+        if (trip.Assignment != null)
+        {
+            trip.Assignment.Status = AssignmentStatus.Cancelled;
+            trip.Assignment.UpdatedAt = now;
+
+            if (trip.Assignment.Load != null)
+            {
+                var prevLoadStatus = trip.Assignment.Load.Status;
+                trip.Assignment.Load.Status = LoadStatus.Cancelled;
+                trip.Assignment.Load.UpdatedAt = now;
+
+                _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+                {
+                    LoadStatusHistoryId = Guid.NewGuid(),
+                    LoadId = trip.Assignment.Load.LoadId,
+                    FromStatus = prevLoadStatus,
+                    ToStatus = LoadStatus.Cancelled,
+                    Reason = reason,
+                    ChangedByUserId = currentUserId,
+                    ChangedAt = now
+                });
+            }
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return await GetByIdAsync(tripId, currentUserId, currentUserRole, cancellationToken);
@@ -912,8 +924,14 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
+        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may delete trips. Drivers are not permitted to delete trips.");
+        }
+
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
             .Include(t => t.Events)
             .Include(t => t.Evidence)
             .Include(t => t.Invoice)
@@ -936,21 +954,6 @@ public class TripService : ITripService
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
             }
         }
-        else if (currentUserRole == UserRole.Driver)
-        {
-            var driver = await _dbContext.Drivers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(d => d.UserId == currentUserId, cancellationToken);
-
-            if (driver == null || trip.DriverId != driver.DriverId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
-            }
-        }
-        else if (currentUserRole != UserRole.Admin)
-        {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
-        }
 
         if (trip.Status == TripStatus.Delivered)
         {
@@ -960,6 +963,29 @@ public class TripService : ITripService
         if (trip.Status == TripStatus.PickedUp || trip.Status == TripStatus.InTransit)
         {
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Active trips in pickup or transit must be cancelled before they can be deleted.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var assignment = trip.Assignment;
+        var load = assignment?.Load;
+
+        // Requirement 4: When an agency deletes a shipment load it has received, the load's status must revert to "Posted," allowing another agency to accept it.
+        if (load != null)
+        {
+            var prevLoadStatus = load.Status;
+            load.Status = LoadStatus.Posted;
+            load.UpdatedAt = now;
+
+            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            {
+                LoadStatusHistoryId = Guid.NewGuid(),
+                LoadId = load.LoadId,
+                FromStatus = prevLoadStatus,
+                ToStatus = LoadStatus.Posted,
+                Reason = "Agency deleted trip/shipment; load reverted to Posted for other agencies to accept.",
+                ChangedByUserId = currentUserId,
+                ChangedAt = now
+            });
         }
 
         if (trip.Events.Count > 0)
@@ -983,6 +1009,13 @@ public class TripService : ITripService
         }
 
         _dbContext.Trips.Remove(trip);
+
+        if (assignment != null)
+        {
+            assignment.Status = AssignmentStatus.Cancelled;
+            assignment.UpdatedAt = now;
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -1028,6 +1061,8 @@ public class TripService : ITripService
                 Name = "Samagi Express Logistics",
                 BusinessRegNo = "PV-88991",
                 YardAddress = "45 Harbor Access Road, Peliyagoda",
+                YardLat = 6.9667m,
+                YardLng = 79.8917m,
                 Status = AgencyStatus.Active,
                 CreatedAt = now,
                 UpdatedAt = now
@@ -1037,6 +1072,9 @@ public class TripService : ITripService
         else
         {
             agency.Status = AgencyStatus.Active;
+            agency.YardAddress = "45 Harbor Access Road, Peliyagoda";
+            agency.YardLat = 6.9667m;
+            agency.YardLng = 79.8917m;
         }
 
         // 2. Users (Drivers)
