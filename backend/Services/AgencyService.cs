@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -184,6 +185,11 @@ public class AgencyService : IAgencyService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
         }
 
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(agency.Status);
+        }
+
         if (request.Name != null) agency.Name = request.Name;
         if (request.YardAddress != null) agency.YardAddress = request.YardAddress;
         if (request.YardLat.HasValue) agency.YardLat = request.YardLat.Value;
@@ -335,6 +341,19 @@ public class AgencyService : IAgencyService
     public async Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var agency = await _dbContext.Agencies.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+            if (agency == null)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
+            }
+
+            AgencyStatusGuard.EnsureActive(agency.Status);
+        }
 
         var vehicle = new Vehicle
         {

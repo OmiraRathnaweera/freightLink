@@ -72,6 +72,11 @@ public class InvoiceService : IInvoiceService
         // Verify caller has permission to generate an invoice for this trip
         EnforceTripPartyAuthorization(trip, currentUserId, role);
 
+        if (role == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+        }
+
         // Check if an invoice already exists for this trip (1-to-1 relationship)
         var exists = await _dbContext.Invoices.AnyAsync(i => i.TripId == request.TripId, cancellationToken);
         if (exists)
@@ -294,6 +299,11 @@ public class InvoiceService : IInvoiceService
 
         EnforceTripPartyWriteAuthorization(invoice.Trip, currentUserId, role);
 
+        if (role == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
+
         if (!InvoiceStatusTransitionRules.CanEdit(invoice.Status))
         {
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_INVOICE_STATUS_TRANSITION, $"Invoice in status '{invoice.Status}' cannot be edited.");
@@ -345,6 +355,11 @@ public class InvoiceService : IInvoiceService
 
         EnforceTripPartyWriteAuthorization(invoice.Trip, currentUserId, role);
 
+        if (role == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
+
         if (InvoiceStatusTransitionRules.IsGatewayOwned(request.Status))
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.INVOICE_STATUS_GATEWAY_OWNED,
@@ -388,6 +403,11 @@ public class InvoiceService : IInvoiceService
         }
 
         EnforceTripPartyWriteAuthorization(invoice.Trip, currentUserId, role);
+
+        if (role == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
 
         if (!InvoiceStatusTransitionRules.CanVoid(invoice.Status))
         {

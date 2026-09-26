@@ -50,6 +50,13 @@ public enum ErrorCode
     /// <summary>A state change was attempted on an agency whose current status doesn't allow it.</summary>
     INVALID_AGENCY_STATUS_TRANSITION,
 
+    /// <summary>
+    /// An AgencyStaff caller attempted an operation other than compliance-document upload/read or
+    /// agency profile read while their agency's <c>Status</c> is not <c>Active</c>. Thrown by
+    /// <see cref="FreightLink.Api.Common.Domain.AgencyStatusGuard.EnsureActive"/>.
+    /// </summary>
+    AGENCY_NOT_ACTIVE,
+
     /// <summary>A load cancellation was attempted without a reason.</summary>
     LOAD_CANCEL_REASON_REQUIRED,
 

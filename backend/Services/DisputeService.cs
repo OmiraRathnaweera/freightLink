@@ -49,6 +49,11 @@ public class DisputeService : IDisputeService
 
         EnforceTripPartyAuthorization(trip, currentUserId, role);
 
+        if (role == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+        }
+
         // Application-level pre-check: gives a readable 409 on the normal (non-concurrent) path
         // and avoids a round-trip to SaveChanges when the caller can clearly see the conflict.
         // This check is NOT a substitute for the catch below — two concurrent requests that both
