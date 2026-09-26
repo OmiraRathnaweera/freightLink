@@ -19,6 +19,7 @@ namespace FreightLink.Api.Controllers;
 [Authorize]
 public class AssignmentsController : ControllerBase
 {
+    private const string AgencyStaffRole = nameof(UserRole.AgencyStaff);
     private const string AgencyStaffOrAdminRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
     private const string AnyAssignmentRole = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Shipper) + "," + nameof(UserRole.Admin);
 
@@ -56,7 +57,7 @@ public class AssignmentsController : ControllerBase
     /// and creating/updating the Trip to Assigned status (ADR-017 / Y3S01-143).
     /// </summary>
     [HttpPost("{loadId:guid}/accept")]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<ActionResult<AssignmentResponseDto>> Accept(Guid loadId, [FromBody] ApproveAssignmentDto? request, CancellationToken cancellationToken)
     {
         var result = await _assignmentService.AcceptAsync(loadId, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -67,7 +68,7 @@ public class AssignmentsController : ControllerBase
     /// Declines a proposed load assignment (triggers auto-retry notification per ADR-018).
     /// </summary>
     [HttpPost("{loadId:guid}/decline")]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<ActionResult<AssignmentResponseDto>> Decline(Guid loadId, [FromBody] DeclineAssignmentDto? request, CancellationToken cancellationToken)
     {
         var result = await _assignmentService.DeclineAsync(loadId, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);

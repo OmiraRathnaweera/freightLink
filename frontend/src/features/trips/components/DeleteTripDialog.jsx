@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { AlertTriangle, Trash2, Truck, User, X } from "lucide-react";
 import { toast } from "sonner";
 import Button from "../../../components/Button.jsx";
@@ -63,7 +62,7 @@ function DeleteTripDialog({ tripId, trip, onClose, onDeleted }) {
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
           <p className="text-body-md text-on-surface-variant">
             Are you sure you want to permanently delete trip <strong className="text-on-surface font-mono">{formattedTripId}</strong>?
-            This will completely remove the trip and its records from the system. If you no longer want this trip, deleting it will fully clear it and allow the underlying assignment to be managed or re-dispatched.
+            This will completely remove the trip from the system, and the shipment load's status will revert to <strong>"Posted"</strong>, allowing another agency to accept it from the marketplace.
           </p>
 
           <div className="rounded-md bg-amber-50 p-3 text-xs text-amber-800 border border-amber-200 flex items-start gap-2">

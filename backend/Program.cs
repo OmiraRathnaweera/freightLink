@@ -208,9 +208,30 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(corsPolicyName, policy =>
     {
-        policy.WithOrigins(corsOrigins)
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin)) return false;
+                try
+                {
+                    var uri = new Uri(origin);
+                    return uri.Host == "localhost" || uri.Host == "127.0.0.1" || corsOrigins.Contains(origin);
+                }
+                catch
+                {
+                    return false;
+                }
+            })
             .AllowAnyHeader()
             .AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
     });
 });
 
@@ -233,7 +254,8 @@ builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 builder.Services.AddScoped<ITripService, TripService>();
-builder.Services.AddScoped<IRouteService, RouteService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IRouteService, RouteService>();
 
 var app = builder.Build();
 
@@ -267,12 +289,17 @@ if (!app.Environment.IsProduction())
     db.Database.Migrate();
 }
 
-// Seed the default Admin account (from ADMIN_USER_EMAIL/ADMIN_USER_PASSWORD) once per startup,
-// in every environment — there is no public admin registration endpoint.
+// Seed the default Admin account, active carrier agencies, and pricing configuration once per startup.
 using (var seedScope = app.Services.CreateScope())
 {
     var authService = seedScope.ServiceProvider.GetRequiredService<IAuthService>();
     await authService.SeedAdminIfNotExistsAsync();
+
+    var agencyService = seedScope.ServiceProvider.GetRequiredService<IAgencyService>();
+    await agencyService.SeedDefaultAgenciesIfNotExistsAsync();
+
+    var pricingConfigService = seedScope.ServiceProvider.GetRequiredService<IPricingConfigService>();
+    await pricingConfigService.SeedDefaultPricingConfigIfNotExistsAsync();
 }
 
 // Configure the HTTP request pipeline.
@@ -284,14 +311,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Disabled: local/sandbox clients (e.g. the PayHere webhook callback) hit this API over plain
-// HTTP, and the redirect was breaking that flow — see the PayHere sandbox checkout integration.
-// app.UseHttpsRedirection();
+// Skipped only in Development: local/sandbox clients (e.g. the PayHere webhook callback, which
+// posts to a localhost NOTIFYURL — see .env.example) hit this API over plain HTTP, and the
+// redirect was breaking that flow. Staging/Production still enforce HTTPS.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors(corsPolicyName);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "freightlink-backend" }));
 
 app.MapControllers();
 

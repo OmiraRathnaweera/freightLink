@@ -129,4 +129,10 @@ public interface IPricingConfigService
     /// </summary>
     /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if any of the three current rows doesn't exist.</exception>
     Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(VehicleClass classLabel, FuelType fuelType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Seeds the default fuel prices, formula configuration, and vehicle class efficiencies
+    /// if they have not been configured yet, ensuring Agent 3 pricing calculation succeeds.
+    /// </summary>
+    Task SeedDefaultPricingConfigIfNotExistsAsync(CancellationToken cancellationToken = default);
 }

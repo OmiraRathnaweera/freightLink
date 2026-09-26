@@ -212,3 +212,23 @@ export function useAddVehicleMutation(options) {
   })
 }
 
+/**
+ * GET /agencies/my/fleet or /agencies/{agencyId}/fleet
+ * Combined vehicles + drivers roster for the caller's own agency, or (Admin)
+ * a specified agency — backs the Admin dashboard's per-agency fleet drill-down.
+ */
+export async function getAgencyFleet(agencyId) {
+  if (agencyId) {
+    return api.get(`/agencies/${agencyId}/fleet`)
+  }
+  return api.get('/agencies/my/fleet')
+}
+
+export function useAgencyFleetQuery(agencyId, options) {
+  return useQuery({
+    queryKey: ['agencies', agencyId ?? 'my', 'fleet'],
+    queryFn: () => getAgencyFleet(agencyId),
+    ...options,
+  })
+}
+

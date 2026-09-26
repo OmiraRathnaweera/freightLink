@@ -260,6 +260,16 @@ public enum ErrorCode
     /// </summary>
     AGENT_STEP_DUPLICATE,
 
+    /// <summary>
+    /// The specified <c>AgentStep</c> could not be found under the given workflow run.
+    /// </summary>
+    AGENT_STEP_NOT_FOUND,
+
+    /// <summary>
+    /// A tool call with this attempt number already exists for this (AgentStep, ToolName) pair (mirrors <c>uq_toolcall_attempt</c>).
+    /// </summary>
+    TOOL_CALL_DUPLICATE_ATTEMPT,
+
     /// <summary>The requested trip could not be found.</summary>
     TRIP_NOT_FOUND,
 

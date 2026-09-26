@@ -1,14 +1,43 @@
 import { Link } from 'react-router-dom'
-import { ShieldAlert } from 'lucide-react'
+import { LogOut, Smartphone, ShieldAlert } from 'lucide-react'
 import Button from '../../../components/Button.jsx'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
+import { useAppDispatch } from '../../../hooks/useAppDispatch.js'
+import { logout } from '../store/authSlice.js'
+import { UserRole } from '../../../lib/enums.js'
 
-// Reached via ProtectedRoute's role check (src/routes/ProtectedRoute.jsx).
-// Same icon-circle/headline/body visual recipe EmptyState/ErrorState use,
-// but built bespoke rather than reusing ErrorState directly — its
-// `onRetry` slot renders a fixed "Retry" button, the wrong action here
-// (.claude/rules/frontend-design.md #2: composition over growing a shared
-// component's prop list for one screen).
 function UnauthorizedPage() {
+  const role = useAppSelector((state) => state.auth.role)
+  const dispatch = useAppDispatch()
+  const isDriver = role === UserRole.DRIVER
+
+  if (isDriver) {
+    return (
+      <div className="flex flex-col items-center gap-4 px-6 py-16 text-center max-w-md mx-auto">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Smartphone className="h-8 w-8" strokeWidth={1.5} />
+        </div>
+        <h3 className="text-headline-md text-on-surface">Mobile Access Required</h3>
+        <p className="text-body-md text-on-surface-variant">
+          Driver accounts do not have access to the web portal. Drivers must use the <strong>FreightLink Mobile App</strong> to view assignments, navigate routes, and upload delivery proofs.
+        </p>
+        <div className="rounded-lg border border-slate-200 bg-surface-container-low p-4 text-xs text-on-surface-variant w-full text-left space-y-1">
+          <p className="font-semibold text-on-surface">Available Platforms:</p>
+          <p>• Android (APK / Play Store)</p>
+          <p>• iOS (TestFlight / App Store)</p>
+        </div>
+        <Button
+          variant="secondary"
+          onClick={() => dispatch(logout())}
+          className="mt-2 inline-flex items-center gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          Log Out
+        </Button>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-status-red-bg">

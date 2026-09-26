@@ -30,12 +30,13 @@ async def report(
     input_data: dict[str, Any] | None = None,
     output_data: dict[str, Any] | None = None,
     error_message: str | None = None,
-) -> None:
+) -> UUID | None:
     """Builds a ReportAgentStepRequest and POSTs it to the backend.
 
     Raises BackendClientError (propagated from report_step) if the report
     can't be delivered - the caller must decide how to surface that,
     since the backend has no other way to learn this step happened.
+    Returns the agent_step_id assigned by the backend, or None.
     """
     completed_at = datetime.now(UTC)
     duration_ms = int((completed_at - started_at).total_seconds() * 1000)
@@ -52,7 +53,7 @@ async def report(
         completed_at=completed_at,
     )
 
-    await report_step(workflow_run_id, request)
+    return await report_step(workflow_run_id, request)
 
 
 def now() -> datetime:

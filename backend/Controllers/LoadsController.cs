@@ -32,6 +32,7 @@ public class LoadsController : ControllerBase
 
     /// <summary>See <see cref="ShipperRole"/>.</summary>
     private const string ShipperOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.Admin);
+    private const string ShipperOrAgencyStaffOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
 
     private readonly ILoadService _loadService;
     private readonly IAssignmentService _assignmentService;
@@ -56,13 +57,14 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
-    /// Fetches a single load. A Shipper may only fetch a load they own; an Admin may fetch any load.
+    /// Fetches a single load. A Shipper may only fetch a load they own; an Admin may fetch any load;
+    /// an Agency may fetch available marketplace loads (Posted) or loads assigned to their agency.
     /// </summary>
     /// <param name="id">The load's id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the matching <see cref="LoadResponseDto"/>.</returns>
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = ShipperOrAdminRoles)]
+    [Authorize(Roles = ShipperOrAgencyStaffOrAdminRoles)]
     public async Task<ActionResult<LoadResponseDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
         var result = await _loadService.GetByIdAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -70,14 +72,14 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
-    /// Searches, filters, sorts, and paginates loads. A Shipper always sees only their own loads,
-    /// regardless of any <c>shipperUserId</c> filter supplied; an Admin sees every load.
+    /// Searches, filters, sorts, and paginates loads. A Shipper sees their own loads; an Admin sees every load;
+    /// an Agency sees open marketplace loads (Posted) or loads assigned to their agency (Requirement 2 & 5).
     /// </summary>
     /// <param name="query">Search/filter/sort/paging parameters.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with a <see cref="PagedLoadResponseDto"/>.</returns>
     [HttpGet]
-    [Authorize(Roles = ShipperOrAdminRoles)]
+    [Authorize(Roles = ShipperOrAgencyStaffOrAdminRoles)]
     public async Task<ActionResult<PagedLoadResponseDto>> GetList([FromQuery] LoadListQueryDto query, CancellationToken cancellationToken)
     {
         var result = await _loadService.GetListAsync(query, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -116,16 +118,40 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
+    /// Gets the match recommendation, candidates, validation checks, and workflow steps for a load.
+    /// Accessible by Shippers (who own the load) and Admins.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="LoadMatchRecommendationDto"/>.</returns>
+    [HttpGet("{loadId:guid}/match")]
+    [Authorize(Roles = ShipperOrAdminRoles)]
+    public async Task<ActionResult<LoadMatchRecommendationDto>> GetMatchRecommendation(
+        Guid loadId,
+        [FromQuery] bool rerun = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _assignmentService.GetMatchRecommendationAsync(
+            loadId,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            rerun,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Confirms a matched agency proposal for a load (concurrency-safe, ADR-013 / ADR-016).
     /// Creates an Assignment in Proposed status, records ApprovalDecision, sends agency proposal email,
-    /// and completes the workflow run.
+    /// and completes the workflow run. Accessible by Shippers (who own the load) and Admins.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="request">The agency chosen by the shipper.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the created <see cref="AssignmentResponseDto"/>.</returns>
     [HttpPost("{loadId:guid}/match/confirm")]
-    [Authorize(Roles = ShipperRole)]
+    [Authorize(Roles = ShipperOrAdminRoles)]
     public async Task<ActionResult<AssignmentResponseDto>> ConfirmMatch(
         Guid loadId,
         [FromBody] ConfirmMatchDto request,

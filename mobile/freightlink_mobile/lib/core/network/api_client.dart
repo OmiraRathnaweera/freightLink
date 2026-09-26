@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:http/http.dart' as http;
 
 import '../constants/app_constants.dart';
@@ -124,6 +125,9 @@ class ApiClient {
     try {
       response = await request();
     } on Exception catch (cause) {
+      if (kDebugMode) {
+        debugPrint('[ApiClient] Network error reaching $_baseUrl: $cause');
+      }
       throw ApiException.network(cause);
     }
 

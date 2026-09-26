@@ -92,4 +92,10 @@ public interface IAgencyService
     /// Retrieves full fleet resources (vehicles and drivers) for an agency.
     /// </summary>
     Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Seeds default active logistics carrier agencies across Sri Lanka (Colombo, Kandy, Galle, Kurunegala)
+    /// if not already present, ensuring realistic fleet capacity for multi-agent matching.
+    /// </summary>
+    Task SeedDefaultAgenciesIfNotExistsAsync(CancellationToken cancellationToken = default);
 }

@@ -44,4 +44,27 @@ public interface IAgentWorkflowService
     /// <c>(WorkflowRunId, StepNo)</c> pair was already reported.
     /// </exception>
     Task<ReportAgentStepResponseDto> ReportStepAsync(Guid workflowRunId, ReportAgentStepRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records one <c>ToolCall</c> row under the given workflow run.
+    /// </summary>
+    /// <param name="workflowRunId">The run this tool call belongs to.</param>
+    /// <param name="request">The tool call's outcome and audit-trail data.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The newly created tool call's id and echoed details.</returns>
+    /// <exception cref="Common.Exceptions.ApiException">
+    /// 404 <see cref="Common.Errors.ErrorCode.WORKFLOW_RUN_NOT_FOUND"/> if <paramref name="workflowRunId"/> doesn't exist;
+    /// 400 <see cref="Common.Errors.ErrorCode.VALIDATION_ERROR"/> if <c>Success</c> is false with no <c>ErrorMessage</c>;
+    /// 409 <see cref="Common.Errors.ErrorCode.TOOL_CALL_DUPLICATE_ATTEMPT"/> if this (AgentStep, ToolName, AttemptNo) was already recorded.
+    /// </exception>
+    Task<FreightLink.Api.DTOs.Internal.ToolCalls.ToolCallResponseDto> RecordToolCallAsync(Guid workflowRunId, FreightLink.Api.DTOs.Internal.ToolCalls.CreateToolCallRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records or updates candidate agencies evaluated by Agent 2 (DomainAnalysis) under the given run.
+    /// </summary>
+    /// <param name="workflowRunId">The run these candidates belong to.</param>
+    /// <param name="candidates">List of evaluated candidate agencies.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task RecordMatchCandidatesAsync(Guid workflowRunId, IEnumerable<FreightLink.Api.DTOs.Internal.Candidates.MatchCandidateDto> candidates, CancellationToken cancellationToken = default);
 }
+

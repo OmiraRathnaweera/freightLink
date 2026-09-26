@@ -7,7 +7,7 @@ const ROLE_HOME_PATHS = {
   [UserRole.SHIPPER]: '/loads',
   [UserRole.ADMIN]: '/loads',
   [UserRole.AGENCY_STAFF]: '/agencies',
-  [UserRole.DRIVER]: '/trips',
+  [UserRole.DRIVER]: '/unauthorized',
 }
 
 export function getRoleHomePath(role) {

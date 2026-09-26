@@ -11,6 +11,11 @@ import httpx
 
 from freightlink_agent.core.config import get_settings
 from freightlink_agent.schemas.callback import ReportAgentStepRequest
+from freightlink_agent.schemas.matching import (
+    CreateToolCallRequest,
+    EstimatePricingRequest,
+    EstimatePricingResponse,
+)
 from freightlink_agent.schemas.workflow import CreateWorkflowRunRequest, CreateWorkflowRunResponse
 
 logger = logging.getLogger(__name__)
@@ -55,12 +60,11 @@ async def create_workflow_run(request: CreateWorkflowRunRequest) -> CreateWorkfl
     return CreateWorkflowRunResponse.model_validate(response.json())
 
 
-async def report_step(workflow_run_id: UUID, step: ReportAgentStepRequest) -> None:
-    """POST /internal/agent-workflow-runs/{workflowRunId}/steps - the only
-    way this service ever reports what Agent 1 did. Retries once on
-    failure; raises BackendClientError if it still fails rather than
-    silently swallowing the error, since the backend has no other way to
-    learn this step happened.
+async def report_step(workflow_run_id: UUID, step: ReportAgentStepRequest) -> UUID | None:
+    """POST /internal/agent-workflow-runs/{workflowRunId}/steps - reports what an agent did.
+
+    Retries once on failure; raises BackendClientError if it still fails.
+    Returns the agent_step_id assigned by the backend.
     """
     settings = get_settings()
     url = f"{settings.backend_base_url}/internal/agent-workflow-runs/{workflow_run_id}/steps"
@@ -72,7 +76,9 @@ async def report_step(workflow_run_id: UUID, step: ReportAgentStepRequest) -> No
             async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
                 response = await client.post(url, json=body, headers=_headers())
             if response.status_code < 300:
-                return
+                data = response.json() if response.content else {}
+                step_id_str = data.get("agentStepId") or data.get("agent_step_id")
+                return UUID(step_id_str) if step_id_str else None
             last_error = f"returned {response.status_code}: {response.text[:500]}"
         except httpx.HTTPError as exc:
             last_error = str(exc)
@@ -82,3 +88,59 @@ async def report_step(workflow_run_id: UUID, step: ReportAgentStepRequest) -> No
     raise BackendClientError(
         f"POST /internal/agent-workflow-runs/{workflow_run_id}/steps failed after retry: {last_error}"
     )
+
+
+
+async def estimate_pricing(request: EstimatePricingRequest) -> EstimatePricingResponse:
+    """POST /internal/pricing/estimate - called by Agent 3 to price the job.
+
+    The backend calculates the price via ADR-015 formula and writes
+    Load.EstimatedPrice directly to the database.
+    """
+    settings = get_settings()
+    url = f"{settings.backend_base_url}/internal/pricing/estimate"
+    body = request.model_dump(mode="json", by_alias=True)
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+            response = await client.post(url, json=body, headers=_headers())
+    except httpx.HTTPError as exc:
+        raise BackendClientError(f"POST /internal/pricing/estimate failed: {exc}") from exc
+
+    if response.status_code >= 300:
+        raise BackendClientError(
+            f"POST /internal/pricing/estimate returned {response.status_code}: {response.text[:500]}"
+        )
+
+    return EstimatePricingResponse.model_validate(response.json())
+
+
+async def record_tool_call(workflow_run_id: UUID, tool_call: CreateToolCallRequest) -> None:
+    """POST /internal/agent-workflow-runs/{workflowRunId}/tool-calls - persists
+
+    a ToolCall audit row in Postgres for Agent 3's tool invocations.
+    If the backend endpoint is not yet deployed, logs a warning rather than
+    crashing the entire matching run.
+    """
+    settings = get_settings()
+    url = f"{settings.backend_base_url}/internal/agent-workflow-runs/{workflow_run_id}/tool-calls"
+    body = tool_call.model_dump(mode="json", by_alias=True)
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+            response = await client.post(url, json=body, headers=_headers())
+        if response.status_code == 404:
+            logger.warning(
+                "POST /internal/agent-workflow-runs/%s/tool-calls returned 404 (endpoint not yet deployed)",
+                workflow_run_id,
+            )
+            return
+        if response.status_code >= 300:
+            logger.warning(
+                "Failed to persist ToolCall row: %s (%s)",
+                response.status_code,
+                response.text[:200],
+            )
+    except httpx.HTTPError as exc:
+        logger.warning("Could not record ToolCall for run %s: %s", workflow_run_id, exc)
+

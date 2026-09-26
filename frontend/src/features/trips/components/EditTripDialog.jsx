@@ -3,7 +3,7 @@ import { AlertCircle, Edit2, SlidersHorizontal, Truck, User, X } from "lucide-re
 import Button from "../../../components/Button.jsx";
 import Input from "../../../components/Input.jsx";
 import { useUpdateTripMutation } from "../api/tripsApi.js";
-import { useAgencyFleetQuery } from "../api/agenciesApi.js";
+import { useAgencyFleetQuery } from "../../agencies/api/agencyApi.js";
 import { getTripErrorMessage } from "../lib/errorMessages.js";
 
 function EditTripDialog({ trip, onClose }) {
@@ -14,8 +14,8 @@ function EditTripDialog({ trip, onClose }) {
 
   // Fetch agency fleet (vehicles & drivers)
   const fleetQuery = useAgencyFleetQuery(trip.agencyId, { staleTime: 60000 });
-  const vehicles = fleetQuery.data?.vehicles ?? [];
-  const drivers = fleetQuery.data?.drivers ?? [];
+  const vehicles = useMemo(() => fleetQuery.data?.vehicles ?? [], [fleetQuery.data?.vehicles]);
+  const drivers = useMemo(() => fleetQuery.data?.drivers ?? [], [fleetQuery.data?.drivers]);
 
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => v.vehicleId === vehicleId),

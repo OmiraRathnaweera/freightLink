@@ -426,9 +426,66 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Create_Returns404_ForAdmin_WhenAssignmentDoesNotExist()
+    public async Task Create_Returns403_ForAdmin()
     {
         using var request = AuthedRequest(HttpMethod.Post, "/api/v1/trips", MintTokenWithRoles("Admin"));
+        request.Content = JsonContent.Create(new CreateTripDto
+        {
+            AssignmentId = Guid.NewGuid(),
+            VehicleId = Guid.NewGuid(),
+            DriverId = Guid.NewGuid()
+        });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Create_Returns404_ForAgencyStaff_WhenAssignmentDoesNotExist()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var staffUserId = Guid.NewGuid();
+        var agencyId = Guid.NewGuid();
+
+        db.Users.Add(new User
+        {
+            UserId = staffUserId,
+            FullName = "Agency Dispatcher",
+            Email = $"staff-create-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Dispatch Logistics",
+            BusinessRegNo = $"BR-DSP-{Guid.NewGuid():N}"[..15],
+            YardAddress = "100 Port Road",
+            YardLat = 6.93m,
+            YardLng = 79.85m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            UserId = staffUserId,
+            AgencyId = agencyId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        await db.SaveChangesAsync();
+
+        var staffToken = MintTokenForUser(staffUserId, UserRole.AgencyStaff);
+        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/trips", staffToken);
         request.Content = JsonContent.Create(new CreateTripDto
         {
             AssignmentId = Guid.NewGuid(),
@@ -486,6 +543,15 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     {
         var shipperTokens = await RegisterAndLoginShipperAsync("trip-delete");
         using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", shipperTokens.AccessToken);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_Returns403_ForDriver()
+    {
+        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Driver"));
 
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -871,6 +937,16 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+    }
+
+    [Fact]
+    public async Task Cancel_Returns403_ForDriver()
+    {
+        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/trips/{Guid.NewGuid()}/cancel", MintTokenWithRoles("Driver"));
+        request.Content = JsonContent.Create(new CancelTripDto { Reason = "test" });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private static string MintTokenForUser(Guid userId, UserRole role)

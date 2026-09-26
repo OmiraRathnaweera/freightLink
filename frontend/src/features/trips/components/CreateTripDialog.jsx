@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -15,7 +15,7 @@ import Button from "../../../components/Button.jsx";
 import Input from "../../../components/Input.jsx";
 import { useCreateTripMutation } from "../api/tripsApi.js";
 import { useAssignmentsQuery } from "../api/assignmentsApi.js";
-import { useAgencyFleetQuery } from "../api/agenciesApi.js";
+import { useAgencyFleetQuery } from "../../agencies/api/agencyApi.js";
 import { getTripErrorMessage } from "../lib/errorMessages.js";
 
 function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
@@ -31,7 +31,10 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
     { staleTime: 30000 }
   );
 
-  const assignments = assignmentsQuery.data?.items ?? [];
+  const assignments = useMemo(
+    () => assignmentsQuery.data?.items ?? [],
+    [assignmentsQuery.data?.items]
+  );
 
   // Group assignments into dispatchable (no trip yet) vs already dispatched
   const { dispatchableAssignments, alreadyDispatchedAssignments } = useMemo(() => {
@@ -52,19 +55,31 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
     };
   }, [assignments]);
 
-  // Selected assignment detail
+  // Selected assignment detail — matches by assignmentId or loadId
   const selectedAssignment = useMemo(
-    () => assignments.find((a) => a.assignmentId === assignmentId),
+    () => assignments.find((a) => a.assignmentId === assignmentId || a.loadId === assignmentId),
     [assignments, assignmentId]
   );
+
+  useEffect(() => {
+    if (selectedAssignment && selectedAssignment.assignmentId !== assignmentId) {
+      setAssignmentId(selectedAssignment.assignmentId);
+    }
+  }, [selectedAssignment, assignmentId]);
 
   // Fetch fleet (vehicles and drivers) for caller's agency
   const fleetQuery = useAgencyFleetQuery(selectedAssignment?.agencyId, {
     staleTime: 60000,
   });
 
-  const vehicles = fleetQuery.data?.vehicles ?? [];
-  const drivers = fleetQuery.data?.drivers ?? [];
+  const vehicles = useMemo(
+    () => fleetQuery.data?.vehicles ?? [],
+    [fleetQuery.data?.vehicles]
+  );
+  const drivers = useMemo(
+    () => fleetQuery.data?.drivers ?? [],
+    [fleetQuery.data?.drivers]
+  );
 
   const selectedVehicle = useMemo(
     () => vehicles.find((v) => v.vehicleId === vehicleId),
