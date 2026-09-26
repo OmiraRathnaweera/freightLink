@@ -47,7 +47,14 @@ class WorkflowState(BaseModel):
     assigned_vehicle: dict[str, Any] | None = None
     assigned_driver: dict[str, Any] | None = None
 
-    # --- Agent 4: Validation & Safety ---
+    # --- Agent 4: Validation & Safety (Component D, Owner: Balasooriya) ---
+    is_valid: bool = False
+    validation_flags: list[str] = Field(default_factory=list)
+    price_deviation_percent: float | None = None
+    validation_summary: str | None = None
+    status: str = "Pending"  # e.g., "AwaitingApproval", "Completed", "Failed"
+    proposal_email_subject: str | None = None
+    proposal_email_body: str | None = None
     validation: dict[str, Any] | None = None
 
     # --- Pipeline Status & Failure Tracking ---

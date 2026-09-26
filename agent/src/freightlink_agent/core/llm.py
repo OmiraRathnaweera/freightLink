@@ -46,6 +46,12 @@ class SelectionJustificationOutput(BaseModel):
     detailed_reasoning: str
 
 
+class ValidationLLMOutput(BaseModel):
+    validation_summary: str
+    proposal_email_subject: str
+    proposal_email_body: str
+
+
 class AgentLLM:
     def __init__(self) -> None:
         self._settings = get_settings()
@@ -155,6 +161,111 @@ class AgentLLM:
                     f"This carrier provides the fastest positioning ETA ({eta} mins, {dist} km) to pickup, full payload capability, and verified safety compliance."
                 ),
             }
+
+    async def generate_validation_summary_and_proposal(
+        self,
+        system_prompt: str,
+        context: dict[str, Any],
+    ) -> dict[str, str]:
+        """Executes LLM reasoning for Agent 4:
+        1. Explains validation findings in plain language for the Shipper.
+        2. Drafts personalized Job Proposal email copy offering the job at the fixed price
+           (ADR-017: No agency bidding or negotiation).
+        """
+        messages = [
+            ("system", system_prompt),
+            ("human", json.dumps(context, default=str)),
+        ]
+
+        if self._settings.llm_provider == "ollama":
+            try:
+                model = self._ollama().with_structured_output(ValidationLLMOutput)
+                result: ValidationLLMOutput = await model.ainvoke(messages)  # type: ignore[assignment]
+                return result.model_dump()
+            except Exception:
+                logger.warning("Ollama LLM call failed, utilizing template fallback", exc_info=True)
+                return self._fallback_validation_copy(context)
+
+        candidate_models = [self._settings.gemini_model]
+        for m in ("gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"):
+            if m not in candidate_models:
+                candidate_models.append(m)
+
+        for gem_model in candidate_models:
+            try:
+                model = self._gemini(gem_model).with_structured_output(ValidationLLMOutput)
+                result = await model.ainvoke(messages)  # type: ignore[assignment]
+                return result.model_dump()
+            except Exception as exc:
+                logger.warning("Gemini model %s failed for validation proposal: %s", gem_model, exc)
+                continue
+
+        logger.warning("All Gemini models failed, attempting Ollama fallback")
+        try:
+            model = self._ollama().with_structured_output(ValidationLLMOutput)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
+            return result.model_dump()
+        except Exception:
+            return self._fallback_validation_copy(context)
+
+    def _fallback_validation_copy(self, context: dict[str, Any]) -> dict[str, str]:
+        """Deterministic copy fallback used when all LLM providers are unreachable."""
+        agency = context.get("selected_agency_name") or "Selected Agency"
+        price = context.get("proposed_price") or 0.0
+        vehicle = context.get("suggested_vehicle_class") or "Standard Freight"
+        eta = context.get("eta_minutes") or 0
+        deviation = context.get("price_deviation_percent")
+        is_valid = context.get("is_valid", True)
+        flags = context.get("validation_flags", [])
+
+        load = context.get("load_context", {})
+        pickup = load.get("pickup", "Origin")
+        dropoff = load.get("dropoff", "Destination")
+        cargo = load.get("cargo_description", "General Freight")
+        weight = load.get("weight_kg") or load.get("weightKg") or "N/A"
+
+        if is_valid:
+            budget_note = ""
+            if deviation is not None:
+                if deviation > 0:
+                    budget_note = f" Note: The price is {deviation:+.1f}% compared to your target budget."
+                elif deviation < 0:
+                    budget_note = f" Great news: The price is {abs(deviation):.1f}% under your target budget."
+                else:
+                    budget_note = " The price perfectly matches your target budget."
+
+            summary = (
+                f"Validation checks passed successfully. We have matched your shipment with {agency} "
+                f"using a {vehicle} vehicle (Estimated transit: {eta} mins). The agreed fixed price is "
+                f"LKR {price:,.2f}.{budget_note} This match is now held in 'AwaitingApproval' pending "
+                f"your authorization. Once approved, the official Job Proposal will be dispatched to the agency."
+            )
+        else:
+            summary = (
+                f"Validation encountered safety or platform issues: {', '.join(flags)}. "
+                f"The proposed match with {agency} at LKR {price:,.2f} cannot proceed until these issues are resolved."
+            )
+
+        email_subject = f"FreightLink Job Proposal: {pickup} to {dropoff} ({vehicle})"
+        email_body = (
+            f"Dear {agency} Dispatch Team,\n\n"
+            f"FreightLink is pleased to offer you a confirmed freight dispatch opportunity:\n\n"
+            f"• Route: {pickup} -> {dropoff}\n"
+            f"• Cargo: {cargo} ({weight} kg)\n"
+            f"• Required Vehicle: {vehicle}\n"
+            f"• Estimated Transit Time: {eta} minutes\n"
+            f"• Fixed Compensation: LKR {price:,.2f}\n\n"
+            f"Please note that this is a direct Job Proposal with fixed compensation pre-approved by the shipper. "
+            f"No bidding or rate negotiation is required. To accept this job and confirm vehicle assignment, "
+            f"please log into your FreightLink Agency Portal.\n\n"
+            f"Best regards,\nFreightLink Automated Logistics Dispatch"
+        )
+
+        return {
+            "validation_summary": summary,
+            "proposal_email_subject": email_subject,
+            "proposal_email_body": email_body,
+        }
 
 
 
