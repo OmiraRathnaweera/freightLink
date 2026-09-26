@@ -75,6 +75,7 @@ const GET_NAV_ITEMS = (role) => [
       { to: '/pricing-config/formula', label: 'Pricing Formula' },
     ],
   },
+  { to: '/disputes', label: 'Disputes', icon: Scale },
 ]
 
 function DashboardLayout() {
