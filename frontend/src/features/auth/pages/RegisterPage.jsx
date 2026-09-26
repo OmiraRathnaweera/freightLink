@@ -8,6 +8,7 @@ import {
   FormikPasswordField,
   FormikSubmitButton,
   FormikTextField,
+  FormikYardLocationField,
 } from '../../../components/form/index.js'
 import { useRegisterAgencyMutation, useRegisterShipperMutation } from '../api/authApi.js'
 import { getAuthErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
@@ -408,33 +409,11 @@ function AgencyRegisterForm() {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <FormikTextField
-                        name="yardAddress"
-                        label="Yard Depot Address"
-                        placeholder="45 Harbor Road, Peliyagoda"
-                        autoComplete="street-address"
-                      />
-                    </div>
-                    <div>
-                      <FormikTextField
-                        name="yardLat"
-                        label="Yard Latitude"
-                        type="number"
-                        step="any"
-                        placeholder="6.9583"
-                        mono
-                        helperText="Coordinates used for AI matching & route ETA"
-                      />
-                    </div>
-                    <div>
-                      <FormikTextField
-                        name="yardLng"
-                        label="Yard Longitude"
-                        type="number"
-                        step="any"
-                        placeholder="79.8833"
-                        mono
-                        helperText="Coordinates used for AI matching & route ETA"
+                      <FormikYardLocationField
+                        addressName="yardAddress"
+                        latName="yardLat"
+                        lngName="yardLng"
+                        label="Yard Depot Location & Coordinates"
                       />
                     </div>
                   </div>
