@@ -45,6 +45,13 @@ def sample_candidates():
         yard_lng=79.8917,
         yard_address="12 Negombo Rd, Peliyagoda",
         available_vehicle_classes=["MediumLorry", "ContainerTruck"],
+        available_vehicles=[
+            {"vehicleId": str(uuid.uuid4()), "registrationNo": "WP-CAB-4521", "capacityKg": 6500, "volumeM3": 30},
+            {"vehicleId": str(uuid.uuid4()), "registrationNo": "WP-DA-8920", "capacityKg": 18000, "volumeM3": 65},
+        ],
+        active_drivers=[
+            {"driverId": str(uuid.uuid4()), "name": "Suneth Alwis", "licenceNo": "B-8839210"},
+        ],
     )
     c2 = CandidateAgency(
         agency_id=uuid.uuid4(),
@@ -53,6 +60,13 @@ def sample_candidates():
         yard_lng=79.8478,
         yard_address="45 Fort, Colombo",
         available_vehicle_classes=["MiniTruck", "MediumLorry"],
+        available_vehicles=[
+            {"vehicleId": str(uuid.uuid4()), "registrationNo": "WP-ND-1102", "capacityKg": 1400, "volumeM3": 5.5},
+            {"vehicleId": str(uuid.uuid4()), "registrationNo": "WP-LC-1029", "capacityKg": 3500, "volumeM3": 14},
+        ],
+        active_drivers=[
+            {"driverId": str(uuid.uuid4()), "name": "Priyantha Kumara", "licenceNo": "B-7740192"},
+        ],
     )
     return [c1, c2]
 
@@ -171,7 +185,7 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
     validation = result.get("validation")
     assert validation is not None
     assert validation["recommendation"] == "Approve"
-    assert len(validation["checks"]) == 4
+    assert len(validation["checks"]) == 6
     assert all(c["passed"] is True for c in validation["checks"])
 
 
@@ -342,6 +356,8 @@ async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates
                 "yardLng": sample_candidates[0].yard_lng,
                 "yardAddress": sample_candidates[0].yard_address,
                 "availableVehicleClasses": ["MediumLorry"],
+                "availableVehicles": sample_candidates[0].available_vehicles,
+                "activeDrivers": sample_candidates[0].active_drivers,
             }
         ],
     }

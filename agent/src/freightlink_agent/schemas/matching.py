@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import Field
@@ -20,6 +21,8 @@ class CandidateAgency(CamelModel):
     yard_lng: float
     yard_address: str = ""
     available_vehicle_classes: list[VehicleClass] = Field(default_factory=list)
+    available_vehicles: list[dict[str, Any]] = Field(default_factory=list)
+    active_drivers: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class RouteAndEtaRequest(CamelModel):

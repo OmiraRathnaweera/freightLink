@@ -13,6 +13,7 @@ from the metadata below - no separate setup needed.
 
 import hmac
 import logging
+from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -65,6 +66,29 @@ async def require_shared_secret(x_internal_api_key: str | None = Depends(_api_ke
         raise HTTPException(status_code=401, detail="A valid X-Internal-Api-Key header is required")
 
 
+def _parse_candidate_agencies(raw: list[Any]) -> list[CandidateAgency]:
+    parsed: list[CandidateAgency] = []
+    for c in raw:
+        if isinstance(c, CandidateAgency):
+            parsed.append(c)
+        elif isinstance(c, dict):
+            parsed.append(
+                CandidateAgency(
+                    agency_id=UUID(str(c.get("agencyId") or c.get("agency_id") or uuid4())),
+                    name=str(c.get("name") or c.get("agencyName") or "Carrier"),
+                    yard_lat=float(c.get("yardLat") or c.get("yard_lat") or 0.0),
+                    yard_lng=float(c.get("yardLng") or c.get("yard_lng") or 0.0),
+                    yard_address=str(c.get("yardAddress") or c.get("yard_address") or ""),
+                    available_vehicle_classes=c.get("availableVehicleClasses")
+                    or c.get("available_vehicle_classes")
+                    or ["MediumLorry"],
+                    available_vehicles=c.get("availableVehicles") or c.get("available_vehicles") or [],
+                    active_drivers=c.get("activeDrivers") or c.get("active_drivers") or [],
+                )
+            )
+    return parsed
+
+
 @app.post(
     "/workflows/run",
     response_model=WorkflowRunResponse,
@@ -85,11 +109,20 @@ async def require_shared_secret(x_internal_api_key: str | None = Depends(_api_ke
     dependencies=[Depends(require_shared_secret)],
 )
 async def run_workflow(request: WorkflowRunRequest) -> WorkflowRunResponse:
+    raw_candidates = (
+        request.candidate_agencies
+        or request.load_context.get("candidateAgencies")
+        or request.load_context.get("candidates")
+        or []
+    )
+    parsed_candidates = _parse_candidate_agencies(raw_candidates)
+
     initial_state = WorkflowState(
         load_id=request.load_id,
         triggered_by_user_id=request.triggered_by_user_id,
         attempt_no=request.attempt_no,
         load_context=request.load_context,
+        candidate_shortlist=parsed_candidates,
     )
 
     pipeline = get_pipeline()
@@ -127,29 +160,13 @@ async def run_workflow(request: WorkflowRunRequest) -> WorkflowRunResponse:
     dependencies=[Depends(require_shared_secret)],
 )
 async def match_workflow(request: WorkflowMatchRequest) -> WorkflowMatchResponse:
-    parsed_candidates: list[CandidateAgency] = []
     raw_candidates = (
         request.candidate_agencies
         or request.load_context.get("candidateAgencies")
         or request.load_context.get("candidates")
         or []
     )
-    for c in raw_candidates:
-        if isinstance(c, CandidateAgency):
-            parsed_candidates.append(c)
-        elif isinstance(c, dict):
-            parsed_candidates.append(
-                CandidateAgency(
-                    agency_id=UUID(str(c.get("agencyId") or c.get("agency_id") or uuid4())),
-                    name=str(c.get("name") or c.get("agencyName") or "Carrier"),
-                    yard_lat=float(c.get("yardLat") or c.get("yard_lat") or 0.0),
-                    yard_lng=float(c.get("yardLng") or c.get("yard_lng") or 0.0),
-                    yard_address=str(c.get("yardAddress") or c.get("yard_address") or ""),
-                    available_vehicle_classes=c.get("availableVehicleClasses")
-                    or c.get("available_vehicle_classes")
-                    or ["MediumLorry"],
-                )
-            )
+    parsed_candidates = _parse_candidate_agencies(raw_candidates)
 
     initial_state = WorkflowState(
         load_id=request.load_id,

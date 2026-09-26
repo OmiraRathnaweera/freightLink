@@ -44,6 +44,8 @@ class WorkflowState(BaseModel):
     proposed_price: float | None = None
     pricing_breakdown: dict[str, Any] | None = None
     selection_justification: str | None = None
+    assigned_vehicle: dict[str, Any] | None = None
+    assigned_driver: dict[str, Any] | None = None
 
     # --- Agent 4: Validation & Safety ---
     validation: dict[str, Any] | None = None

@@ -36,6 +36,10 @@ class WorkflowRunRequest(CamelModel):
             }
         ],
     )
+    candidate_agencies: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Eligible candidate carriers passed for evaluation.",
+    )
 
 
 class WorkflowRunResponse(CamelModel):

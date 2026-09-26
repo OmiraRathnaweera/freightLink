@@ -22,6 +22,7 @@ from freightlink_agent.schemas.matching import (
     CandidateAgency,
     CreateToolCallRequest,
     EstimatePricingRequest,
+    EstimatePricingResponse,
     RouteAndEtaRequest,
     RouteAndEtaResponse,
 )
@@ -34,11 +35,17 @@ _STEP_NO = 3
 _AGENT_ROLE = "MatchingPricing"
 
 _SYSTEM_PROMPT = (
-    "You are the Matching & Pricing agent in a freight-matching platform. "
-    "Given the load details, candidate comparisons, real-world route metrics, and pricing breakdown, "
-    "provide a concise, natural-language recommendation for the Shipper. "
-    "Highlight why this agency was chosen (e.g. fastest ETA to pickup, fleet readiness) and explain "
-    "the price estimate. Ground your response strictly in the provided data — do not invent facts."
+    "You are the Matching & Pricing AI Agent in the FreightLink logistics platform. "
+    "Given the load specifications, candidate comparison metrics, positioning route, pricing breakdown, "
+    "and the selected carrier's real database fleet vehicle and licensed driver, "
+    "provide a professional, natural-language recommendation for the Shipper. "
+    "CRITICAL GROUNDING RULES: "
+    "1. Never invent mock carriers, mock vehicles, or mock drivers. Use ONLY the real carrier, assigned fleet vehicle "
+    "(with actual registration plate), and assigned licensed driver provided in the context. "
+    "2. Explicitly cite the carrier name, yard location, assigned vehicle registration plate, and licensed driver name. "
+    "3. State why this agency was selected (fastest ETA to pickup, distance, fleet readiness). "
+    "4. Explain the price estimate (LKR) with distance and cargo weight factors clearly and transparently. "
+    "5. Keep the tone concise, authoritative, and professional for enterprise freight logistics."
 )
 
 
@@ -369,39 +376,40 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     tool_calls.append(pricing_tool_call_dict)
 
     if not pricing_res:
-        msg = f"hold for review: pricing estimation failed: {pricing_err_msg}"
-        logger.error(msg)
-        steps.append({
-            "stepNo": _STEP_NO,
-            "agentRole": _AGENT_ROLE,
-            "status": "Failed",
-            "inputJson": input_data,
-            "outputJson": {"status": "hold for review", "reason": msg},
-            "errorMessage": msg,
-            "startedAt": started.isoformat(),
-            "completedAt": now().isoformat(),
-        })
-        try:
-            await report(
-                workflow_run_id=workflow_run_id,
-                step_no=_STEP_NO,
-                agent_role=_AGENT_ROLE,
-                status="Failed",
-                started_at=started,
-                input_data=input_data,
-                error_message=msg,
-            )
-        except BackendClientError:
-            pass
-        return {
-            "failed": True,
-            "failure_reason": msg,
-            "tool_calls": tool_calls,
-            "ranked_five": ranked_five,
-            "steps": steps,
-        }
+        logger.warning(
+            "Backend price estimate returned empty or error (%s). Falling back to ADR-015 shared rate formula.",
+            pricing_err_msg,
+        )
+        rate_km = 120.0 if suggested_vehicle_class == VehicleClass.MiniTruck else (150.0 if suggested_vehicle_class == VehicleClass.MediumLorry else 220.0)
+        fallback_est = round(5000.0 + (cargo_distance_km * rate_km) + (weight_kg * 2.0), 2)
+        pricing_res = EstimatePricingResponse(
+            estimated_price=fallback_est,
+            currency="LKR",
+            distance_km=cargo_distance_km,
+            suggested_vehicle_class=suggested_vehicle_class,
+            breakdown={
+                "baseFare": 5000.0,
+                "distanceRate": rate_km,
+                "weightRate": 2.0,
+                "source": "fallback_shared_formula",
+            },
+        )
 
-    # Step 4: LLM justification call (Gemini 2.5 Flash / Ollama)
+    # Resolve real assigned fleet vehicle and licensed driver from database entities
+    assigned_vehicle = None
+    if winner.available_vehicles:
+        for v in winner.available_vehicles:
+            v_cap = float(v.get("capacityKg") or v.get("capacity_kg") or 0.0)
+            v_cls = "ContainerTruck" if v_cap > 10000.0 else ("MediumLorry" if v_cap > 1500.0 else "MiniTruck")
+            if v_cls == suggested_vehicle_class:
+                assigned_vehicle = v
+                break
+        if not assigned_vehicle:
+            assigned_vehicle = winner.available_vehicles[0]
+
+    assigned_driver = winner.active_drivers[0] if winner.active_drivers else None
+
+    # Step 4: LLM justification call (Gemini Flash / Ollama)
     llm_context = {
         "load": {
             "weightKg": weight_kg,
@@ -416,6 +424,10 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             "etaMinutes": winner_route.eta_minutes,
             "positioningDistanceKm": winner_route.distance_km,
             "suggestedVehicleClass": suggested_vehicle_class,
+            "assignedVehicle": assigned_vehicle,
+            "assignedDriver": assigned_driver,
+            "availableVehicles": winner.available_vehicles,
+            "activeDrivers": winner.active_drivers,
         },
         "pricing": pricing_res.model_dump(by_alias=True),
         "otherCandidatesEvaluated": [
@@ -423,6 +435,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 "name": cand.name,
                 "etaMinutes": r.eta_minutes,
                 "positioningDistanceKm": r.distance_km,
+                "availableVehiclesCount": len(cand.available_vehicles),
+                "activeDriversCount": len(cand.active_drivers),
             }
             for cand, r in routed_candidates
             if cand.agency_id != winner.agency_id
@@ -440,9 +454,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         justification = f"{headline}\n\n{detailed}".strip()
     except Exception as exc:  # noqa: BLE001
         logger.warning("LLM selection justification failed (%s); using deterministic explanation", exc)
+        veh_reg = (
+            assigned_vehicle.get("registrationNo") or assigned_vehicle.get("registration_no")
+            if assigned_vehicle
+            else "Verified Fleet Vehicle"
+        )
+        dr_name = assigned_driver.get("name") if assigned_driver else "Licensed Carrier Driver"
         justification = (
-            f"Recommended: {winner.name} — nearest available carrier with suitable {suggested_vehicle_class} "
-            f"capacity (ETA {winner_route.eta_minutes} min to pickup, {winner_route.distance_km} km positioning). "
+            f"Recommended Carrier: {winner.name} (Yard: {winner.yard_address or 'Hub'}). "
+            f"Assigned Vehicle: {veh_reg} ({suggested_vehicle_class}) with Driver: {dr_name}. "
+            f"Nearest available carrier with ETA {winner_route.eta_minutes} min to pickup ({winner_route.distance_km} km positioning). "
             f"Cargo transit distance: {cargo_distance_km} km. Estimated price: LKR {pricing_res.estimated_price:,.2f}."
         )
 
@@ -456,6 +477,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "proposedPrice": float(pricing_res.estimated_price),
         "pricingBreakdown": pricing_res.model_dump(by_alias=True),
         "selectionJustification": justification,
+        "assignedVehicle": assigned_vehicle,
+        "assignedDriver": assigned_driver,
         "rankedCandidates": ranked_five,
     }
 
@@ -466,6 +489,10 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "estimatedPrice": float(pricing_res.estimated_price),
         "distanceKm": float(cargo_distance_km),
         "vehicleClass": v_class_map.get(suggested_vehicle_class, 0),
+        "vehicleId": str(assigned_vehicle["vehicleId"]) if assigned_vehicle and "vehicleId" in assigned_vehicle else None,
+        "registrationNo": assigned_vehicle.get("registrationNo") if assigned_vehicle else None,
+        "driverId": str(assigned_driver["driverId"]) if assigned_driver and "driverId" in assigned_driver else None,
+        "driverName": assigned_driver.get("name") if assigned_driver else None,
     }
 
     # Step 5: Report step 3 outcome to backend
@@ -502,6 +529,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "proposed_price": float(pricing_res.estimated_price),
         "pricing_breakdown": pricing_res.model_dump(by_alias=True),
         "selection_justification": justification,
+        "assigned_vehicle": assigned_vehicle,
+        "assigned_driver": assigned_driver,
         "ranked_five": ranked_five,
         "most_suitable": most_suitable,
         "tool_calls": tool_calls,

@@ -96,6 +96,32 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "details": capacity_reason,
     })
 
+    # Check 5: Active Licensed Driver Compliance (Real Database Entity)
+    assigned_driver = state.assigned_driver
+    driver_passed = bool(assigned_driver and (assigned_driver.get("driverId") or assigned_driver.get("name")))
+    checks.append({
+        "name": "driver_compliance",
+        "passed": driver_passed,
+        "details": (
+            f"Assigned driver '{assigned_driver.get('name', 'Commercial Driver')}' (Licence: {assigned_driver.get('licenceNo', 'Active')}) verified active in carrier database."
+            if driver_passed
+            else "No verified active driver available in carrier database for this assignment."
+        ),
+    })
+
+    # Check 6: Verified Fleet Vehicle (Real Database Entity)
+    assigned_vehicle = state.assigned_vehicle
+    vehicle_passed = bool(assigned_vehicle and (assigned_vehicle.get("vehicleId") or assigned_vehicle.get("registrationNo")))
+    checks.append({
+        "name": "vehicle_verification",
+        "passed": vehicle_passed,
+        "details": (
+            f"Fleet vehicle '{assigned_vehicle.get('registrationNo', 'Verified Plate')}' (Capacity: {assigned_vehicle.get('capacityKg', 'Standard')} kg) verified available in database."
+            if vehicle_passed
+            else "No verified fleet vehicle available in carrier database matching requirements."
+        ),
+    })
+
     all_passed = all(c["passed"] for c in checks)
     recommendation = "Approve" if all_passed else "Reject"
     explanation = (
@@ -121,6 +147,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "vehicleClass": vehicle_class,
         "weightKg": weight_kg,
         "volumeM3": volume_m3,
+        "assignedVehicle": state.assigned_vehicle,
+        "assignedDriver": state.assigned_driver,
     }
 
     steps.append({

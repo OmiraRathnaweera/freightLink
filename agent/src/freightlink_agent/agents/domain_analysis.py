@@ -52,6 +52,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                         available_vehicle_classes=c.get("availableVehicleClasses")
                         or c.get("available_vehicle_classes")
                         or ["MediumLorry"],
+                        available_vehicles=c.get("availableVehicles") or c.get("available_vehicles") or [],
+                        active_drivers=c.get("activeDrivers") or c.get("active_drivers") or [],
                     )
                 )
         raw_candidates = parsed
@@ -67,6 +69,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 "name": c.name,
                 "yardAddress": c.yard_address,
                 "availableVehicleClasses": c.available_vehicle_classes,
+                "availableVehicles": c.available_vehicles,
+                "activeDrivers": c.active_drivers,
             }
             for c in raw_candidates
         ],
@@ -144,6 +148,8 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 "name": c.name,
                 "yardAddress": c.yard_address,
                 "availableVehicleClasses": c.available_vehicle_classes,
+                "availableVehicles": c.available_vehicles,
+                "activeDrivers": c.active_drivers,
             }
             for c in final_shortlist
         ],

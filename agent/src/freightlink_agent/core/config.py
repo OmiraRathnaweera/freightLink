@@ -5,8 +5,16 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+from pathlib import Path
+
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV_FILE) if _ENV_FILE.exists() else ".env",
+        extra="ignore",
+    )
 
     # This service's own bind info
     agent_api_base_url: str = "http://localhost:8001"
