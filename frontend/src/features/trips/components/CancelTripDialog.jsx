@@ -1,14 +1,17 @@
 import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { toast } from "sonner";
 import Button from "../../../components/Button.jsx";
 import { useCancelTripMutation } from "../api/tripsApi.js";
 import { getTripErrorMessage } from "../lib/errorMessages.js";
 
-function CancelTripDialog({ tripId, onClose }) {
+function CancelTripDialog({ tripId, onClose, onCancelled }) {
   const [reason, setReason] = useState("");
 
   const cancelMutation = useCancelTripMutation({
     onSuccess: () => {
+      toast.success("Trip cancelled");
+      onCancelled?.();
       onClose();
     },
   });
@@ -25,7 +28,7 @@ function CancelTripDialog({ tripId, onClose }) {
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs"
     >
       <div className="relative w-full max-w-md rounded-xl bg-surface p-6 shadow-xl border border-slate-200">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">

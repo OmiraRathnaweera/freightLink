@@ -126,4 +126,35 @@ public class RegisterValidationTests
         Assert.False(TryValidate(dto, out var results));
         Assert.Contains(results, r => r.MemberNames.Contains(nameof(RegisterAgencyRequestDto.YardLat)));
     }
+
+    /// <summary>A fully populated, well-formed driver request passes validation.</summary>
+    [Fact]
+    public void RegisterDriverRequestDto_IsValid_WithGoodData()
+    {
+        var dto = new RegisterDriverRequestDto
+        {
+            AgencyId = Guid.NewGuid(),
+            Email = "driver@example.com",
+            Password = "Sup3r$ecret1",
+            FullName = "John Driver",
+            PhoneE164 = "+94771234567",
+            LicenceNo = "DL-123456",
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2))
+        };
+
+        Assert.True(TryValidate(dto, out _));
+    }
+
+    /// <summary>A driver request missing required fields fails validation.</summary>
+    [Fact]
+    public void RegisterDriverRequestDto_IsInvalid_WhenRequiredFieldsMissing()
+    {
+        var dto = new RegisterDriverRequestDto();
+
+        Assert.False(TryValidate(dto, out var results));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(RegisterDriverRequestDto.Email)));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(RegisterDriverRequestDto.Password)));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(RegisterDriverRequestDto.FullName)));
+        Assert.Contains(results, r => r.MemberNames.Contains(nameof(RegisterDriverRequestDto.LicenceNo)));
+    }
 }

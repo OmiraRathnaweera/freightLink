@@ -306,6 +306,15 @@ public enum ErrorCode
     DRIVER_UNAVAILABLE,
 
     /// <summary>The trip cannot be modified because it has already progressed past the Assigned state.</summary>
-    TRIP_CANNOT_BE_MODIFIED
+    TRIP_CANNOT_BE_MODIFIED,
+
+    /// <summary>No eligible match candidate was found for the workflow run.</summary>
+    NO_ELIGIBLE_MATCH_CANDIDATE,
+
+    /// <summary>The workflow run has already been approved.</summary>
+    WORKFLOW_RUN_ALREADY_APPROVED,
+
+    /// <summary>Registration was attempted with a driving licence number already on file.</summary>
+    DRIVER_LICENCE_ALREADY_REGISTERED
 }
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   FileCheck2,
   MapPin,
   RefreshCw,
+  Trash2,
   Truck,
   User,
 } from "lucide-react";
@@ -34,16 +35,27 @@ import TripEvidenceCard from "../components/TripEvidenceCard.jsx";
 import ChangeTripStatusDialog from "../components/ChangeTripStatusDialog.jsx";
 import UploadTripEvidenceDialog from "../components/UploadTripEvidenceDialog.jsx";
 import CancelTripDialog from "../components/CancelTripDialog.jsx";
+import DeleteTripDialog from "../components/DeleteTripDialog.jsx";
 import EditTripDialog from "../components/EditTripDialog.jsx";
 
 function TripDetailPage() {
   const { tripId } = useParams();
+  const navigate = useNavigate();
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isEvidenceDialogOpen, setIsEvidenceDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const tripQuery = useTripDetailQuery(tripId);
+  const tripQuery = useTripDetailQuery(tripId, {
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === "Assigned" || status === "PickedUp" || status === "InTransit") {
+        return 4000;
+      }
+      return false;
+    },
+  });
   const role = useAppSelector((state) => state.auth.role);
 
   if (tripQuery.isLoading) {
@@ -102,6 +114,15 @@ function TripDetailPage() {
     trip.status !== "Delivered" &&
     trip.status !== "Cancelled";
 
+  const canDelete =
+    (role === UserRole.AGENCY_STAFF || role === UserRole.DRIVER || role === UserRole.ADMIN) &&
+    trip.status !== TripStatus.DELIVERED &&
+    trip.status !== "Delivered" &&
+    (trip.status === TripStatus.CANCELLED ||
+      trip.status === "Cancelled" ||
+      trip.status === TripStatus.ASSIGNED ||
+      trip.status === "Assigned");
+
   const hasRouteCoordinates =
     trip.pickupLat != null &&
     trip.pickupLng != null &&
@@ -134,6 +155,16 @@ function TripDetailPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => tripQuery.refetch()}
+            disabled={tripQuery.isFetching}
+            className="inline-flex items-center gap-1.5"
+            title="Refresh trip monitor"
+          >
+            <RefreshCw className={`h-4 w-4 ${tripQuery.isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           {canEdit && (
             <Button
               variant="secondary"
@@ -166,12 +197,24 @@ function TripDetailPage() {
           )}
           {canCancel && (
             <Button
-              variant="destructive"
+              variant="secondary"
               onClick={() => setIsCancelDialogOpen(true)}
               className="inline-flex items-center gap-1.5"
+              aria-label="Cancel Trip"
             >
-              <AlertTriangle className="h-4 w-4" />
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
               Cancel Trip
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="inline-flex items-center gap-1.5"
+              aria-label="Delete Trip"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Trip
             </Button>
           )}
         </div>
@@ -317,6 +360,19 @@ function TripDetailPage() {
         <CancelTripDialog
           tripId={trip.tripId}
           onClose={() => setIsCancelDialogOpen(false)}
+          onCancelled={() => tripQuery.refetch()}
+        />
+      )}
+
+      {isDeleteDialogOpen && (
+        <DeleteTripDialog
+          tripId={trip.tripId}
+          trip={trip}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onDeleted={() => {
+            setIsDeleteDialogOpen(false);
+            navigate("/trips");
+          }}
         />
       )}
 

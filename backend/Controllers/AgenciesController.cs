@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Claims;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -183,11 +183,59 @@ public class AgenciesController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>
+    /// Lists all vehicles in an agency's fleet.
+    /// </summary>
     [HttpGet("{id:guid}/vehicles")]
     [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
-    public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<List<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
     {
         var result = await _agencyService.GetVehiclesAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Lists all drivers employed by an agency.
+    /// </summary>
+    [HttpGet("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<List<DriverResponseDto>>> GetDrivers(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetDriversAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Onboards/adds a driver to an agency.
+    /// </summary>
+    [HttpPost("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<DriverResponseDto>> AddDriver(Guid id, [FromBody] CreateDriverRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddDriverAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers),
+    /// or for Admin to fetch an agency's fleet by specifying agencyId.
+    /// </summary>
+    [HttpGet("my/fleet")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetMyFleet([FromQuery] Guid? agencyId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetFleetAsync(agencyId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Retrieves full fleet resources (vehicles + drivers) for a specific agency.
+    /// </summary>
+    [HttpGet("{id:guid}/fleet")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetFleet(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetFleetAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 

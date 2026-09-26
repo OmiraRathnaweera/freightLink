@@ -47,6 +47,27 @@ public class AuthController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>Registers a new Driver under an existing Agency (self-service, public).</summary>
+    /// <param name="request">Driver registration payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>201 with a success message and the new user's id/email.</returns>
+    [HttpPost("register/driver")]
+    public async Task<ActionResult<RegisterResponseDto>> RegisterDriver([FromBody] RegisterDriverRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _authService.RegisterDriverAsync(request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>Public lookup of active agencies for driver registration selection.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with list of active agencies.</returns>
+    [HttpGet("agencies")]
+    public async Task<ActionResult<List<AgencyLookupDto>>> GetAgenciesLookup(CancellationToken cancellationToken)
+    {
+        var result = await _authService.GetAgenciesLookupAsync(cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>Shared login for every role. Returns only the token pair, never the user profile.</summary>
     /// <param name="request">Login credentials.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

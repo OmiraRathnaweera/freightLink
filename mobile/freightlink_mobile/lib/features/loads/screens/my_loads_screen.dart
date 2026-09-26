@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
+import '../../notifications/providers/notification_provider.dart';
 import '../data/loads_repository.dart';
 import '../providers/loads_list_provider.dart';
 import '../widgets/load_card.dart';
@@ -21,9 +22,16 @@ class MyLoadsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    NotificationProvider? notifProvider;
+    try {
+      notifProvider = Provider.of<NotificationProvider>(context, listen: false);
+    } catch (_) {
+      notifProvider = null;
+    }
+
     return ChangeNotifierProvider(
       create: (context) =>
-          LoadsListProvider(context.read<LoadsRepository>())..load(),
+          LoadsListProvider(context.read<LoadsRepository>(), notifProvider)..load(),
       child: const _MyLoadsBody(),
     );
   }
@@ -46,9 +54,10 @@ class _MyLoadsBody extends StatelessWidget {
     final provider = context.watch<LoadsListProvider>();
 
     return Scaffold(
-      appBar: const AppTopBar(
+      appBar: AppTopBar(
         title: 'My Loads',
-        actions: [NotificationBellButton()],
+        leading: const AppAvatar(),
+        actions: const [NotificationBellButton()],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openPostLoad(context),

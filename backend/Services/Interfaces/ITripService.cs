@@ -146,6 +146,17 @@ public interface ITripService
     Task<TripResponseDto> CancelAsync(Guid tripId, CancelTripDto? request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Permanently deletes a trip record, its events, and its evidence from the database,
+    /// freeing the underlying assignment and resources. Can be performed on trips in
+    /// Cancelled status (e.g. after cancellation) or Assigned status (before departure).
+    /// </summary>
+    /// <param name="tripId">The trip's id.</param>
+    /// <param name="currentUserId">The authenticated caller's id.</param>
+    /// <param name="currentUserRole">The authenticated caller's role (AgencyStaff, Driver, or Admin).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task DeleteAsync(Guid tripId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Seeds complete example testing trips (Assigned, InTransit, Delivered) for development and UI testing.
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>

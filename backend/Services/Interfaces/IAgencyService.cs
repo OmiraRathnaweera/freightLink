@@ -1,4 +1,4 @@
-﻿using FreightLink.Api.DTOs.Agency;
+using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.Services.Interfaces;
@@ -72,5 +72,24 @@ public interface IAgencyService
     Task<ComplianceDocResponseDto> RejectComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default);
-    Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists vehicles belonging to an agency.
+    /// </summary>
+    Task<List<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists drivers belonging to an agency.
+    /// </summary>
+    Task<List<DriverResponseDto>> GetDriversAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds a driver to an agency.
+    /// </summary>
+    Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CreateDriverRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Retrieves full fleet resources (vehicles and drivers) for an agency.
+    /// </summary>
+    Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

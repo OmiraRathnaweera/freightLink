@@ -255,3 +255,26 @@ export function useCancelTripMutation(options) {
   });
 }
 
+/**
+ * DELETE /trips/{id} — permanently delete a trip fully from the database.
+ * @param {string} tripId
+ * @returns {Promise<void>}
+ */
+export async function deleteTrip(tripId) {
+  return api.delete(`/trips/${tripId}`);
+}
+
+/** Mutation hook for permanently deleting a trip fully. */
+export function useDeleteTripMutation(options) {
+  return useMutation({
+    mutationFn: ({ tripId }) => deleteTrip(tripId),
+    onSuccess: (_, { tripId }) => {
+      queryClient.removeQueries({ queryKey: tripKeys.detail(tripId) });
+      queryClient.invalidateQueries({ queryKey: tripKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: tripKeys.all });
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
+    },
+    ...options,
+  });
+}
+

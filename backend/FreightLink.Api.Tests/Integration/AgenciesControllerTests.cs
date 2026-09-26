@@ -112,11 +112,53 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
+    public async Task AddDriver_Returns201_ForAgencyStaff()
+    {
+        var agency = await RegisterAndLoginAgencyAsync("add-driver", "DRV-ADD");
+
+        // Fetch agency id via /my/fleet
+        using var fleetReq = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/my/fleet", agency.AccessToken);
+        var fleetRes = await _client.SendAsync(fleetReq);
+        fleetRes.EnsureSuccessStatusCode();
+        var fleet = await fleetRes.Content.ReadFromJsonAsync<AgencyFleetResponseDto>();
+        var agencyId = fleet!.AgencyId;
+
+        // Add driver
+        var driverEmail = $"staff-driver-{Guid.NewGuid():N}@example.com";
+        var licenceNo = $"DL-{Guid.NewGuid():N}".Substring(0, 15);
+        using var addReq = AuthedRequest(HttpMethod.Post, $"/api/v1/agencies/{agencyId}/drivers", agency.AccessToken);
+        addReq.Content = JsonContent.Create(new CreateDriverRequestDto
+        {
+            Email = driverEmail,
+            Password = "Sup3r$ecret1",
+            FullName = "Employed Driver",
+            PhoneE164 = "+94771234567",
+            LicenceNo = licenceNo,
+            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2))
+        });
+
+        var addRes = await _client.SendAsync(addReq);
+        Assert.Equal(HttpStatusCode.Created, addRes.StatusCode);
+        var created = await addRes.Content.ReadFromJsonAsync<DriverResponseDto>();
+        Assert.NotNull(created);
+        Assert.Equal(driverEmail, created.Email);
+        Assert.Equal("Employed Driver", created.FullName);
+
+        // GetDrivers
+        using var listReq = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies/{agencyId}/drivers", agency.AccessToken);
+        var listRes = await _client.SendAsync(listReq);
+        Assert.Equal(HttpStatusCode.OK, listRes.StatusCode);
+        var drivers = await listRes.Content.ReadFromJsonAsync<List<DriverResponseDto>>();
+        Assert.NotNull(drivers);
+        Assert.Contains(drivers, d => d.Email == driverEmail);
+    }
+
+    [Fact]
     public async Task GetExpiringCompliance_Returns200_ForAdmin()
     {
         using var request = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/expiring-compliance?days=30", MintAdminToken());
         var response = await _client.SendAsync(request);
-        
+
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -125,7 +167,7 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
     {
         var tokens = await RegisterAndLoginAgencyAsync("expiring-fail", "EXPFAIL");
         using var request = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/expiring-compliance", tokens.AccessToken);
-        
+
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

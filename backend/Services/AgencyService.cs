@@ -16,11 +16,13 @@ namespace FreightLink.Api.Services;
 public class AgencyService : IAgencyService
 {
     private readonly AppDbContext _dbContext;
+    private readonly IPasswordHasher _passwordHasher;
 
-    /// <summary>Creates the agency service with its DB context.</summary>
-    public AgencyService(AppDbContext dbContext)
+    /// <summary>Creates the agency service with its DB context and password hasher.</summary>
+    public AgencyService(AppDbContext dbContext, IPasswordHasher passwordHasher)
     {
         _dbContext = dbContext;
+        _passwordHasher = passwordHasher;
     }
 
     /// <inheritdoc />
@@ -476,29 +478,6 @@ public class AgencyService : IAgencyService
         };
     }
 
-    /// <inheritdoc />
-    public async Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
-    {
-        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
-        
-        var vehicles = await _dbContext.Vehicles
-            .Where(v => v.AgencyId == agencyId)
-            .Select(v => new VehicleResponseDto
-            {
-                VehicleId = v.VehicleId,
-                AgencyId = v.AgencyId,
-                RegistrationNo = v.RegistrationNo,
-                VehicleType = v.VehicleType.ToString(),
-                CapacityKg = v.CapacityKg,
-                VolumeM3 = v.VolumeM3,
-                Status = v.Status.ToString(),
-                CreatedAt = v.CreatedAt
-            })
-            .ToListAsync(cancellationToken);
-
-        return vehicles;
-    }
-
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {
         if (currentUserRole == UserRole.Admin)
@@ -520,6 +499,187 @@ public class AgencyService : IAgencyService
         }
 
         throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
+    }
+
+    /// <inheritdoc />
+    public async Task<List<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        var vehicles = await _dbContext.Vehicles.AsNoTracking()
+            .Where(v => v.AgencyId == agencyId)
+            .OrderBy(v => v.RegistrationNo)
+            .ToListAsync(cancellationToken);
+
+        return vehicles.Select(v => new VehicleResponseDto
+        {
+            VehicleId = v.VehicleId,
+            AgencyId = v.AgencyId,
+            RegistrationNo = v.RegistrationNo,
+            VehicleType = v.VehicleType.ToString(),
+            CapacityKg = v.CapacityKg,
+            VolumeM3 = v.VolumeM3,
+            Status = v.Status.ToString(),
+            IsAvailable = v.Status == VehicleStatus.Available,
+            CreatedAt = v.CreatedAt,
+            UpdatedAt = v.UpdatedAt
+        }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<List<DriverResponseDto>> GetDriversAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        var drivers = await _dbContext.Drivers.AsNoTracking()
+            .Include(d => d.User)
+            .Where(d => d.AgencyId == agencyId)
+            .OrderBy(d => d.User.FullName)
+            .ToListAsync(cancellationToken);
+
+        return drivers.Select(d => new DriverResponseDto
+        {
+            DriverId = d.DriverId,
+            UserId = d.UserId,
+            AgencyId = d.AgencyId,
+            FullName = d.User?.FullName ?? string.Empty,
+            Email = d.User?.Email ?? string.Empty,
+            LicenceNo = d.LicenceNo,
+            LicenceExpiry = d.LicenceExpiry,
+            Status = d.Status.ToString(),
+            IsActive = d.Status == DriverStatus.Active,
+            CreatedAt = d.CreatedAt,
+            UpdatedAt = d.UpdatedAt
+        }).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CreateDriverRequestDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (request.LicenceExpiry <= DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Licence expiry date must be in the future.");
+        }
+
+        var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+        if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+        }
+
+        if (await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var user = new User
+        {
+            UserId = Guid.NewGuid(),
+            Role = UserRole.Driver,
+            Email = normalizedEmail,
+            PasswordHash = _passwordHasher.Hash(request.Password),
+            FullName = request.FullName,
+            PhoneE164 = request.PhoneE164,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        var driver = new Driver
+        {
+            DriverId = Guid.NewGuid(),
+            UserId = user.UserId,
+            AgencyId = agencyId,
+            LicenceNo = request.LicenceNo,
+            LicenceExpiry = request.LicenceExpiry,
+            Status = DriverStatus.Active,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _dbContext.Users.Add(user);
+        _dbContext.Drivers.Add(driver);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            if (pg.ConstraintName == "uq_user_email")
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+            }
+            if (pg.ConstraintName == "IX_Drivers_LicenceNo")
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists.");
+            }
+            throw;
+        }
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = user.UserId,
+            AgencyId = driver.AgencyId,
+            FullName = user.FullName,
+            Email = user.Email,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status.ToString(),
+            IsActive = true,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        Guid targetAgencyId;
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var staff = await _dbContext.AgencyStaff.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+            if (staff == null)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "No agency staff profile found for caller.");
+            }
+            targetAgencyId = staff.AgencyId;
+        }
+        else if (agencyId.HasValue)
+        {
+            targetAgencyId = agencyId.Value;
+        }
+        else
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Agency ID must be specified.");
+        }
+
+        var agency = await _dbContext.Agencies.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.AgencyId == targetAgencyId, cancellationToken);
+        if (agency == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        var vehicles = await GetVehiclesAsync(targetAgencyId, currentUserId, currentUserRole, cancellationToken);
+        var drivers = await GetDriversAsync(targetAgencyId, currentUserId, currentUserRole, cancellationToken);
+
+        return new AgencyFleetResponseDto
+        {
+            AgencyId = targetAgencyId,
+            AgencyName = agency.Name,
+            Vehicles = vehicles,
+            Drivers = drivers
+        };
     }
 
     private static AgencyResponseDto MapToResponse(Agency agency)

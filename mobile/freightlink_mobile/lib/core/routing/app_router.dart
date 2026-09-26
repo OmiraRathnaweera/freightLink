@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
+import '../../features/trips/screens/driver_assigned_trip_screen.dart';
+import '../../features/trips/screens/job_proposals_screen.dart';
 import '../../shared/widgets/app_shell.dart';
+import '../../shared/widgets/app_top_bar.dart';
 import '../../shared/widgets/coming_soon_placeholder.dart';
 import '../../features/agencies/screens/agency_dashboard_screen.dart';
 import '../../features/agencies/screens/agency_profile_screen.dart';
@@ -23,7 +27,12 @@ final GlobalKey<NavigatorState> _shellNavigatorReportsKey = GlobalKey<NavigatorS
 GoRouter createAppRouter(AuthProvider authProvider) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    initialLocation: '/dashboard',
+    // The operational tab (Loads/Proposals/My Trip, depending on role) is the
+    // primary view post-login, not Dashboard — StatefulShellRoute branches
+    // build lazily on first visit, so landing on '/dashboard' would mean the
+    // '/loads' branch (and thus MyLoadsScreen/JobProposalsScreen/
+    // DriverAssignedTripScreen) is never built until the user taps that tab.
+    initialLocation: '/loads',
     refreshListenable: authProvider,
     redirect: (context, state) {
       final status = authProvider.status;
@@ -40,7 +49,9 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       }
 
       if (status == AuthStatus.authenticated && (isGoingToLogin || isGoingToRegister)) {
-        return '/dashboard';
+        // Same reasoning as initialLocation above: land on the operational
+        // tab, not Dashboard, so it's actually built.
+        return '/loads';
       }
 
       return null;
@@ -64,7 +75,19 @@ GoRouter createAppRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: '/dashboard',
-                builder: (context, state) => const AgencyDashboardScreen(),
+                builder: (context, state) {
+                  final user = context.watch<AuthProvider>().user;
+                  if (user?.isAgencyStaff ?? false) {
+                    return const AgencyDashboardScreen();
+                  }
+                  // Shipper/Driver dashboards aren't built yet.
+                  return const ComingSoonPlaceholder(
+                    title: 'Dashboard',
+                    icon: Icons.dashboard_outlined,
+                    bottomLeading: AppAvatar(),
+                    actions: [NotificationBellButton()],
+                  );
+                },
                 routes: [
                   GoRoute(
                     path: 'profile',
@@ -97,7 +120,16 @@ GoRouter createAppRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: '/loads',
-                builder: (context, state) => const MyLoadsScreen(),
+                builder: (context, state) {
+                  final user = context.watch<AuthProvider>().user;
+                  if (user?.isDriver ?? false) {
+                    return const DriverAssignedTripScreen();
+                  }
+                  if (user?.isAgencyStaff ?? false) {
+                    return const JobProposalsScreen();
+                  }
+                  return const MyLoadsScreen();
+                },
               ),
             ],
           ),
