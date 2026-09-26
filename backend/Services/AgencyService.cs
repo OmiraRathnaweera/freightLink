@@ -1,4 +1,5 @@
-using System.Net;
+﻿using System.Net;
+using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -172,6 +173,25 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
+    public async Task<IEnumerable<AgencyVerificationQueueItemDto>> GetVerificationQueueAsync(CancellationToken cancellationToken = default)
+    {
+        var agencies = await _dbContext.Agencies
+            .Include(a => a.ComplianceDocs)
+            .Where(a => a.Status == AgencyStatus.Pending)
+            .AsNoTracking()
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return agencies.Select(a => new AgencyVerificationQueueItemDto
+        {
+            Agency = MapToResponse(a),
+            ComplianceDocs = a.ComplianceDocs
+                .OrderByDescending(d => d.CreatedAt)
+                .Select(MapToComplianceDocResponse)
+        });
+    }
+
+    /// <inheritdoc />
     public async Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
@@ -182,6 +202,11 @@ public class AgencyService : IAgencyService
         if (agency == null)
         {
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(agency.Status);
         }
 
         if (request.Name != null) agency.Name = request.Name;
@@ -278,6 +303,202 @@ public class AgencyService : IAgencyService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<ComplianceDocResponseDto> AddComplianceDocAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, ComplianceDocCreateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        var agency = await _dbContext.Agencies.FindAsync(new object[] { agencyId }, cancellationToken);
+        if (agency == null) throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
+
+        var doc = new ComplianceDoc
+        {
+            AgencyId = agencyId,
+            DocType = request.DocType,
+            DocNumber = request.DocNumber,
+            StorageKey = request.PublicId,
+            IssuedOn = request.IssuedOn,
+            ExpiresOn = request.ExpiresOn,
+            Status = ComplianceDocStatus.Pending
+        };
+
+        _dbContext.ComplianceDocs.Add(doc);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <inheritdoc />
+    public async Task<ComplianceDocResponseDto> UpdateComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, ComplianceDocUpdateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var doc = await _dbContext.ComplianceDocs
+            .FirstOrDefaultAsync(d => d.ComplianceDocId == complianceDocId && d.AgencyId == agencyId, cancellationToken);
+
+        if (doc == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.COMPLIANCE_DOC_NOT_FOUND, "The requested compliance document could not be found.");
+        }
+
+        doc.StorageKey = request.PublicId;
+        doc.DocNumber = request.DocNumber;
+        doc.IssuedOn = request.IssuedOn;
+        doc.ExpiresOn = request.ExpiresOn;
+        // A replacement file must be re-verified by an admin, regardless of the document's previous status.
+        doc.Status = ComplianceDocStatus.Pending;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <inheritdoc />
+    public async Task<ComplianceDocResponseDto> VerifyComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        var doc = await GetComplianceDocForReviewAsync(agencyId, complianceDocId, currentUserRole, cancellationToken);
+        doc.Status = ComplianceDocStatus.Verified;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <inheritdoc />
+    public async Task<ComplianceDocResponseDto> RejectComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        var doc = await GetComplianceDocForReviewAsync(agencyId, complianceDocId, currentUserRole, cancellationToken);
+        doc.Status = ComplianceDocStatus.Rejected;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <summary>
+    /// Shared lookup/guard for the two admin review actions: only an Admin may call them, the document
+    /// must exist under the given agency, and it must currently be <c>Pending</c> — an already
+    /// verified/rejected document is not re-reviewable through this path.
+    /// </summary>
+    private async Task<ComplianceDoc> GetComplianceDocForReviewAsync(Guid agencyId, Guid complianceDocId, UserRole currentUserRole, CancellationToken cancellationToken)
+    {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can verify or reject compliance documents.");
+        }
+
+        var doc = await _dbContext.ComplianceDocs
+            .FirstOrDefaultAsync(d => d.ComplianceDocId == complianceDocId && d.AgencyId == agencyId, cancellationToken);
+
+        if (doc == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.COMPLIANCE_DOC_NOT_FOUND, "The requested compliance document could not be found.");
+        }
+
+        if (doc.Status != ComplianceDocStatus.Pending)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_COMPLIANCE_DOC_STATUS_TRANSITION, $"Only pending compliance documents can be reviewed (current status: '{doc.Status}').");
+        }
+
+        return doc;
+    }
+
+    private static ComplianceDocResponseDto MapToComplianceDocResponse(ComplianceDoc doc) => new()
+    {
+        ComplianceDocId = doc.ComplianceDocId,
+        DocType = doc.DocType,
+        DocNumber = doc.DocNumber,
+        StorageKey = doc.StorageKey,
+        IssuedOn = doc.IssuedOn,
+        ExpiresOn = doc.ExpiresOn,
+        Status = doc.Status
+    };
+
+    public async Task<IEnumerable<ComplianceDocResponseDto>> GetComplianceDocsAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        
+        var docs = await _dbContext.ComplianceDocs
+            .Where(d => d.AgencyId == agencyId)
+            .Select(d => new ComplianceDocResponseDto
+            {
+                ComplianceDocId = d.ComplianceDocId,
+                DocType = d.DocType,
+                DocNumber = d.DocNumber,
+                StorageKey = d.StorageKey,
+                IssuedOn = d.IssuedOn,
+                ExpiresOn = d.ExpiresOn,
+                Status = d.Status
+            })
+            .ToListAsync(cancellationToken);
+
+        return docs;
+    }
+
+    /// <inheritdoc />
+    public async Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var agency = await _dbContext.Agencies.AsNoTracking()
+                .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+
+            if (agency == null)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
+            }
+
+            AgencyStatusGuard.EnsureActive(agency.Status);
+        }
+
+        var vehicle = new Vehicle
+        {
+            VehicleId = Guid.NewGuid(),
+            AgencyId = agencyId,
+            RegistrationNo = request.RegistrationNo,
+            VehicleType = request.VehicleType,
+            CapacityKg = request.CapacityKg,
+            VolumeM3 = request.VolumeM3,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        _dbContext.Vehicles.Add(vehicle);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new VehicleResponseDto
+        {
+            VehicleId = vehicle.VehicleId,
+            AgencyId = vehicle.AgencyId,
+            RegistrationNo = vehicle.RegistrationNo,
+            VehicleType = vehicle.VehicleType.ToString(),
+            CapacityKg = vehicle.CapacityKg,
+            VolumeM3 = vehicle.VolumeM3,
+            Status = vehicle.Status.ToString(),
+            CreatedAt = vehicle.CreatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        
+        var vehicles = await _dbContext.Vehicles
+            .Where(v => v.AgencyId == agencyId)
+            .Select(v => new VehicleResponseDto
+            {
+                VehicleId = v.VehicleId,
+                AgencyId = v.AgencyId,
+                RegistrationNo = v.RegistrationNo,
+                VehicleType = v.VehicleType.ToString(),
+                CapacityKg = v.CapacityKg,
+                VolumeM3 = v.VolumeM3,
+                Status = v.Status.ToString(),
+                CreatedAt = v.CreatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return vehicles;
+    }
+
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {
         if (currentUserRole == UserRole.Admin)
@@ -301,65 +522,6 @@ public class AgencyService : IAgencyService
         throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
     }
 
-    /// <inheritdoc />
-    public async Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default)
-    {
-        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
-
-        var vehicle = new Vehicle
-        {
-            VehicleId = Guid.NewGuid(),
-            AgencyId = agencyId,
-            RegistrationNo = request.RegistrationNo,
-            VehicleType = request.VehicleType,
-            CapacityKg = request.CapacityKg,
-            VolumeM3 = request.VolumeM3,
-            Status = VehicleStatus.Available,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-
-        _dbContext.Vehicles.Add(vehicle);
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        return new VehicleResponseDto
-        {
-            VehicleId = vehicle.VehicleId,
-            AgencyId = vehicle.AgencyId,
-            RegistrationNo = vehicle.RegistrationNo,
-            VehicleType = vehicle.VehicleType,
-            CapacityKg = vehicle.CapacityKg,
-            VolumeM3 = vehicle.VolumeM3,
-            Status = vehicle.Status,
-            CreatedAt = vehicle.CreatedAt,
-            UpdatedAt = vehicle.UpdatedAt
-        };
-    }
-
-    /// <inheritdoc />
-    public async Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
-    {
-        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
-
-        var vehicles = await _dbContext.Vehicles
-            .Where(v => v.AgencyId == agencyId)
-            .OrderBy(v => v.CreatedAt)
-            .ToListAsync(cancellationToken);
-
-        return vehicles.Select(v => new VehicleResponseDto
-        {
-            VehicleId = v.VehicleId,
-            AgencyId = v.AgencyId,
-            RegistrationNo = v.RegistrationNo,
-            VehicleType = v.VehicleType,
-            CapacityKg = v.CapacityKg,
-            VolumeM3 = v.VolumeM3,
-            Status = v.Status,
-            CreatedAt = v.CreatedAt,
-            UpdatedAt = v.UpdatedAt
-        });
-    }
-
     private static AgencyResponseDto MapToResponse(Agency agency)
     {
         return new AgencyResponseDto
@@ -376,4 +538,3 @@ public class AgencyService : IAgencyService
         };
     }
 }
-

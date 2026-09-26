@@ -56,8 +56,16 @@ public class DisputeService : IDisputeService
 
         EnforceTripPartyAuthorization(trip, currentUserId, role);
 
-        // Check for active dispute on this trip & category (Raised or UnderReview)
-        var liveStatuses = new[] { DisputeStatus.Raised, DisputeStatus.UnderReview };
+        if (role == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+        }
+
+        // Application-level pre-check: gives a readable 409 on the normal (non-concurrent) path
+        // and avoids a round-trip to SaveChanges when the caller can clearly see the conflict.
+        // This check is NOT a substitute for the catch below — two concurrent requests that both
+        // pass this check can still race to SaveChanges and hit ux_dispute_open simultaneously.
+        var liveStatuses = new[] { DisputeStatus.Open, DisputeStatus.UnderReview };
         var liveDuplicateExists = await _dbContext.Disputes.AnyAsync(
             d => d.TripId == request.TripId
               && d.Category == request.Category
