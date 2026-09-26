@@ -34,4 +34,21 @@ class FleetProvider extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  Future<bool> addVehicle(Map<String, dynamic> vehicle) async {
+    _state = FleetState.loading;
+    notifyListeners();
+    try {
+      await _repository.addVehicle(vehicle);
+      _vehicles.add(vehicle);
+      _state = FleetState.loaded;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString();
+      _state = _vehicles.isEmpty ? FleetState.empty : FleetState.loaded;
+      notifyListeners();
+      return false;
+    }
+  }
 }

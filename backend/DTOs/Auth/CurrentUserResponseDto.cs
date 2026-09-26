@@ -23,4 +23,7 @@ public class CurrentUserResponseDto
 
     /// <summary>When the account was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The ID of the agency this user belongs to, if they are AgencyStaff.</summary>
+    public Guid? AgencyId { get; set; }
 }

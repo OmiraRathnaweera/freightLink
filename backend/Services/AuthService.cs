@@ -247,7 +247,9 @@ public class AuthService : IAuthService
     /// <inheritdoc />
     public async Task<CurrentUserResponseDto> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+        var user = await _dbContext.Users
+            .Include(u => u.AgencyStaff)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
 
         if (user is null)
         {
@@ -333,7 +335,8 @@ public class AuthService : IAuthService
         PhoneE164 = user.PhoneE164,
         Role = user.Role.ToString(),
         IsActive = user.IsActive,
-        CreatedAt = user.CreatedAt
+        CreatedAt = user.CreatedAt,
+        AgencyId = user.AgencyStaff?.AgencyId
     };
 
     /// <summary>Normalizes an email for case-insensitive storage/lookup.</summary>

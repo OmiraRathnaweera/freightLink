@@ -34,6 +34,11 @@ class AgencyDashboardScreen extends StatelessWidget {
                   Text('Total Vehicles: ${provider.stats?['totalVehicles'] ?? 0}'),
                   const SizedBox(height: 20),
                   ElevatedButton(
+                    onPressed: () => context.go('/dashboard/profile'),
+                    child: const Text('Agency Profile'),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
                     onPressed: () => context.go('/dashboard/fleet'),
                     child: const Text('Fleet Management'),
                   ),

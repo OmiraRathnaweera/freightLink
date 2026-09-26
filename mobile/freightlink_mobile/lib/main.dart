@@ -38,7 +38,7 @@ class FreightLinkApp extends StatelessWidget {
           update: (_, auth, _) => LoadsRepository(auth.apiClient),
         ),
         ProxyProvider<AuthProvider, AgenciesRepository>(
-          update: (_, auth, _) => AgenciesRepository(auth.apiClient),
+          update: (_, auth, _) => AgenciesRepository(auth.apiClient, auth.user?.agencyId),
         ),
       ],
       child: MaterialApp.router(

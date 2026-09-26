@@ -301,6 +301,65 @@ public class AgencyService : IAgencyService
         throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
     }
 
+    /// <inheritdoc />
+    public async Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var vehicle = new Vehicle
+        {
+            VehicleId = Guid.NewGuid(),
+            AgencyId = agencyId,
+            RegistrationNo = request.RegistrationNo,
+            VehicleType = request.VehicleType,
+            CapacityKg = request.CapacityKg,
+            VolumeM3 = request.VolumeM3,
+            Status = VehicleStatus.Available,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        _dbContext.Vehicles.Add(vehicle);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new VehicleResponseDto
+        {
+            VehicleId = vehicle.VehicleId,
+            AgencyId = vehicle.AgencyId,
+            RegistrationNo = vehicle.RegistrationNo,
+            VehicleType = vehicle.VehicleType,
+            CapacityKg = vehicle.CapacityKg,
+            VolumeM3 = vehicle.VolumeM3,
+            Status = vehicle.Status,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var vehicles = await _dbContext.Vehicles
+            .Where(v => v.AgencyId == agencyId)
+            .OrderBy(v => v.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return vehicles.Select(v => new VehicleResponseDto
+        {
+            VehicleId = v.VehicleId,
+            AgencyId = v.AgencyId,
+            RegistrationNo = v.RegistrationNo,
+            VehicleType = v.VehicleType,
+            CapacityKg = v.CapacityKg,
+            VolumeM3 = v.VolumeM3,
+            Status = v.Status,
+            CreatedAt = v.CreatedAt,
+            UpdatedAt = v.UpdatedAt
+        });
+    }
+
     private static AgencyResponseDto MapToResponse(Agency agency)
     {
         return new AgencyResponseDto

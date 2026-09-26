@@ -21,10 +21,7 @@ class DriverOnboardingProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Simulate API call for now
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // await _repository.onboardDriver(driverData);
+      await _repository.addDriver(driverData);
       _isSuccess = true;
     } catch (e) {
       _errorMessage = e.toString();

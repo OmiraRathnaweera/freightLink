@@ -35,8 +35,12 @@ class FleetListScreen extends StatelessWidget {
             return ListView.builder(
               itemCount: provider.vehicles.length,
               itemBuilder: (context, index) {
+                final vehicle = provider.vehicles[index];
                 return ListTile(
-                  title: Text('Vehicle ${index + 1}'),
+                  leading: const CircleAvatar(child: Icon(Icons.local_shipping)),
+                  title: Text(vehicle['registrationNo'] ?? 'Unknown Vehicle'),
+                  subtitle: Text('${vehicle['vehicleType'] ?? ''} - Status: ${vehicle['status'] ?? ''}'),
+                  trailing: Text('${vehicle['capacityKg'] ?? '0'} kg'),
                 );
               },
             );
