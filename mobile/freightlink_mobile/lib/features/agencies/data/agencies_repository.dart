@@ -1,30 +1,76 @@
 import '../../../core/network/api_client.dart';
 
 class AgenciesRepository {
-  const AgenciesRepository(this._client);
+  AgenciesRepository(this._client, this.agencyId);
 
   final ApiClient _client;
+  final String? agencyId;
+  
+  final List<Map<String, dynamic>> _mockVehicles = [];
+  final List<Map<String, dynamic>> _mockDrivers = [];
 
-  // Placeholder for fetching dashboard stats
+  // Fetch dashboard stats
   Future<Map<String, dynamic>> getDashboardStats() async {
-    // final json = await _client.get('/agencies/stats') as Map<String, dynamic>;
-    // return json;
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
     
-    // Simulate network delay for now
-    await Future.delayed(const Duration(milliseconds: 800));
+    final vehicles = await getFleet();
+    
     return {
-      'totalVehicles': 12,
-      'activeDrivers': 8,
+      'totalVehicles': vehicles.length,
+      'activeDrivers': 8 + _mockDrivers.length,
       'pendingCompliance': 3,
     };
   }
 
-  // Placeholder for fetching fleet
+  // Fetch actual fleet
   Future<List<Map<String, dynamic>>> getFleet() async {
-    // final json = await _client.get('/agencies/fleet') as List<dynamic>;
-    // return json.cast<Map<String, dynamic>>();
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    final response = await _client.get('/agencies/$agencyId/vehicles') as List<dynamic>;
+    return response.cast<Map<String, dynamic>>();
+  }
 
+  // Fetch actual agency profile
+  Future<Map<String, dynamic>> getProfile() async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    final response = await _client.get('/agencies/$agencyId') as Map<String, dynamic>;
+    return response;
+  }
+
+  // Update actual agency profile
+  Future<void> updateProfile(Map<String, dynamic> data) async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    await _client.put(
+      '/agencies/$agencyId',
+      body: data,
+    );
+  }
+
+  // Add actual vehicle
+  Future<void> addVehicle(Map<String, dynamic> data) async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    await _client.post(
+      '/agencies/$agencyId/vehicles',
+      body: data,
+    );
+  }
+
+  // Placeholder for adding a driver
+  Future<void> addDriver(Map<String, dynamic> data) async {
     await Future.delayed(const Duration(milliseconds: 800));
-    return []; // Empty fleet for now
+    _mockDrivers.add(data);
   }
 }

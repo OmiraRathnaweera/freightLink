@@ -114,6 +114,28 @@ public class AgenciesController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// Adds a vehicle to the agency's fleet.
+    /// </summary>
+    [HttpPost("{id:guid}/vehicles")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<VehicleResponseDto>> AddVehicle(Guid id, [FromBody] VehicleCreateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddVehicleAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result); // Return 200 OK with the created vehicle
+    }
+
+    /// <summary>
+    /// Retrieves all vehicles for the specified agency.
+    /// </summary>
+    [HttpGet("{id:guid}/vehicles")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetVehiclesAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
     private Guid GetCurrentUserId()
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);

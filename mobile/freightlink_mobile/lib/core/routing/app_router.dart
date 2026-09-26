@@ -8,6 +8,7 @@ import '../../features/loads/screens/my_loads_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/coming_soon_placeholder.dart';
 import '../../features/agencies/screens/agency_dashboard_screen.dart';
+import '../../features/agencies/screens/agency_profile_screen.dart';
 import '../../features/agencies/screens/fleet_list_screen.dart';
 import '../../features/agencies/screens/add_vehicle_screen.dart';
 import '../../features/agencies/screens/driver_onboarding_screen.dart';
@@ -65,6 +66,10 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                 path: '/dashboard',
                 builder: (context, state) => const AgencyDashboardScreen(),
                 routes: [
+                  GoRoute(
+                    path: 'profile',
+                    builder: (context, state) => const AgencyProfileScreen(),
+                  ),
                   GoRoute(
                     path: 'fleet',
                     builder: (context, state) => const FleetListScreen(),
