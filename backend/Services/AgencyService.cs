@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -278,27 +278,57 @@ public class AgencyService : IAgencyService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
+    public async Task<ComplianceDocResponseDto> AddComplianceDocAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, ComplianceDocCreateDto request, CancellationToken cancellationToken = default)
     {
-        if (currentUserRole == UserRole.Admin)
-        {
-            return;
-        }
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        var agency = await _dbContext.Agencies.FindAsync(new object[] { agencyId }, cancellationToken);
+        if (agency == null) throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
 
-        if (currentUserRole == UserRole.AgencyStaff)
+        var doc = new ComplianceDoc
         {
-            var isOwned = await _dbContext.AgencyStaff
-                .AnyAsync(s => s.UserId == currentUserId && s.AgencyId == agencyId, cancellationToken);
+            AgencyId = agencyId,
+            DocType = request.DocType,
+            DocNumber = request.DocNumber,
+            StorageKey = request.PublicId,
+            IssuedOn = request.IssuedOn,
+            ExpiresOn = request.ExpiresOn,
+            Status = ComplianceDocStatus.Pending
+        };
 
-            if (!isOwned)
+        _dbContext.ComplianceDocs.Add(doc);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new ComplianceDocResponseDto
+        {
+            ComplianceDocId = doc.ComplianceDocId,
+            DocType = doc.DocType,
+            DocNumber = doc.DocNumber,
+            StorageKey = doc.StorageKey,
+            IssuedOn = doc.IssuedOn,
+            ExpiresOn = doc.ExpiresOn,
+            Status = doc.Status
+        };
+    }
+
+    public async Task<IEnumerable<ComplianceDocResponseDto>> GetComplianceDocsAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+        
+        var docs = await _dbContext.ComplianceDocs
+            .Where(d => d.AgencyId == agencyId)
+            .Select(d => new ComplianceDocResponseDto
             {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.AGENCY_NOT_OWNED, "You do not have permission to access this agency.");
-            }
-            
-            return;
-        }
+                ComplianceDocId = d.ComplianceDocId,
+                DocType = d.DocType,
+                DocNumber = d.DocNumber,
+                StorageKey = d.StorageKey,
+                IssuedOn = d.IssuedOn,
+                ExpiresOn = d.ExpiresOn,
+                Status = d.Status
+            })
+            .ToListAsync(cancellationToken);
 
-        throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
+        return docs;
     }
 
     /// <inheritdoc />
@@ -327,12 +357,11 @@ public class AgencyService : IAgencyService
             VehicleId = vehicle.VehicleId,
             AgencyId = vehicle.AgencyId,
             RegistrationNo = vehicle.RegistrationNo,
-            VehicleType = vehicle.VehicleType,
+            VehicleType = vehicle.VehicleType.ToString(),
             CapacityKg = vehicle.CapacityKg,
             VolumeM3 = vehicle.VolumeM3,
-            Status = vehicle.Status,
-            CreatedAt = vehicle.CreatedAt,
-            UpdatedAt = vehicle.UpdatedAt
+            Status = vehicle.Status.ToString(),
+            CreatedAt = vehicle.CreatedAt
         };
     }
 
@@ -340,24 +369,46 @@ public class AgencyService : IAgencyService
     public async Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
-
+        
         var vehicles = await _dbContext.Vehicles
             .Where(v => v.AgencyId == agencyId)
-            .OrderBy(v => v.CreatedAt)
+            .Select(v => new VehicleResponseDto
+            {
+                VehicleId = v.VehicleId,
+                AgencyId = v.AgencyId,
+                RegistrationNo = v.RegistrationNo,
+                VehicleType = v.VehicleType.ToString(),
+                CapacityKg = v.CapacityKg,
+                VolumeM3 = v.VolumeM3,
+                Status = v.Status.ToString(),
+                CreatedAt = v.CreatedAt
+            })
             .ToListAsync(cancellationToken);
 
-        return vehicles.Select(v => new VehicleResponseDto
+        return vehicles;
+    }
+
+    private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
+    {
+        if (currentUserRole == UserRole.Admin)
         {
-            VehicleId = v.VehicleId,
-            AgencyId = v.AgencyId,
-            RegistrationNo = v.RegistrationNo,
-            VehicleType = v.VehicleType,
-            CapacityKg = v.CapacityKg,
-            VolumeM3 = v.VolumeM3,
-            Status = v.Status,
-            CreatedAt = v.CreatedAt,
-            UpdatedAt = v.UpdatedAt
-        });
+            return;
+        }
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var isOwned = await _dbContext.AgencyStaff
+                .AnyAsync(s => s.UserId == currentUserId && s.AgencyId == agencyId, cancellationToken);
+
+            if (!isOwned)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.AGENCY_NOT_OWNED, "You do not have permission to access this agency.");
+            }
+            
+            return;
+        }
+
+        throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit accessing agency data.");
     }
 
     private static AgencyResponseDto MapToResponse(Agency agency)
@@ -376,4 +427,3 @@ public class AgencyService : IAgencyService
         };
     }
 }
-

@@ -1,4 +1,4 @@
-namespace FreightLink.Api.DTOs.Auth;
+﻿namespace FreightLink.Api.DTOs.Auth;
 
 /// <summary>Response for <c>GET /api/v1/auth/me</c> — the authenticated caller's safe profile (no password hash).</summary>
 public class CurrentUserResponseDto

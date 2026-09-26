@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Security.Claims;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -6,6 +6,7 @@ using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FreightLink.Api.Controllers;
@@ -114,20 +115,30 @@ public class AgenciesController : ControllerBase
         return Ok();
     }
 
-    /// <summary>
-    /// Adds a vehicle to the agency's fleet.
-    /// </summary>
-    [HttpPost("{id:guid}/vehicles")]
+    [HttpPost("{id:guid}/compliance-docs")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> AddComplianceDoc(Guid id, [FromBody] ComplianceDocCreateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddComplianceDocAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpGet("{id:guid}/compliance-docs")]
     [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<IEnumerable<ComplianceDocResponseDto>>> GetComplianceDocs(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetComplianceDocsAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/vehicles")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
     public async Task<ActionResult<VehicleResponseDto>> AddVehicle(Guid id, [FromBody] VehicleCreateDto request, CancellationToken cancellationToken)
     {
         var result = await _agencyService.AddVehicleAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
-        return Ok(result); // Return 200 OK with the created vehicle
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    /// <summary>
-    /// Retrieves all vehicles for the specified agency.
-    /// </summary>
     [HttpGet("{id:guid}/vehicles")]
     [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
     public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)

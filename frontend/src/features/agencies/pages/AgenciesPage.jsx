@@ -1,7 +1,8 @@
-import { Navigate } from 'react-router-dom'
+﻿import { Navigate } from 'react-router-dom'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
 import { useAgenciesQuery } from '../api/agencyApi.js'
+import AgencyProfilePage from './AgencyProfilePage.jsx'
 import Card from '../../../components/Card.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
@@ -79,13 +80,11 @@ export default function AgenciesPage() {
   }
 
   if (role === UserRole.AGENCY_STAFF) {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">My Agency Profile</h1>
-        <p className="text-slate-500">Agency profile view not implemented yet.</p>
-      </div>
-    )
+    return <AgencyProfilePage />
   }
 
   return <Navigate to="/unauthorized" replace />
 }
+
+
+

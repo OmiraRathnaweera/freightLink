@@ -48,9 +48,17 @@ import { cx } from '../lib/cx.js'
 // sidebar can never link to a section the signed-in role would just get
 // bounced from, and there's one place (not two) to update when a role
 // gains access to a route.
-const NAV_ITEMS = [
+const GET_NAV_ITEMS = (role) => [
   { to: '/loads', label: 'Loads', icon: Package },
-  { to: '/agencies', label: 'Agencies', icon: Building2, children: [ { to: '/agencies', label: 'All Agencies', end: true }, { to: '/agencies/verification', label: 'Verification Queue' } ] },
+  { 
+    to: '/agencies', 
+    label: role === 'AgencyStaff' ? 'My Agency' : 'Agencies', 
+    icon: Building2, 
+    children: role === 'Admin' ? [ 
+      { to: '/agencies', label: 'All Agencies', end: true }, 
+      { to: '/agencies/verification', label: 'Verification Queue' } 
+    ] : undefined
+  },
   { to: '/trips', label: 'Trips', icon: RouteIcon },
   { to: '/billing', label: 'Billing', icon: Receipt },
   { to: '/agent-workflows', label: 'Agent Workflows', icon: Workflow },
@@ -81,7 +89,7 @@ function DashboardLayoutContent() {
 
   useEscapeKey(isOpen, closeSidebar)
 
-  const visibleNavItems = NAV_ITEMS.filter((item) => isRouteAllowedForRole(role, item.to))
+  const visibleNavItems = GET_NAV_ITEMS(role).filter((item) => isRouteAllowedForRole(role, item.to))
 
   return (
     <div className="flex min-h-screen bg-background text-on-background lg:flex-row">
@@ -198,4 +206,5 @@ function DashboardLayoutContent() {
 }
 
 export default DashboardLayout
+
 

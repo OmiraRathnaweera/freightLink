@@ -1,4 +1,4 @@
-﻿import { useMutation, useQuery } from '@tanstack/react-query'
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../lib/api/api.js'
 
 export const agencyKeys = {
@@ -65,6 +65,61 @@ export function useSuspendAgencyMutation(options) {
   return useMutation({
     mutationFn: suspendAgency,
     ...options,
+  })
+}
+
+
+export async function getComplianceDocs(agencyId) {
+  return api.get(`/agencies/${agencyId}/compliance-docs`)
+}
+
+export async function addComplianceDoc({ agencyId, doc }) {
+  return api.post(`/agencies/${agencyId}/compliance-docs`, doc)
+}
+
+export async function getVehicles(agencyId) {
+  return api.get(`/agencies/${agencyId}/vehicles`)
+}
+
+export async function addVehicle({ agencyId, vehicle }) {
+  return api.post(`/agencies/${agencyId}/vehicles`, vehicle)
+}
+
+export function useComplianceDocsQuery(agencyId, options) {
+  return useQuery({
+    queryKey: ['agencies', agencyId, 'compliance-docs'],
+    queryFn: () => getComplianceDocs(agencyId),
+    ...options
+  })
+}
+
+export function useAddComplianceDocMutation(options) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: addComplianceDoc,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'compliance-docs'] })
+    },
+    ...options
+  })
+}
+
+export function useVehiclesQuery(agencyId, options) {
+  return useQuery({
+    queryKey: ['agencies', agencyId, 'vehicles'],
+    queryFn: () => getVehicles(agencyId),
+    ...options
+  })
+}
+
+export function useAddVehicleMutation(options) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: addVehicle,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'vehicles'] })
+    },
+    ...options
   })
 }
 

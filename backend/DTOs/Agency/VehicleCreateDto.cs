@@ -1,4 +1,5 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.DTOs.Agency;
@@ -10,11 +11,14 @@ public class VehicleCreateDto
     public string RegistrationNo { get; set; } = string.Empty;
 
     [Required]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public VehicleType VehicleType { get; set; }
 
-    [Range(0, double.MaxValue)]
+    [Required]
+    [Range(0, 100000)]
     public decimal CapacityKg { get; set; }
 
-    [Range(0, double.MaxValue)]
+    [Required]
+    [Range(0, 1000)]
     public decimal VolumeM3 { get; set; }
 }
