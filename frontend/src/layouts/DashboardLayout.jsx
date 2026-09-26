@@ -7,6 +7,7 @@ import {
   Package,
   Receipt,
   Route as RouteIcon,
+  Scale,
   Truck,
   Workflow,
   X,
