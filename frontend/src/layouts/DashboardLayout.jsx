@@ -1,4 +1,4 @@
-﻿import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
   Building2,
   CircleDollarSign,
@@ -7,6 +7,7 @@ import {
   Package,
   Receipt,
   Route as RouteIcon,
+  Scale,
   Truck,
   Workflow,
   X,
@@ -64,6 +65,7 @@ const NAV_ITEMS = [
       { to: '/pricing-config/formula', label: 'Pricing Formula' },
     ],
   },
+  { to: '/disputes', label: 'Disputes', icon: Scale },
 ]
 
 function DashboardLayout() {

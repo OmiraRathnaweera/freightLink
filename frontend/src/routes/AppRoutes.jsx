@@ -1,4 +1,4 @@
-﻿import { createBrowserRouter, createRoutesFromElements, Navigate, Route } from 'react-router-dom'
+import { createBrowserRouter, createRoutesFromElements, Navigate, Route } from 'react-router-dom'
 import DashboardLayout from '../layouts/DashboardLayout.jsx'
 import ProtectedRoute from './ProtectedRoute.jsx'
 import PublicRoute from './PublicRoute.jsx'
@@ -20,6 +20,7 @@ import AgentWorkflowConsolePage from '../features/agent-workflows/pages/AgentWor
 import FuelRatesPage from '../features/pricingConfig/pages/FuelRatesPage.jsx'
 import VehicleEfficiencyPage from '../features/pricingConfig/pages/VehicleEfficiencyPage.jsx'
 import PricingFormulaPage from '../features/pricingConfig/pages/PricingFormulaPage.jsx'
+import AdminDisputesPage from '../features/disputes/pages/AdminDisputesPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
@@ -63,6 +64,7 @@ const router = createBrowserRouter(
           <Route path="/pricing-config/fuel-rates" element={<FuelRatesPage />} />
           <Route path="/pricing-config/vehicle-efficiency" element={<VehicleEfficiencyPage />} />
           <Route path="/pricing-config/formula" element={<PricingFormulaPage />} />
+          <Route path="/disputes" element={<AdminDisputesPage />} />
         </Route>
       </Route>
     </>,
