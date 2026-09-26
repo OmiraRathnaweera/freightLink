@@ -15,7 +15,7 @@ import Button from "../../../components/Button.jsx";
 import Input from "../../../components/Input.jsx";
 import { useCreateTripMutation } from "../api/tripsApi.js";
 import { useAssignmentsQuery } from "../api/assignmentsApi.js";
-import { useAgencyFleetQuery } from "../api/agenciesApi.js";
+import { useAgencyFleetQuery } from "../../agencies/api/agencyApi.js";
 import { getTripErrorMessage } from "../lib/errorMessages.js";
 
 function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {

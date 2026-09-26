@@ -3,7 +3,7 @@ import { AlertCircle, Edit2, SlidersHorizontal, Truck, User, X } from "lucide-re
 import Button from "../../../components/Button.jsx";
 import Input from "../../../components/Input.jsx";
 import { useUpdateTripMutation } from "../api/tripsApi.js";
-import { useAgencyFleetQuery } from "../api/agenciesApi.js";
+import { useAgencyFleetQuery } from "../../agencies/api/agencyApi.js";
 import { getTripErrorMessage } from "../lib/errorMessages.js";
 
 function EditTripDialog({ trip, onClose }) {

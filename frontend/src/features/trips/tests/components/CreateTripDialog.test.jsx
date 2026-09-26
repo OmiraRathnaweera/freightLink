@@ -5,7 +5,7 @@ import CreateTripDialog from "../../components/CreateTripDialog.jsx";
 import { renderWithProviders } from "../../../../test/testUtils.jsx";
 import * as tripsApi from "../../api/tripsApi.js";
 import * as assignmentsApi from "../../api/assignmentsApi.js";
-import * as agenciesApi from "../../api/agenciesApi.js";
+import * as agenciesApi from "../../../agencies/api/agencyApi.js";
 
 vi.mock("../../api/tripsApi.js", async (importOriginal) => {
   const actual = await importOriginal();
@@ -23,7 +23,7 @@ vi.mock("../../api/assignmentsApi.js", async (importOriginal) => {
   };
 });
 
-vi.mock("../../api/agenciesApi.js", async (importOriginal) => {
+vi.mock("../../../agencies/api/agencyApi.js", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
