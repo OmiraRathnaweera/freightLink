@@ -1,4 +1,4 @@
-﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../lib/api/api.js'
 
 export const agencyKeys = {
@@ -13,6 +13,21 @@ export const agencyKeys = {
  */
 export async function getAgencies(queryParams) {
   return api.get('/agencies', { params: queryParams })
+}
+
+/**
+ * GET /agencies/{id}
+ */
+export async function getAgency(agencyId) {
+  return api.get(`/agencies/${agencyId}`)
+}
+
+export function useAgencyQuery(agencyId, options) {
+  return useQuery({
+    queryKey: agencyKeys.detail(agencyId),
+    queryFn: () => getAgency(agencyId),
+    ...options,
+  })
 }
 
 /**

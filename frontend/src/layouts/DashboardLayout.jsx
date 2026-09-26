@@ -1,4 +1,4 @@
-﻿import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
 import {
   Building2,
   CircleDollarSign,
@@ -57,6 +57,9 @@ const GET_NAV_ITEMS = (role) => [
     children: role === 'Admin' ? [ 
       { to: '/agencies', label: 'All Agencies', end: true }, 
       { to: '/agencies/verification', label: 'Verification Queue' } 
+    ] : role === 'AgencyStaff' ? [
+      { to: '/agencies', label: 'Compliance & Profile', end: true },
+      { to: '/agencies/vehicles', label: 'Fleet Vehicles' }
     ] : undefined
   },
   { to: '/trips', label: 'Trips', icon: RouteIcon },
