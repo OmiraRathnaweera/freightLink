@@ -32,6 +32,9 @@ class PlanOutput(BaseModel):
     objective: str
     steps: list[PipelineStage]
 
+class DomainAnalysisExplanation(BaseModel):
+    explanation: str
+
 
 class AgentLLM:
     def __init__(self) -> None:
@@ -67,6 +70,27 @@ class AgentLLM:
         except Exception:
             logger.warning("Primary LLM (Gemini) failed, falling back to Ollama", exc_info=True)
             model = self._ollama().with_structured_output(PlanOutput)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
+
+        return result.model_dump()
+
+    async def domain_analysis_explain(self, system_prompt: str, data: dict[str, Any]) -> dict:
+        messages = [
+            ("system", system_prompt),
+            ("human", json.dumps(data, default=str)),
+        ]
+
+        if self._settings.llm_provider == "ollama":
+            model = self._ollama().with_structured_output(DomainAnalysisExplanation)
+            result: DomainAnalysisExplanation = await model.ainvoke(messages)  # type: ignore[assignment]
+            return result.model_dump()
+
+        try:
+            model = self._gemini().with_structured_output(DomainAnalysisExplanation)
+            result = await model.ainvoke(messages)  # type: ignore[assignment]
+        except Exception:
+            logger.warning("Primary LLM (Gemini) failed, falling back to Ollama", exc_info=True)
+            model = self._ollama().with_structured_output(DomainAnalysisExplanation)
             result = await model.ainvoke(messages)  # type: ignore[assignment]
 
         return result.model_dump()

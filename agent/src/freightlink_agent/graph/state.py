@@ -2,6 +2,7 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel
+from freightlink_agent.schemas.domain import Agency, EvaluatedAgency, RankedCandidate
 
 
 class WorkflowState(BaseModel):
@@ -13,6 +14,12 @@ class WorkflowState(BaseModel):
     triggered_by_user_id: UUID
     attempt_no: int
     load_context: dict[str, Any]
+    candidate_agencies: list[Agency] = []
+    
+    # Agent 2 Outputs
+    shortlisted_agencies: list[RankedCandidate] = []
+    evaluated_agencies: list[EvaluatedAgency] = []
+    domain_analysis_explanation: str | None = None
 
     workflow_run_id: UUID | None = None
     """Null until Agent 1 creates the AgentWorkflowRun row on the backend

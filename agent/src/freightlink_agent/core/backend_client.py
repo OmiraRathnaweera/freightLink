@@ -82,3 +82,45 @@ async def report_step(workflow_run_id: UUID, step: ReportAgentStepRequest) -> No
     raise BackendClientError(
         f"POST /internal/agent-workflow-runs/{workflow_run_id}/steps failed after retry: {last_error}"
     )
+
+from freightlink_agent.schemas.domain import Agency
+from freightlink_agent.schemas.callback import CreateMatchCandidateRequest
+
+async def get_active_agencies() -> list[Agency]:
+    """GET /internal/agencies - Fetches all agencies for Agent 2."""
+    settings = get_settings()
+    url = f"{settings.backend_base_url}/internal/agencies"
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+            response = await client.get(url, headers=_headers())
+    except httpx.HTTPError as exc:
+        raise BackendClientError(f"GET /internal/agencies failed: {exc}") from exc
+
+    if response.status_code >= 300:
+        raise BackendClientError(
+            f"GET /internal/agencies returned {response.status_code}: {response.text[:500]}"
+        )
+    return [Agency.model_validate(agency) for agency in response.json()]
+
+async def create_match_candidate(workflow_run_id: UUID, candidate: CreateMatchCandidateRequest) -> None:
+    """POST /internal/agent-workflow-runs/{workflowRunId}/match-candidates"""
+    settings = get_settings()
+    url = f"{settings.backend_base_url}/internal/agent-workflow-runs/{workflow_run_id}/match-candidates"
+    body = candidate.model_dump(mode="json", by_alias=True)
+
+    last_error = ""
+    for attempt in range(2):
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+                response = await client.post(url, json=body, headers=_headers())
+            if response.status_code < 300:
+                return
+            last_error = f"returned {response.status_code}: {response.text[:500]}"
+        except httpx.HTTPError as exc:
+            last_error = str(exc)
+        if attempt == 0:
+            logger.warning("Create match candidate call failed (%s), retrying once", last_error)
+
+    raise BackendClientError(
+        f"POST /internal/agent-workflow-runs/{workflow_run_id}/match-candidates failed after retry: {last_error}"
+    )

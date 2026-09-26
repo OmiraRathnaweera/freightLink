@@ -10,7 +10,7 @@ honest gap.
 
 from langgraph.graph import END, StateGraph
 
-from freightlink_agent.agents import planner
+from freightlink_agent.agents import planner, domain_analysis
 from freightlink_agent.graph.state import WorkflowState
 
 
@@ -18,8 +18,13 @@ def build_graph():
     graph = StateGraph(WorkflowState)
 
     graph.add_node("planner", planner.run)
+    graph.add_node("domain_analysis", domain_analysis.run)
+    
     graph.set_entry_point("planner")
-    graph.add_edge("planner", END)
+    
+    # Simple sequential execution
+    graph.add_edge("planner", "domain_analysis")
+    graph.add_edge("domain_analysis", END)
 
     return graph.compile()
 

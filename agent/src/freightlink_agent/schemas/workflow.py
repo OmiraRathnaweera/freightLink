@@ -6,6 +6,7 @@ from pydantic import Field
 from .base import CamelModel
 
 
+
 class WorkflowRunRequest(CamelModel):
     """What triggers POST /workflows/run."""
 
@@ -26,6 +27,7 @@ class WorkflowRunRequest(CamelModel):
         description="Free-form load details passed straight into Agent 1's prompt - not validated against a fixed shape.",
         examples=[{"weightKg": 500, "volumeM3": 3.2, "cargoDescription": "Palletized dry goods"}],
     )
+
 
 
 class WorkflowRunResponse(CamelModel):
