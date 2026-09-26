@@ -25,6 +25,9 @@ export function getAgencyErrorMessage(error) {
     ) {
       return 'A vehicle with this registration number already exists in your fleet.'
     }
+    if (message.includes('VehicleType') || message.includes('$.vehicleType')) {
+      return 'Invalid vehicle type. Please select a supported vehicle type (Lorry, Container, Refrigerated, Flatbed, or Tipper).'
+    }
   }
 
   return (

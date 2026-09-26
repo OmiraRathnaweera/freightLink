@@ -52,6 +52,15 @@ export const VehicleStatus = Object.freeze({
   INACTIVE: 'Inactive',
 })
 
+// Physical body/chassis type of a fleet vehicle (matches backend VehicleType enum).
+export const VehicleType = Object.freeze({
+  LORRY: 'Lorry',
+  CONTAINER: 'Container',
+  REFRIGERATED: 'Refrigerated',
+  FLAT_BED: 'FlatBed',
+  TIPPER: 'Tipper',
+})
+
 // Employment/availability state of a driver.
 export const DriverStatus = Object.freeze({
   ACTIVE: 'Active',

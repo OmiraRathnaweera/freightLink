@@ -40,26 +40,26 @@ const MOCK_VEHICLES = [
   {
     vehicleId: 'veh-1',
     registrationNo: 'WP-CAD-1020',
-    vehicleType: 'MiniTruck',
-    capacityKg: 1500,
-    volumeM3: 6.5,
+    vehicleType: 'Lorry',
+    capacityKg: 5000,
+    volumeM3: 18.0,
     status: 'Available',
     createdAt: '2026-09-01T10:00:00Z',
   },
   {
     vehicleId: 'veh-2',
     registrationNo: 'WP-LH-5544',
-    vehicleType: 'MediumLorry',
-    capacityKg: 5000,
-    volumeM3: 18.0,
+    vehicleType: 'FlatBed',
+    capacityKg: 20000,
+    volumeM3: 40.0,
     status: 'InUse',
     createdAt: '2026-09-05T10:00:00Z',
   },
   {
     vehicleId: 'veh-3',
     registrationNo: 'CP-CONT-9988',
-    vehicleType: 'ContainerTruck',
-    capacityKg: 20000,
+    vehicleType: 'Container',
+    capacityKg: 35000,
     volumeM3: 65.0,
     status: 'Maintenance',
     createdAt: '2026-09-10T10:00:00Z',
@@ -192,7 +192,7 @@ describe('FleetVehiclesPage', () => {
     expect(mockMutateAsync).not.toHaveBeenCalled()
   })
 
-  it('enforces class-based capacity limits dynamically based on vehicle class selection', async () => {
+  it('enforces type-based capacity limits dynamically based on vehicle type selection', async () => {
     const user = userEvent.setup()
     authApi.useCurrentUserQuery.mockReturnValue({
       data: MOCK_USER,
@@ -207,31 +207,31 @@ describe('FleetVehiclesPage', () => {
 
     await user.click(screen.getByRole('button', { name: /add new vehicle/i }))
 
-    // Default is Mini Truck (up to 2,500 kg). Type 3000 kg.
+    // Default is Lorry (up to 10,000 kg). Type 12000 kg.
     await user.type(screen.getByPlaceholderText(/WP AB-1234/i), 'WP-CAD-1234')
-    await user.type(screen.getByPlaceholderText('1500'), '3000')
-    await user.type(screen.getByPlaceholderText('12.5'), '10')
+    await user.type(screen.getByPlaceholderText('5000'), '12000')
+    await user.type(screen.getByPlaceholderText('18'), '10')
 
     await user.click(screen.getByRole('button', { name: /add to fleet/i }))
 
-    // Should show error for Mini Truck exceeding 2,500 kg
+    // Should show error for Lorry exceeding 10,000 kg
     expect(
-      await screen.findByText(/capacity for mini truck cannot exceed 2,500 kg/i),
+      await screen.findByText(/capacity for lorry cannot exceed 10,000 kg/i),
     ).toBeInTheDocument()
     expect(mockMutateAsync).not.toHaveBeenCalled()
 
-    // Switch to Medium Lorry (2,500 - 10,000 kg)
-    await user.click(screen.getByLabelText(/medium lorry/i))
+    // Switch to Container (10,000 - 100,000 kg)
+    await user.click(screen.getByLabelText(/^container$/i))
 
-    // Type 2000 kg for Medium Lorry (below 2,500 kg)
-    const capacityInput = screen.getByDisplayValue('3000')
+    // Type 5000 kg for Container (below 10,000 kg)
+    const capacityInput = screen.getByDisplayValue('12000')
     await user.clear(capacityInput)
-    await user.type(capacityInput, '2000')
+    await user.type(capacityInput, '5000')
 
     await user.click(screen.getByRole('button', { name: /add to fleet/i }))
 
     expect(
-      await screen.findByText(/capacity for medium lorry must be at least 2,500 kg/i),
+      await screen.findByText(/capacity for container must be at least 10,000 kg/i),
     ).toBeInTheDocument()
     expect(mockMutateAsync).not.toHaveBeenCalled()
   })
@@ -252,8 +252,8 @@ describe('FleetVehiclesPage', () => {
     await user.click(screen.getByRole('button', { name: /add new vehicle/i }))
 
     await user.type(screen.getByPlaceholderText(/WP AB-1234/i), 'INVALID-99')
-    await user.type(screen.getByPlaceholderText('1500'), '1500')
-    await user.type(screen.getByPlaceholderText('12.5'), '10')
+    await user.type(screen.getByPlaceholderText('5000'), '1500')
+    await user.type(screen.getByPlaceholderText('18'), '10')
 
     await user.click(screen.getByRole('button', { name: /add to fleet/i }))
 
@@ -268,7 +268,7 @@ describe('FleetVehiclesPage', () => {
     mockMutateAsync.mockResolvedValueOnce({
       vehicleId: 'veh-new',
       registrationNo: 'WP-DA-9988',
-      vehicleType: 'MediumLorry',
+      vehicleType: 'Lorry',
       capacityKg: 4000,
       volumeM3: 15,
       status: 'Available',
@@ -287,13 +287,10 @@ describe('FleetVehiclesPage', () => {
 
     await user.click(screen.getByRole('button', { name: /add new vehicle/i }))
 
-    // Select Medium Lorry
-    await user.click(screen.getByLabelText(/medium lorry/i))
-
-    // Fill valid fields
+    // Fill valid fields (default Lorry)
     await user.type(screen.getByPlaceholderText(/WP AB-1234/i), 'WP-DA-9988')
     await user.type(screen.getByPlaceholderText('5000'), '4000')
-    await user.type(screen.getByPlaceholderText('12.5'), '15')
+    await user.type(screen.getByPlaceholderText('18'), '15')
 
     await user.click(screen.getByRole('button', { name: /add to fleet/i }))
 
@@ -301,7 +298,7 @@ describe('FleetVehiclesPage', () => {
       expect(mockMutateAsync).toHaveBeenCalledWith({
         agencyId: 'agency-101',
         vehicle: {
-          vehicleType: 'MediumLorry',
+          vehicleType: 'Lorry',
           registrationNo: 'WP-DA-9988',
           capacityKg: 4000,
           volumeM3: 15,
@@ -338,12 +335,12 @@ describe('FleetVehiclesPage', () => {
 
     await user.click(screen.getByRole('button', { name: /add new vehicle/i }))
 
-    // Select Container Truck so 25000 kg is within class range (10,000 - 100,000 kg)
-    await user.click(screen.getByLabelText(/container truck/i))
+    // Select Container so 25000 kg is within type range (10,000 - 100,000 kg)
+    await user.click(screen.getByLabelText(/^container$/i))
 
     await user.type(screen.getByPlaceholderText(/WP AB-1234/i), 'WP-CAD-1020')
-    await user.type(screen.getByPlaceholderText('20000'), '25000')
-    await user.type(screen.getByPlaceholderText('12.5'), '10')
+    await user.type(screen.getByPlaceholderText('25000'), '25000')
+    await user.type(screen.getByPlaceholderText('65'), '10')
 
     await user.click(screen.getByRole('button', { name: /add to fleet/i }))
 
@@ -372,14 +369,45 @@ describe('FleetVehiclesPage', () => {
     await user.click(screen.getByRole('button', { name: /add new vehicle/i }))
 
     await user.type(screen.getByPlaceholderText(/WP AB-1234/i), 'WP-NEW-1122')
-    await user.type(screen.getByPlaceholderText('1500'), '2000')
-    await user.type(screen.getByPlaceholderText('12.5'), '12')
+    await user.type(screen.getByPlaceholderText('5000'), '2000')
+    await user.type(screen.getByPlaceholderText('18'), '12')
 
     await user.click(screen.getByRole('button', { name: /add to fleet/i }))
 
     // Banner error should be visible
     expect(
       await screen.findByText(/compliance documents must be verified by an administrator/i),
+    ).toBeInTheDocument()
+  })
+
+  it('displays user-friendly alert message when backend throws VehicleType conversion error', async () => {
+    const user = userEvent.setup()
+    const backendError = new Error(
+      'The JSON value could not be converted to FreightLink.Api.Entities.Enums.VehicleType. Path: $.vehicleType | LineNumber: 0 | BytePositionInLine: 26.',
+    )
+    mockMutateAsync.mockRejectedValueOnce(backendError)
+
+    authApi.useCurrentUserQuery.mockReturnValue({
+      data: MOCK_USER,
+      isLoading: false,
+    })
+    agencyApi.useVehiclesQuery.mockReturnValue({
+      data: MOCK_VEHICLES,
+      isLoading: false,
+    })
+
+    renderPage()
+
+    await user.click(screen.getByRole('button', { name: /add new vehicle/i }))
+
+    await user.type(screen.getByPlaceholderText(/WP AB-1234/i), 'WP-CAD-1020')
+    await user.type(screen.getByPlaceholderText('5000'), '3000')
+    await user.type(screen.getByPlaceholderText('18'), '10')
+
+    await user.click(screen.getByRole('button', { name: /add to fleet/i }))
+
+    expect(
+      await screen.findByText(/invalid vehicle type\. please select a supported vehicle type/i),
     ).toBeInTheDocument()
   })
 })

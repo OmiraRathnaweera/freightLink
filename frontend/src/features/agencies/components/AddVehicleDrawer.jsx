@@ -7,10 +7,10 @@ import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
 import { useAddVehicleMutation } from '../api/agencyApi.js'
 import { addVehicleSchema } from '../lib/validationSchemas.js'
 import { getAgencyErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
-import { VEHICLE_CLASS_CONFIG, VEHICLE_TYPES } from '../lib/vehicleClasses.js'
+import { VEHICLE_TYPE_CONFIG, VEHICLE_TYPES } from '../lib/vehicleClasses.js'
 
 const INITIAL_VALUES = {
-  vehicleType: 'MiniTruck',
+  vehicleType: 'Lorry',
   registrationNo: '',
   capacityKg: '',
   volumeM3: '',
@@ -108,8 +108,8 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
           onSubmit={handleSubmit}
         >
           {({ values, errors, touched, status, isSubmitting, setFieldValue }) => {
-            const activeClassConfig =
-              VEHICLE_CLASS_CONFIG[values.vehicleType] || VEHICLE_CLASS_CONFIG.MiniTruck
+            const activeTypeConfig =
+              VEHICLE_TYPE_CONFIG[values.vehicleType] || VEHICLE_TYPE_CONFIG.Lorry
 
             return (
               <Form className="flex flex-1 flex-col justify-between overflow-y-auto p-6" noValidate>
@@ -126,7 +126,7 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
 
                   <div>
                     <label className="mb-2 block text-body-md font-semibold text-primary">
-                      Vehicle Class <span className="text-status-red-text">*</span>
+                      Vehicle Type <span className="text-status-red-text">*</span>
                     </label>
                     <div className="space-y-2">
                       {VEHICLE_TYPES.map((type) => (
@@ -140,8 +140,10 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
                         >
                           <input
                             type="radio"
+                            id={`vehicle-type-${type.value}`}
                             name="vehicleType"
                             value={type.value}
+                            aria-label={type.label}
                             checked={values.vehicleType === type.value}
                             onChange={() => setFieldValue('vehicleType', type.value)}
                             className="mt-1 text-primary focus:ring-primary"
@@ -177,11 +179,11 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
                       label="Capacity (Kg)"
                       required
                       mono
-                      min={activeClassConfig.minCapacityKg}
-                      max={activeClassConfig.maxCapacityKg}
+                      min={activeTypeConfig.minCapacityKg}
+                      max={activeTypeConfig.maxCapacityKg}
                       step="any"
-                      placeholder={activeClassConfig.placeholderCapacity}
-                      helperText={activeClassConfig.capacityHint}
+                      placeholder={activeTypeConfig.placeholderCapacity}
+                      helperText={activeTypeConfig.capacityHint}
                     />
 
                     <FormikNumberField
@@ -191,7 +193,7 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
                       mono
                       min="0.1"
                       step="any"
-                      placeholder="12.5"
+                      placeholder={activeTypeConfig.placeholderVolume || '18'}
                     />
                   </div>
                 </div>

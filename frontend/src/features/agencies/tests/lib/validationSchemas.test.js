@@ -3,28 +3,28 @@ import { addVehicleSchema } from '../../lib/validationSchemas.js'
 
 describe('addVehicleSchema', () => {
   const validPayload = {
-    vehicleType: 'MiniTruck',
+    vehicleType: 'Lorry',
     registrationNo: 'WP-CAD-1234',
-    capacityKg: 2000,
+    capacityKg: 5000,
     volumeM3: 12.5,
   }
 
   it('validates a correct vehicle registration payload', async () => {
     const validated = await addVehicleSchema.validate(validPayload)
     expect(validated.registrationNo).toBe('WP-CAD-1234')
-    expect(validated.capacityKg).toBe(2000)
+    expect(validated.capacityKg).toBe(5000)
     expect(validated.volumeM3).toBe(12.5)
-    expect(validated.vehicleType).toBe('MiniTruck')
+    expect(validated.vehicleType).toBe('Lorry')
   })
 
   it('rejects missing or invalid vehicleType', async () => {
     await expect(
       addVehicleSchema.validate({ ...validPayload, vehicleType: '' }),
-    ).rejects.toThrow(/vehicle class is required/i)
+    ).rejects.toThrow(/vehicle type is required/i)
 
     await expect(
       addVehicleSchema.validate({ ...validPayload, vehicleType: 'Helicopter' }),
-    ).rejects.toThrow(/select a valid vehicle class/i)
+    ).rejects.toThrow(/select a valid vehicle type/i)
   })
 
   describe('Sri Lankan vehicle registration number pattern', () => {
@@ -79,76 +79,81 @@ describe('addVehicleSchema', () => {
     })
   })
 
-  describe('vehicle class weight limitations', () => {
-    it('enforces Mini Truck capacity limits (up to 2,500 kg)', async () => {
-      // Valid Mini Truck capacities
+  describe('vehicle type weight limitations', () => {
+    it('enforces Lorry capacity limits (up to 10,000 kg)', async () => {
+      // Valid Lorry capacities
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MiniTruck', capacityKg: 1 }),
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Lorry', capacityKg: 1 }),
       ).resolves.toBeTruthy()
 
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MiniTruck', capacityKg: 2500 }),
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Lorry', capacityKg: 10000 }),
       ).resolves.toBeTruthy()
 
-      // Invalid: exceeds 2,500 kg
+      // Invalid: exceeds 10,000 kg
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MiniTruck', capacityKg: 2501 }),
-      ).rejects.toThrow(/capacity for mini truck cannot exceed 2,500 kg/i)
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Lorry', capacityKg: 10001 }),
+      ).rejects.toThrow(/capacity for lorry cannot exceed 10,000 kg/i)
 
       // Invalid: zero or negative
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MiniTruck', capacityKg: 0 }),
-      ).rejects.toThrow(/capacity for mini truck must be at least 1 kg/i)
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Lorry', capacityKg: 0 }),
+      ).rejects.toThrow(/capacity for lorry must be at least 1 kg/i)
     })
 
-    it('enforces Medium Lorry capacity limits (2,500 – 10,000 kg)', async () => {
-      // Below 2,500 kg
-      await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MediumLorry', capacityKg: 2499 }),
-      ).rejects.toThrow(/capacity for medium lorry must be at least 2,500 kg/i)
-
-      // Valid boundary values
-      await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MediumLorry', capacityKg: 2500 }),
-      ).resolves.toBeTruthy()
-
-      await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MediumLorry', capacityKg: 6000 }),
-      ).resolves.toBeTruthy()
-
-      await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MediumLorry', capacityKg: 10000 }),
-      ).resolves.toBeTruthy()
-
-      // Exceeds 10,000 kg
-      await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'MediumLorry', capacityKg: 10001 }),
-      ).rejects.toThrow(/capacity for medium lorry cannot exceed 10,000 kg/i)
-    })
-
-    it('enforces Container Truck capacity limits (10,000 – 100,000 kg)', async () => {
+    it('enforces Container capacity limits (10,000 – 100,000 kg)', async () => {
       // Below 10,000 kg
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'ContainerTruck', capacityKg: 9999 }),
-      ).rejects.toThrow(/capacity for container truck must be at least 10,000 kg/i)
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Container', capacityKg: 9999 }),
+      ).rejects.toThrow(/capacity for container must be at least 10,000 kg/i)
 
       // Valid boundary values
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'ContainerTruck', capacityKg: 10000 }),
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Container', capacityKg: 10000 }),
       ).resolves.toBeTruthy()
 
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'ContainerTruck', capacityKg: 30000 }),
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Container', capacityKg: 30000 }),
       ).resolves.toBeTruthy()
 
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'ContainerTruck', capacityKg: 100000 }),
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Container', capacityKg: 100000 }),
       ).resolves.toBeTruthy()
 
       // Exceeds system max 100,000 kg
       await expect(
-        addVehicleSchema.validate({ ...validPayload, vehicleType: 'ContainerTruck', capacityKg: 100001 }),
-      ).rejects.toThrow(/capacity for container truck cannot exceed 100,000 kg/i)
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Container', capacityKg: 100001 }),
+      ).rejects.toThrow(/capacity for container cannot exceed 100,000 kg/i)
+    })
+
+    it('enforces Refrigerated capacity limits (up to 25,000 kg)', async () => {
+      await expect(
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Refrigerated', capacityKg: 25000 }),
+      ).resolves.toBeTruthy()
+
+      await expect(
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Refrigerated', capacityKg: 25001 }),
+      ).rejects.toThrow(/capacity for refrigerated cannot exceed 25,000 kg/i)
+    })
+
+    it('enforces Flatbed capacity limits (up to 50,000 kg)', async () => {
+      await expect(
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'FlatBed', capacityKg: 50000 }),
+      ).resolves.toBeTruthy()
+
+      await expect(
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'FlatBed', capacityKg: 50001 }),
+      ).rejects.toThrow(/capacity for flatbed cannot exceed 50,000 kg/i)
+    })
+
+    it('enforces Tipper capacity limits (up to 30,000 kg)', async () => {
+      await expect(
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Tipper', capacityKg: 30000 }),
+      ).resolves.toBeTruthy()
+
+      await expect(
+        addVehicleSchema.validate({ ...validPayload, vehicleType: 'Tipper', capacityKg: 30001 }),
+      ).rejects.toThrow(/capacity for tipper cannot exceed 30,000 kg/i)
     })
   })
 

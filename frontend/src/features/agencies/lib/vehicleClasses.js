@@ -1,52 +1,77 @@
+import { VehicleType } from '../../../lib/enums.js'
+
 /**
- * Vehicle class definitions, capacity weight limitations, and Sri Lankan vehicle patterns.
+ * Vehicle type definitions, capacity weight limitations, and Sri Lankan vehicle patterns.
+ * Matches backend FreightLink.Api.Entities.Enums.VehicleType.
  *
- * Weight limitations (matching vehicle class descriptions):
- * - Mini Truck: Light urban cargo (up to 2,500 kg) -> 1 to 2,500 kg
- * - Medium Lorry: Regional transit (2,500 – 10,000 kg) -> 2,500 to 10,000 kg
- * - Container Truck: Heavy container & long haul (10,000+ kg) -> 10,000 to 100,000 kg
+ * Weight limitations (matching vehicle type descriptions):
+ * - Lorry: General cargo & regional transit (up to 10,000 kg) -> 1 to 10,000 kg
+ * - Container: Heavy container & long haul (10,000 – 100,000 kg) -> 10,000 to 100,000 kg
+ * - Refrigerated: Cold chain & perishable goods (up to 25,000 kg) -> 1 to 25,000 kg
+ * - Flatbed: Heavy machinery & oversized cargo (up to 50,000 kg) -> 1 to 50,000 kg
+ * - Tipper: Bulk materials, sand & aggregate (up to 30,000 kg) -> 1 to 30,000 kg
  */
 
-export const VEHICLE_CLASSES = Object.freeze({
-  MINI_TRUCK: 'MiniTruck',
-  MEDIUM_LORRY: 'MediumLorry',
-  CONTAINER_TRUCK: 'ContainerTruck',
-})
-
-export const VEHICLE_CLASS_CONFIG = Object.freeze({
-  [VEHICLE_CLASSES.MINI_TRUCK]: {
-    value: 'MiniTruck',
-    label: 'Mini Truck',
-    desc: 'Light urban cargo (up to 2,500 kg)',
+export const VEHICLE_TYPE_CONFIG = Object.freeze({
+  [VehicleType.LORRY]: {
+    value: VehicleType.LORRY,
+    label: 'Lorry',
+    desc: 'General cargo & regional transit (up to 10,000 kg)',
     minCapacityKg: 1,
-    maxCapacityKg: 2500,
-    defaultCapacityKg: 1500,
-    capacityHint: 'Allowed: 1 – 2,500 kg',
-    placeholderCapacity: '1500',
-  },
-  [VEHICLE_CLASSES.MEDIUM_LORRY]: {
-    value: 'MediumLorry',
-    label: 'Medium Lorry',
-    desc: 'Regional transit (2,500 – 10,000 kg)',
-    minCapacityKg: 2500,
     maxCapacityKg: 10000,
     defaultCapacityKg: 5000,
-    capacityHint: 'Allowed: 2,500 – 10,000 kg',
+    capacityHint: 'Allowed: 1 – 10,000 kg',
     placeholderCapacity: '5000',
+    placeholderVolume: '18',
   },
-  [VEHICLE_CLASSES.CONTAINER_TRUCK]: {
-    value: 'ContainerTruck',
-    label: 'Container Truck',
-    desc: 'Heavy container & long haul (10,000+ kg)',
+  [VehicleType.CONTAINER]: {
+    value: VehicleType.CONTAINER,
+    label: 'Container',
+    desc: 'Heavy container & long haul (10,000 – 100,000 kg)',
     minCapacityKg: 10000,
     maxCapacityKg: 100000,
-    defaultCapacityKg: 20000,
+    defaultCapacityKg: 25000,
     capacityHint: 'Allowed: 10,000 – 100,000 kg',
+    placeholderCapacity: '25000',
+    placeholderVolume: '65',
+  },
+  [VehicleType.REFRIGERATED]: {
+    value: VehicleType.REFRIGERATED,
+    label: 'Refrigerated',
+    desc: 'Cold chain & perishable goods (up to 25,000 kg)',
+    minCapacityKg: 1,
+    maxCapacityKg: 25000,
+    defaultCapacityKg: 8000,
+    capacityHint: 'Allowed: 1 – 25,000 kg',
+    placeholderCapacity: '8000',
+    placeholderVolume: '25',
+  },
+  [VehicleType.FLAT_BED]: {
+    value: VehicleType.FLAT_BED,
+    label: 'Flatbed',
+    desc: 'Heavy machinery & oversized cargo (up to 50,000 kg)',
+    minCapacityKg: 1,
+    maxCapacityKg: 50000,
+    defaultCapacityKg: 20000,
+    capacityHint: 'Allowed: 1 – 50,000 kg',
     placeholderCapacity: '20000',
+    placeholderVolume: '40',
+  },
+  [VehicleType.TIPPER]: {
+    value: VehicleType.TIPPER,
+    label: 'Tipper',
+    desc: 'Bulk materials, sand & aggregate (up to 30,000 kg)',
+    minCapacityKg: 1,
+    maxCapacityKg: 30000,
+    defaultCapacityKg: 15000,
+    capacityHint: 'Allowed: 1 – 30,000 kg',
+    placeholderCapacity: '15000',
+    placeholderVolume: '20',
   },
 })
 
-export const VEHICLE_TYPES = Object.values(VEHICLE_CLASS_CONFIG)
+export const VEHICLE_CLASS_CONFIG = VEHICLE_TYPE_CONFIG
+export const VEHICLE_TYPES = Object.values(VEHICLE_TYPE_CONFIG)
 
 /**
  * Valid Sri Lankan DMT province prefixes:

@@ -19,6 +19,16 @@ import AddVehicleDrawer from '../components/AddVehicleDrawer.jsx'
 
 function getVehicleTypeBadge(type) {
   switch (type) {
+    case 'Lorry':
+      return { label: 'Lorry', color: 'blue' }
+    case 'Container':
+      return { label: 'Container', color: 'primary' }
+    case 'Refrigerated':
+      return { label: 'Refrigerated', color: 'cyan' }
+    case 'FlatBed':
+      return { label: 'Flatbed', color: 'purple' }
+    case 'Tipper':
+      return { label: 'Tipper', color: 'amber' }
     case 'MiniTruck':
       return { label: 'Mini Truck', color: 'blue' }
     case 'MediumLorry':
@@ -170,10 +180,12 @@ export default function FleetVehiclesPage() {
               onChange={(e) => setTypeFilter(e.target.value)}
               className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700"
             >
-              <option value="ALL">All Classes</option>
-              <option value="MiniTruck">Mini Truck</option>
-              <option value="MediumLorry">Medium Lorry</option>
-              <option value="ContainerTruck">Container Truck</option>
+              <option value="ALL">All Types</option>
+              <option value="Lorry">Lorry</option>
+              <option value="Container">Container</option>
+              <option value="Refrigerated">Refrigerated</option>
+              <option value="FlatBed">Flatbed</option>
+              <option value="Tipper">Tipper</option>
             </select>
 
             <select
@@ -220,7 +232,7 @@ export default function FleetVehiclesPage() {
               <thead className="border-b border-slate-border bg-slate-50 text-body-xs font-semibold uppercase text-slate-600">
                 <tr>
                   <th className="px-6 py-3.5">Registration No</th>
-                  <th className="px-6 py-3.5">Vehicle Class</th>
+                  <th className="px-6 py-3.5">Vehicle Type</th>
                   <th className="px-6 py-3.5">Payload Capacity</th>
                   <th className="px-6 py-3.5">Cargo Volume</th>
                   <th className="px-6 py-3.5">Status</th>

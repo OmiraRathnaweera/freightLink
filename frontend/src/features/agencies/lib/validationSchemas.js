@@ -18,8 +18,8 @@ import { SRI_LANKAN_VEHICLE_REG_REGEX, VEHICLE_CLASS_CONFIG } from './vehicleCla
 export const addVehicleSchema = Yup.object({
   vehicleType: Yup.string()
     .transform((value, originalValue) => (originalValue === '' ? undefined : value))
-    .required('Vehicle class is required')
-    .oneOf(Object.keys(VEHICLE_CLASS_CONFIG), 'Select a valid vehicle class'),
+    .required('Vehicle type is required')
+    .oneOf(Object.keys(VEHICLE_CLASS_CONFIG), 'Select a valid vehicle type'),
 
   registrationNo: Yup.string()
     .trim()
