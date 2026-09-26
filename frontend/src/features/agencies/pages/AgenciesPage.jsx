@@ -1,4 +1,6 @@
-﻿import { Navigate } from 'react-router-dom'
+﻿import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
+import { FileText } from 'lucide-react'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
 import { useAgenciesQuery } from '../api/agencyApi.js'
@@ -6,10 +8,14 @@ import AgencyProfilePage from './AgencyProfilePage.jsx'
 import Card from '../../../components/Card.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
+import Button from '../../../components/Button.jsx'
+import ViewComplianceDocsModal from '../components/ViewComplianceDocsModal.jsx'
 
 function AdminAgenciesList() {
   const { data: pagedData, isLoading, isError } = useAgenciesQuery({})
   const agencies = pagedData?.items || []
+  
+  const [selectedAgencyForDocs, setSelectedAgencyForDocs] = useState(null)
 
   return (
     <div className="space-y-6">
@@ -35,6 +41,7 @@ function AdminAgenciesList() {
                     <th className="px-6 py-3 font-medium">Location</th>
                     <th className="px-6 py-3 font-medium">Registered On</th>
                     <th className="px-6 py-3 font-medium">Status</th>
+                    <th className="px-6 py-3 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -60,6 +67,16 @@ function AdminAgenciesList() {
                           {agency.status}
                         </StatusBadge>
                       </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button 
+                          variant="secondary" 
+                          className="!px-3 !py-1.5 text-xs"
+                          onClick={() => setSelectedAgencyForDocs(agency)}
+                        >
+                          <FileText className="mr-1.5 h-3.5 w-3.5" />
+                          View Docs
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -68,6 +85,13 @@ function AdminAgenciesList() {
           )
         )}
       </Card>
+      
+      <ViewComplianceDocsModal 
+        isOpen={!!selectedAgencyForDocs}
+        onClose={() => setSelectedAgencyForDocs(null)}
+        agencyId={selectedAgencyForDocs?.agencyId}
+        agencyName={selectedAgencyForDocs?.name}
+      />
     </div>
   )
 }
@@ -85,6 +109,3 @@ export default function AgenciesPage() {
 
   return <Navigate to="/unauthorized" replace />
 }
-
-
-
