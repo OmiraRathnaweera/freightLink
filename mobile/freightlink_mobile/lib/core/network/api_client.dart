@@ -89,6 +89,36 @@ class ApiClient {
     );
   }
 
+  Future<dynamic> upload(String path, {required List<int> fileBytes, required String fileName, String fileField = 'file'}) async {
+    final token = authToken();
+    final request = http.MultipartRequest('POST', _uri(path))
+      ..headers.addAll({
+        'Accept': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      })
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          fileField,
+          fileBytes,
+          filename: fileName,
+        ),
+      );
+
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (response.body.isEmpty) return null;
+      return jsonDecode(response.body);
+    }
+    
+    if (response.statusCode == 401) {
+      onUnauthorized?.call();
+    }
+    
+    throw _parseError(response);
+  }
+
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     final http.Response response;
     try {

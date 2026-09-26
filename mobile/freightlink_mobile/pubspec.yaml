@@ -41,6 +41,7 @@ dependencies:
   latlong2: ^0.10.1
   intl: ^0.20.3
   go_router: ^18.0.1
+  file_picker: ^8.1.2
 
 dev_dependencies:
   flutter_test:
@@ -95,3 +96,6 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+dependency_overrides:
+  win32: ^6.0.1

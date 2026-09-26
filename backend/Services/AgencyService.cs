@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -16,11 +16,13 @@ namespace FreightLink.Api.Services;
 public class AgencyService : IAgencyService
 {
     private readonly AppDbContext _dbContext;
+    private readonly IPasswordHasher _passwordHasher;
 
-    /// <summary>Creates the agency service with its DB context.</summary>
-    public AgencyService(AppDbContext dbContext)
+    /// <summary>Creates the agency service with its DB context and password hasher.</summary>
+    public AgencyService(AppDbContext dbContext, IPasswordHasher passwordHasher)
     {
         _dbContext = dbContext;
+        _passwordHasher = passwordHasher;
     }
 
     /// <inheritdoc />
@@ -498,6 +500,139 @@ public class AgencyService : IAgencyService
 
         return vehicles;
     }
+
+    public async Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, DriverCreateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var existingUser = await _dbContext.Users.AnyAsync(u => u.Email == request.Email, cancellationToken);
+        if (existingUser)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "Email is already registered.");
+        }
+        
+        var existingDriver = await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo, cancellationToken);
+        if (existingDriver)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LICENCE_ALREADY_REGISTERED, "License number is already registered.");
+        }
+
+        var user = new User
+        {
+            UserId = Guid.NewGuid(),
+            Email = request.Email,
+            PasswordHash = _passwordHasher.Hash(request.Password),
+            FullName = request.FullName,
+            Role = UserRole.Driver,
+            IsActive = true
+        };
+
+        var driver = new Driver
+        {
+            DriverId = Guid.NewGuid(),
+            UserId = user.UserId,
+            AgencyId = agencyId,
+            LicenceNo = request.LicenceNo,
+            LicenceExpiry = request.LicenceExpiry,
+            Status = DriverStatus.Active
+        };
+
+        _dbContext.Users.Add(user);
+        _dbContext.Drivers.Add(driver);
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = driver.UserId,
+            AgencyId = driver.AgencyId,
+            Email = user.Email,
+            FullName = user.FullName,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
+    }
+
+    public async Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var driver = await _dbContext.Drivers
+            .Include(d => d.User)
+            .FirstOrDefaultAsync(d => d.DriverId == driverId && d.AgencyId == agencyId, cancellationToken);
+
+        if (driver == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DRIVER_NOT_FOUND, "Driver not found.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+        {
+            driver.User.FullName = request.FullName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.LicenceNo) && request.LicenceNo != driver.LicenceNo)
+        {
+            var licenceExists = await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo && d.DriverId != driverId, cancellationToken);
+            if (licenceExists)
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LICENCE_ALREADY_REGISTERED, "License number is already registered.");
+            }
+            driver.LicenceNo = request.LicenceNo;
+        }
+
+        if (request.LicenceExpiry.HasValue)
+        {
+            driver.LicenceExpiry = request.LicenceExpiry.Value;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = driver.UserId,
+            AgencyId = driver.AgencyId,
+            Email = driver.User.Email,
+            FullName = driver.User.FullName,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
+    }
+
+    public async Task<IEnumerable<DriverResponseDto>> GetDriversAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var drivers = await _dbContext.Drivers
+            .Include(d => d.User)
+            .Where(d => d.AgencyId == agencyId)
+            .OrderByDescending(d => d.CreatedAt)
+            .Select(d => new DriverResponseDto
+            {
+                DriverId = d.DriverId,
+                UserId = d.UserId,
+                AgencyId = d.AgencyId,
+                Email = d.User.Email,
+                FullName = d.User.FullName,
+                LicenceNo = d.LicenceNo,
+                LicenceExpiry = d.LicenceExpiry,
+                Status = d.Status,
+                CreatedAt = d.CreatedAt,
+                UpdatedAt = d.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return drivers;
+    }
+
 
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {

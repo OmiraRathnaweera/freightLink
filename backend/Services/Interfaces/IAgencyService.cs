@@ -1,4 +1,4 @@
-﻿using FreightLink.Api.DTOs.Agency;
+using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.Services.Interfaces;
@@ -73,4 +73,8 @@ public interface IAgencyService
 
     Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default);
     Task<IEnumerable<VehicleResponseDto>> GetVehiclesAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, DriverCreateDto request, CancellationToken cancellationToken = default);
+    Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default);
+    Task<IEnumerable<DriverResponseDto>> GetDriversAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

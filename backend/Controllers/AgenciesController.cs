@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Claims;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -188,6 +188,30 @@ public class AgenciesController : ControllerBase
     public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
     {
         var result = await _agencyService.GetVehiclesAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/drivers")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<DriverResponseDto>> AddDriver(Guid id, [FromBody] DriverCreateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddDriverAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpPut("{id:guid}/drivers/{driverId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<DriverResponseDto>> UpdateDriver(Guid id, Guid driverId, [FromBody] DriverUpdateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateDriverAsync(id, driverId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpGet("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<IEnumerable<DriverResponseDto>>> GetDrivers(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetDriversAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 

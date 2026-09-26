@@ -6,9 +6,6 @@ class AgenciesRepository {
   final ApiClient _client;
   final String? agencyId;
   
-  final List<Map<String, dynamic>> _mockVehicles = [];
-  final List<Map<String, dynamic>> _mockDrivers = [];
-
   // Fetch dashboard stats
   Future<Map<String, dynamic>> getDashboardStats() async {
     if (agencyId == null) {
@@ -16,11 +13,12 @@ class AgenciesRepository {
     }
     
     final vehicles = await getFleet();
+    final drivers = await getDrivers();
     
     return {
       'totalVehicles': vehicles.length,
-      'activeDrivers': 8 + _mockDrivers.length,
-      'pendingCompliance': 3,
+      'activeDrivers': drivers.length,
+      'pendingCompliance': 3, // Still mocked for now since compliance docs aren't implemented fully
     };
   }
 
@@ -68,9 +66,53 @@ class AgenciesRepository {
     );
   }
 
-  // Placeholder for adding a driver
+  // Add actual driver
   Future<void> addDriver(Map<String, dynamic> data) async {
-    await Future.delayed(const Duration(milliseconds: 800));
-    _mockDrivers.add(data);
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    await _client.post(
+      '/agencies/$agencyId/drivers',
+      body: data,
+    );
+  }
+
+  // Fetch actual drivers
+  Future<List<Map<String, dynamic>>> getDrivers() async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    final response = await _client.get('/agencies/$agencyId/drivers') as List<dynamic>;
+    return response.cast<Map<String, dynamic>>();
+  }
+
+  // Fetch compliance docs
+  Future<List<Map<String, dynamic>>> getComplianceDocs() async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    final response = await _client.get('/agencies/$agencyId/compliance-docs') as List<dynamic>;
+    return response.cast<Map<String, dynamic>>();
+  }
+
+  // Upload file
+  Future<String> uploadFile(List<int> bytes, String fileName) async {
+    final response = await _client.upload('/files/single', fileBytes: bytes, fileName: fileName);
+    return response['publicId'] as String;
+  }
+
+  // Add compliance doc
+  Future<void> addComplianceDoc(Map<String, dynamic> data) async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+    
+    await _client.post(
+      '/agencies/$agencyId/compliance-docs',
+      body: data,
+    );
   }
 }

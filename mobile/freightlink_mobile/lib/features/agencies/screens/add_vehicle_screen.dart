@@ -82,7 +82,7 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
               ),
               const SizedBox(height: AppConstants.spaceLg),
               DropdownButtonFormField<String>(
-                value: _selectedVehicleType,
+                initialValue: _selectedVehicleType,
                 decoration: InputDecoration(
                   labelText: 'Vehicle Type',
                   prefixIcon: const Icon(Icons.local_shipping_outlined),
