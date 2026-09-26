@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/widgets/app_top_bar.dart';
 
 class AddVehicleScreen extends StatelessWidget {
   const AddVehicleScreen({super.key});
@@ -7,8 +8,8 @@ class AddVehicleScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Vehicle'),
+      appBar: AppTopBar(
+        title: 'Add Vehicle',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/dashboard/fleet'),

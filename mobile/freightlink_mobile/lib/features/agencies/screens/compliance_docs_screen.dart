@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../../shared/widgets/app_top_bar.dart';
 
 class ComplianceDocsScreen extends StatelessWidget {
   const ComplianceDocsScreen({super.key});
@@ -7,8 +8,8 @@ class ComplianceDocsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Compliance Documents'),
+      appBar: AppTopBar(
+        title: 'Compliance Documents',
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/dashboard'),

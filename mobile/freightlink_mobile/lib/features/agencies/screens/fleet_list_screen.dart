@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../data/agencies_repository.dart';
 import '../providers/fleet_provider.dart';
+import '../../../shared/widgets/app_top_bar.dart';
 
 class FleetListScreen extends StatelessWidget {
   const FleetListScreen({super.key});
@@ -13,8 +14,8 @@ class FleetListScreen extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => FleetProvider(context.read<AgenciesRepository>())..load(),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Fleet Management'),
+        appBar: AppTopBar(
+          title: 'Fleet Management',
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/dashboard'),

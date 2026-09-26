@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../data/agencies_repository.dart';
 import '../providers/driver_onboarding_provider.dart';
+import '../../../shared/widgets/app_top_bar.dart';
 
 class DriverOnboardingScreen extends StatelessWidget {
   const DriverOnboardingScreen({super.key});
@@ -13,8 +14,8 @@ class DriverOnboardingScreen extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => DriverOnboardingProvider(context.read<AgenciesRepository>()),
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Driver Onboarding'),
+        appBar: AppTopBar(
+          title: 'Driver Onboarding',
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.go('/dashboard'),
