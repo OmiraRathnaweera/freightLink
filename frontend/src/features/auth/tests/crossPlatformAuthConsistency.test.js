@@ -95,19 +95,19 @@ describe('Cross-Platform Auth & Session Consistency (Y3S01-103)', () => {
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/agencies')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/trips')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/billing')).toBe(true)
+      // Requirement 5: AgencyStaff can access loads marketplace to view and accept posted loads
+      expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/loads')).toBe(true)
 
-      // Gated from Shipper load creation and Admin pricing
-      expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/loads')).toBe(false)
+      // Gated from Admin pricing and agent workflows
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/pricing-config')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/agent-workflows')).toBe(false)
     })
 
-    it('enforces Driver permissions and role home (/trips)', () => {
-      expect(getRoleHomePath(UserRole.DRIVER)).toBe('/trips')
+    it('enforces Driver has no web UI per Requirement 1 (mobile application only)', () => {
+      expect(getRoleHomePath(UserRole.DRIVER)).toBe('/unauthorized')
 
-      expect(isRouteAllowedForRole(UserRole.DRIVER, '/trips')).toBe(true)
-
-      // Gated from all other modules
+      // Requirement 1: There is no web-based frontend UI for drivers (only mobile)
+      expect(isRouteAllowedForRole(UserRole.DRIVER, '/trips')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.DRIVER, '/loads')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.DRIVER, '/agencies')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.DRIVER, '/billing')).toBe(false)

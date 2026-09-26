@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -55,11 +55,17 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
     };
   }, [assignments]);
 
-  // Selected assignment detail
+  // Selected assignment detail — matches by assignmentId or loadId
   const selectedAssignment = useMemo(
-    () => assignments.find((a) => a.assignmentId === assignmentId),
+    () => assignments.find((a) => a.assignmentId === assignmentId || a.loadId === assignmentId),
     [assignments, assignmentId]
   );
+
+  useEffect(() => {
+    if (selectedAssignment && selectedAssignment.assignmentId !== assignmentId) {
+      setAssignmentId(selectedAssignment.assignmentId);
+    }
+  }, [selectedAssignment, assignmentId]);
 
   // Fetch fleet (vehicles and drivers) for caller's agency
   const fleetQuery = useAgencyFleetQuery(selectedAssignment?.agencyId, {

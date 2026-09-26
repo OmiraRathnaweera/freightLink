@@ -108,14 +108,14 @@ function TripDetailPage() {
     (trip.status === TripStatus.ASSIGNED || trip.status === "Assigned");
 
   const canCancel =
-    (role === UserRole.AGENCY_STAFF || role === UserRole.DRIVER || role === UserRole.ADMIN) &&
+    (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) &&
     trip.status !== TripStatus.DELIVERED &&
     trip.status !== TripStatus.CANCELLED &&
     trip.status !== "Delivered" &&
     trip.status !== "Cancelled";
 
   const canDelete =
-    (role === UserRole.AGENCY_STAFF || role === UserRole.DRIVER || role === UserRole.ADMIN) &&
+    (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) &&
     trip.status !== TripStatus.DELIVERED &&
     trip.status !== "Delivered" &&
     (trip.status === TripStatus.CANCELLED ||

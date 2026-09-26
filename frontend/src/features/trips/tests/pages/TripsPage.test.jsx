@@ -142,4 +142,31 @@ describe("TripsPage — loaded state with table", () => {
     expect(screen.queryByRole("button", { name: /delete trip del-111/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delete trip canc-111/i })).toBeInTheDocument();
   });
+
+  it("renders Dispatch Trip button for AgencyStaff, but hides it for Admin per Requirement 3", () => {
+    tripsApi.useTripsQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { items: [], page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    });
+
+    const { unmount } = renderTripsPage(UserRole.AGENCY_STAFF);
+    expect(screen.getByRole("button", { name: /dispatch trip/i })).toBeInTheDocument();
+    unmount();
+
+    renderTripsPage(UserRole.ADMIN);
+    expect(screen.queryByRole("button", { name: /dispatch trip/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render delete button for Driver role per Requirement 4", () => {
+    const trip = sampleTrip({ status: "Assigned" });
+    tripsApi.useTripsQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { items: [trip], page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
+    });
+
+    renderTripsPage(UserRole.DRIVER);
+    expect(screen.queryByRole("button", { name: /delete trip/i })).not.toBeInTheDocument();
+  });
 });

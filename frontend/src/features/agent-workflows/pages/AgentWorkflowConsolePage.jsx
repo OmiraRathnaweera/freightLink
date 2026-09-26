@@ -12,6 +12,7 @@ import ErrorState from '../../../components/ErrorState.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
 import { useLoadsQuery, useLoadDetailQuery } from '../../loads/api/loadsApi.js'
 import {
+  getLoadMatch,
   useLoadMatchQuery,
   useConfirmMatchMutation,
 } from '../api/agentWorkflowsApi.js'
@@ -85,7 +86,14 @@ export default function AgentWorkflowConsolePage() {
   const handleRetryMatch = async () => {
     setActionErrorMessage(null)
     setActionSuccessMessage(null)
-    await matchQuery.refetch()
+    try {
+      if (activeLoadId) {
+        await getLoadMatch(activeLoadId, true)
+      }
+      await matchQuery.refetch()
+    } catch {
+      await matchQuery.refetch()
+    }
   }
 
   return (
@@ -203,6 +211,8 @@ export default function AgentWorkflowConsolePage() {
             loadStatus={matchData.loadStatus}
             recommendedAgency={matchData.recommendedAgency}
             selectedAgencyId={activeSelectedAgencyId}
+            alternateCandidates={matchData.alternateCandidates}
+            onResetSelectedAgency={() => setSelectedAgencyId(null)}
             existingAssignment={matchData.existingAssignment}
             onApproveMatch={handleApproveMatch}
             onRetryMatch={handleRetryMatch}

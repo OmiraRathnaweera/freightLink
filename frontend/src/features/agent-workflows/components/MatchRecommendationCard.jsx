@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   Building2,
   TrendingDown,
+  UserCheck,
+  ShieldCheck,
 } from 'lucide-react'
 import { formatCurrency } from '../../loads/lib/format.js'
 import Button from '../../../components/Button.jsx'
@@ -26,6 +28,8 @@ export default function MatchRecommendationCard({
   loadStatus,
   recommendedAgency,
   selectedAgencyId,
+  alternateCandidates = [],
+  onResetSelectedAgency,
   existingAssignment,
   onApproveMatch,
   onRetryMatch,
@@ -53,6 +57,11 @@ export default function MatchRecommendationCard({
   }
 
   const isMatched = loadStatus === 'Matched' || Boolean(existingAssignment)
+
+  const selectedCandidate =
+    selectedAgencyId && selectedAgencyId !== recommendedAgency.agencyId
+      ? alternateCandidates?.find((c) => c.agencyId === selectedAgencyId)
+      : null
 
   const vehicleClassDisplay =
     VEHICLE_CLASS_LABELS[recommendedAgency.suggestedVehicleClass] ||
@@ -88,6 +97,30 @@ export default function MatchRecommendationCard({
       </div>
 
       <div className="p-6 space-y-6">
+        {/* Shipper Candidate Override Notice */}
+        {selectedCandidate && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-950 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-amber-200 px-2 py-0.5 font-bold uppercase tracking-wider text-[10px]">
+                Override Active
+              </span>
+              <span>
+                You have selected Candidate #{selectedCandidate.rank}:{' '}
+                <strong>{selectedCandidate.name}</strong> instead of the #1 recommendation.
+              </span>
+            </div>
+            {onResetSelectedAgency && (
+              <button
+                type="button"
+                onClick={onResetSelectedAgency}
+                className="font-bold underline hover:text-amber-800 transition-colors"
+              >
+                Reset to #1 Recommended
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Header: Carrier Info */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
@@ -117,6 +150,28 @@ export default function MatchRecommendationCard({
             </div>
           </div>
         </div>
+
+        {/* Real Grounded Fleet Vehicle & Driver Roster (Database Entities) */}
+        {(recommendedAgency.assignedVehicleRegNo || recommendedAgency.assignedDriverName) && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-2.5 text-xs text-on-surface">
+            <span className="font-semibold uppercase tracking-wider text-primary flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Verified Database Assets:
+            </span>
+            {recommendedAgency.assignedVehicleRegNo && (
+              <span className="inline-flex items-center gap-1.5 rounded bg-white px-2.5 py-1 font-mono font-semibold text-slate-800 shadow-xs border border-slate-200">
+                <Truck className="h-3.5 w-3.5 text-secondary" />
+                Vehicle Plate: {recommendedAgency.assignedVehicleRegNo}
+              </span>
+            )}
+            {recommendedAgency.assignedDriverName && (
+              <span className="inline-flex items-center gap-1.5 rounded bg-white px-2.5 py-1 font-medium text-slate-800 shadow-xs border border-slate-200">
+                <UserCheck className="h-3.5 w-3.5 text-status-green-text" />
+                Driver: {recommendedAgency.assignedDriverName}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* 3 Metric Spotlight Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -248,7 +303,11 @@ export default function MatchRecommendationCard({
                 ) : (
                   <>
                     <Check className="h-5 w-5 stroke-[2.5]" />
-                    <span>Approve Match & Dispatch</span>
+                    <span>
+                      {selectedCandidate
+                        ? `Approve ${selectedCandidate.name} & Dispatch`
+                        : 'Approve Match & Dispatch'}
+                    </span>
                   </>
                 )}
               </button>

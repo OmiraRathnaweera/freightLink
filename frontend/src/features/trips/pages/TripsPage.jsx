@@ -21,10 +21,12 @@ const DEFAULT_PAGE_SIZE = 20;
 
 function TripsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const dispatchAssignmentId = searchParams.get("dispatch") || searchParams.get("assignmentId");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(Boolean(dispatchAssignmentId));
-  const [tripToDelete, setTripToDelete] = useState(null);
   const role = useAppSelector((state) => state.auth.role);
+  const dispatchAssignmentId = searchParams.get("dispatch") || searchParams.get("assignmentId");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(
+    Boolean(dispatchAssignmentId && role === UserRole.AGENCY_STAFF)
+  );
+  const [tripToDelete, setTripToDelete] = useState(null);
 
   const page = Number(searchParams.get("page") ?? "1");
   const pageSize = Number(searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE));
@@ -83,7 +85,7 @@ function TripsPage() {
               <RefreshCw className={`h-4 w-4 ${tripsQuery.isFetching ? "animate-spin" : ""}`} />
               Refresh
             </Button>
-            {(role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) && (
+            {role === UserRole.AGENCY_STAFF && (
               <Button
                 variant="primary"
                 onClick={() => setIsCreateDialogOpen(true)}

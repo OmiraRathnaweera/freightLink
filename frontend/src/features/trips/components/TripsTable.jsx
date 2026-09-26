@@ -41,8 +41,7 @@ function TripsTable({ trips, sortBy, sortDir, onSortChange, onDeleteTrip }) {
 
   const canDeleteTripRole =
     role === UserRole.AGENCY_STAFF ||
-    role === UserRole.ADMIN ||
-    role === UserRole.DRIVER;
+    role === UserRole.ADMIN;
 
   return (
     <div className="overflow-x-auto min-h-[60vh]">

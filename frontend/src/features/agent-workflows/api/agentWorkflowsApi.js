@@ -13,8 +13,9 @@ export const matchKeys = {
  * @param {string} loadId
  * @returns {Promise<import('./types').LoadMatchRecommendationDto>}
  */
-export async function getLoadMatch(loadId) {
-  return api.get(`/loads/${loadId}/match`)
+export async function getLoadMatch(loadId, rerun = false) {
+  const url = rerun ? `/loads/${loadId}/match?rerun=true` : `/loads/${loadId}/match`
+  return api.get(url)
 }
 
 /**

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, Sparkles } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Sparkles, Truck } from 'lucide-react'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
+import { UserRole } from '../../../lib/enums.js'
 import { useLoadDetailQuery } from '../api/loadsApi.js'
 import { getLoadStatusTone } from '../lib/statusTone.js'
 import { formatCurrency, formatDateTime, formatShipperName, formatWeight } from '../lib/format.js'
@@ -16,6 +17,7 @@ import RouteMapCard from '../components/RouteMapCard.jsx'
 import LoadFilesSection from '../components/LoadFilesSection.jsx'
 import LoadStatusHistoryCard from '../components/LoadStatusHistoryCard.jsx'
 import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
+import AcceptShipmentDialog from '../components/AcceptShipmentDialog.jsx'
 
 // Load detail — GET /api/v1/loads/{id}, full LoadResponseDto
 // (docs/load-management-api.md Section 3.6). RateBreakdownCard/
@@ -28,6 +30,7 @@ import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
 function LoadDetailPage() {
   const { loadId } = useParams()
   const [isCancelOpen, setIsCancelOpen] = useState(false)
+  const [isAcceptOpen, setIsAcceptOpen] = useState(false)
   const loadQuery = useLoadDetailQuery(loadId)
   const role = useAppSelector((state) => state.auth.role)
 
@@ -71,7 +74,28 @@ function LoadDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {(load.status === 'Posted' || load.status === 'Matched') && (
+          {role === UserRole.AGENCY_STAFF && load.status === 'Posted' && (
+            <Button
+              variant="primary"
+              onClick={() => setIsAcceptOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Accept Shipment
+            </Button>
+          )}
+          {role === UserRole.AGENCY_STAFF && load.status === 'Matched' && (
+            <Button
+              as={Link}
+              to={`/trips?dispatch=${load.loadId}`}
+              variant="primary"
+              className="inline-flex items-center gap-1.5"
+            >
+              <Truck className="h-4 w-4" />
+              Dispatch Driver & Vehicle
+            </Button>
+          )}
+          {(role === UserRole.SHIPPER || role === UserRole.ADMIN) && (load.status === 'Posted' || load.status === 'Matched') && (
             <Button
               as={Link}
               to={`/agent-workflows?loadId=${load.loadId}`}
@@ -231,6 +255,13 @@ function LoadDetailPage() {
       </div>
 
       {isCancelOpen && <CancelLoadDialog loadId={load.loadId} onClose={() => setIsCancelOpen(false)} />}
+      {isAcceptOpen && (
+        <AcceptShipmentDialog
+          load={load}
+          onClose={() => setIsAcceptOpen(false)}
+          onAccepted={() => loadQuery.refetch()}
+        />
+      )}
     </div>
   )
 }
