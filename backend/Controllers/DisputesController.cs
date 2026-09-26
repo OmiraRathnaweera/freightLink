@@ -11,14 +11,16 @@ using Microsoft.AspNetCore.Mvc;
 namespace FreightLink.Api.Controllers;
 
 /// <summary>
-/// Dispute management endpoints (Component D): raise, retrieve (single/list), update, and adjudicate/resolve.
+/// Dispute management endpoints: raise, retrieve, update, and lifecycle state machine transitions (review/resolve).
 /// </summary>
 [ApiController]
 [Route("api/v1/disputes")]
+[Route("api/disputes")]
 [Authorize]
 public class DisputesController : ControllerBase
 {
-    private const string DisputeRaiseRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
+    // Business Rule 1: Created exclusively by a Shipper or an Agency
+    private const string DisputeRaiseRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff);
     private const string AdminRole = nameof(UserRole.Admin);
 
     private readonly IDisputeService _disputeService;
@@ -29,7 +31,7 @@ public class DisputesController : ControllerBase
         _disputeService = disputeService;
     }
 
-    /// <summary>Raises a new dispute for a trip.</summary>
+    /// <summary>Raises a new dispute for a trip in initial status 'Raised'.</summary>
     /// <param name="request">Dispute creation details.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 Created with the created dispute.</returns>
@@ -75,16 +77,42 @@ public class DisputesController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Resolves or rejects a dispute with outcome and notes (Admin adjudication).</summary>
+    /// <summary>Transitions a dispute from Raised to UnderReview (Admin only).</summary>
     /// <param name="id">The dispute's ID.</param>
-    /// <param name="request">The resolution decision and outcome.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the updated dispute in UnderReview status.</returns>
+    [HttpPatch("{id:guid}/review")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<DisputeResponseDto>> Review(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _disputeService.MoveToReviewAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Resolves a dispute with mandatory resolution notes (Admin adjudication).</summary>
+    /// <param name="id">The dispute's ID.</param>
+    /// <param name="request">The resolution decision and notes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the resolved dispute details.</returns>
+    [HttpPatch("{id:guid}/resolve")]
     [HttpPost("{id:guid}/resolve")]
     [Authorize(Roles = AdminRole)]
     public async Task<ActionResult<DisputeResponseDto>> Resolve(Guid id, [FromBody] ResolveDisputeDto request, CancellationToken cancellationToken)
     {
         var result = await _disputeService.ResolveAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Unified status transition endpoint according to lifecycle rules (Admin only).</summary>
+    /// <param name="id">The dispute's ID.</param>
+    /// <param name="request">Target status and optional resolution payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the transitioned dispute.</returns>
+    [HttpPatch("{id:guid}/status")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<DisputeResponseDto>> TransitionStatus(Guid id, [FromBody] TransitionDisputeStatusDto request, CancellationToken cancellationToken)
+    {
+        var result = await _disputeService.TransitionStatusAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return Ok(result);
     }
 
@@ -102,7 +130,7 @@ public class DisputesController : ControllerBase
     private UserRole GetCurrentUserRole()
     {
         var roleClaim = User.FindFirstValue(ClaimTypes.Role);
-        if (!Enum.TryParse<UserRole>(roleClaim, out var role) || !Enum.IsDefined(role))
+        if (!Enum.TryParse<UserRole>(roleClaim, true, out var role))
         {
             throw new ApiException(HttpStatusCode.Unauthorized, ErrorCode.UNAUTHORIZED, "The access token does not contain a valid role.");
         }

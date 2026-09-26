@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../notifications/models/in_app_notification.dart';
+import '../../notifications/providers/notification_provider.dart';
 import '../data/loads_repository.dart';
 import '../models/load.dart';
 import '../models/load_status.dart';
@@ -15,9 +17,11 @@ enum LoadsListState { loading, loaded, empty, error }
 /// **My Loads** and the Admin **All Loads** screen; each screen creates its
 /// own instance.
 class LoadsListProvider extends ChangeNotifier {
-  LoadsListProvider(this._repository);
+  LoadsListProvider(this._repository, [this._notificationProvider]);
 
   final LoadsRepository _repository;
+  final NotificationProvider? _notificationProvider;
+  final Map<String, LoadStatus> _knownStatuses = {};
 
   LoadsListState _state = LoadsListState.loading;
   List<LoadListItem> _items = [];
@@ -41,6 +45,22 @@ class LoadsListProvider extends ChangeNotifier {
         search: _search,
         status: _statusFilter,
       );
+
+      for (final item in page.items) {
+        final previousStatus = _knownStatuses[item.loadId];
+        if (previousStatus != null &&
+            previousStatus != item.status &&
+            item.status == LoadStatus.matched) {
+          _notificationProvider?.pushNotification(
+            title: 'Load Matched!',
+            message: 'Your load ${item.referenceCode} has been matched and approved by dispatch.',
+            category: NotificationCategory.loadMatched,
+            referenceId: item.loadId,
+          );
+        }
+        _knownStatuses[item.loadId] = item.status;
+      }
+
       _items = page.items;
       _state = _items.isEmpty ? LoadsListState.empty : LoadsListState.loaded;
     } on ApiException catch (error) {

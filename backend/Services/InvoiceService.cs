@@ -85,6 +85,11 @@ public class InvoiceService : IInvoiceService
             // Verify caller has permission to generate an invoice for this trip
             EnforceTripPartyAuthorization(trip, currentUserId, role);
 
+            if (role == UserRole.AgencyStaff)
+            {
+                AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+            }
+
             // Check if an invoice already exists for this trip
             var exists = await _dbContext.Invoices.AnyAsync(i => i.TripId == request.TripId.Value, cancellationToken);
             if (exists)
@@ -352,6 +357,11 @@ public class InvoiceService : IInvoiceService
 
         EnforceInvoiceModifyAuthorization(invoice, currentUserId, role);
 
+        if (role == UserRole.AgencyStaff && invoice.Trip != null)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
+
         // Immutability enforcement: modifications rejected if not in Draft status
         if (!InvoiceStatusTransitionRules.CanEdit(invoice.Status))
         {
@@ -526,6 +536,11 @@ public class InvoiceService : IInvoiceService
 
         EnforceInvoiceModifyAuthorization(invoice, currentUserId, role);
 
+        if (role == UserRole.AgencyStaff && invoice.Trip != null)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
+
         if (InvoiceStatusTransitionRules.IsGatewayOwned(request.Status))
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.INVALID_INVOICE_STATUS_TRANSITION,
@@ -578,6 +593,11 @@ public class InvoiceService : IInvoiceService
         }
 
         EnforceInvoiceModifyAuthorization(invoice, currentUserId, role);
+
+        if (role == UserRole.AgencyStaff && invoice.Trip != null)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
 
         if (!InvoiceStatusTransitionRules.CanVoid(invoice.Status))
         {

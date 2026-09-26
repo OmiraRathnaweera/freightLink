@@ -5,8 +5,16 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+from pathlib import Path
+
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=str(_ENV_FILE) if _ENV_FILE.exists() else ".env",
+        extra="ignore",
+    )
 
     # This service's own bind info
     agent_api_base_url: str = "http://localhost:8001"
@@ -19,6 +27,10 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     ollama_model: str = "llama3.2"
     ollama_base_url: str = "http://localhost:11434"
+
+    # Routing tool (OpenRouteService, ADR-012)
+    openrouteservice_api_key: str | None = None
+    openrouteservice_base_url: str = "https://api.openrouteservice.org"
 
     # Inbound auth: checked on POST /workflows/run (X-Internal-Api-Key header)
     # No default — must come from .env; an empty-string fallback would make

@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 using FreightLink.Api.Common.Errors;
@@ -183,6 +183,97 @@ public class AuthService : IAuthService
     }
 
     /// <inheritdoc />
+    public async Task<RegisterResponseDto> RegisterDriverAsync(RegisterDriverRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var normalizedEmail = NormalizeEmail(request.Email);
+
+        if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+        }
+
+        var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == request.AgencyId, cancellationToken);
+        if (agency is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The selected agency could not be found.");
+        }
+
+        if (agency.Status == AgencyStatus.Suspended)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Cannot register under a suspended agency.");
+        }
+
+        if (request.LicenceExpiry <= DateOnly.FromDateTime(DateTime.UtcNow))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Licence expiry date must be in the future.");
+        }
+
+        if (await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var user = new User
+        {
+            UserId = Guid.NewGuid(),
+            Role = UserRole.Driver,
+            Email = normalizedEmail,
+            PasswordHash = _passwordHasher.Hash(request.Password),
+            FullName = request.FullName,
+            PhoneE164 = request.PhoneE164,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        var driver = new Driver
+        {
+            DriverId = Guid.NewGuid(),
+            UserId = user.UserId,
+            AgencyId = request.AgencyId,
+            LicenceNo = request.LicenceNo,
+            LicenceExpiry = request.LicenceExpiry,
+            Status = DriverStatus.Active,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+
+        _dbContext.Users.Add(user);
+        _dbContext.Drivers.Add(driver);
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            throw MapUniqueViolationToApiException(pg);
+        }
+
+        return new RegisterResponseDto
+        {
+            Message = "Driver registered successfully.",
+            UserId = user.UserId,
+            Email = user.Email
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<List<AgencyLookupDto>> GetAgenciesLookupAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Agencies.AsNoTracking()
+            .Where(a => a.Status != AgencyStatus.Suspended)
+            .OrderBy(a => a.Name)
+            .Select(a => new AgencyLookupDto
+            {
+                AgencyId = a.AgencyId,
+                Name = a.Name
+            })
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<TokenResponseDto> LoginAsync(LoginRequestDto request, string? userAgent, CancellationToken cancellationToken = default)
     {
         var normalizedEmail = NormalizeEmail(request.Email);
@@ -247,7 +338,9 @@ public class AuthService : IAuthService
     /// <inheritdoc />
     public async Task<CurrentUserResponseDto> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+        var user = await _dbContext.Users
+            .Include(u => u.AgencyStaff)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
 
         if (user is null)
         {
@@ -333,7 +426,8 @@ public class AuthService : IAuthService
         PhoneE164 = user.PhoneE164,
         Role = user.Role.ToString(),
         IsActive = user.IsActive,
-        CreatedAt = user.CreatedAt
+        CreatedAt = user.CreatedAt,
+        AgencyId = user.AgencyStaff?.AgencyId
     };
 
     /// <summary>Normalizes an email for case-insensitive storage/lookup.</summary>
@@ -351,6 +445,7 @@ public class AuthService : IAuthService
         "uq_user_email" => new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists."),
         "uq_shipperprofile_regno" => new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "A shipper with this business registration number already exists."),
         "uq_agency_regno" => new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "An agency with this business registration number already exists."),
+        "IX_Drivers_LicenceNo" => new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists."),
         _ => throw new DbUpdateException("Unhandled unique-constraint violation.", pg)
     };
 }

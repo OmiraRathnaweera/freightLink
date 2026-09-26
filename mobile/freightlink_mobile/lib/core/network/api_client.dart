@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:http/http.dart' as http;
 
 import '../constants/app_constants.dart';
@@ -89,11 +90,44 @@ class ApiClient {
     );
   }
 
+  Future<dynamic> postMultipart(
+    String path, {
+    required List<int> fileBytes,
+    required String filename,
+    String fieldName = 'file',
+    Map<String, String>? fields,
+  }) {
+    return _send(() async {
+      final request = http.MultipartRequest('POST', _uri(path));
+      final token = authToken();
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+      request.headers['Accept'] = 'application/json';
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          fieldName,
+          fileBytes,
+          filename: filename,
+        ),
+      );
+
+      final streamedResponse = await _http.send(request);
+      return http.Response.fromStream(streamedResponse);
+    });
+  }
+
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     final http.Response response;
     try {
       response = await request();
     } on Exception catch (cause) {
+      if (kDebugMode) {
+        debugPrint('[ApiClient] Network error reaching $_baseUrl: $cause');
+      }
       throw ApiException.network(cause);
     }
 

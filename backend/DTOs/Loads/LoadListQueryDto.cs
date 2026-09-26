@@ -43,4 +43,9 @@ public class LoadListQueryDto
 
     /// <summary>Optional inclusive upper bound on <c>CreatedAt</c>.</summary>
     public DateTimeOffset? CreatedTo { get; set; }
+
+    /// <summary>
+    /// When true for an agency caller, filters for available open marketplace loads (Posted status).
+    /// </summary>
+    public bool? Marketplace { get; set; }
 }

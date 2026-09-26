@@ -74,6 +74,18 @@ public class AuthServiceTests
         YardLng = 80.6337m
     };
 
+    /// <summary>A valid Driver registration payload.</summary>
+    private static RegisterDriverRequestDto ValidDriverRequest(Guid agencyId, string email = "driver@example.com", string licenceNo = "DL-123456") => new()
+    {
+        AgencyId = agencyId,
+        Email = email,
+        Password = "Sup3r$ecret1",
+        FullName = "John Driver",
+        PhoneE164 = "+94771234567",
+        LicenceNo = licenceNo,
+        LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(1))
+    };
+
     // --- Registration ---
 
     /// <summary>Registering a shipper creates both the User and ShipperProfile rows.</summary>
@@ -167,6 +179,130 @@ public class AuthServiceTests
         var user = await dbContext.Users.FindAsync(result.UserId);
         Assert.NotEqual(request.Password, user!.PasswordHash);
         Assert.True(new PasswordHasher().Verify(request.Password, user.PasswordHash));
+    }
+
+    /// <summary>Registering a driver creates both the User (Role=Driver) and Driver entity rows.</summary>
+    [Fact]
+    public async Task RegisterDriverAsync_Succeeds_WithValidData()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var agency = await sut.RegisterAgencyAsync(ValidAgencyRequest());
+        var agencyEntity = await dbContext.Agencies.FirstAsync();
+
+        var driverReq = ValidDriverRequest(agencyEntity.AgencyId);
+        var result = await sut.RegisterDriverAsync(driverReq);
+
+        Assert.NotEqual(Guid.Empty, result.UserId);
+        var user = await dbContext.Users.FindAsync(result.UserId);
+        Assert.NotNull(user);
+        Assert.Equal(UserRole.Driver, user!.Role);
+        var driver = await dbContext.Drivers.FirstOrDefaultAsync(d => d.UserId == result.UserId);
+        Assert.NotNull(driver);
+        Assert.Equal(agencyEntity.AgencyId, driver!.AgencyId);
+        Assert.Equal(driverReq.LicenceNo, driver.LicenceNo);
+    }
+
+    /// <summary>Registering a driver with a non-existent agency throws AGENCY_NOT_FOUND.</summary>
+    [Fact]
+    public async Task RegisterDriverAsync_Throws_WhenAgencyNotFound()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var driverReq = ValidDriverRequest(Guid.NewGuid());
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(driverReq));
+        Assert.Equal(ErrorCode.AGENCY_NOT_FOUND, exception.Code);
+    }
+
+    /// <summary>Registering a driver with an already registered email throws EMAIL_ALREADY_REGISTERED.</summary>
+    [Fact]
+    public async Task RegisterDriverAsync_Throws_WhenEmailAlreadyRegistered()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await sut.RegisterAgencyAsync(ValidAgencyRequest());
+        var agencyEntity = await dbContext.Agencies.FirstAsync();
+
+        var driverReq = ValidDriverRequest(agencyEntity.AgencyId, email: "dup-driver@example.com");
+        await sut.RegisterDriverAsync(driverReq);
+
+        var duplicateReq = ValidDriverRequest(agencyEntity.AgencyId, email: "dup-driver@example.com", licenceNo: "DL-999999");
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(duplicateReq));
+        Assert.Equal(ErrorCode.EMAIL_ALREADY_REGISTERED, exception.Code);
+    }
+
+    /// <summary>Registering a driver with duplicate licence number throws DRIVER_LICENCE_ALREADY_REGISTERED.</summary>
+    [Fact]
+    public async Task RegisterDriverAsync_Throws_WhenLicenceAlreadyRegistered()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await sut.RegisterAgencyAsync(ValidAgencyRequest());
+        var agencyEntity = await dbContext.Agencies.FirstAsync();
+
+        var driverReq1 = ValidDriverRequest(agencyEntity.AgencyId, email: "driver1@example.com", licenceNo: "DL-SAME");
+        await sut.RegisterDriverAsync(driverReq1);
+
+        var driverReq2 = ValidDriverRequest(agencyEntity.AgencyId, email: "driver2@example.com", licenceNo: "DL-SAME");
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(driverReq2));
+        Assert.Equal(ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, exception.Code);
+    }
+
+    /// <summary>Registering a driver with expired licence throws VALIDATION_ERROR.</summary>
+    [Fact]
+    public async Task RegisterDriverAsync_Throws_WhenLicenceExpired()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await sut.RegisterAgencyAsync(ValidAgencyRequest());
+        var agencyEntity = await dbContext.Agencies.FirstAsync();
+
+        var driverReq = ValidDriverRequest(agencyEntity.AgencyId);
+        driverReq.LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(driverReq));
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, exception.Code);
+    }
+
+    /// <summary>GetAgenciesLookupAsync returns non-suspended agencies ordered by name.</summary>
+    [Fact]
+    public async Task GetAgenciesLookupAsync_ReturnsNonSuspendedAgencies()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+
+        dbContext.Agencies.Add(new FreightLink.Api.Entities.Agency
+        {
+            AgencyId = Guid.NewGuid(),
+            Name = "Bravo Logistics",
+            BusinessRegNo = "BRN-B",
+            YardAddress = "Address B",
+            Status = AgencyStatus.Active
+        });
+        dbContext.Agencies.Add(new FreightLink.Api.Entities.Agency
+        {
+            AgencyId = Guid.NewGuid(),
+            Name = "Alpha Freight",
+            BusinessRegNo = "BRN-A",
+            YardAddress = "Address A",
+            Status = AgencyStatus.Pending
+        });
+        dbContext.Agencies.Add(new FreightLink.Api.Entities.Agency
+        {
+            AgencyId = Guid.NewGuid(),
+            Name = "Suspended Cargo",
+            BusinessRegNo = "BRN-S",
+            YardAddress = "Address S",
+            Status = AgencyStatus.Suspended
+        });
+        await dbContext.SaveChangesAsync();
+
+        var list = await sut.GetAgenciesLookupAsync();
+
+        Assert.Equal(2, list.Count);
+        Assert.Equal("Alpha Freight", list[0].Name);
+        Assert.Equal("Bravo Logistics", list[1].Name);
     }
 
     // --- Login ---

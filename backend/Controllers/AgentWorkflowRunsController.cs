@@ -51,4 +51,33 @@ public class AgentWorkflowRunsController : ControllerBase
         var result = await _agentWorkflowService.ReportStepAsync(workflowRunId, request, cancellationToken);
         return CreatedAtAction(nameof(ReportStep), new { workflowRunId }, result);
     }
+
+    /// <summary>
+    /// Records one tool invocation attempt (ToolCall) under an existing workflow run (Agent 3 Matching/Pricing).
+    /// </summary>
+    /// <param name="workflowRunId">The run this tool call belongs to.</param>
+    /// <param name="request">The tool call's telemetry and audit-trail data.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>201 with the created tool call's id and details.</returns>
+    [HttpPost("{workflowRunId:guid}/tool-calls")]
+    public async Task<ActionResult<FreightLink.Api.DTOs.Internal.ToolCalls.ToolCallResponseDto>> RecordToolCall(Guid workflowRunId, [FromBody] FreightLink.Api.DTOs.Internal.ToolCalls.CreateToolCallRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agentWorkflowService.RecordToolCallAsync(workflowRunId, request, cancellationToken);
+        return CreatedAtAction(nameof(RecordToolCall), new { workflowRunId }, result);
+    }
+
+    /// <summary>
+    /// Records candidate agencies evaluated by Agent 2 (DomainAnalysis) under an existing workflow run.
+    /// </summary>
+    /// <param name="workflowRunId">The run these candidates belong to.</param>
+    /// <param name="candidates">The list of evaluated candidate agencies.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK.</returns>
+    [HttpPost("{workflowRunId:guid}/candidates")]
+    public async Task<ActionResult> RecordMatchCandidates(Guid workflowRunId, [FromBody] List<FreightLink.Api.DTOs.Internal.Candidates.MatchCandidateDto> candidates, CancellationToken cancellationToken)
+    {
+        await _agentWorkflowService.RecordMatchCandidatesAsync(workflowRunId, candidates, cancellationToken);
+        return Ok(new { message = "Candidates recorded successfully" });
+    }
 }
+

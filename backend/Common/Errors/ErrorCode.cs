@@ -38,6 +38,12 @@ public enum ErrorCode
     /// <summary>The agency exists but does not belong to the authenticated caller.</summary>
     AGENCY_NOT_OWNED,
 
+    /// <summary>No <c>ComplianceDoc</c> exists with the requested id under the given agency.</summary>
+    COMPLIANCE_DOC_NOT_FOUND,
+
+    /// <summary>An admin attempted to verify/reject a compliance document that is not currently Pending.</summary>
+    INVALID_COMPLIANCE_DOC_STATUS_TRANSITION,
+
     /// <summary>The requested load could not be found.</summary>
     LOAD_NOT_FOUND,
 
@@ -49,6 +55,13 @@ public enum ErrorCode
 
     /// <summary>A state change was attempted on an agency whose current status doesn't allow it.</summary>
     INVALID_AGENCY_STATUS_TRANSITION,
+
+    /// <summary>
+    /// An AgencyStaff caller attempted an operation other than compliance-document upload/read or
+    /// agency profile read while their agency's <c>Status</c> is not <c>Active</c>. Thrown by
+    /// <see cref="FreightLink.Api.Common.Domain.AgencyStatusGuard.EnsureActive"/>.
+    /// </summary>
+    AGENCY_NOT_ACTIVE,
 
     /// <summary>A load cancellation was attempted without a reason.</summary>
     LOAD_CANCEL_REASON_REQUIRED,
@@ -253,6 +266,16 @@ public enum ErrorCode
     /// </summary>
     AGENT_STEP_DUPLICATE,
 
+    /// <summary>
+    /// The specified <c>AgentStep</c> could not be found under the given workflow run.
+    /// </summary>
+    AGENT_STEP_NOT_FOUND,
+
+    /// <summary>
+    /// A tool call with this attempt number already exists for this (AgentStep, ToolName) pair (mirrors <c>uq_toolcall_attempt</c>).
+    /// </summary>
+    TOOL_CALL_DUPLICATE_ATTEMPT,
+
     /// <summary>The requested trip could not be found.</summary>
     TRIP_NOT_FOUND,
 
@@ -299,6 +322,15 @@ public enum ErrorCode
     DRIVER_UNAVAILABLE,
 
     /// <summary>The trip cannot be modified because it has already progressed past the Assigned state.</summary>
-    TRIP_CANNOT_BE_MODIFIED
+    TRIP_CANNOT_BE_MODIFIED,
+
+    /// <summary>No eligible match candidate was found for the workflow run.</summary>
+    NO_ELIGIBLE_MATCH_CANDIDATE,
+
+    /// <summary>The workflow run has already been approved.</summary>
+    WORKFLOW_RUN_ALREADY_APPROVED,
+
+    /// <summary>Registration was attempted with a driving licence number already on file.</summary>
+    DRIVER_LICENCE_ALREADY_REGISTERED
 }
 

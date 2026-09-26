@@ -7,3 +7,9 @@ AgentRole = Literal["Planner", "DomainAnalysis", "MatchingPricing", "ValidationS
 
 # Mirrors backend/Entities/Enums/AgentStepStatus.cs.
 AgentStepStatus = Literal["Pending", "Running", "Succeeded", "Failed"]
+
+# Mirrors backend/Entities/Enums/VehicleClass.cs.
+VehicleClass = Literal["MiniTruck", "MediumLorry", "ContainerTruck"]
+
+# Mirrors backend/Entities/Enums/ToolName.cs.
+ToolName = Literal["get_route_and_eta"]

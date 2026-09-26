@@ -35,7 +35,16 @@ function SortableHeader({ column, label, sortBy, sortDir, onSortChange }) {
 // (LoadListItemDto, docs/load-management-api.md Section 3.3) and
 // StatusBadge-tone mapping are specific to the Loads domain
 // (.claude/rules/frontend-design.md #1).
-function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = false, role }) {
+function LoadsTable({
+  loads,
+  sortBy,
+  sortDir,
+  onSortChange,
+  showShipperColumn = false,
+  role,
+  onAcceptLoad,
+  onDispatchLoad,
+}) {
   return (
     <div className="overflow-x-auto min-h-[60vh]">
       <table className="w-full text-left text-body-md">
@@ -90,7 +99,26 @@ function LoadsTable({ loads, sortBy, sortDir, onSortChange, showShipperColumn = 
               </td>
               <td className="py-table-cell-py pr-table-cell-px text-on-surface-variant">{formatDateTime(load.createdAt)}</td>
               <td className="py-table-cell-py text-right">
-                <RowActionsMenu loadId={load.loadId} status={load.status} role={role} />
+                <div className="flex items-center justify-end gap-2">
+                  {onAcceptLoad && load.status === 'Posted' && (
+                    <button
+                      type="button"
+                      onClick={() => onAcceptLoad(load)}
+                      className="inline-flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-primary/90"
+                    >
+                      Accept
+                    </button>
+                  )}
+                  {onDispatchLoad && load.status === 'Matched' && (
+                    <Link
+                      to={`/trips?dispatch=${load.loadId}`}
+                      className="inline-flex items-center gap-1 rounded border border-slate-300 bg-surface px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                    >
+                      Dispatch
+                    </Link>
+                  )}
+                  <RowActionsMenu loadId={load.loadId} status={load.status} role={role} />
+                </div>
               </td>
             </tr>
           ))}

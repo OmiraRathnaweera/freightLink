@@ -2091,7 +2091,7 @@ namespace FreightLink.Api.Migrations
                     b.HasOne("FreightLink.Api.Entities.Trip", "Trip")
                         .WithMany("Events")
                         .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("RecordedByUser");
@@ -2110,7 +2110,7 @@ namespace FreightLink.Api.Migrations
                     b.HasOne("FreightLink.Api.Entities.Trip", "Trip")
                         .WithMany("Evidence")
                         .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("CapturedByUser");

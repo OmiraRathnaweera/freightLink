@@ -1,4 +1,5 @@
 using System.Net;
+using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Data;
@@ -41,6 +42,8 @@ public class TripService : ITripService
             .AsNoTracking()
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Agency)
+            .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
             .Include(t => t.Driver)
                 .ThenInclude(d => d.User)
             .Include(t => t.Vehicle);
@@ -192,6 +195,8 @@ public class TripService : ITripService
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to advance status on this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
         else if (actingUserRole == UserRole.Driver)
         {
@@ -271,6 +276,7 @@ public class TripService : ITripService
     {
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -308,6 +314,8 @@ public class TripService : ITripService
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
         else if (actingUserRole == UserRole.Driver)
         {
@@ -451,6 +459,9 @@ public class TripService : ITripService
         VehicleId = t.VehicleId,
         DriverId = t.DriverId,
         DriverName = t.Driver?.User?.FullName,
+        PickupAddress = t.Assignment?.Load?.PickupAddress,
+        DropoffAddress = t.Assignment?.Load?.DropoffAddress,
+        ReferenceCode = t.Assignment?.Load?.ReferenceCode,
         Status = t.Status.ToString(),
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt
@@ -473,6 +484,14 @@ public class TripService : ITripService
         PickupLng = t.Assignment?.Load?.PickupLng,
         DropoffLat = t.Assignment?.Load?.DropoffLat,
         DropoffLng = t.Assignment?.Load?.DropoffLng,
+        CargoDescription = t.Assignment?.Load?.CargoDescription,
+        WeightKg = t.Assignment?.Load?.WeightKg,
+        VolumeM3 = t.Assignment?.Load?.VolumeM3,
+        PickupWindowStart = t.Assignment?.Load?.PickupWindowStart,
+        PickupWindowEnd = t.Assignment?.Load?.PickupWindowEnd,
+        ReferenceCode = t.Assignment?.Load?.ReferenceCode,
+        RoutedDistanceKm = t.Assignment?.RoutedDistanceKm,
+        ProposedEtaMinutes = t.Assignment?.ProposedEtaMinutes,
         Status = t.Status.ToString(),
         CreatedAt = t.CreatedAt,
         UpdatedAt = t.UpdatedAt,
@@ -519,24 +538,20 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.Admin && currentUserRole != UserRole.AgencyStaff)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff or Admin may create and dispatch trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may create and dispatch trips.");
         }
 
-        Guid? callerAgencyId = null;
-        if (currentUserRole == UserRole.AgencyStaff)
-        {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "No agency staff record found for caller.");
-            }
-            callerAgencyId = agencyStaff.AgencyId;
+        if (agencyStaff == null)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "No agency staff record found for caller.");
         }
+        var callerAgencyId = agencyStaff.AgencyId;
 
         var assignment = await _dbContext.Assignments
             .Include(a => a.Load)
@@ -549,14 +564,29 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.ASSIGNMENT_NOT_FOUND, "The requested assignment could not be found.");
         }
 
-        if (callerAgencyId.HasValue && assignment.AgencyId != callerAgencyId.Value)
+        if (assignment.AgencyId != callerAgencyId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ASSIGNMENT_NOT_OWNED, "You do not have access to dispatch this assignment.");
+        }
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            AgencyStatusGuard.EnsureActive(assignment.Agency.Status);
         }
 
         if (assignment.Trip != null)
         {
             throw new ApiException(HttpStatusCode.Conflict, ErrorCode.TRIP_ALREADY_EXISTS, "A trip has already been created for this assignment.");
+        }
+
+        if (assignment.Status == AssignmentStatus.Declined)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Declined assignments cannot be dispatched into a trip.");
+        }
+
+        if (assignment.Status == AssignmentStatus.Cancelled)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Cancelled assignments cannot be dispatched into a trip.");
         }
 
         // Validate vehicle
@@ -626,6 +656,20 @@ public class TripService : ITripService
         {
             assignment.Status = AssignmentStatus.Accepted;
             assignment.UpdatedAt = now;
+
+            var existingResponse = await _dbContext.AssignmentResponses
+                .FirstOrDefaultAsync(r => r.AssignmentId == assignment.AssignmentId, cancellationToken);
+            if (existingResponse == null)
+            {
+                _dbContext.AssignmentResponses.Add(new AssignmentResponse
+                {
+                    AssignmentId = assignment.AssignmentId,
+                    RespondedByUserId = currentUserId,
+                    Response = AssignmentResponseType.Accepted,
+                    DeclineReason = null,
+                    RespondedAt = now
+                });
+            }
         }
 
         if (assignment.Load != null)
@@ -672,13 +716,14 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.Admin && currentUserRole != UserRole.AgencyStaff)
+        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff or Admin may update trip assignments.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may update trip assignments. Drivers are not permitted to update trips.");
         }
 
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -692,10 +737,12 @@ public class TripService : ITripService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null || trip.Assignment.AgencyId != agencyStaff.AgencyId)
+            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
             }
+
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
 
         if (trip.Status != TripStatus.Assigned)
@@ -804,8 +851,16 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
+        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may cancel trips. Drivers are not permitted to cancel trips.");
+        }
+
         var trip = await _dbContext.Trips
             .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
+            .Include(t => t.Assignment)
+                .ThenInclude(a => a.Agency)
             .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
@@ -819,25 +874,12 @@ public class TripService : ITripService
                 .AsNoTracking()
                 .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null || trip.Assignment.AgencyId != agencyStaff.AgencyId)
+            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
             {
                 throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
             }
-        }
-        else if (currentUserRole == UserRole.Driver)
-        {
-            var driver = await _dbContext.Drivers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(d => d.UserId == currentUserId, cancellationToken);
 
-            if (driver == null || trip.DriverId != driver.DriverId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
-            }
-        }
-        else if (currentUserRole != UserRole.Admin)
-        {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
+            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
         }
 
         if (trip.Status == TripStatus.Delivered || trip.Status == TripStatus.Cancelled)
@@ -846,7 +888,7 @@ public class TripService : ITripService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var reason = string.IsNullOrWhiteSpace(request?.Reason) ? "Trip cancelled." : request.Reason.Trim();
+        var reason = string.IsNullOrWhiteSpace(request?.Reason) ? "Trip cancelled by agency." : request.Reason.Trim();
 
         var tripEvent = new TripEvent
         {
@@ -863,9 +905,136 @@ public class TripService : ITripService
         trip.UpdatedAt = now;
 
         _dbContext.TripEvents.Add(tripEvent);
+
+        if (trip.Assignment != null)
+        {
+            trip.Assignment.Status = AssignmentStatus.Cancelled;
+            trip.Assignment.UpdatedAt = now;
+
+            if (trip.Assignment.Load != null)
+            {
+                var prevLoadStatus = trip.Assignment.Load.Status;
+                trip.Assignment.Load.Status = LoadStatus.Cancelled;
+                trip.Assignment.Load.UpdatedAt = now;
+
+                _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+                {
+                    LoadStatusHistoryId = Guid.NewGuid(),
+                    LoadId = trip.Assignment.Load.LoadId,
+                    FromStatus = prevLoadStatus,
+                    ToStatus = LoadStatus.Cancelled,
+                    Reason = reason,
+                    ChangedByUserId = currentUserId,
+                    ChangedAt = now
+                });
+            }
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return await GetByIdAsync(tripId, currentUserId, currentUserRole, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteAsync(
+        Guid tripId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may delete trips. Drivers are not permitted to delete trips.");
+        }
+
+        var trip = await _dbContext.Trips
+            .Include(t => t.Assignment)
+                .ThenInclude(a => a.Load)
+            .Include(t => t.Events)
+            .Include(t => t.Evidence)
+            .Include(t => t.Invoice)
+            .Include(t => t.Disputes)
+            .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
+
+        if (trip == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
+        }
+
+        if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var agencyStaff = await _dbContext.AgencyStaff
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
+            }
+        }
+
+        if (trip.Status == TripStatus.Delivered)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Cannot delete a trip that has already been delivered.");
+        }
+
+        if (trip.Status == TripStatus.PickedUp || trip.Status == TripStatus.InTransit)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_TRIP_STATUS_TRANSITION, "Active trips in pickup or transit must be cancelled before they can be deleted.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var assignment = trip.Assignment;
+        var load = assignment?.Load;
+
+        // Requirement 4: When an agency deletes a shipment load it has received, the load's status must revert to "Posted," allowing another agency to accept it.
+        if (load != null)
+        {
+            var prevLoadStatus = load.Status;
+            load.Status = LoadStatus.Posted;
+            load.UpdatedAt = now;
+
+            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            {
+                LoadStatusHistoryId = Guid.NewGuid(),
+                LoadId = load.LoadId,
+                FromStatus = prevLoadStatus,
+                ToStatus = LoadStatus.Posted,
+                Reason = "Agency deleted trip/shipment; load reverted to Posted for other agencies to accept.",
+                ChangedByUserId = currentUserId,
+                ChangedAt = now
+            });
+        }
+
+        if (trip.Events.Count > 0)
+        {
+            _dbContext.TripEvents.RemoveRange(trip.Events);
+        }
+
+        if (trip.Evidence.Count > 0)
+        {
+            _dbContext.TripEvidences.RemoveRange(trip.Evidence);
+        }
+
+        if (trip.Invoice != null)
+        {
+            _dbContext.Invoices.Remove(trip.Invoice);
+        }
+
+        if (trip.Disputes.Count > 0)
+        {
+            _dbContext.Disputes.RemoveRange(trip.Disputes);
+        }
+
+        _dbContext.Trips.Remove(trip);
+
+        if (assignment != null)
+        {
+            assignment.Status = AssignmentStatus.Cancelled;
+            assignment.UpdatedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -889,7 +1058,10 @@ public class TripService : ITripService
             .Where(t => t.TripId == trip1Id || t.TripId == trip2Id || t.TripId == trip3Id)
             .ToListAsync(cancellationToken);
 
-        if (existingTrips.Count == 3)
+        var assignment4Id = Guid.Parse("b4000000-0000-0000-0000-000000000004");
+        var hasAssignment4 = await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment4Id, cancellationToken);
+
+        if (existingTrips.Count == 3 && hasAssignment4)
         {
             return existingTrips.Select(MapToDetailResponse).ToList();
         }
@@ -907,6 +1079,8 @@ public class TripService : ITripService
                 Name = "Samagi Express Logistics",
                 BusinessRegNo = "PV-88991",
                 YardAddress = "45 Harbor Access Road, Peliyagoda",
+                YardLat = 6.9667m,
+                YardLng = 79.8917m,
                 Status = AgencyStatus.Active,
                 CreatedAt = now,
                 UpdatedAt = now
@@ -916,6 +1090,9 @@ public class TripService : ITripService
         else
         {
             agency.Status = AgencyStatus.Active;
+            agency.YardAddress = "45 Harbor Access Road, Peliyagoda";
+            agency.YardLat = 6.9667m;
+            agency.YardLng = 79.8917m;
         }
 
         // 2. Users (Drivers)
@@ -925,7 +1102,8 @@ public class TripService : ITripService
         var staffUserId = Guid.Parse("2d276e2c-8ada-400d-b9f8-f5b49c1507af");
         var shipperUserId = Guid.Parse("c67e538b-3247-44a0-9362-09667ba6d97f");
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == driverUser1Id, cancellationToken))
+        var existingDriverUser1 = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == driverUser1Id || u.Email == "driver1@freightlink.lk", cancellationToken);
+        if (existingDriverUser1 == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -939,8 +1117,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            driverUser1Id = existingDriverUser1.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == driverUser2Id, cancellationToken))
+        var existingDriverUser2 = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == driverUser2Id || u.Email == "driver2@freightlink.lk", cancellationToken);
+        if (existingDriverUser2 == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -954,8 +1137,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            driverUser2Id = existingDriverUser2.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == driverUser3Id, cancellationToken))
+        var existingDriverUser3 = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == driverUser3Id || u.Email == "driver3@freightlink.lk", cancellationToken);
+        if (existingDriverUser3 == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -969,8 +1157,13 @@ public class TripService : ITripService
                 UpdatedAt = now
             });
         }
+        else
+        {
+            driverUser3Id = existingDriverUser3.UserId;
+        }
 
-        if (!await _dbContext.Users.AnyAsync(u => u.UserId == shipperUserId, cancellationToken))
+        var existingShipper = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == shipperUserId || u.Email == "user@example.com", cancellationToken);
+        if (existingShipper == null)
         {
             _dbContext.Users.Add(new User
             {
@@ -980,6 +1173,42 @@ public class TripService : ITripService
                 FullName = "Amara Silva",
                 PasswordHash = "$2a$11$A8Hb51phJ3SgRiT1.ec4OOwF0EhvmuY6g5tLu1aeideTGaAY2z10C",
                 IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+        else
+        {
+            shipperUserId = existingShipper.UserId;
+        }
+
+        var existingStaff = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == staffUserId || u.Email == "agency@freightlink.lk", cancellationToken);
+        if (existingStaff == null)
+        {
+            _dbContext.Users.Add(new User
+            {
+                UserId = staffUserId,
+                Role = UserRole.AgencyStaff,
+                Email = "agency@freightlink.lk",
+                FullName = "Kasun Jayasuriya",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+                IsActive = true,
+                CreatedAt = now,
+                UpdatedAt = now
+            });
+        }
+        else
+        {
+            staffUserId = existingStaff.UserId;
+        }
+
+        if (!await _dbContext.AgencyStaff.AnyAsync(s => s.UserId == staffUserId && s.AgencyId == agencyId, cancellationToken))
+        {
+            _dbContext.AgencyStaff.Add(new AgencyStaff
+            {
+                UserId = staffUserId,
+                AgencyId = agencyId,
+                JobTitle = "Operations Dispatcher",
                 CreatedAt = now,
                 UpdatedAt = now
             });
@@ -1168,10 +1397,37 @@ public class TripService : ITripService
             });
         }
 
+        var load4Id = Guid.Parse("a4000000-0000-0000-0000-000000000004");
+        if (!await _dbContext.Loads.AnyAsync(l => l.LoadId == load4Id, cancellationToken))
+        {
+            _dbContext.Loads.Add(new Load
+            {
+                LoadId = load4Id,
+                ShipperUserId = shipperUserId,
+                ReferenceCode = "LD-JAF-CMB-04",
+                CargoDescription = "Fresh Northern Agricultural Produce & Dry Goods (500 Crates)",
+                WeightKg = 4200,
+                VolumeM3 = 18.0m,
+                PickupAddress = "Jaffna Central Wholesale Market, Hospital Road, Jaffna",
+                PickupLat = 9.661500m,
+                PickupLng = 80.025500m,
+                DropoffAddress = "Manning Market Wholesale Complex, Peliyagoda",
+                DropoffLat = 6.965000m,
+                DropoffLng = 79.885000m,
+                PickupWindowStart = now.AddHours(2),
+                PickupWindowEnd = now.AddDays(2),
+                EstimatedPrice = 78500.00m,
+                Status = LoadStatus.Posted,
+                CreatedAt = now.AddHours(-3),
+                UpdatedAt = now
+            });
+        }
+
         // 6. WorkflowRuns
         var workflow1Id = Guid.Parse("f1000000-0000-0000-0000-000000000001");
         var workflow2Id = Guid.Parse("f2000000-0000-0000-0000-000000000002");
         var workflow3Id = Guid.Parse("f3000000-0000-0000-0000-000000000003");
+        var workflow4Id = Guid.Parse("f4000000-0000-0000-0000-000000000004");
 
         if (!await _dbContext.AgentWorkflowRuns.AnyAsync(w => w.WorkflowRunId == workflow1Id, cancellationToken))
         {
@@ -1224,10 +1480,28 @@ public class TripService : ITripService
             });
         }
 
+        if (!await _dbContext.AgentWorkflowRuns.AnyAsync(w => w.WorkflowRunId == workflow4Id, cancellationToken))
+        {
+            _dbContext.AgentWorkflowRuns.Add(new AgentWorkflowRun
+            {
+                WorkflowRunId = workflow4Id,
+                LoadId = load4Id,
+                TriggeredByUserId = shipperUserId,
+                AttemptNo = 1,
+                Objective = "Match Jaffna-Colombo Agricultural Load",
+                Status = WorkflowRunStatus.Completed,
+                StartedAt = now.AddHours(-2),
+                CompletedAt = now.AddHours(-2),
+                CreatedAt = now.AddHours(-2),
+                UpdatedAt = now
+            });
+        }
+
         // 7. Assignments
         var assignment1Id = Guid.Parse("b1000000-0000-0000-0000-000000000001");
         var assignment2Id = Guid.Parse("b2000000-0000-0000-0000-000000000002");
         var assignment3Id = Guid.Parse("b3000000-0000-0000-0000-000000000003");
+        assignment4Id = Guid.Parse("b4000000-0000-0000-0000-000000000004");
 
         if (!await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment1Id, cancellationToken))
         {
@@ -1276,6 +1550,23 @@ public class TripService : ITripService
                 ProposedEtaMinutes = 280,
                 Status = AssignmentStatus.Accepted,
                 CreatedAt = now.AddDays(-4),
+                UpdatedAt = now
+            });
+        }
+
+        if (!await _dbContext.Assignments.AnyAsync(a => a.AssignmentId == assignment4Id, cancellationToken))
+        {
+            _dbContext.Assignments.Add(new Assignment
+            {
+                AssignmentId = assignment4Id,
+                LoadId = load4Id,
+                AgencyId = agencyId,
+                WorkflowRunId = workflow4Id,
+                ProposedPrice = 78500.00m,
+                RoutedDistanceKm = 395.5m,
+                ProposedEtaMinutes = 420,
+                Status = AssignmentStatus.Proposed,
+                CreatedAt = now.AddHours(-2),
                 UpdatedAt = now
             });
         }
@@ -1378,18 +1669,24 @@ public class TripService : ITripService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // 10. Update Trip Statuses
-        var trip1 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip1Id, cancellationToken);
-        if (trip1 != null)
+        if (!existingTrips.Any(t => t.TripId == trip1Id))
         {
-            trip1.Status = TripStatus.InTransit;
-            trip1.UpdatedAt = now;
+            var trip1 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip1Id, cancellationToken);
+            if (trip1 != null)
+            {
+                trip1.Status = TripStatus.InTransit;
+                trip1.UpdatedAt = now;
+            }
         }
 
-        var trip3 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip3Id, cancellationToken);
-        if (trip3 != null)
+        if (!existingTrips.Any(t => t.TripId == trip3Id))
         {
-            trip3.Status = TripStatus.Delivered;
-            trip3.UpdatedAt = now;
+            var trip3 = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == trip3Id, cancellationToken);
+            if (trip3 != null)
+            {
+                trip3.Status = TripStatus.Delivered;
+                trip3.UpdatedAt = now;
+            }
         }
 
         // 11. Timeline Events

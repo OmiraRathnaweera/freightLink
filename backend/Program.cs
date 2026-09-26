@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CloudinaryDotNet;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
@@ -34,7 +35,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        // Global fallback so every enum property serializes/deserializes as its string name
+        // (e.g. "Pending") rather than the default numeric value, matching the frontend/mobile
+        // clients' expectations everywhere — DTOs that already carry an explicit
+        // [JsonConverter(typeof(JsonStringEnumConverter))] attribute are unaffected either way.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     })
     .ConfigureApiBehaviorOptions(options =>
     {
@@ -73,7 +78,7 @@ builder.Services.AddSwaggerGen(options =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Paste only the raw access token (no \"Bearer \" prefix) â€” Swagger UI adds it for you."
+        Description = "Paste only the raw access token (no \"Bearer \" prefix) — Swagger UI adds it for you."
     });
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -88,24 +93,25 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Connection string comes only from ConnectionStrings:DefaultConnection (env var
-// CONNECTIONSTRINGS__DEFAULTCONNECTION) â€” never hardcoded in appsettings.json. The mixed-case
+// CONNECTIONSTRINGS__DEFAULTCONNECTION) — never hardcoded in appsettings.json. The mixed-case
 // section/key names here vs. .env.example's SCREAMING_CASE are not a mismatch to fix: ASP.NET
 // Core's environment-variable configuration provider maps "__" to ":" and every configuration
 // lookup (GetSection, GetConnectionString, the [] indexer) is case-insensitive by design, so
 // "ConnectionStrings:DefaultConnection" and "CONNECTIONSTRINGS__DEFAULTCONNECTION" are the same
-// key â€” deliberately keeping C# lookups in the PascalCase that matches the bound POCO property
+// key — deliberately keeping C# lookups in the PascalCase that matches the bound POCO property
 // names (e.g. JwtOptions.Issuer below), rather than forcing ALL-CAPS C# to visually match the env
 // var spelling, which the "__"-to-":" translation would make misleading anyway.
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
+// JWT settings (Jwt:* / JWT__* env vars) used both to bind JwtOptions for DI and, immediately
+// below, to configure the JwtBearer handler's signing-key/issuer/audience validation. Same
+// case-insensitive "__"-to-":" mapping as the connection string above.
 var jwtSection = builder.Configuration.GetSection("Jwt");
 builder.Services.Configure<JwtOptions>(jwtSection);
 var jwtOptions = jwtSection.Get<JwtOptions>() ?? new JwtOptions();
 
-// Microsoft.IdentityModel.Tokens enforces a minimum 256-bit (32-byte) key for HS256 signing â€”
+// Microsoft.IdentityModel.Tokens enforces a minimum 256-bit (32-byte) key for HS256 signing —
 // a shorter JWT__KEY doesn't fail here, it fails later inside TokenService.GenerateAccessToken
 // on the first successful login, surfacing as an opaque 500. Fail fast at startup instead.
 const int minimumJwtKeyBytes = 32;
@@ -125,7 +131,7 @@ builder.Services.Configure<AdminSeedOptions>(options =>
     options.Password = builder.Configuration["ADMIN_USER_PASSWORD"];
 });
 
-// Shared secret for internal-only, non-JWT endpoints (e.g. POST /internal/pricing/estimate) â€”
+// Shared secret for internal-only, non-JWT endpoints (e.g. POST /internal/pricing/estimate) —
 // same flat-key pattern as the admin-seed credentials above.
 builder.Services.Configure<InternalApiOptions>(options =>
 {
@@ -189,7 +195,7 @@ builder.Services
         };
 
         // Without these, a missing/invalid/expired token or a failed role/policy check is handled
-        // directly by the JwtBearer/authorization middleware â€” never as a thrown exception â€” so it
+        // directly by the JwtBearer/authorization middleware — never as a thrown exception — so it
         // bypasses ExceptionHandlingMiddleware entirely and falls back to ASP.NET's bare,
         // envelope-less default response instead of this project's standard error shape.
         options.Events = new JwtBearerEvents
@@ -209,7 +215,7 @@ builder.Services
     });
 
 // Comma-separated CORS_ORIGINS (e.g. "http://localhost:5173,http://localhost:3000") is the only
-// source for allowed origins â€” no wildcard fallback, so an empty/unset value denies all cross-origin
+// source for allowed origins — no wildcard fallback, so an empty/unset value denies all cross-origin
 // requests rather than silently allowing everything.
 const string corsPolicyName = "ConfiguredOrigins";
 var corsOrigins = (builder.Configuration["CORS_ORIGINS"] ?? string.Empty)
@@ -219,9 +225,30 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(corsPolicyName, policy =>
     {
-        policy.WithOrigins(corsOrigins)
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin)) return false;
+                try
+                {
+                    var uri = new Uri(origin);
+                    return uri.Host == "localhost" || uri.Host == "127.0.0.1" || corsOrigins.Contains(origin);
+                }
+                catch
+                {
+                    return false;
+                }
+            })
             .AllowAnyHeader()
             .AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
     });
 });
 
@@ -242,13 +269,15 @@ builder.Services.AddScoped<IPayHereService, PayHereService>();
 builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
+builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 builder.Services.AddScoped<ITripService, TripService>();
-builder.Services.AddScoped<IRouteService, RouteService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IRouteService, RouteService>();
 
 var app = builder.Build();
 
-// CORS_ORIGINS resolving to zero origins is a deliberate deny-all, not a bug â€” but it's also the
+// CORS_ORIGINS resolving to zero origins is a deliberate deny-all, not a bug — but it's also the
 // one CORS_ORIGINS outcome that produces no server-side signal at all: every symptom shows up only
 // as a browser-side CORS error on the client, with nothing in the API's own logs to point at the
 // actual cause. A single startup-time log line closes that gap without changing the deny-all
@@ -256,7 +285,7 @@ var app = builder.Build();
 if (corsOrigins.Length == 0)
 {
     app.Logger.LogWarning(
-        "CORS_ORIGINS is unset or empty â€” the '{PolicyName}' policy allows zero origins, so every " +
+        "CORS_ORIGINS is unset or empty — the '{PolicyName}' policy allows zero origins, so every " +
         "cross-origin browser request will be rejected. Set CORS_ORIGINS to a comma-separated list " +
         "(e.g. \"http://localhost:5173,http://localhost:3000\") if browser clients need to reach this API.",
         corsPolicyName);
@@ -269,7 +298,7 @@ else
 }
 
 // Apply any pending EF Core migrations once at startup outside Production. Migrate() only
-// applies migrations not yet recorded in __EFMigrationsHistory â€” it never drops/recreates
+// applies migrations not yet recorded in __EFMigrationsHistory — it never drops/recreates
 // existing tables. Production schema changes are a separate, deliberate manual step.
 if (!app.Environment.IsProduction())
 {
@@ -278,12 +307,17 @@ if (!app.Environment.IsProduction())
     db.Database.Migrate();
 }
 
-// Seed the default Admin account (from ADMIN_USER_EMAIL/ADMIN_USER_PASSWORD) once per startup,
-// in every environment â€” there is no public admin registration endpoint.
+// Seed the default Admin account, active carrier agencies, and pricing configuration once per startup.
 using (var seedScope = app.Services.CreateScope())
 {
     var authService = seedScope.ServiceProvider.GetRequiredService<IAuthService>();
     await authService.SeedAdminIfNotExistsAsync();
+
+    var agencyService = seedScope.ServiceProvider.GetRequiredService<IAgencyService>();
+    await agencyService.SeedDefaultAgenciesIfNotExistsAsync();
+
+    var pricingConfigService = seedScope.ServiceProvider.GetRequiredService<IPricingConfigService>();
+    await pricingConfigService.SeedDefaultPricingConfigIfNotExistsAsync();
 }
 
 // Configure the HTTP request pipeline.
@@ -295,12 +329,20 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Skipped only in Development: local/sandbox clients (e.g. the PayHere webhook callback, which
+// posts to a localhost NOTIFYURL — see .env.example) hit this API over plain HTTP, and the
+// redirect was breaking that flow. Staging/Production still enforce HTTPS.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors(corsPolicyName);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "freightlink-backend" }));
 
 app.MapControllers();
 
@@ -308,7 +350,7 @@ app.Run();
 
 /// <summary>
 /// Writes the standard <c>{ "error": { code, message } }</c> envelope directly to an in-flight
-/// authentication/authorization response â€” used by the <c>JwtBearerEvents</c> handlers above,
+/// authentication/authorization response — used by the <c>JwtBearerEvents</c> handlers above,
 /// which run outside <see cref="FreightLink.Api.Middleware.ExceptionHandlingMiddleware"/>'s
 /// exception-catching scope since no exception is thrown for a 401/403 auth failure.
 /// </summary>
@@ -335,4 +377,3 @@ static async Task WriteAuthErrorAsync(HttpResponse response, int statusCode, Err
 /// <c>WebApplicationFactory&lt;Program&gt;</c> in the integration test project.
 /// </summary>
 public partial class Program;
-

@@ -65,7 +65,7 @@ public static class LoadStatusTransitionRules
         {
             [LoadStatus.Draft] = new HashSet<LoadStatus> { LoadStatus.Posted, LoadStatus.Cancelled },
             [LoadStatus.Posted] = new HashSet<LoadStatus> { LoadStatus.Matched, LoadStatus.Cancelled },
-            [LoadStatus.Matched] = new HashSet<LoadStatus> { LoadStatus.InTransit, LoadStatus.Cancelled },
+            [LoadStatus.Matched] = new HashSet<LoadStatus> { LoadStatus.InTransit, LoadStatus.Cancelled, LoadStatus.Posted },
             [LoadStatus.InTransit] = new HashSet<LoadStatus> { LoadStatus.Delivered },
             [LoadStatus.Delivered] = new HashSet<LoadStatus> { LoadStatus.Closed },
             [LoadStatus.Closed] = new HashSet<LoadStatus>(),
@@ -96,7 +96,7 @@ public static class LoadStatusTransitionRules
     /// </summary>
     /// <param name="currentStatus">The load's current status.</param>
     /// <returns><c>true</c> if a transition to <see cref="LoadStatus.Posted"/> is allowed from this status.</returns>
-    public static bool CanPublish(LoadStatus currentStatus) => CanTransition(currentStatus, LoadStatus.Posted);
+    public static bool CanPublish(LoadStatus currentStatus) => currentStatus == LoadStatus.Draft;
 
     /// <summary>Whether a direct transition from <paramref name="from"/> to <paramref name="to"/> is allowed.</summary>
     /// <param name="from">The load's current status.</param>

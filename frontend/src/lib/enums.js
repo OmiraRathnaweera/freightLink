@@ -52,6 +52,15 @@ export const VehicleStatus = Object.freeze({
   INACTIVE: 'Inactive',
 })
 
+// Physical body/chassis type of a fleet vehicle (matches backend VehicleType enum).
+export const VehicleType = Object.freeze({
+  LORRY: 'Lorry',
+  CONTAINER: 'Container',
+  REFRIGERATED: 'Refrigerated',
+  FLAT_BED: 'FlatBed',
+  TIPPER: 'Tipper',
+})
+
 // Employment/availability state of a driver.
 export const DriverStatus = Object.freeze({
   ACTIVE: 'Active',
@@ -59,11 +68,24 @@ export const DriverStatus = Object.freeze({
   SUSPENDED: 'Suspended',
 })
 
-// Validity state of a compliance document (license, insurance, etc.).
+// Review state of a compliance document (license, insurance, etc.), set by
+// the admin verification-queue workflow. Matches the backend's
+// ComplianceDocStatus enum exactly — this previously drifted (Valid/
+// Expiring/Expired) from what the API actually returns.
 export const ComplianceDocStatus = Object.freeze({
-  VALID: 'Valid',
-  EXPIRING: 'Expiring',
+  PENDING: 'Pending',
+  VERIFIED: 'Verified',
+  REJECTED: 'Rejected',
   EXPIRED: 'Expired',
+})
+
+// Kind of regulatory document an agency uploads for compliance review.
+export const ComplianceDocType = Object.freeze({
+  BUSINESS_REGISTRATION: 'BusinessRegistration',
+  VEHICLE_INSURANCE: 'VehicleInsurance',
+  REVENUE_LICENCE: 'RevenueLicence',
+  GOODS_TRANSPORT_PERMIT: 'GoodsTransportPermit',
+  OTHER: 'Other',
 })
 
 // --- Component C: Matching & Trip ---

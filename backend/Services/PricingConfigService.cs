@@ -610,4 +610,162 @@ public class PricingConfigService : IPricingConfigService
         DeletedAt = config.DeletedAt,
         DeletedByUserId = config.DeletedByUserId
     };
+
+    /// <inheritdoc />
+    public async Task SeedDefaultPricingConfigIfNotExistsAsync(CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var adminUser = await _dbContext.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Role == UserRole.Admin, cancellationToken);
+            var actingUserId = adminUser?.UserId ?? Guid.NewGuid();
+
+            // 1. Seed Fuel Price Rate (AutoDiesel)
+            var hasFuelPrice = await _dbContext.FuelPriceRates
+                .AnyAsync(f => f.DeletedAt == null && f.EffectiveFrom <= now, cancellationToken);
+
+            if (!hasFuelPrice)
+            {
+                _dbContext.FuelPriceRates.Add(new FuelPriceRate
+                {
+                    FuelPriceRateId = Guid.NewGuid(),
+                    FuelType = FuelType.AutoDiesel,
+                    PricePerLitre = 350m,
+                    Source = "CPC Market Reference Rate (Seeded)",
+                    EffectiveFrom = now,
+                    SetByUserId = actingUserId,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+
+            // 2. Seed Pricing Formula Config
+            var hasFormulaConfig = await _dbContext.PricingFormulaConfigs
+                .AnyAsync(f => f.DeletedAt == null && f.EffectiveFrom <= now, cancellationToken);
+
+            if (!hasFormulaConfig)
+            {
+                _dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
+                {
+                    PricingFormulaConfigId = Guid.NewGuid(),
+                    BaseFare = 5000m,
+                    RatePerKg = 2m,
+                    DriverCostPerKm = 25m,
+                    MaintenanceAllowancePerKm = 15m,
+                    MarginPercent = 0.15m,
+                    Source = "ADR-015 Standard Rate Matrix (Seeded)",
+                    EffectiveFrom = now,
+                    SetByUserId = actingUserId,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+
+            // 3. Seed Vehicle Class Efficiencies (MiniTruck, MediumLorry, ContainerTruck)
+            var existingClasses = await _dbContext.VehicleClassEfficiencies
+                .Where(v => v.DeletedAt == null && v.EffectiveFrom <= now)
+                .Select(v => v.ClassLabel)
+                .ToListAsync(cancellationToken);
+
+            if (existingClasses.Count == 0)
+            {
+                _dbContext.VehicleClassEfficiencies.AddRange(
+                    new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.MiniTruck,
+                        MinPayloadKg = 0m,
+                        MaxPayloadKg = 1500m,
+                        MinVolumeM3 = 0m,
+                        MaxVolumeM3 = 6m,
+                        FuelConsumptionLPer100Km = 10m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    },
+                    new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.MediumLorry,
+                        MinPayloadKg = 1500m,
+                        MaxPayloadKg = 10000m,
+                        MinVolumeM3 = 6m,
+                        MaxVolumeM3 = 25m,
+                        FuelConsumptionLPer100Km = 18m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    },
+                    new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.ContainerTruck,
+                        MinPayloadKg = 10000m,
+                        MaxPayloadKg = null,
+                        MinVolumeM3 = 25m,
+                        MaxVolumeM3 = null,
+                        FuelConsumptionLPer100Km = 30m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    }
+                );
+            }
+            else
+            {
+                // If only partial classes exist, ensure MediumLorry and ContainerTruck are present
+                if (!existingClasses.Contains(VehicleClass.MediumLorry))
+                {
+                    _dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.MediumLorry,
+                        MinPayloadKg = 1500m,
+                        MaxPayloadKg = 10000m,
+                        MinVolumeM3 = 6m,
+                        MaxVolumeM3 = 25m,
+                        FuelConsumptionLPer100Km = 18m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    });
+                }
+
+                if (!existingClasses.Contains(VehicleClass.ContainerTruck))
+                {
+                    _dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.ContainerTruck,
+                        MinPayloadKg = 10000m,
+                        MaxPayloadKg = null,
+                        MinVolumeM3 = 25m,
+                        MaxVolumeM3 = null,
+                        FuelConsumptionLPer100Km = 30m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    });
+                }
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
 }

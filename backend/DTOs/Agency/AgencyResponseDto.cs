@@ -11,6 +11,9 @@ public class AgencyResponseDto
     public decimal YardLat { get; set; }
     public decimal YardLng { get; set; }
     public AgencyStatus Status { get; set; }
+    public int DriverCount { get; set; }
+    public int ActiveDriverCount { get; set; }
+    public int VehicleCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }
