@@ -217,6 +217,17 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Updates an existing driver's editable details.
+    /// </summary>
+    [HttpPut("{id:guid}/drivers/{driverId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<DriverResponseDto>> UpdateDriver(Guid id, Guid driverId, [FromBody] DriverUpdateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateDriverAsync(id, driverId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers),
     /// or for Admin to fetch an agency's fleet by specifying agencyId.
     /// </summary>

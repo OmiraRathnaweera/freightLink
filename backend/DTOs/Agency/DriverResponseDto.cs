@@ -1,3 +1,5 @@
+using FreightLink.Api.Entities.Enums;
+
 namespace FreightLink.Api.DTOs.Agency;
 
 /// <summary>
@@ -12,8 +14,7 @@ public class DriverResponseDto
     public string Email { get; set; } = string.Empty;
     public string LicenceNo { get; set; } = string.Empty;
     public DateOnly LicenceExpiry { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public bool IsActive { get; set; }
+    public DriverStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 }

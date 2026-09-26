@@ -89,6 +89,11 @@ public interface IAgencyService
     Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CreateDriverRequestDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Updates an existing driver's editable details.
+    /// </summary>
+    Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves full fleet resources (vehicles and drivers) for an agency.
     /// </summary>
     Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);

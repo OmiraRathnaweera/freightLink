@@ -16,7 +16,9 @@ import '../../features/agencies/screens/agency_profile_screen.dart';
 import '../../features/agencies/screens/fleet_list_screen.dart';
 import '../../features/agencies/screens/add_vehicle_screen.dart';
 import '../../features/agencies/screens/driver_onboarding_screen.dart';
+import '../../features/agencies/screens/add_driver_screen.dart';
 import '../../features/agencies/screens/compliance_docs_screen.dart';
+import '../../features/agencies/screens/add_compliance_doc_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorDashboardKey = GlobalKey<NavigatorState>();
@@ -105,11 +107,23 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                   ),
                   GoRoute(
                     path: 'driver-onboarding',
-                    builder: (context, state) => const DriverOnboardingScreen(),
+                    builder: (context, state) => const DriverListScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'add',
+                        builder: (context, state) => const AddDriverScreen(),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'compliance-docs',
                     builder: (context, state) => const ComplianceDocsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'add',
+                        builder: (context, state) => const AddComplianceDocScreen(),
+                      ),
+                    ],
                   ),
                 ],
               ),

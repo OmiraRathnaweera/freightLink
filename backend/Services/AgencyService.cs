@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using FreightLink.Api.Common.Domain;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
@@ -482,6 +482,57 @@ public class AgencyService : IAgencyService
         };
     }
 
+    /// <inheritdoc />
+    public async Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var driver = await _dbContext.Drivers
+            .Include(d => d.User)
+            .FirstOrDefaultAsync(d => d.DriverId == driverId && d.AgencyId == agencyId, cancellationToken);
+
+        if (driver == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DRIVER_NOT_FOUND, "Driver not found.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+        {
+            driver.User.FullName = request.FullName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.LicenceNo) && request.LicenceNo != driver.LicenceNo)
+        {
+            var licenceExists = await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo && d.DriverId != driverId, cancellationToken);
+            if (licenceExists)
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LICENCE_ALREADY_REGISTERED, "License number is already registered.");
+            }
+            driver.LicenceNo = request.LicenceNo;
+        }
+
+        if (request.LicenceExpiry.HasValue)
+        {
+            driver.LicenceExpiry = request.LicenceExpiry.Value;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = driver.UserId,
+            AgencyId = driver.AgencyId,
+            Email = driver.User.Email,
+            FullName = driver.User.FullName,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
+    }
+
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {
         if (currentUserRole == UserRole.Admin)
@@ -548,8 +599,7 @@ public class AgencyService : IAgencyService
             Email = d.User?.Email ?? string.Empty,
             LicenceNo = d.LicenceNo,
             LicenceExpiry = d.LicenceExpiry,
-            Status = d.Status.ToString(),
-            IsActive = d.Status == DriverStatus.Active,
+            Status = d.Status,
             CreatedAt = d.CreatedAt,
             UpdatedAt = d.UpdatedAt
         }).ToList();
@@ -637,8 +687,7 @@ public class AgencyService : IAgencyService
             Email = user.Email,
             LicenceNo = driver.LicenceNo,
             LicenceExpiry = driver.LicenceExpiry,
-            Status = driver.Status.ToString(),
-            IsActive = true,
+            Status = driver.Status,
             CreatedAt = driver.CreatedAt,
             UpdatedAt = driver.UpdatedAt
         };

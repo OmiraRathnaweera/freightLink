@@ -23,6 +23,9 @@ public enum ErrorCode
     /// <summary>Agency registration was attempted with a business registration number already on file.</summary>
     BUSINESS_REG_NO_ALREADY_REGISTERED,
 
+    /// <summary>Driver registration was attempted with a license number already on file.</summary>
+    LICENCE_ALREADY_REGISTERED,
+
     /// <summary>The supplied refresh token is unknown, revoked, or expired.</summary>
     INVALID_REFRESH_TOKEN,
 
