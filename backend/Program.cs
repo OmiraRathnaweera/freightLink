@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using CloudinaryDotNet;
 using DotNetEnv;
@@ -132,9 +132,26 @@ builder.Services.Configure<InternalApiOptions>(options =>
     options.ApiKey = builder.Configuration["INTERNAL_API_KEY"];
 });
 
-// Cloudinary settings (Cloudinary:* / CLOUDINARY__* env vars). Same case-insensitive "__"-to-":"
-// mapping as the other sections above.
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
+
+// PayHere settings (PayHere:* / PAYHERE__* env vars or flat PAYHERE_* env vars).
+builder.Services.Configure<PayHereOptions>(options =>
+{
+    builder.Configuration.GetSection(PayHereOptions.SectionName).Bind(options);
+
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_MERCHANT_ID"]))
+        options.MerchantId = builder.Configuration["PAYHERE_MERCHANT_ID"]!;
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_MERCHANT_SECRET"]))
+        options.MerchantSecret = builder.Configuration["PAYHERE_MERCHANT_SECRET"]!;
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_ENV"]))
+        options.Env = builder.Configuration["PAYHERE_ENV"]!;
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_RETURN_URL"]))
+        options.ReturnUrl = builder.Configuration["PAYHERE_RETURN_URL"]!;
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_CANCEL_URL"]))
+        options.CancelUrl = builder.Configuration["PAYHERE_CANCEL_URL"]!;
+    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_NOTIFY_URL"]))
+        options.NotifyUrl = builder.Configuration["PAYHERE_NOTIFY_URL"]!;
+});
 
 // Email settings (Email:* / EMAIL__* env vars) for GmailEmailService. Only validated when
 // EMAIL__ENABLED is true — mirrors the JWT key-length fail-fast above, but is itself opt-in since
@@ -221,6 +238,7 @@ builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IPayHereService, PayHereService>();
 builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();

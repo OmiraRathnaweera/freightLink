@@ -7,5 +7,6 @@ public enum InvoiceStatus
     PaymentPending,
     Paid,
     Failed,
-    Void
+    Void,
+    Voided = Void
 }
