@@ -6,7 +6,7 @@ import Dropzone from '../../../components/Dropzone.jsx'
 import Input from '../../../components/Input.jsx'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
 import { useUploadFileMutation } from '../../loads/api/loadsApi.js'
-import { useAddComplianceDocMutation } from '../api/agencyApi.js'
+import { useAddComplianceDocMutation, useUpdateComplianceDocMutation } from '../api/agencyApi.js'
 
 /**
  * Modal dialog for uploading/replacing compliance documents using Dropzone.
@@ -30,6 +30,7 @@ export default function UploadComplianceDocModal({
 
   const uploadFile = useUploadFileMutation()
   const addDoc = useAddComplianceDocMutation()
+  const updateDoc = useUpdateComplianceDocMutation()
 
   useEscapeKey(isOpen, handleClose)
 
@@ -41,7 +42,7 @@ export default function UploadComplianceDocModal({
     onClose()
   }
 
-  const isSubmitting = uploadFile.isPending || addDoc.isPending
+  const isSubmitting = uploadFile.isPending || addDoc.isPending || updateDoc.isPending
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -66,15 +67,27 @@ export default function UploadComplianceDocModal({
         throw new Error('File upload completed, but no storage identifier was returned.')
       }
 
-      await addDoc.mutateAsync({
-        agencyId,
-        doc: {
-          publicId,
-          docType: docTypeInfo.id,
-          docNumber: trimmedDocNumber,
-          issuedOn: new Date().toISOString().split('T')[0],
-        },
-      })
+      if (existingDoc?.complianceDocId) {
+        await updateDoc.mutateAsync({
+          agencyId,
+          docId: existingDoc.complianceDocId,
+          doc: {
+            publicId,
+            docNumber: trimmedDocNumber,
+            issuedOn: new Date().toISOString().split('T')[0],
+          },
+        })
+      } else {
+        await addDoc.mutateAsync({
+          agencyId,
+          doc: {
+            publicId,
+            docType: docTypeInfo.id,
+            docNumber: trimmedDocNumber,
+            issuedOn: new Date().toISOString().split('T')[0],
+          },
+        })
+      }
 
       toast.success(`${docTypeInfo.title} uploaded successfully!`)
       handleClose()

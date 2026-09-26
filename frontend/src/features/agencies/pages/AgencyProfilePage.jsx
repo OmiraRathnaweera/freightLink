@@ -1,16 +1,5 @@
 import { useMemo, useState } from 'react'
-import {
-  Building2,
-  CheckCircle2,
-  Clock,
-  ExternalLink,
-  FileCheck2,
-  FileText,
-  MapPin,
-  ShieldCheck,
-  Truck,
-  UploadCloud,
-} from 'lucide-react'
+import { Building2, CheckCircle2, Clock, ExternalLink, MapPin, UploadCloud } from 'lucide-react'
 import Button from '../../../components/Button.jsx'
 import Card from '../../../components/Card.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
@@ -20,50 +9,9 @@ import {
   useAgencyQuery,
   useComplianceDocsQuery,
 } from '../api/agencyApi.js'
+import { COMPLIANCE_DOC_TYPES } from '../lib/complianceDocTypes.js'
+import { getFileUrl } from '../../../lib/api/fileUrl.js'
 import UploadComplianceDocModal from '../components/UploadComplianceDocModal.jsx'
-
-const COMPLIANCE_DOC_TYPES = [
-  {
-    id: 'BusinessRegistration',
-    title: 'Business Registration',
-    shortTitle: 'Business Reg',
-    description: 'Certificate of Incorporation or Business Registration license.',
-    icon: Building2,
-    mandatory: true,
-  },
-  {
-    id: 'VehicleInsurance',
-    title: 'Fleet Insurance Policy',
-    shortTitle: 'Insurance',
-    description: 'Comprehensive commercial vehicle & goods-in-transit liability coverage.',
-    icon: ShieldCheck,
-    mandatory: true,
-  },
-  {
-    id: 'RevenueLicence',
-    title: 'Revenue Licence',
-    shortTitle: 'Revenue Licence',
-    description: 'Annual valid commercial motor traffic revenue license permit.',
-    icon: FileCheck2,
-    mandatory: true,
-  },
-  {
-    id: 'GoodsTransportPermit',
-    title: 'Goods Transport Permit',
-    shortTitle: 'Transport Permit',
-    description: 'Provincial / national freight transportation and carriage permit.',
-    icon: Truck,
-    mandatory: true,
-  },
-  {
-    id: 'Other',
-    title: 'Additional Documentation',
-    shortTitle: 'Additional Doc',
-    description: 'Tax clearance certificates, environmental permits, or safety records.',
-    icon: FileText,
-    mandatory: false,
-  },
-]
 
 export default function AgencyProfilePage() {
   const { data: user, isLoading: userLoading } = useCurrentUserQuery()
@@ -317,9 +265,20 @@ export default function AgencyProfilePage() {
                           {(matchingDoc.storageKey || matchingDoc.publicId) && (
                             <div className="pt-1 text-right">
                               <a
-                                href={matchingDoc.storageKey || `#`}
-                                target="_blank"
+                                href={getFileUrl(matchingDoc.storageKey || matchingDoc.publicId)}
+                                target="popup"
                                 rel="noreferrer"
+                                onClick={(e) => {
+                                  const url = getFileUrl(matchingDoc.storageKey || matchingDoc.publicId)
+                                  const popup = window.open(
+                                    url,
+                                    'popup',
+                                    'width=900,height=800,scrollbars=yes,resizable=yes',
+                                  )
+                                  if (popup) {
+                                    e.preventDefault()
+                                  }
+                                }}
                                 className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
                               >
                                 <span>View File</span>

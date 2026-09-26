@@ -59,11 +59,24 @@ export const DriverStatus = Object.freeze({
   SUSPENDED: 'Suspended',
 })
 
-// Validity state of a compliance document (license, insurance, etc.).
+// Review state of a compliance document (license, insurance, etc.), set by
+// the admin verification-queue workflow. Matches the backend's
+// ComplianceDocStatus enum exactly — this previously drifted (Valid/
+// Expiring/Expired) from what the API actually returns.
 export const ComplianceDocStatus = Object.freeze({
-  VALID: 'Valid',
-  EXPIRING: 'Expiring',
+  PENDING: 'Pending',
+  VERIFIED: 'Verified',
+  REJECTED: 'Rejected',
   EXPIRED: 'Expired',
+})
+
+// Kind of regulatory document an agency uploads for compliance review.
+export const ComplianceDocType = Object.freeze({
+  BUSINESS_REGISTRATION: 'BusinessRegistration',
+  VEHICLE_INSURANCE: 'VehicleInsurance',
+  REVENUE_LICENCE: 'RevenueLicence',
+  GOODS_TRANSPORT_PERMIT: 'GoodsTransportPermit',
+  OTHER: 'Other',
 })
 
 // --- Component C: Matching & Trip ---

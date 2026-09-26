@@ -83,6 +83,23 @@ export function useSuspendAgencyMutation(options) {
   })
 }
 
+/**
+ * GET /agencies/verification-queue
+ * Admin-only: every Pending agency bundled with the compliance documents it
+ * has uploaded so far, in one call — avoids an N+1 round-trip per agency.
+ */
+export async function getVerificationQueue() {
+  return api.get('/agencies/verification-queue')
+}
+
+export function useVerificationQueueQuery(options) {
+  return useQuery({
+    queryKey: ['agencies', 'verification-queue'],
+    queryFn: getVerificationQueue,
+    ...options,
+  })
+}
+
 
 export async function getComplianceDocs(agencyId) {
   return api.get(`/agencies/${agencyId}/compliance-docs`)
@@ -90,6 +107,16 @@ export async function getComplianceDocs(agencyId) {
 
 export async function addComplianceDoc({ agencyId, doc }) {
   return api.post(`/agencies/${agencyId}/compliance-docs`, doc)
+}
+
+/**
+ * PUT /agencies/{id}/compliance-docs/{docId}
+ * Replaces an existing document's file/number/dates in place (re-upload/renewal), rather than
+ * inserting a new row — reusing addComplianceDoc for this would 500 while the existing document
+ * is still Pending/Verified (one-live-document-per-type constraint).
+ */
+export async function updateComplianceDoc({ agencyId, docId, doc }) {
+  return api.put(`/agencies/${agencyId}/compliance-docs/${docId}`, doc)
 }
 
 export async function getVehicles(agencyId) {
@@ -115,6 +142,53 @@ export function useAddComplianceDocMutation(options) {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'compliance-docs'] })
     },
+    ...options
+  })
+}
+
+export function useUpdateComplianceDocMutation(options) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateComplianceDoc,
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'compliance-docs'] })
+    },
+    ...options
+  })
+}
+
+/**
+ * POST /agencies/{id}/compliance-docs/{docId}/verify
+ * POST /agencies/{id}/compliance-docs/{docId}/reject
+ * Admin-only: moves a Pending compliance document to Verified/Rejected.
+ */
+export async function verifyComplianceDoc({ agencyId, docId }) {
+  return api.post(`/agencies/${agencyId}/compliance-docs/${docId}/verify`)
+}
+
+export async function rejectComplianceDoc({ agencyId, docId }) {
+  return api.post(`/agencies/${agencyId}/compliance-docs/${docId}/reject`)
+}
+
+function invalidateComplianceDocQueries(queryClient, agencyId) {
+  queryClient.invalidateQueries({ queryKey: ['agencies', agencyId, 'compliance-docs'] })
+  queryClient.invalidateQueries({ queryKey: ['agencies', 'verification-queue'] })
+}
+
+export function useVerifyComplianceDocMutation(options) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: verifyComplianceDoc,
+    onSuccess: (data, variables) => invalidateComplianceDocQueries(queryClient, variables.agencyId),
+    ...options
+  })
+}
+
+export function useRejectComplianceDocMutation(options) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: rejectComplianceDoc,
+    onSuccess: (data, variables) => invalidateComplianceDocQueries(queryClient, variables.agencyId),
     ...options
   })
 }

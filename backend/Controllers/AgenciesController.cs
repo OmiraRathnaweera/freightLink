@@ -72,6 +72,18 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves every Pending agency together with the compliance documents it has uploaded so far,
+    /// for the admin verification queue.
+    /// </summary>
+    [HttpGet("verification-queue")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IEnumerable<AgencyVerificationQueueItemDto>>> GetVerificationQueue(CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetVerificationQueueAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Updates an existing agency's profile details.
     /// </summary>
     [HttpPut("{id:guid}")]
@@ -128,6 +140,38 @@ public class AgenciesController : ControllerBase
     public async Task<ActionResult<IEnumerable<ComplianceDocResponseDto>>> GetComplianceDocs(Guid id, CancellationToken cancellationToken)
     {
         var result = await _agencyService.GetComplianceDocsAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Replaces an existing compliance document's file/number/dates in place (e.g. re-uploading after
+    /// a rejection, or renewing an expiring document). Resets the document back to Pending for
+    /// re-verification. Distinct from <see cref="AddComplianceDoc"/>, which always inserts a new row
+    /// and would collide with the one-live-document-per-type constraint if reused for replacement.
+    /// </summary>
+    [HttpPut("{id:guid}/compliance-docs/{docId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> UpdateComplianceDoc(Guid id, Guid docId, [FromBody] ComplianceDocUpdateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only: marks a Pending compliance document as Verified.</summary>
+    [HttpPost("{id:guid}/compliance-docs/{docId:guid}/verify")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> VerifyComplianceDoc(Guid id, Guid docId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.VerifyComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only: marks a Pending compliance document as Rejected.</summary>
+    [HttpPost("{id:guid}/compliance-docs/{docId:guid}/reject")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> RejectComplianceDoc(Guid id, Guid docId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.RejectComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 

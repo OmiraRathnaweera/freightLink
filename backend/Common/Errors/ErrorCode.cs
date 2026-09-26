@@ -38,6 +38,12 @@ public enum ErrorCode
     /// <summary>The agency exists but does not belong to the authenticated caller.</summary>
     AGENCY_NOT_OWNED,
 
+    /// <summary>No <c>ComplianceDoc</c> exists with the requested id under the given agency.</summary>
+    COMPLIANCE_DOC_NOT_FOUND,
+
+    /// <summary>An admin attempted to verify/reject a compliance document that is not currently Pending.</summary>
+    INVALID_COMPLIANCE_DOC_STATUS_TRANSITION,
+
     /// <summary>The requested load could not be found.</summary>
     LOAD_NOT_FOUND,
 

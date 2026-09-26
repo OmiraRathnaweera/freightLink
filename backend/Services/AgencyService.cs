@@ -173,6 +173,25 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
+    public async Task<IEnumerable<AgencyVerificationQueueItemDto>> GetVerificationQueueAsync(CancellationToken cancellationToken = default)
+    {
+        var agencies = await _dbContext.Agencies
+            .Include(a => a.ComplianceDocs)
+            .Where(a => a.Status == AgencyStatus.Pending)
+            .AsNoTracking()
+            .OrderBy(a => a.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return agencies.Select(a => new AgencyVerificationQueueItemDto
+        {
+            Agency = MapToResponse(a),
+            ComplianceDocs = a.ComplianceDocs
+                .OrderByDescending(d => d.CreatedAt)
+                .Select(MapToComplianceDocResponse)
+        });
+    }
+
+    /// <inheritdoc />
     public async Task<AgencyResponseDto> UpdateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, AgencyUpdateDto request, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
@@ -304,17 +323,90 @@ public class AgencyService : IAgencyService
         _dbContext.ComplianceDocs.Add(doc);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return new ComplianceDocResponseDto
-        {
-            ComplianceDocId = doc.ComplianceDocId,
-            DocType = doc.DocType,
-            DocNumber = doc.DocNumber,
-            StorageKey = doc.StorageKey,
-            IssuedOn = doc.IssuedOn,
-            ExpiresOn = doc.ExpiresOn,
-            Status = doc.Status
-        };
+        return MapToComplianceDocResponse(doc);
     }
+
+    /// <inheritdoc />
+    public async Task<ComplianceDocResponseDto> UpdateComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, ComplianceDocUpdateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var doc = await _dbContext.ComplianceDocs
+            .FirstOrDefaultAsync(d => d.ComplianceDocId == complianceDocId && d.AgencyId == agencyId, cancellationToken);
+
+        if (doc == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.COMPLIANCE_DOC_NOT_FOUND, "The requested compliance document could not be found.");
+        }
+
+        doc.StorageKey = request.PublicId;
+        doc.DocNumber = request.DocNumber;
+        doc.IssuedOn = request.IssuedOn;
+        doc.ExpiresOn = request.ExpiresOn;
+        // A replacement file must be re-verified by an admin, regardless of the document's previous status.
+        doc.Status = ComplianceDocStatus.Pending;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <inheritdoc />
+    public async Task<ComplianceDocResponseDto> VerifyComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        var doc = await GetComplianceDocForReviewAsync(agencyId, complianceDocId, currentUserRole, cancellationToken);
+        doc.Status = ComplianceDocStatus.Verified;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <inheritdoc />
+    public async Task<ComplianceDocResponseDto> RejectComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        var doc = await GetComplianceDocForReviewAsync(agencyId, complianceDocId, currentUserRole, cancellationToken);
+        doc.Status = ComplianceDocStatus.Rejected;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return MapToComplianceDocResponse(doc);
+    }
+
+    /// <summary>
+    /// Shared lookup/guard for the two admin review actions: only an Admin may call them, the document
+    /// must exist under the given agency, and it must currently be <c>Pending</c> — an already
+    /// verified/rejected document is not re-reviewable through this path.
+    /// </summary>
+    private async Task<ComplianceDoc> GetComplianceDocForReviewAsync(Guid agencyId, Guid complianceDocId, UserRole currentUserRole, CancellationToken cancellationToken)
+    {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can verify or reject compliance documents.");
+        }
+
+        var doc = await _dbContext.ComplianceDocs
+            .FirstOrDefaultAsync(d => d.ComplianceDocId == complianceDocId && d.AgencyId == agencyId, cancellationToken);
+
+        if (doc == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.COMPLIANCE_DOC_NOT_FOUND, "The requested compliance document could not be found.");
+        }
+
+        if (doc.Status != ComplianceDocStatus.Pending)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_COMPLIANCE_DOC_STATUS_TRANSITION, $"Only pending compliance documents can be reviewed (current status: '{doc.Status}').");
+        }
+
+        return doc;
+    }
+
+    private static ComplianceDocResponseDto MapToComplianceDocResponse(ComplianceDoc doc) => new()
+    {
+        ComplianceDocId = doc.ComplianceDocId,
+        DocType = doc.DocType,
+        DocNumber = doc.DocNumber,
+        StorageKey = doc.StorageKey,
+        IssuedOn = doc.IssuedOn,
+        ExpiresOn = doc.ExpiresOn,
+        Status = doc.Status
+    };
 
     public async Task<IEnumerable<ComplianceDocResponseDto>> GetComplianceDocsAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
