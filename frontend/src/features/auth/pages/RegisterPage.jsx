@@ -1,9 +1,40 @@
-import { useSearchParams, Link, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
-import { useRegisterAgencyMutation, useRegisterShipperMutation } from '../api/authApi.js'
-import Card from '../../../components/Card.jsx'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Form, Formik } from 'formik'
+import { ArrowRight, Building2, PackageCheck } from 'lucide-react'
+import { toast } from 'sonner'
 import Button from '../../../components/Button.jsx'
-import Input from '../../../components/Input.jsx'
+import Card from '../../../components/Card.jsx'
+import {
+  FormikPasswordField,
+  FormikSubmitButton,
+  FormikTextField,
+} from '../../../components/form/index.js'
+import { useRegisterAgencyMutation, useRegisterShipperMutation } from '../api/authApi.js'
+import { getAuthErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
+import { agencyRegisterSchema, shipperRegisterSchema } from '../lib/validationSchemas.js'
+
+const INITIAL_SHIPPER_VALUES = {
+  fullName: '',
+  email: '',
+  password: '',
+  phoneE164: '',
+  companyName: '',
+  businessRegNo: '',
+  billingAddress: '',
+}
+
+const INITIAL_AGENCY_VALUES = {
+  fullName: '',
+  email: '',
+  password: '',
+  phoneE164: '',
+  jobTitle: '',
+  agencyName: '',
+  businessRegNo: '',
+  yardAddress: '',
+  yardLat: '',
+  yardLng: '',
+}
 
 export default function RegisterPage() {
   const [searchParams] = useSearchParams()
@@ -17,121 +48,225 @@ export default function RegisterPage() {
     return <ShipperRegisterForm />
   }
 
-  // Placeholder for other roles or role selection
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4">
-      <Card className="max-w-md w-full p-8 text-center space-y-4">
-        <h1 className="text-2xl font-bold text-slate-900">Choose Account Type</h1>
-        <Button as={Link} to="/register?role=agency" className="w-full">
-          Join Agency Network
-        </Button>
-        <Button as={Link} to="/register?role=shipper" variant="secondary" className="w-full">
-          Register as Shipper
-        </Button>
-      </Card>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md rounded-md border border-slate-border bg-surface-container-lowest p-8 shadow-soft">
+        <div className="mb-8 text-center">
+          <h1 className="text-headline-lg font-bold text-primary">FreightLink</h1>
+          <h2 className="mt-2 text-body-md text-on-surface-variant">Choose your account type to register</h2>
+        </div>
+
+        <div className="space-y-4">
+          <Link
+            to="/register?role=shipper"
+            className="group block rounded-md border border-slate-border p-4 transition-all hover:border-primary hover:bg-surface-container-low"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-secondary-container text-on-secondary-container">
+                  <PackageCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-body-md font-semibold text-primary group-hover:text-primary">
+                    Register as Shipper
+                  </h2>
+                  <p className="text-body-sm text-on-surface-variant">
+                    Post loads, track shipments, and review AI matches
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-on-surface-variant group-hover:text-primary" />
+            </div>
+          </Link>
+
+          <Link
+            to="/register?role=agency"
+            className="group block rounded-md border border-slate-border p-4 transition-all hover:border-primary hover:bg-surface-container-low"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary-container text-on-primary">
+                  <Building2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-body-md font-semibold text-primary group-hover:text-primary">
+                    Join Agency Network
+                  </h2>
+                  <p className="text-body-sm text-on-surface-variant">
+                    Manage fleet, dispatch drivers, and receive proposals
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-on-surface-variant group-hover:text-primary" />
+            </div>
+          </Link>
+        </div>
+
+        <div className="mt-8 border-t border-slate-border pt-6 text-center">
+          <p className="text-body-md text-on-surface-variant">
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-status-blue-text hover:underline">
+              Sign In
+            </Link>
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
 function ShipperRegisterForm() {
   const navigate = useNavigate()
-  const registerMutation = useRegisterShipperMutation({
-    onSuccess: () => {
-      alert('Registration successful! Please login.')
+  const registerMutation = useRegisterShipperMutation()
+
+  const handleSubmit = async (values, { setErrors, setStatus, setSubmitting }) => {
+    setStatus(undefined)
+    try {
+      const payload = {
+        fullName: values.fullName.trim(),
+        email: values.email.trim(),
+        password: values.password,
+        companyName: values.companyName.trim(),
+        billingAddress: values.billingAddress.trim(),
+      }
+
+      if (values.phoneE164 && values.phoneE164.trim()) {
+        payload.phoneE164 = values.phoneE164.trim()
+      }
+
+      if (values.businessRegNo && values.businessRegNo.trim()) {
+        payload.businessRegNo = values.businessRegNo.trim()
+      }
+
+      await registerMutation.mutateAsync(payload)
+      toast.success('Registration successful! Please sign in with your credentials.')
       navigate('/login')
-    },
-    onError: (err) => {
-      alert(`Registration failed: ${err.message || 'Check your inputs and try again.'}`)
+    } catch (error) {
+      if (error?.code === 'VALIDATION_ERROR' && error?.details) {
+        setErrors(mapValidationDetailsToFormik(error.details))
+      }
+      setStatus(getAuthErrorMessage(error))
+    } finally {
+      setSubmitting(false)
     }
-  })
-
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-    phoneE164: '',
-    companyName: '',
-    businessRegNo: '',
-    billingAddress: ''
-  })
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    const payload = { ...formData }
-    
-    if (!payload.phoneE164) {
-      delete payload.phoneE164
-    }
-    if (!payload.businessRegNo) {
-      delete payload.businessRegNo
-    }
-    
-    registerMutation.mutate(payload)
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4 py-12">
-      <Card className="max-w-2xl w-full">
-        <Card.Header className="p-6 border-b border-slate-200">
-          <h1 className="text-2xl font-bold text-slate-900">Register as Shipper</h1>
-          <p className="text-sm text-slate-500 mt-1">Create your shipping company profile and your user account.</p>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 py-12">
+      <Card className="w-full max-w-2xl overflow-hidden p-0">
+        <Card.Header className="flex items-center justify-between border-b border-slate-border p-6">
+          <div>
+            <h1 className="text-headline-sm font-bold text-primary">Register as Shipper</h1>
+            <p className="mt-1 text-body-md text-on-surface-variant">
+              Create your shipping business profile and manager account
+            </p>
+          </div>
+          <Button as={Link} to="/register" variant="secondary" className="text-xs">
+            Switch Role
+          </Button>
         </Card.Header>
+
         <Card.Body className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-800 border-b pb-2">User Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                  <Input name="fullName" required value={formData.fullName} onChange={handleChange} placeholder="Jane Doe" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <Input type="email" name="email" required value={formData.email} onChange={handleChange} placeholder="jane@example.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                  <Input type="password" name="password" required value={formData.password} onChange={handleChange} placeholder="Strong password" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone (Optional)</label>
-                  <Input type="tel" name="phoneE164" value={formData.phoneE164} onChange={handleChange} placeholder="+14155552671" />
-                </div>
-              </div>
-            </div>
+          <Formik
+            initialValues={INITIAL_SHIPPER_VALUES}
+            validationSchema={shipperRegisterSchema}
+            onSubmit={handleSubmit}
+          >
+            {({ status }) => (
+              <Form className="space-y-6">
+                {status && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-status-red-text bg-status-red-bg px-4 py-3 text-body-md text-status-red-text"
+                  >
+                    {status}
+                  </div>
+                )}
 
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-800 border-b pb-2">Company Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Company Name</label>
-                  <Input name="companyName" required value={formData.companyName} onChange={handleChange} placeholder="Acme Shipping Corp" />
+                <div className="space-y-4">
+                  <h2 className="border-b border-slate-border pb-2 text-body-lg font-semibold text-primary">
+                    Personal & Account Details
+                  </h2>
+                  <div className="grid grid-cols-1 gap-form-gap md:grid-cols-2">
+                    <FormikTextField
+                      name="fullName"
+                      label="Full Name"
+                      placeholder="Jane Doe"
+                      autoComplete="name"
+                    />
+                    <FormikTextField
+                      name="email"
+                      label="Email Address"
+                      type="email"
+                      placeholder="jane@company.lk"
+                      autoComplete="email"
+                    />
+                    <FormikPasswordField
+                      name="password"
+                      label="Password"
+                      placeholder="••••••••"
+                      helperText="At least 8 chars with uppercase, lowercase, number & symbol"
+                      autoComplete="new-password"
+                    />
+                    <FormikTextField
+                      name="phoneE164"
+                      label="Phone Number (Optional)"
+                      type="tel"
+                      placeholder="+94771234567"
+                      helperText="E.164 format with country code"
+                      autoComplete="tel"
+                    />
+                  </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Business Registration No (Optional)</label>
-                  <Input name="businessRegNo" value={formData.businessRegNo} onChange={handleChange} placeholder="BR-98765" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Billing Address</label>
-                  <Input name="billingAddress" required value={formData.billingAddress} onChange={handleChange} placeholder="456 Commerce St, City" />
-                </div>
-              </div>
-            </div>
 
-            <Button 
-              type="submit" 
-              className="w-full py-2.5 text-base"
-              disabled={registerMutation.isPending}
-            >
-              {registerMutation.isPending ? 'Registering...' : 'Complete Registration'}
-            </Button>
-          </form>
+                <div className="space-y-4">
+                  <h2 className="border-b border-slate-border pb-2 text-body-lg font-semibold text-primary">
+                    Company Information
+                  </h2>
+                  <div className="grid grid-cols-1 gap-form-gap md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="companyName"
+                        label="Company Name"
+                        placeholder="Acme Logistics Corp"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="businessRegNo"
+                        label="Business Registration Number (Optional)"
+                        placeholder="PV12345 or BR-98765"
+                        helperText="Official company registration number if available"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="billingAddress"
+                        label="Billing Address"
+                        placeholder="123 Galle Road, Colombo 03"
+                        autoComplete="street-address"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <FormikSubmitButton className="w-full py-2.5 text-base">
+                    Complete Shipper Registration
+                  </FormikSubmitButton>
+                </div>
+
+                <div className="border-t border-slate-border pt-4 text-center">
+                  <p className="text-body-md text-on-surface-variant">
+                    Already registered?{' '}
+                    <Link to="/login" className="font-medium text-status-blue-text hover:underline">
+                      Sign In
+                    </Link>
+                  </p>
+                </div>
+              </Form>
+            )}
+          </Formik>
         </Card.Body>
       </Card>
     </div>
@@ -140,126 +275,188 @@ function ShipperRegisterForm() {
 
 function AgencyRegisterForm() {
   const navigate = useNavigate()
-  const registerMutation = useRegisterAgencyMutation({
-    onSuccess: () => {
-      alert('Registration successful! Please login.')
+  const registerMutation = useRegisterAgencyMutation()
+
+  const handleSubmit = async (values, { setErrors, setStatus, setSubmitting }) => {
+    setStatus(undefined)
+    try {
+      const payload = {
+        fullName: values.fullName.trim(),
+        email: values.email.trim(),
+        password: values.password,
+        agencyName: values.agencyName.trim(),
+        businessRegNo: values.businessRegNo.trim(),
+        yardAddress: values.yardAddress.trim(),
+        yardLat: Number(values.yardLat),
+        yardLng: Number(values.yardLng),
+      }
+
+      if (values.phoneE164 && values.phoneE164.trim()) {
+        payload.phoneE164 = values.phoneE164.trim()
+      }
+
+      if (values.jobTitle && values.jobTitle.trim()) {
+        payload.jobTitle = values.jobTitle.trim()
+      }
+
+      await registerMutation.mutateAsync(payload)
+      toast.success('Registration successful! Please sign in to access your agency workspace.')
       navigate('/login')
-    },
-    onError: (err) => {
-      alert(`Registration failed: ${err.message || 'Check your inputs and try again.'}`)
+    } catch (error) {
+      if (error?.code === 'VALIDATION_ERROR' && error?.details) {
+        setErrors(mapValidationDetailsToFormik(error.details))
+      }
+      setStatus(getAuthErrorMessage(error))
+    } finally {
+      setSubmitting(false)
     }
-  })
-
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-    phoneE164: '',
-    jobTitle: '',
-    agencyName: '',
-    businessRegNo: '',
-    yardAddress: '',
-    yardLat: '',
-    yardLng: ''
-  })
-
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData(prev => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    // Convert lat/lng to numbers
-    const payload = {
-      ...formData,
-      yardLat: Number(formData.yardLat),
-      yardLng: Number(formData.yardLng)
-    }
-    
-    // Convert phone to null if empty, otherwise E.164 requires it or breaks
-    if (!payload.phoneE164) {
-      delete payload.phoneE164
-    }
-    
-    // Delete jobTitle if empty
-    if (!payload.jobTitle) {
-      delete payload.jobTitle
-    }
-    
-    registerMutation.mutate(payload)
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-4 py-12">
-      <Card className="max-w-2xl w-full">
-        <Card.Header className="p-6 border-b border-slate-200">
-          <h1 className="text-2xl font-bold text-slate-900">Join Agency Network</h1>
-          <p className="text-sm text-slate-500 mt-1">Create your agency profile and your staff account.</p>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4 py-12">
+      <Card className="w-full max-w-2xl overflow-hidden p-0">
+        <Card.Header className="flex items-center justify-between border-b border-slate-border p-6">
+          <div>
+            <h1 className="text-headline-sm font-bold text-primary">Join Agency Network</h1>
+            <p className="mt-1 text-body-md text-on-surface-variant">
+              Create your agency organization, fleet depot yard, and staff account
+            </p>
+          </div>
+          <Button as={Link} to="/register" variant="secondary" className="text-xs">
+            Switch Role
+          </Button>
         </Card.Header>
+
         <Card.Body className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-800 border-b pb-2">User Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Full Name</label>
-                  <Input name="fullName" required value={formData.fullName} onChange={handleChange} placeholder="John Doe" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <Input type="email" name="email" required value={formData.email} onChange={handleChange} placeholder="john@example.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-                  <Input type="password" name="password" required value={formData.password} onChange={handleChange} placeholder="Strong password" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone (Optional)</label>
-                  <Input type="tel" name="phoneE164" value={formData.phoneE164} onChange={handleChange} placeholder="+14155552671" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Job Title (Optional)</label>
-                  <Input name="jobTitle" value={formData.jobTitle} onChange={handleChange} placeholder="Fleet Manager" />
-                </div>
-              </div>
-            </div>
+          <Formik
+            initialValues={INITIAL_AGENCY_VALUES}
+            validationSchema={agencyRegisterSchema}
+            onSubmit={handleSubmit}
+          >
+            {({ status }) => (
+              <Form className="space-y-6">
+                {status && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-status-red-text bg-status-red-bg px-4 py-3 text-body-md text-status-red-text"
+                  >
+                    {status}
+                  </div>
+                )}
 
-            <div className="space-y-4">
-              <h2 className="text-lg font-semibold text-slate-800 border-b pb-2">Agency Details</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Agency Name</label>
-                  <Input name="agencyName" required value={formData.agencyName} onChange={handleChange} placeholder="Fast Freight Inc." />
+                <div className="space-y-4">
+                  <h2 className="border-b border-slate-border pb-2 text-body-lg font-semibold text-primary">
+                    Agency Staff Account
+                  </h2>
+                  <div className="grid grid-cols-1 gap-form-gap md:grid-cols-2">
+                    <FormikTextField
+                      name="fullName"
+                      label="Full Name"
+                      placeholder="John Doe"
+                      autoComplete="name"
+                    />
+                    <FormikTextField
+                      name="email"
+                      label="Work Email Address"
+                      type="email"
+                      placeholder="john@agency.lk"
+                      autoComplete="email"
+                    />
+                    <FormikPasswordField
+                      name="password"
+                      label="Password"
+                      placeholder="••••••••"
+                      helperText="At least 8 chars with uppercase, lowercase, number & symbol"
+                      autoComplete="new-password"
+                    />
+                    <FormikTextField
+                      name="phoneE164"
+                      label="Phone Number (Optional)"
+                      type="tel"
+                      placeholder="+94771234567"
+                      helperText="E.164 format with country code"
+                      autoComplete="tel"
+                    />
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="jobTitle"
+                        label="Job Title (Optional)"
+                        placeholder="Fleet Operations Dispatcher"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Business Registration No</label>
-                  <Input name="businessRegNo" required value={formData.businessRegNo} onChange={handleChange} placeholder="BR-12345" />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Yard Address</label>
-                  <Input name="yardAddress" required value={formData.yardAddress} onChange={handleChange} placeholder="123 Yard St, City" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Yard Latitude</label>
-                  <Input type="number" step="any" name="yardLat" required value={formData.yardLat} onChange={handleChange} placeholder="37.7749" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Yard Longitude</label>
-                  <Input type="number" step="any" name="yardLng" required value={formData.yardLng} onChange={handleChange} placeholder="-122.4194" />
-                </div>
-              </div>
-            </div>
 
-            <Button 
-              type="submit" 
-              className="w-full py-2.5 text-base"
-              disabled={registerMutation.isPending}
-            >
-              {registerMutation.isPending ? 'Registering...' : 'Complete Registration'}
-            </Button>
-          </form>
+                <div className="space-y-4">
+                  <h2 className="border-b border-slate-border pb-2 text-body-lg font-semibold text-primary">
+                    Agency & Depot Yard Details
+                  </h2>
+                  <div className="grid grid-cols-1 gap-form-gap md:grid-cols-2">
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="agencyName"
+                        label="Agency Organization Name"
+                        placeholder="Lanka Fast Freight Logistics"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="businessRegNo"
+                        label="Business Registration Number"
+                        placeholder="PV12345"
+                        helperText="Required for verification and KYC compliance"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <FormikTextField
+                        name="yardAddress"
+                        label="Yard Depot Address"
+                        placeholder="45 Harbor Road, Peliyagoda"
+                        autoComplete="street-address"
+                      />
+                    </div>
+                    <div>
+                      <FormikTextField
+                        name="yardLat"
+                        label="Yard Latitude"
+                        type="number"
+                        step="any"
+                        placeholder="6.9583"
+                        mono
+                        helperText="Coordinates used for AI matching & route ETA"
+                      />
+                    </div>
+                    <div>
+                      <FormikTextField
+                        name="yardLng"
+                        label="Yard Longitude"
+                        type="number"
+                        step="any"
+                        placeholder="79.8833"
+                        mono
+                        helperText="Coordinates used for AI matching & route ETA"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <FormikSubmitButton className="w-full py-2.5 text-base">
+                    Complete Agency Registration
+                  </FormikSubmitButton>
+                </div>
+
+                <div className="border-t border-slate-border pt-4 text-center">
+                  <p className="text-body-md text-on-surface-variant">
+                    Already registered?{' '}
+                    <Link to="/login" className="font-medium text-status-blue-text hover:underline">
+                      Sign In
+                    </Link>
+                  </p>
+                </div>
+              </Form>
+            )}
+          </Formik>
         </Card.Body>
       </Card>
     </div>
