@@ -131,6 +131,12 @@ public enum ErrorCode
     /// <summary>An invalid invoice amount was supplied.</summary>
     INVALID_INVOICE_AMOUNT,
 
+    /// <summary>The invoice is already settled and paid.</summary>
+    INVOICE_ALREADY_PAID,
+
+    /// <summary>The payment gateway webhook callback signature check failed.</summary>
+    PAYMENT_SIGNATURE_INVALID,
+
     /// <summary>
     /// The supplied <c>DueDate</c> falls before the invoice's issuance date.
     /// The database constraint <c>ck_invoice_due</c> requires

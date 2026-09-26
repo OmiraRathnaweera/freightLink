@@ -4,7 +4,7 @@ using FreightLink.Api.Entities.Enums;
 namespace FreightLink.Api.DTOs.Invoices;
 
 /// <summary>
-/// Query parameters for GET /api/v1/invoices.
+/// Query parameters for GET /api/invoices and GET /api/v1/invoices.
 /// </summary>
 public class InvoiceListQueryDto
 {
@@ -22,7 +22,16 @@ public class InvoiceListQueryDto
     /// <summary>Optional filter by associated trip ID.</summary>
     public Guid? TripId { get; set; }
 
-    /// <summary>Optional text search against InvoiceNumber.</summary>
+    /// <summary>Optional filter by recipient user ID.</summary>
+    public Guid? RecipientId { get; set; }
+
+    /// <summary>Optional filter for invoices created/issued on or after this date.</summary>
+    public DateTimeOffset? StartDate { get; set; }
+
+    /// <summary>Optional filter for invoices created/issued on or before this date.</summary>
+    public DateTimeOffset? EndDate { get; set; }
+
+    /// <summary>Optional text search against InvoiceNumber, recipient name, or notes.</summary>
     [StringLength(100)]
     public string? Search { get; set; }
 

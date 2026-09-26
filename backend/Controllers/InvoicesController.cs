@@ -11,15 +11,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace FreightLink.Api.Controllers;
 
 /// <summary>
-/// Invoice management endpoints (Component D): creation, single/list retrieval, update, status transition, and cancellation.
+/// Invoice management endpoints: manual creation, line items drafting, issuing, voiding, and role-based retrieval.
 /// </summary>
 [ApiController]
+[Route("api/invoices")]
 [Route("api/v1/invoices")]
 [Authorize]
 public class InvoicesController : ControllerBase
 {
-    private const string InvoiceCreationRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
-    private const string DeliveryEventRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver) + "," + nameof(UserRole.Admin);
+    private const string AgentRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Agent);
+    private const string ShipperRoles = nameof(UserRole.Shipper);
+    private const string DeliveryEventRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Agent);
 
     private readonly IInvoiceService _invoiceService;
 
@@ -29,24 +31,33 @@ public class InvoicesController : ControllerBase
         _invoiceService = invoiceService;
     }
 
-    /// <summary>Creates a new invoice for a trip.</summary>
-    /// <param name="request">Invoice details.</param>
+    /// <summary>Creates a new invoice in 'Draft' or 'Issued' status with manual line items (Agent only).</summary>
+    /// <param name="request">Invoice creation details including line items.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 Created with the created invoice.</returns>
     [HttpPost]
-    [Authorize(Roles = InvoiceCreationRoles)]
+    [Authorize(Roles = AgentRoles)]
     public async Task<ActionResult<InvoiceResponseDto>> Create([FromBody] CreateInvoiceDto request, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.CreateAsync(GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>Lists candidate recipients for invoice creation (Agent only).</summary>
+    [HttpGet("recipients")]
+    [Authorize(Roles = AgentRoles)]
+    public async Task<ActionResult<List<InvoiceRecipientDto>>> GetRecipients(CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.GetRecipientsAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>
-    /// Auto-generates a placeholder invoice for a trip that has reached Delivered status (delivery event).
+    /// Legacy/idempotent delivery hook: returns existing invoice if one exists for the trip, or creates one if not.
     /// </summary>
     /// <param name="tripId">The delivered trip's ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>201 Created with the generated invoice details.</returns>
+    /// <returns>201 Created or 200 OK with the invoice details.</returns>
     [HttpPost("on-delivery/{tripId:guid}")]
     [HttpPost("delivery-event/{tripId:guid}")]
     [Authorize(Roles = DeliveryEventRoles)]
@@ -56,7 +67,7 @@ public class InvoicesController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    /// <summary>Fetches a single invoice by its ID.</summary>
+    /// <summary>Fetches a single invoice by its ID with line items and audit trail.</summary>
     /// <param name="id">The invoice's ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the invoice details.</returns>
@@ -78,42 +89,79 @@ public class InvoicesController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Updates a draft invoice's amount, currency, or due date.</summary>
+    /// <summary>Updates editable fields on a draft invoice. Rejects modifications if status is Issued or Paid (Agent only).</summary>
     /// <param name="id">The invoice's ID.</param>
     /// <param name="request">The updated invoice values.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the updated invoice.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = InvoiceCreationRoles)]
+    [Authorize(Roles = AgentRoles)]
     public async Task<ActionResult<InvoiceResponseDto>> Update(Guid id, [FromBody] UpdateInvoiceDto request, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.UpdateAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return Ok(result);
     }
 
-    /// <summary>Transitions an invoice's status according to allowed domain state rules.</summary>
+    /// <summary>Transitions status from 'Draft' to 'Issued', finalizing totals and locking edits (Agent only).</summary>
+    /// <param name="id">The invoice's ID.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the issued invoice.</returns>
+    [HttpPost("{id:guid}/issue")]
+    [Authorize(Roles = AgentRoles)]
+    public async Task<ActionResult<InvoiceResponseDto>> Issue(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.IssueAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Settles and pays an issued invoice (Shipper only).</summary>
+    /// <param name="id">The invoice's ID.</param>
+    /// <param name="request">Optional payment parameters.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the paid invoice.</returns>
+    [HttpPost("{id:guid}/pay")]
+    [Authorize(Roles = ShipperRoles)]
+    public async Task<ActionResult<InvoiceResponseDto>> Pay(Guid id, [FromBody] PayInvoiceDto? request, CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.PayAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Transitions an invoice's status according to allowed domain state rules (Agent only).</summary>
     /// <param name="id">The invoice's ID.</param>
     /// <param name="request">The target status.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the transitioned invoice.</returns>
     [HttpPatch("{id:guid}/status")]
-    [Authorize(Roles = InvoiceCreationRoles)]
+    [Authorize(Roles = AgentRoles)]
     public async Task<ActionResult<InvoiceResponseDto>> UpdateStatus(Guid id, [FromBody] UpdateInvoiceStatusDto request, CancellationToken cancellationToken)
     {
         var result = await _invoiceService.UpdateStatusAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return Ok(result);
     }
 
-    /// <summary>Voids/cancels an invoice (moves status to Void).</summary>
+    /// <summary>
+    /// Voids/cancels an invoice. Strictly requires a non-empty voidReason string (Agent only).
+    /// Supports DELETE and POST /void, PATCH /void for client compatibility.
+    /// </summary>
     /// <param name="id">The invoice's ID.</param>
+    /// <param name="request">Void request with mandatory reason.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the voided invoice.</returns>
+    [HttpDelete("{id:guid}")]
+    [HttpPost("{id:guid}/void")]
     [HttpPatch("{id:guid}/void")]
     [HttpPatch("{id:guid}/cancel")]
-    [Authorize(Roles = InvoiceCreationRoles)]
-    public async Task<ActionResult<InvoiceResponseDto>> Void(Guid id, CancellationToken cancellationToken)
+    [Authorize(Roles = AgentRoles)]
+    public async Task<ActionResult<InvoiceResponseDto>> Void(Guid id, [FromBody] VoidInvoiceDto? request, CancellationToken cancellationToken)
     {
-        var result = await _invoiceService.VoidAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        var reason = request?.VoidReason;
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "A non-empty void reason is required.");
+        }
+
+        var result = await _invoiceService.VoidAsync(id, GetCurrentUserId(), GetCurrentUserRole(), reason, cancellationToken);
         return Ok(result);
     }
 
