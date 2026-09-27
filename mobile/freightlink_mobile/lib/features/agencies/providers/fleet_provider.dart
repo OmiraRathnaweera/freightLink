@@ -51,4 +51,20 @@ class FleetProvider extends ChangeNotifier {
       return false;
     }
   }
+
+  Future<bool> updateVehicleStatus(String vehicleId, String status) async {
+    try {
+      final updated = await _repository.updateVehicleStatus(vehicleId, status);
+      final index = _vehicles.indexWhere((vehicle) => vehicle['vehicleId'] == vehicleId);
+      if (index >= 0) {
+        _vehicles[index] = updated;
+        notifyListeners();
+      }
+      return true;
+    } catch (error) {
+      _errorMessage = error.toString();
+      notifyListeners();
+      return false;
+    }
+  }
 }

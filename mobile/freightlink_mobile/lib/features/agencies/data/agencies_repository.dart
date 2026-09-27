@@ -66,6 +66,21 @@ class AgenciesRepository {
     );
   }
 
+  Future<Map<String, dynamic>> updateVehicleStatus(
+    String vehicleId,
+    String status,
+  ) async {
+    if (agencyId == null) {
+      throw Exception('Agency ID is missing.');
+    }
+
+    final response = await _client.patch(
+      '/agencies/$agencyId/vehicles/$vehicleId/status',
+      body: {'status': status},
+    ) as Map<String, dynamic>;
+    return response;
+  }
+
   // Add actual driver
   Future<void> addDriver(Map<String, dynamic> data) async {
     if (agencyId == null) {

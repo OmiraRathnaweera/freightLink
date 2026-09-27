@@ -189,6 +189,10 @@ public enum ErrorCode
     /// <summary>A soft delete was attempted on a <c>VehicleClassEfficiency</c> row that is already soft-deleted.</summary>
     VEHICLE_CLASS_EFFICIENCY_ALREADY_DELETED,
 
+    /// <summary>A fleet vehicle status change attempted to bypass trip-managed or terminal availability rules.</summary>
+    INVALID_VEHICLE_STATUS_TRANSITION,
+
+
     /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxPayloadKg</c> was not strictly greater than its <c>MinPayloadKg</c> (mirrors <c>ck_vce_payload_bounds</c>).</summary>
     VEHICLE_CLASS_EFFICIENCY_INVALID_PAYLOAD_BAND,
 

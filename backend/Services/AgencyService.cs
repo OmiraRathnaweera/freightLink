@@ -483,6 +483,60 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
+    public async Task<VehicleResponseDto> UpdateVehicleStatusAsync(
+        Guid agencyId,
+        Guid vehicleId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        UpdateVehicleStatusDto request,
+        CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+        if (agency is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+        AgencyStatusGuard.EnsureActive(agency.Status);
+
+        var vehicle = await _dbContext.Vehicles.FirstOrDefaultAsync(
+            v => v.VehicleId == vehicleId && v.AgencyId == agencyId,
+            cancellationToken);
+        if (vehicle is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.VEHICLE_NOT_FOUND, "The requested vehicle could not be found in this agency fleet.");
+        }
+
+        // Trip assignment/execution is the sole authority for OnTrip. Retired vehicles are
+        // deliberately terminal so matching cannot accidentally revive a decommissioned vehicle.
+        if (request.Status == VehicleStatus.OnTrip || vehicle.Status == VehicleStatus.OnTrip ||
+            (vehicle.Status == VehicleStatus.Retired && request.Status != VehicleStatus.Retired))
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_VEHICLE_STATUS_TRANSITION,
+                "Vehicle availability can only move between Available, Maintenance, and Retired. OnTrip is managed by trip execution and Retired is terminal.");
+        }
+
+        vehicle.Status = request.Status;
+        vehicle.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new VehicleResponseDto
+        {
+            VehicleId = vehicle.VehicleId,
+            AgencyId = vehicle.AgencyId,
+            RegistrationNo = vehicle.RegistrationNo,
+            VehicleType = vehicle.VehicleType.ToString(),
+            CapacityKg = vehicle.CapacityKg,
+            VolumeM3 = vehicle.VolumeM3,
+            Status = vehicle.Status.ToString(),
+            IsAvailable = vehicle.Status == VehicleStatus.Available,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
     public async Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default)
     {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
