@@ -25,7 +25,8 @@ public class TripServiceTests
 
     private static async Task<(Trip trip, Guid shipperUserId, Guid agencyStaffUserId, Guid driverUserId, Guid otherUserId)> SeedTripHierarchyAsync(
         AppDbContext db,
-        TripStatus tripStatus = TripStatus.Assigned)
+        TripStatus tripStatus = TripStatus.Assigned,
+        LoadStatus loadStatus = LoadStatus.Matched)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -143,7 +144,7 @@ public class TripServiceTests
             DropoffLng = 80.6337m,
             PickupWindowStart = now.AddDays(1),
             PickupWindowEnd = now.AddDays(2),
-            Status = LoadStatus.InTransit,
+            Status = loadStatus,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -358,6 +359,64 @@ public class TripServiceTests
         Assert.Equal("PickedUp", statusResult.Status);
         Assert.Single(statusResult.Events);
         Assert.Equal("PickedUp", statusResult.Events[0].ToStatus);
+    }
+
+    [Fact]
+    public async Task ChangeStatusAsync_SyncsLoadStatus_ToInTransit_WhenTripAdvancesToPickedUp()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+        var (trip, _, _, driverUserId, _) = await SeedTripHierarchyAsync(db, TripStatus.Assigned);
+
+        await db.TripEvidences.AddAsync(new TripEvidence
+        {
+            TripEvidenceId = Guid.NewGuid(),
+            TripId = trip.TripId,
+            CapturedByUserId = driverUserId,
+            EvidenceType = EvidenceType.PickupProof,
+            StorageKey = "pickup-photo-1",
+            CapturedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        await sut.ChangeStatusAsync(trip.TripId, driverUserId, UserRole.Driver, new ChangeTripStatusDto
+        {
+            TargetStatus = TripStatus.PickedUp
+        });
+
+        var load = await db.Loads.AsNoTracking().FirstAsync();
+        Assert.Equal(LoadStatus.InTransit, load.Status);
+
+        var history = await db.LoadStatusHistories.AsNoTracking().SingleAsync(h => h.LoadId == load.LoadId);
+        Assert.Equal(LoadStatus.Matched, history.FromStatus);
+        Assert.Equal(LoadStatus.InTransit, history.ToStatus);
+    }
+
+    [Fact]
+    public async Task ChangeStatusAsync_SyncsLoadStatus_ToDelivered_WhenTripCompletes()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+        var (trip, _, _, driverUserId, _) = await SeedTripHierarchyAsync(db, TripStatus.InTransit);
+
+        await db.TripEvidences.AddAsync(new TripEvidence
+        {
+            TripEvidenceId = Guid.NewGuid(),
+            TripId = trip.TripId,
+            CapturedByUserId = driverUserId,
+            EvidenceType = EvidenceType.DeliveryProof,
+            StorageKey = "delivery-photo-1",
+            CapturedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        await sut.ChangeStatusAsync(trip.TripId, driverUserId, UserRole.Driver, new ChangeTripStatusDto
+        {
+            TargetStatus = TripStatus.Delivered
+        });
+
+        var load = await db.Loads.AsNoTracking().FirstAsync();
+        Assert.Equal(LoadStatus.Delivered, load.Status);
     }
 
     [Fact]

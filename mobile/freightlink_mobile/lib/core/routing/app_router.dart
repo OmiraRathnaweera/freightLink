@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
+import '../../features/loads/screens/shipper_dashboard_screen.dart';
 import '../../features/trips/screens/driver_assigned_trip_screen.dart';
 import '../../features/trips/screens/job_proposals_screen.dart';
 import '../../features/trips/screens/agency_trips_screen.dart';
@@ -118,7 +119,10 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                   if (user?.isAgencyStaff ?? false) {
                     return const AgencyDashboardScreen();
                   }
-                  // Shipper/Driver dashboards aren't built yet.
+                  if (user?.isShipper ?? false) {
+                    return const ShipperDashboardScreen();
+                  }
+                  // Driver dashboard isn't built yet.
                   return const ComingSoonPlaceholder(
                     title: 'Dashboard',
                     icon: Icons.dashboard_outlined,

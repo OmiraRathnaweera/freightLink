@@ -254,6 +254,38 @@ public class TripService : ITripService
         trip.Status = target;
         trip.UpdatedAt = now;
 
+        // Keep the Load's own status in step with the Trip it's running on — without this, a Load
+        // stays "Matched" for the entire trip lifecycle (PickedUp/InTransit/Delivered), since nothing
+        // else ever moves it forward once a Trip exists. Mirrors the sync already done for the
+        // Cancelled path in CancelAsync/DeleteAsync below.
+        if (TripToLoadStatusMap.TryGetValue(target, out var mappedLoadStatus))
+        {
+            var load = trip.Assignment?.Load;
+            if (load != null && load.Status != mappedLoadStatus)
+            {
+                var prevLoadStatus = load.Status;
+                load.Status = mappedLoadStatus;
+                load.UpdatedAt = now;
+
+                _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+                {
+                    LoadStatusHistoryId = Guid.NewGuid(),
+                    LoadId = load.LoadId,
+                    FromStatus = prevLoadStatus,
+                    ToStatus = mappedLoadStatus,
+                    Reason = $"Trip advanced to '{target}'.",
+                    ChangedByUserId = actingUserId,
+                    ChangedAt = now
+                });
+
+                if (target == TripStatus.Cancelled && trip.Assignment != null)
+                {
+                    trip.Assignment.Status = AssignmentStatus.Cancelled;
+                    trip.Assignment.UpdatedAt = now;
+                }
+            }
+        }
+
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -265,6 +297,19 @@ public class TripService : ITripService
 
         return MapToDetailResponse(trip);
     }
+
+    /// <summary>
+    /// Maps a Trip status this method can transition into to the Load status it should carry the
+    /// owning Load to. <see cref="TripStatus.Assigned"/> has no entry — a Trip is only ever created
+    /// once its Load is already <see cref="LoadStatus.Matched"/>, so there is nothing to advance.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<TripStatus, LoadStatus> TripToLoadStatusMap = new Dictionary<TripStatus, LoadStatus>
+    {
+        [TripStatus.PickedUp] = LoadStatus.InTransit,
+        [TripStatus.InTransit] = LoadStatus.InTransit,
+        [TripStatus.Delivered] = LoadStatus.Delivered,
+        [TripStatus.Cancelled] = LoadStatus.Cancelled
+    };
 
     /// <inheritdoc />
     public async Task<TripEvidenceResponseDto> UploadEvidenceAsync(

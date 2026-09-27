@@ -6,6 +6,8 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/auto_resize_text.dart';
+import '../../../shared/widgets/dashboard_action_tile.dart';
+import '../../../shared/widgets/dashboard_kpi_card.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -87,7 +89,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     icon: Icons.flash_on_outlined,
                   ),
                   const SizedBox(height: AppConstants.spaceMd),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Fleet Management',
                     subtitle: 'Manage vehicle availability, capacity & specs',
                     icon: Icons.local_shipping_outlined,
@@ -95,7 +97,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     onTap: () => context.go('/dashboard/fleet'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Job Proposals',
                     subtitle: 'Review posted shipments and place bids',
                     icon: Icons.assignment_outlined,
@@ -103,7 +105,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     onTap: () => context.go('/loads'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Agency Trips',
                     subtitle: 'Monitor active shipments, pickup & delivery proof',
                     icon: Icons.route_outlined,
@@ -114,7 +116,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     onTap: () => context.push('/trips'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Billing & Invoices',
                     subtitle: 'Review invoices, payment receipts & settlements',
                     icon: Icons.receipt_long_outlined,
@@ -127,7 +129,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     icon: Icons.admin_panel_settings_outlined,
                   ),
                   const SizedBox(height: AppConstants.spaceMd),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Driver Onboarding',
                     subtitle: 'Manage driver roster, status & credentials',
                     icon: Icons.person_add_outlined,
@@ -135,7 +137,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     onTap: () => context.go('/dashboard/driver-onboarding'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Compliance Documents',
                     subtitle: 'Carrier permits, vehicle insurance & KYC records',
                     icon: Icons.description_outlined,
@@ -146,7 +148,7 @@ class _AgencyDashboardView extends StatelessWidget {
                     onTap: () => context.go('/dashboard/compliance-docs'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
-                  _ActionTile(
+                  DashboardActionTile(
                     title: 'Agency Profile',
                     subtitle: 'Yard coordinates, registration & contact info',
                     icon: Icons.business_outlined,
@@ -350,7 +352,7 @@ class _KpiGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       children: [
-        _KpiMetricCard(
+        DashboardKpiCard(
           icon: Icons.local_shipping_outlined,
           iconBg: AppColors.statusMatchedBg,
           iconFg: AppColors.statusMatchedFg,
@@ -360,7 +362,7 @@ class _KpiGrid extends StatelessWidget {
           footerColor: AppColors.statusSuccessFg,
           onTap: () => context.go('/dashboard/fleet'),
         ),
-        _KpiMetricCard(
+        DashboardKpiCard(
           icon: Icons.badge_outlined,
           iconBg: AppColors.statusNeutralBg,
           iconFg: AppColors.ink,
@@ -370,7 +372,7 @@ class _KpiGrid extends StatelessWidget {
           footerColor: AppColors.inkMuted,
           onTap: () => context.go('/dashboard/driver-onboarding'),
         ),
-        _KpiMetricCard(
+        DashboardKpiCard(
           icon: Icons.navigation_outlined,
           iconBg: AppColors.statusInTransitBg,
           iconFg: AppColors.statusInTransitFg,
@@ -380,7 +382,7 @@ class _KpiGrid extends StatelessWidget {
           footerColor: onTripVehicles > 0 ? AppColors.statusInTransitFg : AppColors.inkMuted,
           onTap: () => context.push('/trips'),
         ),
-        _KpiMetricCard(
+        DashboardKpiCard(
           icon: Icons.verified_user_outlined,
           iconBg: pendingCompliance > 0 ? AppColors.statusErrorBg : AppColors.statusSuccessBg,
           iconFg: pendingCompliance > 0 ? AppColors.statusErrorFg : AppColors.statusSuccessFg,
@@ -391,109 +393,6 @@ class _KpiGrid extends StatelessWidget {
           onTap: () => context.go('/dashboard/compliance-docs'),
         ),
       ],
-    );
-  }
-}
-
-/// An individual KPI card with touch feedback.
-class _KpiMetricCard extends StatelessWidget {
-  const _KpiMetricCard({
-    required this.icon,
-    required this.iconBg,
-    required this.iconFg,
-    required this.value,
-    required this.label,
-    required this.footer,
-    required this.footerColor,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final Color iconBg;
-  final Color iconFg;
-  final String value;
-  final String label;
-  final String footer;
-  final Color footerColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-            border: Border.all(color: AppColors.border),
-          ),
-          padding: const EdgeInsets.all(AppConstants.spaceMd),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: iconBg,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(icon, size: 18, color: iconFg),
-                  ),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 14,
-                    color: AppColors.inkFaint,
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AutoResizeText.kpi(
-                    value,
-                    minFontSize: 13,
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.ink,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  AutoResizeText(
-                    label,
-                    maxLines: 1,
-                    minFontSize: 10,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.inkMuted,
-                    ),
-                  ),
-                ],
-              ),
-              AutoResizeText(
-                footer,
-                maxLines: 1,
-                minFontSize: 9,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: footerColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -625,113 +524,6 @@ class _FleetUtilizationCard extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Navigation action card with icon, title, description, badge, and touch ripple.
-class _ActionTile extends StatelessWidget {
-  const _ActionTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.onTap,
-    this.badgeText,
-    this.isWarning = false,
-    this.isHighlight = false,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-  final String? badgeText;
-  final bool isWarning;
-  final bool isHighlight;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppConstants.spaceLg,
-            vertical: 14,
-          ),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 22, color: AppColors.ink),
-              ),
-              const SizedBox(width: AppConstants.spaceMd),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AutoResizeText(
-                      title,
-                      maxLines: 1,
-                      minFontSize: 12,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    AutoResizeText(
-                      subtitle,
-                      maxLines: 1,
-                      minFontSize: 10,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.inkMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (badgeText != null) ...[
-                const SizedBox(width: AppConstants.spaceSm),
-                StatusPill(
-                  label: badgeText!,
-                  foreground: isWarning
-                      ? AppColors.statusErrorFg
-                      : isHighlight
-                          ? AppColors.statusInTransitFg
-                          : AppColors.statusNeutralFg,
-                  background: isWarning
-                      ? AppColors.statusErrorBg
-                      : isHighlight
-                          ? AppColors.statusInTransitBg
-                          : AppColors.statusNeutralBg,
-                ),
-              ],
-              const SizedBox(width: AppConstants.spaceSm),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: AppColors.inkFaint,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
