@@ -836,11 +836,11 @@ public class LoadServiceTests
 
     // --- ChangeStatus: cancel ---
 
-    /// <summary>A load in Draft, Posted, or Matched can be cancelled.</summary>
+    /// <summary>A load in Draft or Posted can be cancelled.</summary>
     [Fact]
     public async Task ChangeStatusAsync_Cancel_Succeeds_FromValidStatuses()
     {
-        var cancellableStatuses = new[] { LoadStatus.Draft, LoadStatus.Posted, LoadStatus.Matched };
+        var cancellableStatuses = new[] { LoadStatus.Draft, LoadStatus.Posted };
         foreach (var status in cancellableStatuses)
         {
             using var dbContext = await CreateContextAsync();
@@ -855,11 +855,11 @@ public class LoadServiceTests
         }
     }
 
-    /// <summary>A load already InTransit or in a terminal status cannot be cancelled through this method.</summary>
+    /// <summary>A load already Matched, InTransit, or in a terminal status cannot be cancelled through this method.</summary>
     [Fact]
     public async Task ChangeStatusAsync_Cancel_Throws_FromInvalidStatuses()
     {
-        var nonCancellableStatuses = new[] { LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
+        var nonCancellableStatuses = new[] { LoadStatus.Matched, LoadStatus.InTransit, LoadStatus.Delivered, LoadStatus.Closed, LoadStatus.Cancelled };
         foreach (var status in nonCancellableStatuses)
         {
             using var dbContext = await CreateContextAsync();

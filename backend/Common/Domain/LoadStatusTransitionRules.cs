@@ -36,12 +36,12 @@ public static class LoadStatusTransitionRules
         new HashSet<LoadStatus> { LoadStatus.Draft, LoadStatus.Posted };
 
     /// <summary>
-    /// Statuses from which a load may still be cancelled. <see cref="LoadStatus.Matched"/> is
-    /// included deliberately: a match is only an AI recommendation pending Shipper approval
-    /// (ADR-016) and/or agency accept/decline (ADR-017), so the shipper can still back out before a
-    /// <c>Trip</c> exists. Once a load reaches <see cref="LoadStatus.InTransit"/> a physical pickup
-    /// has already happened, so cancellation is no longer offered here — that scenario is handled by
-    /// the separate dispute/trip-abort flow (Component B/C), not this endpoint.
+    /// Statuses from which a load may still be cancelled: only <see cref="LoadStatus.Draft"/> and
+    /// <see cref="LoadStatus.Posted"/>, i.e. strictly before a match is confirmed. Once a load reaches
+    /// <see cref="LoadStatus.Matched"/>, an agency has already accepted and a <c>Trip</c> (with an
+    /// allocated driver/vehicle) exists for it, so the shipper can no longer back out through this
+    /// endpoint — that scenario is handled by the separate dispute/trip-abort flow (Component B/C),
+    /// not this endpoint.
     /// </summary>
     /// <remarks>
     /// ADR-019 also names a future <c>LoadStatus.Discarded</c> value, distinct from
@@ -51,7 +51,7 @@ public static class LoadStatusTransitionRules
     /// gains that member.
     /// </remarks>
     public static readonly IReadOnlySet<LoadStatus> CancellableStatuses =
-        new HashSet<LoadStatus> { LoadStatus.Draft, LoadStatus.Posted, LoadStatus.Matched };
+        new HashSet<LoadStatus> { LoadStatus.Draft, LoadStatus.Posted };
 
     /// <summary>
     /// The full transition graph: for each current status, the set of statuses it may move to next.
@@ -65,7 +65,7 @@ public static class LoadStatusTransitionRules
         {
             [LoadStatus.Draft] = new HashSet<LoadStatus> { LoadStatus.Posted, LoadStatus.Cancelled },
             [LoadStatus.Posted] = new HashSet<LoadStatus> { LoadStatus.Matched, LoadStatus.Cancelled },
-            [LoadStatus.Matched] = new HashSet<LoadStatus> { LoadStatus.InTransit, LoadStatus.Cancelled, LoadStatus.Posted },
+            [LoadStatus.Matched] = new HashSet<LoadStatus> { LoadStatus.InTransit, LoadStatus.Posted },
             [LoadStatus.InTransit] = new HashSet<LoadStatus> { LoadStatus.Delivered },
             [LoadStatus.Delivered] = new HashSet<LoadStatus> { LoadStatus.Closed },
             [LoadStatus.Closed] = new HashSet<LoadStatus>(),

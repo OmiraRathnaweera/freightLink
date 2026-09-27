@@ -99,11 +99,10 @@ enum LoadStatus {
   bool get isEditable => this == LoadStatus.draft || this == LoadStatus.posted;
 
   /// Whether `PATCH /loads/{id}/status` → Cancelled is allowed from this
-  /// status, mirroring `LoadStatusTransitionRules.CanCancel`.
-  bool get isCancellable =>
-      this == LoadStatus.draft ||
-      this == LoadStatus.posted ||
-      this == LoadStatus.matched;
+  /// status, mirroring `LoadStatusTransitionRules.CanCancel`. Once a load is
+  /// Matched, an agency has accepted and a Trip exists for it, so it can no
+  /// longer be cancelled here.
+  bool get isCancellable => this == LoadStatus.draft || this == LoadStatus.posted;
 
   /// Whether this load can still be published (Draft → Posted).
   bool get canPost => this == LoadStatus.draft;

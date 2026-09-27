@@ -123,7 +123,7 @@ describe('LoadsPage — list rendering', () => {
     expect(table.getByText('Matched')).toBeInTheDocument()
   })
 
-  it('shows Edit for a Draft row and hides it for a Matched row (Cancel shows on both)', async () => {
+  it('shows Edit and Cancel for a Draft row but hides both for a Matched row', async () => {
     const user = userEvent.setup()
     loadsApi.useLoadsQuery.mockReturnValue({
       isLoading: false,
@@ -150,6 +150,6 @@ describe('LoadsPage — list rendering', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for load-matched' }))
     menu = within(screen.getByRole('menu'))
     expect(menu.queryByRole('menuitem', { name: /edit/i })).not.toBeInTheDocument()
-    expect(menu.getByRole('menuitem', { name: /cancel/i })).toBeInTheDocument()
+    expect(menu.queryByRole('menuitem', { name: /cancel/i })).not.toBeInTheDocument()
   })
 })

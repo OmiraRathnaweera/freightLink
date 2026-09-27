@@ -96,7 +96,7 @@ function LoadDetailPage() {
               Dispatch Driver & Vehicle
             </Button>
           )}
-          {(role === UserRole.SHIPPER || role === UserRole.ADMIN) && (load.status === 'Posted' || load.status === 'Matched') && (
+          {role === UserRole.SHIPPER && (load.status === 'Posted' || load.status === 'Matched') && (
             <Button
               as={Link}
               to={`/agent-workflows?loadId=${load.loadId}`}
@@ -105,6 +105,17 @@ function LoadDetailPage() {
             >
               <Sparkles className="h-4 w-4 text-amber-300" />
               {load.status === 'Matched' ? 'View AI Match' : 'Review AI Match'}
+            </Button>
+          )}
+          {load.tripId && (role === UserRole.SHIPPER || role === UserRole.ADMIN) && (
+            <Button
+              as={Link}
+              to={`/trips/${load.tripId}`}
+              variant="secondary"
+              className="inline-flex items-center gap-1.5"
+            >
+              <Truck className="h-4 w-4" />
+              View Trip Status
             </Button>
           )}
           {canEditLoad(role, load.status) && (
@@ -120,7 +131,7 @@ function LoadDetailPage() {
         </div>
       </div>
 
-      {(load.status === 'Posted' || load.status === 'Matched') && (
+      {role === UserRole.SHIPPER && (load.status === 'Posted' || load.status === 'Matched') && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary-fixed/40 via-surface-container-low to-surface-container p-4 shadow-soft">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm">

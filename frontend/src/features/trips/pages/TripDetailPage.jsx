@@ -53,6 +53,11 @@ function TripDetailPage() {
     },
   });
   const role = useAppSelector((state) => state.auth.role);
+  // A Shipper has no access to the Agency Staff trips list (/trips), only to
+  // their own trip's detail page (per ROLE_ALLOWED_PREFIXES) — send them back
+  // to My Loads instead of a page they'd immediately be bounced from.
+  const backHref = role === UserRole.SHIPPER ? "/loads" : "/trips";
+  const backLabel = role === UserRole.SHIPPER ? "Back to My Loads" : "Back to Trips";
 
   if (tripQuery.isLoading) {
     return (
@@ -67,10 +72,10 @@ function TripDetailPage() {
     return (
       <div className="space-y-6">
         <Link
-          to="/trips"
+          to={backHref}
           className="inline-flex items-center gap-1 text-body-md text-secondary hover:text-primary"
         >
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Back to Trips
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> {backLabel}
         </Link>
         <Card>
           <ErrorState
@@ -123,10 +128,10 @@ function TripDetailPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link
-            to="/trips"
+            to={backHref}
             className="mb-2 inline-flex items-center gap-1 text-body-md text-secondary hover:text-primary"
           >
-            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> Back to Trips
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} /> {backLabel}
           </Link>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-headline-lg text-on-surface">

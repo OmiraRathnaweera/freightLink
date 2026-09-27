@@ -10,6 +10,7 @@ import '../../../shared/widgets/cancel_reason_dialog.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../trips/screens/agency_trip_detail_screen.dart';
 import '../data/loads_repository.dart';
 import '../models/load.dart';
 import '../providers/load_detail_provider.dart';
@@ -17,7 +18,6 @@ import '../widgets/load_status_badge.dart';
 import '../widgets/load_timeline.dart';
 import '../widgets/route_map_preview.dart';
 import 'edit_load_screen.dart';
-import 'load_match_screen.dart';
 
 /// **Load Detail** — one screen that adapts to the load's real
 /// [LoadStatus] (composed from shared sections) rather than one bespoke
@@ -282,14 +282,18 @@ class _LoadDetailContent extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: AppConstants.spaceLg),
-        OutlinedButton.icon(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => LoadMatchScreen(loadId: load.loadId)),
+        if (load.tripId != null) ...[
+          const SizedBox(height: AppConstants.spaceLg),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => AgencyTripDetailScreen(tripId: load.tripId!),
+              ),
+            ),
+            icon: const Icon(Icons.local_shipping_outlined),
+            label: const Text('View Trip Status'),
           ),
-          icon: const Icon(Icons.auto_awesome_outlined),
-          label: const Text('View estimate & AI match'),
-        ),
+        ],
       ],
     );
   }

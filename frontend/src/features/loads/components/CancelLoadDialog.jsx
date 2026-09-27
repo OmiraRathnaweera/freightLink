@@ -8,7 +8,7 @@ import { getLoadErrorMessage } from '../lib/errorMessages.js'
 
 // Confirm dialog for PATCH /loads/{id}/status (docs/load-management-api.md
 // Section 3.5) — only ever rendered for a Shipper-owned load in
-// Draft/Posted/Matched (canCancelLoad — loadPermissions.js), by
+// Draft/Posted (canCancelLoad — loadPermissions.js), by
 // RowActionsMenu (table row) or LoadDetailPage (detail action bar), each
 // owning their own open/close state and passing loadId + onClose.
 function CancelLoadDialog({ loadId, onClose }) {

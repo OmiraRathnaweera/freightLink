@@ -186,7 +186,13 @@ public class LoadService : ILoadService
             .Select(r => (Guid?)r.WorkflowRunId)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory, estimatedPrice, workflowRunId);
+        // Resolve the dispatched trip id, if any, so a Shipper can look up trip-progress details.
+        var tripId = await _dbContext.Assignments
+            .Where(a => a.LoadId == loadId && a.Trip != null)
+            .Select(a => (Guid?)a.Trip!.TripId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory, estimatedPrice, workflowRunId, tripId);
     }
 
     /// <inheritdoc />
@@ -538,7 +544,8 @@ public class LoadService : ILoadService
         string shipperName,
         List<LoadStatusHistoryResponseDto>? statusHistory = null,
         decimal? estimatedPrice = null,
-        Guid? workflowRunId = null) => new()
+        Guid? workflowRunId = null,
+        Guid? tripId = null) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -558,6 +565,7 @@ public class LoadService : ILoadService
         EstimatedPrice = estimatedPrice ?? load.EstimatedPrice,
         Status = load.Status.ToString(),
         WorkflowRunId = workflowRunId,
+        TripId = tripId,
         CreatedAt = load.CreatedAt,
         UpdatedAt = load.UpdatedAt,
         StatusHistory = statusHistory ?? new List<LoadStatusHistoryResponseDto>()

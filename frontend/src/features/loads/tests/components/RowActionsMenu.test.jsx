@@ -46,9 +46,9 @@ describe('RowActionsMenu — per-status action visibility (Shipper)', () => {
     expect(menu.queryByRole('menuitem', { name: /publish/i })).not.toBeInTheDocument()
   })
 
-  it('shows Cancel but not Edit for a Matched load', async () => {
+  it('hides Edit, Cancel and Publish for a Matched load', async () => {
     const menu = await openMenu('load-3', LoadStatus.MATCHED, UserRole.SHIPPER)
-    expect(menu.getByRole('menuitem', { name: /cancel/i })).toBeInTheDocument()
+    expect(menu.queryByRole('menuitem', { name: /cancel/i })).not.toBeInTheDocument()
     expect(menu.queryByRole('menuitem', { name: /edit/i })).not.toBeInTheDocument()
     expect(menu.queryByRole('menuitem', { name: /publish/i })).not.toBeInTheDocument()
   })

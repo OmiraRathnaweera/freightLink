@@ -15,10 +15,11 @@ import '../models/trip_event.dart';
 import '../models/trip_models.dart';
 import '../widgets/trip_status_pill.dart';
 
-/// Full trip detail for Agency Staff — the mobile counterpart to the web
-/// app's `TripDetailPage`: overview (agency/driver/vehicle/route), a route
-/// map, the full status timeline, and captured pickup/delivery evidence
-/// photos, so both surfaces show the same data for a given trip.
+/// Full trip detail — the mobile counterpart to the web app's `TripDetailPage`:
+/// overview (agency/driver/vehicle/route), a route map, the full status
+/// timeline, and captured pickup/delivery evidence photos. Read-only, so it's
+/// reused as-is both from Agency Staff's Trips list and from a Shipper's own
+/// Load Detail screen once their load has a dispatched trip.
 class AgencyTripDetailScreen extends StatefulWidget {
   const AgencyTripDetailScreen({super.key, required this.tripId});
 
