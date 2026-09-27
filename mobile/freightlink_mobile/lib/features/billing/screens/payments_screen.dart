@@ -125,7 +125,7 @@ class _InvoiceCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '${AppFormatters.currency(invoice.totalAmount)} ${invoice.currency}',
+              AppFormatters.currency(invoice.totalAmount),
               style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
             ),
             if (invoice.status == InvoiceStatus.paymentPending && invoice.hasPaymentProof) ...[

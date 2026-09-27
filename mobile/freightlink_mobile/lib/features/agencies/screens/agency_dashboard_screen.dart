@@ -113,7 +113,7 @@ class _AgencyDashboardView extends StatelessWidget {
                         ? '${provider.stats!['onTripVehicles']} In Transit'
                         : null,
                     isHighlight: (provider.stats?['onTripVehicles'] ?? 0) > 0,
-                    onTap: () => context.push('/trips'),
+                    onTap: () => context.push('/dashboard/trips'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
                   DashboardActionTile(
@@ -380,7 +380,7 @@ class _KpiGrid extends StatelessWidget {
           label: 'On Trip',
           footer: onTripVehicles > 0 ? '$onTripVehicles active now' : 'No trips in transit',
           footerColor: onTripVehicles > 0 ? AppColors.statusInTransitFg : AppColors.inkMuted,
-          onTap: () => context.push('/trips'),
+          onTap: () => context.push('/dashboard/trips'),
         ),
         DashboardKpiCard(
           icon: Icons.verified_user_outlined,

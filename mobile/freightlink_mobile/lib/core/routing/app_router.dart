@@ -43,7 +43,7 @@ const _roleHomes = <String, String>{
 
 const _roleAllowedExactPaths = <String, List<String>>{
   'Shipper': ['/loads', '/payments', '/dashboard'],
-  'AgencyStaff': ['/dashboard', '/loads', '/trips', '/payments'],
+  'AgencyStaff': ['/dashboard', '/loads', '/payments'],
   'Driver': ['/loads', '/dashboard'],
 };
 
@@ -54,8 +54,8 @@ const _roleAllowedNestedPrefixes = <String, List<String>>{
     '/dashboard/fleet',
     '/dashboard/driver-onboarding',
     '/dashboard/compliance-docs',
+    '/dashboard/trips',
     '/payments/',
-    '/trips/',
   ],
   'Driver': [],
 };
@@ -170,6 +170,19 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                       ),
                     ],
                   ),
+                  GoRoute(
+                    path: 'trips',
+                    builder: (context, state) => const AgencyTripsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: ':tripId',
+                        builder: (context, state) {
+                          final tripId = state.pathParameters['tripId']!;
+                          return AgencyTripDetailScreen(tripId: tripId);
+                        },
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ],
@@ -228,19 +241,6 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                 ],
               ),
             ],
-          ),
-        ],
-      ),
-      GoRoute(
-        path: '/trips',
-        builder: (context, state) => const AgencyTripsScreen(),
-        routes: [
-          GoRoute(
-            path: ':tripId',
-            builder: (context, state) {
-              final tripId = state.pathParameters['tripId']!;
-              return AgencyTripDetailScreen(tripId: tripId);
-            },
           ),
         ],
       ),

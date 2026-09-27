@@ -207,10 +207,10 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
           ),
           const SizedBox(height: AppConstants.spaceMd),
           _overviewRow('Recipient', invoice.recipientName ?? 'Direct'),
-          _overviewRow('Subtotal', '${AppFormatters.currency(invoice.subtotal)} ${invoice.currency}'),
-          _overviewRow('Tax', '${AppFormatters.currency(invoice.taxTotal)} ${invoice.currency}'),
-          _overviewRow('Discount', '${AppFormatters.currency(invoice.discountTotal)} ${invoice.currency}'),
-          _overviewRow('Total', '${AppFormatters.currency(invoice.totalAmount)} ${invoice.currency}', bold: true),
+          _overviewRow('Subtotal', AppFormatters.currency(invoice.subtotal)),
+          _overviewRow('Tax', AppFormatters.currency(invoice.taxTotal)),
+          _overviewRow('Discount', AppFormatters.currency(invoice.discountTotal)),
+          _overviewRow('Total', AppFormatters.currency(invoice.totalAmount), bold: true),
           if (invoice.issuedAt != null) _overviewRow('Issued', AppFormatters.date(invoice.issuedAt!)),
           if (invoice.dueDate != null) _overviewRow('Due', invoice.dueDate!),
           if (invoice.paidAt != null) _overviewRow('Paid', AppFormatters.date(invoice.paidAt!)),
@@ -227,9 +227,14 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 13, color: AppColors.inkMuted)),
-          Text(
-            value,
-            style: TextStyle(fontSize: 13, fontWeight: bold ? FontWeight.w700 : FontWeight.w500, color: AppColors.ink),
+          const SizedBox(width: AppConstants.spaceSm),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, fontWeight: bold ? FontWeight.w700 : FontWeight.w500, color: AppColors.ink),
+            ),
           ),
         ],
       ),

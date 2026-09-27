@@ -19,7 +19,8 @@ void main() {
       expect(isMobileRouteAllowed('AgencyStaff', '/dashboard/compliance-docs/add'), isTrue);
       expect(isMobileRouteAllowed('AgencyStaff', '/loads'), isTrue);
       expect(isMobileRouteAllowed('AgencyStaff', '/payments'), isTrue);
-      expect(isMobileRouteAllowed('AgencyStaff', '/trips'), isTrue);
+      expect(isMobileRouteAllowed('AgencyStaff', '/dashboard/trips'), isTrue);
+      expect(isMobileRouteAllowed('AgencyStaff', '/dashboard/trips/trip-1'), isTrue);
       expect(isMobileRouteAllowed('AgencyStaff', '/reports'), isFalse);
     });
 

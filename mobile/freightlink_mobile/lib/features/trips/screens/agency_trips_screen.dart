@@ -169,7 +169,7 @@ class _AgencyTripsScreenState extends State<AgencyTripsScreen> {
 
     return InkWell(
       key: Key('trip_card_${trip.tripId}'),
-      onTap: () => context.push('/trips/${trip.tripId}'),
+      onTap: () => context.push('/dashboard/trips/${trip.tripId}'),
       borderRadius: BorderRadius.circular(AppConstants.radiusMd),
       child: Container(
         padding: const EdgeInsets.all(AppConstants.spaceLg),
