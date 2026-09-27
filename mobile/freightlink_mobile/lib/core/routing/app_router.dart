@@ -28,6 +28,38 @@ final GlobalKey<NavigatorState> _shellNavigatorLoadsKey = GlobalKey<NavigatorSta
 final GlobalKey<NavigatorState> _shellNavigatorPaymentsKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorReportsKey = GlobalKey<NavigatorState>();
 
+// One routing policy for every authenticated mobile role. Screen builders may
+// still select role-specific content for shared tab slots, but they must never
+// be the only authorization boundary: a user can type a nested URL directly.
+const _roleHomes = <String, String>{
+  'Shipper': '/loads',
+  'AgencyStaff': '/dashboard',
+  'Driver': '/loads',
+};
+
+const _roleAllowedExactPaths = <String, List<String>>{
+  'Shipper': ['/loads', '/payments', '/dashboard', '/reports'],
+  'AgencyStaff': ['/dashboard', '/loads', '/reports'],
+  'Driver': ['/loads', '/dashboard'],
+};
+
+const _roleAllowedNestedPrefixes = <String, List<String>>{
+  'Shipper': ['/payments/'],
+  'AgencyStaff': [
+    '/dashboard/profile',
+    '/dashboard/fleet',
+    '/dashboard/driver-onboarding',
+    '/dashboard/compliance-docs',
+  ],
+  'Driver': [],
+};
+
+String mobileRoleHome(String? role) => _roleHomes[role] ?? '/login';
+
+bool isMobileRouteAllowed(String? role, String path) =>
+    (_roleAllowedExactPaths[role] ?? const <String>[]).contains(path) ||
+    (_roleAllowedNestedPrefixes[role] ?? const <String>[]).any(path.startsWith);
+
 GoRouter createAppRouter(AuthProvider authProvider) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
@@ -44,8 +76,10 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       final isGoingToRegister = state.matchedLocation == '/register';
 
       if (status == AuthStatus.unknown) {
-        // App is still bootstrapping
-        return null;
+        // Fail closed while secure storage/session validation is still running.
+        // Returning null here exposed protected shell routes briefly (and on a
+        // failed bootstrap) to direct URL navigation such as /dashboard.
+        return (isGoingToLogin || isGoingToRegister) ? null : '/login';
       }
 
       if (status == AuthStatus.guest && !isGoingToLogin && !isGoingToRegister) {
@@ -53,21 +87,12 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       }
 
       if (status == AuthStatus.authenticated && (isGoingToLogin || isGoingToRegister)) {
-        // Same reasoning as initialLocation above: land on the operational
-        // tab, not Dashboard, so it's actually built.
-        return '/loads';
+        return mobileRoleHome(authProvider.user?.role);
       }
 
-      // Agency profile, fleet, driver-onboarding, and compliance routes are an AgencyStaff
-      // workspace. Do not rely on the child screen builders alone: a Shipper or Driver can type
-      // a nested URL directly, so enforce the role boundary once at the router level.
-      final isAgencyWorkspace = state.matchedLocation == '/dashboard' ||
-          state.matchedLocation.startsWith('/dashboard/profile') ||
-          state.matchedLocation.startsWith('/dashboard/fleet') ||
-          state.matchedLocation.startsWith('/dashboard/driver-onboarding') ||
-          state.matchedLocation.startsWith('/dashboard/compliance-docs');
-      if (status == AuthStatus.authenticated && isAgencyWorkspace && !(authProvider.user?.isAgencyStaff ?? false)) {
-        return '/loads';
+      if (status == AuthStatus.authenticated &&
+          !isMobileRouteAllowed(authProvider.user?.role, state.matchedLocation)) {
+        return mobileRoleHome(authProvider.user?.role);
       }
 
       return null;

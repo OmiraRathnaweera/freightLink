@@ -31,7 +31,14 @@ http.Client fakeAuthClient({
   return MockClient((request) async {
     if (request.url.path.endsWith('/auth/login')) {
       return http.Response(
-        jsonEncode({'accessToken': 'test-token'}),
+        jsonEncode({'accessToken': 'test-token', 'refreshToken': 'test-refresh-token'}),
+        200,
+        headers: {'content-type': 'application/json'},
+      );
+    }
+    if (request.url.path.endsWith('/auth/refresh')) {
+      return http.Response(
+        jsonEncode({'accessToken': 'refreshed-token', 'refreshToken': 'rotated-refresh-token'}),
         200,
         headers: {'content-type': 'application/json'},
       );
@@ -62,6 +69,9 @@ void main() {
   setUp(() {
     repository = MockLoadsRepository();
     tokenStorage = MockTokenStorage();
+    when(() => tokenStorage.readRefreshToken()).thenAnswer((_) async => null);
+    when(() => tokenStorage.saveTokenPair(accessToken: any(named: 'accessToken'), refreshToken: any(named: 'refreshToken'))).thenAnswer((_) async {});
+    when(() => tokenStorage.clear()).thenAnswer((_) async {});
     when(
       () => repository.getList(
         search: any(named: 'search'),
@@ -98,7 +108,6 @@ void main() {
   group('Auth navigation', () {
     testWidgets('login success lands on My Loads', (tester) async {
       when(() => tokenStorage.readAccessToken()).thenAnswer((_) async => null);
-      when(() => tokenStorage.saveAccessToken(any())).thenAnswer((_) async {});
 
       final authProvider = AuthProvider(
         tokenStorage: tokenStorage,
@@ -124,7 +133,6 @@ void main() {
 
     testWidgets('driver login success lands on DriverAssignedTripScreen', (tester) async {
       when(() => tokenStorage.readAccessToken()).thenAnswer((_) async => null);
-      when(() => tokenStorage.saveAccessToken(any())).thenAnswer((_) async {});
 
       final mockTripsRepo = MockTripsRepository();
       when(() => mockTripsRepo.getDriverActiveTrip()).thenAnswer((_) async => null);
@@ -145,15 +153,8 @@ void main() {
 
       expect(find.byType(LoginScreen), findsOneWidget);
 
-      // Select Driver tab
-      await tester.tap(find.byKey(const Key('role_tab_driver')));
-      await tester.pumpAndSettle();
-
-      expect(find.text('Sign in to view your assigned trips & deliveries'), findsOneWidget);
-
-      // Tap quick-fill chip for driver
-      await tester.tap(find.byKey(const Key('fill_driver1_chip')));
-      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, 'driver1@freightlink.lk');
+      await tester.enterText(find.byType(TextField).last, 'Password123!');
 
       await tester.tap(find.widgetWithText(ElevatedButton, 'Sign in'));
       await tester.pumpAndSettle();
@@ -167,10 +168,7 @@ void main() {
     testWidgets(
       'logging out from an authenticated session redirects to login',
       (tester) async {
-        when(
-          () => tokenStorage.readAccessToken(),
-        ).thenAnswer((_) async => 'stored-token');
-        when(() => tokenStorage.clear()).thenAnswer((_) async {});
+        when(() => tokenStorage.readRefreshToken()).thenAnswer((_) async => 'stored-refresh-token');
 
         final authProvider = AuthProvider(
           tokenStorage: tokenStorage,

@@ -200,16 +200,15 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
       return;
     }
 
-    final selected = await FilePicker.platform.pickFiles(
+    final selected = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
-      withData: true,
     );
-    final file = selected?.files.single;
-    if (file?.bytes == null) return;
+    final file = selected.isEmpty ? null : selected.first;
+    if (file == null) return;
     form.setAttachment(LoadAttachment(
-      filename: file!.name,
-      bytes: file.bytes!,
+      filename: file.name,
+      bytes: await file.readAsBytes(),
       fileType: _attachmentType,
     ));
   }

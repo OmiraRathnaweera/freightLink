@@ -32,17 +32,16 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
 
   Future<void> _submitReceipt(String invoiceId) async {
     final repo = context.read<BillingRepository>();
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
-      withData: true,
     );
-    final picked = result?.files.single;
-    if (picked == null || picked.bytes == null) return;
+    final picked = result.isEmpty ? null : result.first;
+    if (picked == null) return;
 
     setState(() => _submittingInvoiceId = invoiceId);
     try {
-      final publicId = await repo.uploadFile(picked.bytes!, picked.name);
+      final publicId = await repo.uploadFile(await picked.readAsBytes(), picked.name);
       await repo.submitPaymentProof(invoiceId, publicId);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

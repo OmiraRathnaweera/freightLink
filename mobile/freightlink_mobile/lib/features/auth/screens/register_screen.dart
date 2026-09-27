@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
+import '../../loads/screens/location_picker_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -28,6 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _businessRegNoController = TextEditingController();
   final _yardAddressController = TextEditingController();
   final _jobTitleController = TextEditingController();
+  PickedLocation? _yardLocation;
 
   @override
   void dispose() {
@@ -44,8 +46,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _submit() async {
     final auth = context.read<AuthProvider>();
-    
-    await auth.registerAgency(
+    final yard = _yardLocation;
+    if (yard == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select your agency yard location.')),
+      );
+      return;
+    }
+
+    final registered = await auth.registerAgency(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       fullName: _fullNameController.text.trim(),
@@ -53,10 +62,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
       jobTitle: _jobTitleController.text.trim(),
       agencyName: _agencyNameController.text.trim(),
       businessRegNo: _businessRegNoController.text.trim(),
-      yardAddress: _yardAddressController.text.trim(),
-      yardLat: 34.05, // Defaulting coordinates for quick registration
-      yardLng: -118.25,
+      yardAddress: yard.address,
+      yardLat: yard.point.latitude,
+      yardLng: yard.point.longitude,
     );
+    if (registered && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Agency registered. Verify your email, then sign in.')),
+      );
+      context.go('/login');
+    }
+  }
+
+  Future<void> _pickYard() async {
+    final picked = await Navigator.of(context).push<PickedLocation>(
+      MaterialPageRoute(
+        builder: (_) => LocationPickerScreen(
+          title: 'Select agency yard',
+          initialPoint: _yardLocation?.point,
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _yardLocation = picked;
+      _yardAddressController.text = picked.address;
+    });
   }
 
   @override
@@ -162,8 +193,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       AppTextField(
                         label: 'Yard Address',
                         controller: _yardAddressController,
-                        hintText: '123 Main St, City, ST 12345',
+                        hintText: 'Tap to select on map',
                         prefixIcon: Icons.location_on_outlined,
+                        readOnly: true,
+                        onTap: _pickYard,
                         textInputAction: TextInputAction.done,
                       ),
                     ],

@@ -32,7 +32,9 @@ class ApiClient {
   /// without needing to be re-created on every login/logout.
   final String? Function() authToken;
 
-  final void Function()? onUnauthorized;
+  /// Returns true only when a token refresh succeeded and the original
+  /// request may be retried once.
+  final Future<bool> Function()? onUnauthorized;
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final normalized = path.startsWith('/') ? path.substring(1) : path;
@@ -56,37 +58,51 @@ class ApiClient {
     };
   }
 
-  Future<dynamic> get(String path, {Map<String, dynamic>? query}) {
-    return _send(() => _http.get(_uri(path, query), headers: _headers));
+  Future<dynamic> get(
+    String path, {
+    Map<String, dynamic>? query,
+    bool retryOnUnauthorized = true,
+  }) {
+    return _send(
+      () => _http.get(_uri(path, query), headers: _headers),
+      retryOnUnauthorized: retryOnUnauthorized,
+    );
   }
 
-  Future<dynamic> post(String path, {Object? body}) {
+  Future<dynamic> post(
+    String path, {
+    Object? body,
+    bool retryOnUnauthorized = true,
+  }) {
     return _send(
       () => _http.post(
         _uri(path),
         headers: _headers,
         body: body == null ? null : jsonEncode(body),
       ),
+      retryOnUnauthorized: retryOnUnauthorized,
     );
   }
 
-  Future<dynamic> put(String path, {Object? body}) {
+  Future<dynamic> put(String path, {Object? body, bool retryOnUnauthorized = true}) {
     return _send(
       () => _http.put(
         _uri(path),
         headers: _headers,
         body: body == null ? null : jsonEncode(body),
       ),
+      retryOnUnauthorized: retryOnUnauthorized,
     );
   }
 
-  Future<dynamic> patch(String path, {Object? body}) {
+  Future<dynamic> patch(String path, {Object? body, bool retryOnUnauthorized = true}) {
     return _send(
       () => _http.patch(
         _uri(path),
         headers: _headers,
         body: body == null ? null : jsonEncode(body),
       ),
+      retryOnUnauthorized: retryOnUnauthorized,
     );
   }
 
@@ -96,6 +112,7 @@ class ApiClient {
     required String filename,
     String fieldName = 'file',
     Map<String, String>? fields,
+    bool retryOnUnauthorized = true,
   }) {
     return _send(() async {
       final request = http.MultipartRequest('POST', _uri(path));
@@ -117,10 +134,13 @@ class ApiClient {
 
       final streamedResponse = await _http.send(request);
       return http.Response.fromStream(streamedResponse);
-    });
+    }, retryOnUnauthorized: retryOnUnauthorized);
   }
 
-  Future<dynamic> _send(Future<http.Response> Function() request) async {
+  Future<dynamic> _send(
+    Future<http.Response> Function() request, {
+    required bool retryOnUnauthorized,
+  }) async {
     final http.Response response;
     try {
       response = await request();
@@ -136,8 +156,11 @@ class ApiClient {
       return jsonDecode(response.body);
     }
 
-    if (response.statusCode == 401) {
-      onUnauthorized?.call();
+    if (response.statusCode == 401 && retryOnUnauthorized && onUnauthorized != null) {
+      final refreshed = await onUnauthorized!();
+      if (refreshed) {
+        return _send(request, retryOnUnauthorized: false);
+      }
     }
 
     throw _parseError(response);

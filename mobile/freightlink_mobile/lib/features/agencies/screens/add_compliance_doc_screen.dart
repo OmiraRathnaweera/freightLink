@@ -37,7 +37,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
   final _issuedOnController = TextEditingController();
 
   String _selectedDocType = 'BusinessRegistration';
-  PlatformFile? _selectedFile;
+  String? _selectedFileName;
+  List<int>? _selectedFileBytes;
 
   @override
   void dispose() {
@@ -47,16 +48,17 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
-      withData: true,
     );
 
-    if (result != null) {
+    if (result.isNotEmpty) {
+      final file = result.first;
       setState(() {
-        _selectedFile = result.files.single;
+        _selectedFileName = file.name;
       });
+      _selectedFileBytes = await file.readAsBytes();
     }
   }
 
@@ -70,11 +72,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
     final bytes = await photo.readAsBytes();
     if (!mounted) return;
     setState(() {
-      _selectedFile = PlatformFile(
-        name: photo.name,
-        size: bytes.length,
-        bytes: bytes,
-      );
+      _selectedFileName = photo.name;
+      _selectedFileBytes = bytes;
     });
   }
 
@@ -128,7 +127,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
       );
       return;
     }
-    if (_selectedFile == null || _selectedFile!.bytes == null) {
+    if (_selectedFileName == null || _selectedFileBytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a file to upload.')),
       );
@@ -139,8 +138,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
       _selectedDocType,
       _docNumberController.text.trim(),
       _issuedOnController.text.trim(),
-      _selectedFile!.bytes!,
-      _selectedFile!.name,
+      _selectedFileBytes!,
+      _selectedFileName!,
     );
 
     if (!mounted) return;
@@ -222,7 +221,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                 OutlinedButton.icon(
                   onPressed: _chooseDocumentSource,
                   icon: const Icon(Icons.upload_file),
-                  label: Text(_selectedFile == null ? 'Add document' : _selectedFile!.name),
+                  label: Text(_selectedFileName == null ? 'Add document' : _selectedFileName!),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
