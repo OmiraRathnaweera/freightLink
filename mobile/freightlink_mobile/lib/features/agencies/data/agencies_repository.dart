@@ -6,19 +6,25 @@ class AgenciesRepository {
   final ApiClient _client;
   final String? agencyId;
   
-  // Fetch dashboard stats
+  // Build dashboard metrics from the same persisted resources shown by the
+  // Agency screens; never surface demo-only numbers in an operational view.
   Future<Map<String, dynamic>> getDashboardStats() async {
     if (agencyId == null) {
       throw Exception('Agency ID is missing.');
     }
     
-    final vehicles = await getFleet();
-    final drivers = await getDrivers();
+    final results = await Future.wait([getFleet(), getDrivers(), getComplianceDocs()]);
+    final vehicles = results[0] as List<Map<String, dynamic>>;
+    final drivers = results[1] as List<Map<String, dynamic>>;
+    final complianceDocs = results[2] as List<Map<String, dynamic>>;
     
     return {
       'totalVehicles': vehicles.length,
       'activeDrivers': drivers.length,
-      'pendingCompliance': 3, // Still mocked for now since compliance docs aren't implemented fully
+      'availableVehicles': vehicles.where((v) => v['status'] == 'Available').length,
+      'onTripVehicles': vehicles.where((v) => v['status'] == 'OnTrip').length,
+      'maintenanceVehicles': vehicles.where((v) => v['status'] == 'Maintenance').length,
+      'pendingCompliance': complianceDocs.where((d) => d['status'] == 'Pending').length,
     };
   }
 

@@ -8,6 +8,7 @@ import '../../features/auth/screens/register_screen.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
 import '../../features/trips/screens/driver_assigned_trip_screen.dart';
 import '../../features/trips/screens/job_proposals_screen.dart';
+import '../../features/trips/screens/agency_trips_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/app_top_bar.dart';
 import '../../shared/widgets/coming_soon_placeholder.dart';
@@ -39,7 +40,7 @@ const _roleHomes = <String, String>{
 
 const _roleAllowedExactPaths = <String, List<String>>{
   'Shipper': ['/loads', '/payments', '/dashboard', '/reports'],
-  'AgencyStaff': ['/dashboard', '/loads', '/reports'],
+  'AgencyStaff': ['/dashboard', '/loads', '/trips', '/payments', '/reports'],
   'Driver': ['/loads', '/dashboard'],
 };
 
@@ -50,6 +51,7 @@ const _roleAllowedNestedPrefixes = <String, List<String>>{
     '/dashboard/fleet',
     '/dashboard/driver-onboarding',
     '/dashboard/compliance-docs',
+    '/payments/',
   ],
   'Driver': [],
 };
@@ -222,6 +224,10 @@ GoRouter createAppRouter(AuthProvider authProvider) {
             ],
           ),
         ],
+      ),
+      GoRoute(
+        path: '/trips',
+        builder: (context, state) => const AgencyTripsScreen(),
       ),
     ],
   );

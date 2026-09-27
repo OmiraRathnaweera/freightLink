@@ -31,17 +31,14 @@ class AgencyDashboardScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
-                      Text(
-                        'Total Vehicles: ${provider.stats?['totalVehicles'] ?? 0}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      Text(
-                        'Total Drivers: ${provider.stats?['activeDrivers'] ?? 0}',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
+                      _MetricChip(label: 'Vehicles', value: provider.stats?['totalVehicles'] ?? 0, icon: Icons.local_shipping_outlined),
+                      _MetricChip(label: 'Active drivers', value: provider.stats?['activeDrivers'] ?? 0, icon: Icons.person_outline),
+                      _MetricChip(label: 'Available', value: provider.stats?['availableVehicles'] ?? 0, icon: Icons.check_circle_outline),
+                      _MetricChip(label: 'Compliance pending', value: provider.stats?['pendingCompliance'] ?? 0, icon: Icons.assignment_late_outlined),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -71,6 +68,21 @@ class AgencyDashboardScreen extends StatelessWidget {
                           icon: Icons.description,
                           onTap: () => context.go('/dashboard/compliance-docs'),
                         ),
+                        _DashboardCard(
+                          title: 'Job Proposals',
+                          icon: Icons.assignment_outlined,
+                          onTap: () => context.go('/loads'),
+                        ),
+                        _DashboardCard(
+                          title: 'Agency Trips',
+                          icon: Icons.route_outlined,
+                          onTap: () => context.push('/trips'),
+                        ),
+                        _DashboardCard(
+                          title: 'Billing',
+                          icon: Icons.receipt_long_outlined,
+                          onTap: () => context.go('/payments'),
+                        ),
                       ],
                     ),
                   ),
@@ -82,6 +94,20 @@ class AgencyDashboardScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MetricChip extends StatelessWidget {
+  const _MetricChip({required this.label, required this.value, required this.icon});
+
+  final String label;
+  final Object value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Chip(
+        avatar: Icon(icon, size: 18),
+        label: Text('$label: $value'),
+      );
 }
 
 class _DashboardCard extends StatelessWidget {

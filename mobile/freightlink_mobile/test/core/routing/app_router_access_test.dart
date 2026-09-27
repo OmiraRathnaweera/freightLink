@@ -12,12 +12,13 @@ void main() {
       expect(isMobileRouteAllowed('Shipper', '/dashboard/compliance-docs'), isFalse);
     });
 
-    test('Agency Staff owns Agency workspace and proposals but not Billing', () {
+    test('Agency Staff owns Agency workspace, proposals, trips, and Billing', () {
       expect(mobileRoleHome('AgencyStaff'), '/dashboard');
       expect(isMobileRouteAllowed('AgencyStaff', '/dashboard/fleet/add'), isTrue);
       expect(isMobileRouteAllowed('AgencyStaff', '/dashboard/compliance-docs/add'), isTrue);
       expect(isMobileRouteAllowed('AgencyStaff', '/loads'), isTrue);
-      expect(isMobileRouteAllowed('AgencyStaff', '/payments'), isFalse);
+      expect(isMobileRouteAllowed('AgencyStaff', '/payments'), isTrue);
+      expect(isMobileRouteAllowed('AgencyStaff', '/trips'), isTrue);
     });
 
     test('Driver is restricted to operational trip tab and placeholder dashboard', () {
