@@ -28,7 +28,8 @@ class PaymentsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => InvoiceListProvider(context.read<BillingRepository>())..load(),
+      create: (context) =>
+          InvoiceListProvider(context.read<BillingRepository>())..load(),
       child: const _PaymentsView(),
     );
   }
@@ -41,19 +42,35 @@ class _PaymentsView extends StatelessWidget {
   Widget build(BuildContext context) {
     final provider = context.watch<InvoiceListProvider>();
     final isShipper = context.watch<AuthProvider>().user?.isShipper ?? false;
-    final isAgencyStaff = context.watch<AuthProvider>().user?.isAgencyStaff ?? false;
+    final isAgencyStaff =
+        context.watch<AuthProvider>().user?.isAgencyStaff ?? false;
 
     return Scaffold(
-      appBar: const AppTopBar(title: 'Invoices & Payments', leading: AppAvatar(), actions: [NotificationBellButton()]),
+      appBar: AppTopBar(
+        title: 'Invoices & Payments',
+        leading: const AppAvatar(),
+        actions: [
+          IconButton(
+            tooltip: 'Trip disputes',
+            onPressed: () => context.push('/payments/disputes'),
+            icon: const Icon(Icons.balance_outlined),
+          ),
+          const NotificationBellButton(),
+        ],
+      ),
       body: Builder(
         builder: (context) {
           switch (provider.state) {
             case InvoiceListState.loading:
-              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
             case InvoiceListState.error:
               return ErrorState(
                 title: 'Unable to load invoices',
-                message: provider.error?.message ?? 'Please check your connection and try again.',
+                message:
+                    provider.error?.message ??
+                    'Please check your connection and try again.',
                 onRetry: provider.load,
               );
             case InvoiceListState.empty:
@@ -75,7 +92,8 @@ class _PaymentsView extends StatelessWidget {
                 child: ListView.separated(
                   padding: const EdgeInsets.all(AppConstants.spaceLg),
                   itemCount: provider.items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: AppConstants.spaceMd),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: AppConstants.spaceMd),
                   itemBuilder: (context, index) {
                     final invoice = provider.items[index];
                     return _InvoiceCard(
@@ -94,7 +112,11 @@ class _PaymentsView extends StatelessWidget {
 }
 
 class _InvoiceCard extends StatelessWidget {
-  const _InvoiceCard({required this.invoice, required this.isShipper, required this.isAgencyStaff});
+  const _InvoiceCard({
+    required this.invoice,
+    required this.isShipper,
+    required this.isAgencyStaff,
+  });
 
   final Invoice invoice;
   final bool isShipper;
@@ -116,7 +138,11 @@ class _InvoiceCard extends StatelessWidget {
                     invoice.invoiceNumber,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppConstants.spaceSm),
@@ -128,7 +154,8 @@ class _InvoiceCard extends StatelessWidget {
               AppFormatters.currency(invoice.totalAmount),
               style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
             ),
-            if (invoice.status == InvoiceStatus.paymentPending && invoice.hasPaymentProof) ...[
+            if (invoice.status == InvoiceStatus.paymentPending &&
+                invoice.hasPaymentProof) ...[
               const SizedBox(height: 6),
               const Text(
                 'Receipt submitted — awaiting Agency confirmation.',
@@ -141,11 +168,15 @@ class _InvoiceCard extends StatelessWidget {
               children: [
                 if (invoice.tripId != null)
                   TextButton(
-                    onPressed: () => context.push('/payments/dispute', extra: invoice.tripId),
+                    onPressed: () => context.push(
+                      '/payments/dispute',
+                      extra: invoice.tripId,
+                    ),
                     child: const Text('Raise dispute'),
                   ),
                 TextButton(
-                  onPressed: () => context.push('/payments/${invoice.invoiceId}'),
+                  onPressed: () =>
+                      context.push('/payments/${invoice.invoiceId}'),
                   child: Text(isAgencyStaff ? 'Manage' : 'View details'),
                 ),
               ],

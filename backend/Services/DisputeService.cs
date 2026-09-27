@@ -217,6 +217,7 @@ public class DisputeService : IDisputeService
                 Description = d.Description,
                 Status = d.Status,
                 CreatedAt = d.CreatedAt,
+                UpdatedAt = d.UpdatedAt,
                 HasResolution = d.Resolution != null,
                 TripRouteSummary = d.Trip.Assignment.Load.PickupAddress + " → " + d.Trip.Assignment.Load.DropoffAddress,
                 CarrierAgencyName = d.Trip.Assignment.Agency.Name,
@@ -443,6 +444,13 @@ public class DisputeService : IDisputeService
         DisputeId = dispute.DisputeId,
         TripId = dispute.TripId,
         RaisedByUserId = dispute.RaisedByUserId,
+        RaisedByName = dispute.RaisedByUser?.FullName,
+        RaisedByRole = dispute.RaisedByUser?.Role.ToString(),
+        TripRouteSummary = dispute.Trip?.Assignment?.Load is { } load
+            ? load.PickupAddress + " → " + load.DropoffAddress
+            : null,
+        CarrierAgencyName = dispute.Trip?.Assignment?.Agency?.Name,
+        VehicleRegistrationNo = dispute.Trip?.Vehicle?.RegistrationNo,
         Category = dispute.Category,
         Description = dispute.Description,
         Status = dispute.Status,

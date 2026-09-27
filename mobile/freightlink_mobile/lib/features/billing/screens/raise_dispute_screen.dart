@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../data/billing_repository.dart';
+import '../../disputes/data/dispute_repository.dart';
+import '../../disputes/models/dispute.dart';
 
 class RaiseDisputeScreen extends StatefulWidget {
   const RaiseDisputeScreen({super.key, required this.tripId});
@@ -30,23 +31,31 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     try {
-      await context.read<BillingRepository>().raiseDispute(
-            tripId: widget.tripId,
-            category: _category,
-            description: _description.text.trim(),
-          );
+      final dispute = await context.read<DisputeRepository>().raiseDispute(
+        tripId: widget.tripId,
+        category: DisputeCategory.fromWire(_category),
+        description: _description.text.trim(),
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Dispute raised and sent for review.')),
       );
-      context.pop();
+      context.replace('/payments/disputes/${dispute.disputeId}');
     } on ApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+      final message =
+          error.code == 'DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY'
+          ? 'You already have an active dispute in this category for this trip.'
+          : error.message;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to raise dispute. Please try again.')),
+        const SnackBar(
+          content: Text('Failed to raise dispute. Please try again.'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -64,7 +73,10 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Trip ${widget.tripId}', style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                'Trip ${widget.tripId}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
                 value: _category,
@@ -75,7 +87,9 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
                   DropdownMenuItem(value: 'Billing', child: Text('Billing')),
                   DropdownMenuItem(value: 'Other', child: Text('Other')),
                 ],
-                onChanged: _submitting ? null : (value) => setState(() => _category = value!),
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _category = value!),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -84,7 +98,10 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
                 minLines: 5,
                 maxLines: 8,
                 maxLength: 2000,
-                decoration: const InputDecoration(labelText: 'What happened?', alignLabelWithHint: true),
+                decoration: const InputDecoration(
+                  labelText: 'What happened?',
+                  alignLabelWithHint: true,
+                ),
                 // Mirrors CreateDisputeDto: [Required][StringLength(2000, MinimumLength = 10)]
                 // (backend/DTOs/Disputes/CreateDisputeDto.cs).
                 validator: (value) {

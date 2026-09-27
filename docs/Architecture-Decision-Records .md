@@ -465,7 +465,7 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 The original design (see the "Admin" wording still present in early drafts of ADR-007, ADR-010, and ADR-013 before this ADR) had the Admin reviewing and approving the AI's recommended agency match, mirroring a generic "platform overseer approves everything" pattern. On review, the team reconsidered who actually has the standing to make this call: it is the shipper's cargo and the shipper's money at stake in each match, not the platform operator's.
 
 ### Decision
-The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignment and approves, rejects, or requests revision. This happens on the Shipper's own React console (Component A), which displays the recommended agency, ETA, price, and the price-deviation percentage as decision-support context. The **Admin's** role is narrowed to two functions only: **agency KYC/compliance verification** (Component B) and **system-wide analytics**. Admin has no involvement in per-load matching decisions. *(ADR-019 subsequently adds a third, narrow Admin function — maintaining the pricing-configuration reference data — which does not involve per-load matching decisions and is consistent with this ADR's separation-of-concerns intent; see ADR-019 for the reasoning.)*
+The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignment and approves, rejects, or requests revision. This happens on the Shipper's own React console (Component A), which displays the recommended agency, ETA, price, and the price-deviation percentage as decision-support context. The **Admin** retains platform-oversight functions only: **agency KYC/compliance verification** (Component B), **system-wide analytics**, **pricing-configuration reference data** (ADR-019), and **dispute adjudication**. Admin has no involvement in per-load matching decisions.
 
 ### Consequences
 **Positive**
@@ -476,14 +476,15 @@ The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignme
 **Negative**
 - The approval endpoint must now be guarded to accept a decision only from the specific load's own shipper (not just "any authenticated user with the Shipper role"), which is a small but necessary additional authorization check beyond simple role-based access control.
 - Unlike a small, predictable Admin user population, the live demo now depends on the correct Shipper account being logged in and responsive at the exact moment the recommendation is ready — the demo script must have that session open in advance.
-- Narrows Component D's ("Billing & Admin Oversight") scope, since the approval console it previously owned moves to Component A. This is judged an acceptable, even positive, simplification, since Component D retains full ownership of Agent 4's computation, the `ApprovalDecision` write endpoint, invoicing, and (pending confirmation) dispute resolution.
+- Narrows Component D's ("Billing & Admin Oversight") scope, since the approval console it previously owned moves to Component A. This is judged an acceptable, even positive, simplification, since Component D retains full ownership of Agent 4's computation, the `ApprovalDecision` write endpoint, invoicing, and dispute resolution.
 
 ### Alternatives Considered
 - **Admin approves (original design):** Rejected — a weaker mirror of real-world incentives, and unnecessarily routes every single match through a staff account that has no direct stake in the outcome.
 - **Dual approval (both Shipper and Admin must approve):** Rejected — adds friction and an extra state to test and demo, with no rubric requirement to justify it within the 8-week timeline.
 
-### Open Follow-On Question
-Whether Admin's narrowed "KYC + analytics only" remit also removes dispute resolution from Component D, or whether disputes remain with Admin as a distinct function unrelated to per-load matching, is not yet resolved by the team — flagged for confirmation before Component D's individual report is finalized.
+### Follow-On Decision — Resolved (27 September 2026)
+
+Dispute resolution remains an **Admin-only** function, exercised on the React web portal. It is distinct from per-load AI-match approval and is consistent with Admin's platform-oversight remit. Component D owns disputes end to end: claimant raise and visibility, followed by Admin review and resolution.
 
 ---
 

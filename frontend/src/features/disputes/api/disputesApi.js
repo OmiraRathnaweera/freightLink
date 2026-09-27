@@ -51,6 +51,16 @@ export async function fetchDispute(disputeId) {
   return toDisplayDispute(await api.get(`/disputes/${disputeId}`))
 }
 
+export async function raiseDispute({ tripId, category, description }) {
+  return toDisplayDispute(
+    await api.post('/disputes', {
+      tripId,
+      category,
+      description: description.trim(),
+    }),
+  )
+}
+
 export async function startReviewDispute(disputeId) {
   return toDisplayDispute(await api.patch(`/disputes/${disputeId}/review`))
 }
@@ -75,6 +85,14 @@ export function useDisputeDetailQuery(disputeId, options = {}) {
     queryFn: () => fetchDispute(disputeId),
     enabled: Boolean(disputeId),
     ...options,
+  })
+}
+
+export function useRaiseDisputeMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: raiseDispute,
+    onSuccess: (data) => invalidateDisputes(queryClient, data.disputeId),
   })
 }
 

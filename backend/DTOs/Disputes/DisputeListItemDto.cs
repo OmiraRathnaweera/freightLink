@@ -33,6 +33,9 @@ public class DisputeListItemDto
     /// <summary>Timestamp when the dispute was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Timestamp of the last lifecycle/content update.</summary>
+    public DateTimeOffset UpdatedAt { get; set; }
+
     /// <summary>Whether a formal resolution is attached to this dispute.</summary>
     public bool HasResolution { get; set; }
 

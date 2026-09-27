@@ -28,6 +28,9 @@ import FuelRatesPage from '../features/pricingConfig/pages/FuelRatesPage.jsx'
 import VehicleEfficiencyPage from '../features/pricingConfig/pages/VehicleEfficiencyPage.jsx'
 import PricingFormulaPage from '../features/pricingConfig/pages/PricingFormulaPage.jsx'
 import AdminDisputesPage from '../features/disputes/pages/AdminDisputesPage.jsx'
+import MyDisputesPage from '../features/disputes/pages/MyDisputesPage.jsx'
+import RaiseDisputePage from '../features/disputes/pages/RaiseDisputePage.jsx'
+import ClaimantDisputeDetailPage from '../features/disputes/pages/ClaimantDisputeDetailPage.jsx'
 import AdminAnalyticsPage from '../features/analytics/pages/AdminAnalyticsPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
@@ -80,6 +83,9 @@ const router = createBrowserRouter(
           <Route path="/pricing-config/vehicle-efficiency" element={<VehicleEfficiencyPage />} />
           <Route path="/pricing-config/formula" element={<PricingFormulaPage />} />
           <Route path="/disputes" element={<AdminDisputesPage />} />
+          <Route path="/my-disputes" element={<MyDisputesPage />} />
+          <Route path="/my-disputes/new" element={<RaiseDisputePage />} />
+          <Route path="/my-disputes/:disputeId" element={<ClaimantDisputeDetailPage />} />
           <Route path="/analytics" element={<AdminAnalyticsPage />} />
         </Route>
       </Route>

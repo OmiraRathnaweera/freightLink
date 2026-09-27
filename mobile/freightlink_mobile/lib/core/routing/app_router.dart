@@ -24,13 +24,18 @@ import '../../features/agencies/screens/compliance_docs_screen.dart';
 import '../../features/agencies/screens/add_compliance_doc_screen.dart';
 import '../../features/billing/screens/payments_screen.dart';
 import '../../features/billing/screens/raise_dispute_screen.dart';
+import '../../features/disputes/screens/dispute_detail_screen.dart';
+import '../../features/disputes/screens/my_disputes_screen.dart';
 import '../../features/billing/screens/invoice_detail_screen.dart';
 import '../../features/billing/screens/create_invoice_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorDashboardKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorLoadsKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorPaymentsKey = GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorDashboardKey =
+    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorLoadsKey =
+    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> _shellNavigatorPaymentsKey =
+    GlobalKey<NavigatorState>();
 
 // One routing policy for every authenticated mobile role. Screen builders may
 // still select role-specific content for shared tab slots, but they must never
@@ -96,17 +101,17 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       }
 
       if (status == AuthStatus.authenticated &&
-          !isMobileRouteAllowed(authProvider.user?.role, state.matchedLocation)) {
+          !isMobileRouteAllowed(
+            authProvider.user?.role,
+            state.matchedLocation,
+          )) {
         return mobileRoleHome(authProvider.user?.role);
       }
 
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/login',
-        builder: (context, state) => const LoginScreen(),
-      ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppShell(navigationShell: navigationShell);
@@ -166,7 +171,8 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                     routes: [
                       GoRoute(
                         path: 'add',
-                        builder: (context, state) => const AddComplianceDocScreen(),
+                        builder: (context, state) =>
+                            const AddComplianceDocScreen(),
                       ),
                     ],
                   ),
@@ -218,11 +224,27 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                       final tripId = state.extra as String?;
                       if (tripId == null) {
                         return const Scaffold(
-                          body: Center(child: Text('No trip was selected for this dispute.')),
+                          body: Center(
+                            child: Text(
+                              'No trip was selected for this dispute.',
+                            ),
+                          ),
                         );
                       }
                       return RaiseDisputeScreen(tripId: tripId);
                     },
+                  ),
+                  GoRoute(
+                    path: 'disputes',
+                    builder: (context, state) => const MyDisputesScreen(),
+                    routes: [
+                      GoRoute(
+                        path: ':disputeId',
+                        builder: (context, state) => DisputeDetailScreen(
+                          disputeId: state.pathParameters['disputeId']!,
+                        ),
+                      ),
+                    ],
                   ),
                   GoRoute(
                     path: 'create',

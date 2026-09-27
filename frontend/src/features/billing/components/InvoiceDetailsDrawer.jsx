@@ -32,6 +32,7 @@ function InvoiceDetailsDrawer({
   onVoid,
   onUploadPaymentProof,
   onConfirmPayment,
+  onRaiseDispute,
   isAgent = true,
   isAdmin = false,
   isShipper = false,
@@ -55,6 +56,7 @@ function InvoiceDetailsDrawer({
   const canVoid = isAgent && (isDraft || isIssued || isPaymentPending || isFailed)
   const canSubmitReceipt = isShipper && isUnpaid && !isVoided
   const canConfirmPayment = isAgent && isPaymentPending && Boolean(invoice?.paymentProofUrl)
+  const canRaiseDispute = (isAgent || isShipper) && Boolean(invoice?.tripId || invoice?.linkedEntityId || invoice?.loadRef)
 
   const handleSubmitReceipt = async () => {
     if (!receiptFile || !onUploadPaymentProof) return
@@ -433,6 +435,23 @@ function InvoiceDetailsDrawer({
                       Confirm Payment & Close Invoice
                     </>
                   )}
+                </Button>
+              </div>
+            )}
+
+            {/* Internal Notes */}
+            {canRaiseDispute && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <h3 className="text-sm font-bold text-amber-950">Need to report a trip issue?</h3>
+                <p className="mt-1 text-xs text-amber-800">
+                  Raise one dispute per category for this trip. An Admin will review its status and final resolution.
+                </p>
+                <Button
+                  variant="secondary"
+                  onClick={() => onRaiseDispute?.(linkedTrip)}
+                  className="mt-3 border-amber-300 bg-white text-amber-900 hover:bg-amber-100"
+                >
+                  Raise dispute
                 </Button>
               </div>
             )}

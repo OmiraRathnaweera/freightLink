@@ -75,6 +75,7 @@ const GET_NAV_ITEMS = (role) => [
   },
   { to: '/trips', label: 'Trips', icon: RouteIcon },
   { to: '/billing', label: 'Billing', icon: Receipt },
+  { to: '/my-disputes', label: 'My Disputes', icon: Scale },
   { to: '/agent-workflows', label: 'Agent Workflows', icon: Workflow },
   {
     to: '/pricing-config',

@@ -227,10 +227,10 @@ Query parameters, applied consistently across all `GET` list endpoints:
 | POST | `/disputes` | Raise a dispute | Shipper, AgencyStaff |
 | GET | `/disputes` | List disputes | Admin, Shipper (own), AgencyStaff (own) |
 | GET | `/disputes/{id}` | Dispute detail | Admin, Shipper (own), AgencyStaff (own) |
-| POST | `/disputes/{id}/resolve` | Resolve a dispute (`UnderReview → Resolved`) | **Admin — provisional, pending team decision (README Section 10, #9)** |
+| POST | `/disputes/{id}/resolve` | Resolve a dispute (`UnderReview → Resolved`) | **Admin** |
 | GET | `/admin/summary` | Admin financial/operational summary | Admin |
 
-> **Flagged in Rev. 2:** `disputes/{id}/resolve`'s role is currently assumed to be `Admin`, but README Section 10 explicitly lists this as an **unresolved** open decision — "whether Admin retains dispute resolution responsibility." Confirm with the team before Component D's individual report is finalized; if resolution moves elsewhere, only this one row needs to change.
+> **Resolved in ADR-016 follow-on decision (27 September 2026):** dispute resolution remains an Admin-only platform-oversight responsibility. It is distinct from Shipper-owned AI-match approval.
 
 ### 4.6 Agentic AI Workflow — Cross-Component
 

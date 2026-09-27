@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertCircle,
   CheckCircle2,
@@ -6,6 +7,7 @@ import {
   Download,
   Plus,
   RefreshCw,
+  Scale,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader.jsx'
@@ -37,6 +39,7 @@ import {
 const PAGE_SIZE = 8
 
 function BillingPage() {
+  const navigate = useNavigate()
   const { role } = useAppSelector((state) => state.auth)
   const isAgent = role === UserRole.AGENCY_STAFF
   const isAdmin = role === UserRole.ADMIN
@@ -354,6 +357,17 @@ function BillingPage() {
               <span>{isExporting ? 'Exporting…' : 'Export CSV'}</span>
             </button>
 
+            {(isAgent || isShipper) && (
+              <button
+                type="button"
+                onClick={() => navigate('/my-disputes')}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                <Scale className="h-4 w-4 text-slate-500" />
+                <span>My Disputes</span>
+              </button>
+            )}
+
             {/* Create Invoice: Strictly for Agent role */}
             {isAgent && (
               <button
@@ -529,6 +543,10 @@ function BillingPage() {
         onVoid={handleOpenVoidDialog}
         onUploadPaymentProof={handleUploadPaymentProof}
         onConfirmPayment={handleConfirmPayment}
+        onRaiseDispute={(tripId) => {
+          setIsDrawerOpen(false)
+          navigate(`/my-disputes/new?tripId=${encodeURIComponent(tripId)}`)
+        }}
         role={role}
         isAgent={isAgent}
         isAdmin={isAdmin}

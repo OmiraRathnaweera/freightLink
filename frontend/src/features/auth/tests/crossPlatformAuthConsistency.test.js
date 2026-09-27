@@ -82,11 +82,13 @@ describe('Cross-Platform Auth & Session Consistency (Y3S01-103)', () => {
       expect(isRouteAllowedForRole(UserRole.SHIPPER, '/loads')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.SHIPPER, '/loads/new')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.SHIPPER, '/billing')).toBe(true)
+      expect(isRouteAllowedForRole(UserRole.SHIPPER, '/my-disputes')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.SHIPPER, '/agent-workflows')).toBe(true)
 
       // Gated from Agency operations and Admin pricing
       expect(isRouteAllowedForRole(UserRole.SHIPPER, '/agencies')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.SHIPPER, '/pricing-config')).toBe(false)
+      expect(isRouteAllowedForRole(UserRole.SHIPPER, '/disputes')).toBe(false)
     })
 
     it('enforces AgencyStaff permissions and role home (/agencies)', () => {
@@ -95,12 +97,14 @@ describe('Cross-Platform Auth & Session Consistency (Y3S01-103)', () => {
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/agencies')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/trips')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/billing')).toBe(true)
+      expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/my-disputes')).toBe(true)
       // Requirement 5: AgencyStaff can access loads marketplace to view and accept posted loads
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/loads')).toBe(true)
 
       // Gated from Admin pricing and agent workflows
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/pricing-config')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/agent-workflows')).toBe(false)
+      expect(isRouteAllowedForRole(UserRole.AGENCY_STAFF, '/disputes')).toBe(false)
     })
 
     it('enforces Driver has no web UI per Requirement 1 (mobile application only)', () => {
@@ -113,6 +117,7 @@ describe('Cross-Platform Auth & Session Consistency (Y3S01-103)', () => {
       expect(isRouteAllowedForRole(UserRole.DRIVER, '/billing')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.DRIVER, '/pricing-config')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.DRIVER, '/agent-workflows')).toBe(false)
+      expect(isRouteAllowedForRole(UserRole.DRIVER, '/my-disputes')).toBe(false)
     })
 
     it('enforces Admin permissions across all management routes', () => {
@@ -124,6 +129,8 @@ describe('Cross-Platform Auth & Session Consistency (Y3S01-103)', () => {
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/billing')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/agent-workflows')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/pricing-config')).toBe(true)
+      expect(isRouteAllowedForRole(UserRole.ADMIN, '/disputes')).toBe(true)
+      expect(isRouteAllowedForRole(UserRole.ADMIN, '/my-disputes')).toBe(false)
     })
   })
 

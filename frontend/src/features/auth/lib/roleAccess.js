@@ -21,8 +21,8 @@ export const ROLE_ALLOWED_PREFIXES = {
   // their own load's dispatched trip once they have its id (from
   // LoadResponseDto.tripId), but GET /trips (list) is Agency/Driver/Admin
   // only on the backend regardless.
-  [UserRole.SHIPPER]: ['/loads', '/billing', '/agent-workflows', '/trips/'],
-  [UserRole.AGENCY_STAFF]: ['/loads', '/agencies', '/trips', '/billing'],
+  [UserRole.SHIPPER]: ['/loads', '/billing', '/agent-workflows', '/trips/', '/my-disputes'],
+  [UserRole.AGENCY_STAFF]: ['/loads', '/agencies', '/trips', '/billing', '/my-disputes'],
   [UserRole.DRIVER]: [], // Requirement 1: drivers only have access to mobile application UI
   [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/pricing-config', '/disputes', '/analytics'],
 }

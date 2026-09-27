@@ -1,5 +1,6 @@
 import 'package:freightlink_mobile/core/storage/token_storage.dart';
 import 'package:freightlink_mobile/features/billing/data/billing_repository.dart';
+import 'package:freightlink_mobile/features/disputes/data/dispute_repository.dart';
 import 'package:freightlink_mobile/features/loads/data/loads_repository.dart';
 import 'package:freightlink_mobile/features/trips/data/trips_repository.dart';
 import 'package:freightlink_mobile/features/trips/models/trip_models.dart';
@@ -15,6 +16,8 @@ class MockLoadsRepository extends Mock implements LoadsRepository {}
 class MockTripsRepository extends Mock implements TripsRepository {}
 
 class MockBillingRepository extends Mock implements BillingRepository {}
+
+class MockDisputeRepository extends Mock implements DisputeRepository {}
 
 class MockImageCaptureService extends Mock implements ImageCaptureService {}
 

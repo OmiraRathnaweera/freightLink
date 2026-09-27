@@ -16,6 +16,13 @@ public class DisputeResponseDto
     /// <summary>The user ID of the user who raised the dispute.</summary>
     public Guid RaisedByUserId { get; set; }
 
+    /// <summary>Claimant details and safe trip context for a claimant-facing detail view.</summary>
+    public string? RaisedByName { get; set; }
+    public string? RaisedByRole { get; set; }
+    public string? TripRouteSummary { get; set; }
+    public string? CarrierAgencyName { get; set; }
+    public string? VehicleRegistrationNo { get; set; }
+
     /// <summary>The category of the dispute.</summary>
     public DisputeCategory Category { get; set; }
 
