@@ -97,6 +97,12 @@ public interface IAgencyService
     Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Removes/reactivates a driver from an agency's active roster by transitioning between Active
+    /// and Inactive. OnTrip is trip-execution-owned and can never be set or cleared here.
+    /// </summary>
+    Task<DriverResponseDto> UpdateDriverStatusAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, UpdateDriverStatusDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves full fleet resources (vehicles and drivers) for an agency.
     /// </summary>
     Task<AgencyFleetResponseDto> GetFleetAsync(Guid? agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);

@@ -127,6 +127,55 @@ export async function addVehicle({ agencyId, vehicle }) {
   return api.post(`/agencies/${agencyId}/vehicles`, vehicle)
 }
 
+export async function getDrivers(agencyId) {
+  return api.get(`/agencies/${agencyId}/drivers`)
+}
+
+export async function addDriver({ agencyId, driver }) {
+  return api.post(`/agencies/${agencyId}/drivers`, driver)
+}
+
+/**
+ * PATCH /agencies/{id}/drivers/{driverId}/status
+ * Removes ("Inactive") or reinstates ("Active") a driver on the agency's roster. OnTrip is
+ * trip-execution-owned and cannot be set here.
+ */
+export async function updateDriverStatus({ agencyId, driverId, status }) {
+  return api.patch(`/agencies/${agencyId}/drivers/${driverId}/status`, { status })
+}
+
+export function useDriversQuery(agencyId, options) {
+  return useQuery({
+    queryKey: ['agencies', agencyId, 'drivers'],
+    queryFn: () => getDrivers(agencyId),
+    ...options,
+  })
+}
+
+export function useAddDriverMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: addDriver,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useUpdateDriverStatusMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateDriverStatus,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
 export function useComplianceDocsQuery(agencyId, options) {
   return useQuery({
     queryKey: ['agencies', agencyId, 'compliance-docs'],

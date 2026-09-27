@@ -7,7 +7,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
-import 'driver_register_screen.dart';
 
 enum LoginRole {
   shipper('Shipper', 'Sign in to manage your loads', Icons.local_shipping_rounded),
@@ -248,34 +247,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     if (_selectedRole == LoginRole.driver) ...[
                       const SizedBox(height: AppConstants.spaceLg),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'New driver? ',
-                            style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
-                          ),
-                          GestureDetector(
-                            key: const Key('register_driver_link'),
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => const DriverRegisterScreen(),
-                                ),
-                              );
-                            },
-                            child: const Text(
-                              'Register here',
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        key: Key('driver_registration_notice'),
+                        'Driver accounts are added by your agency. Contact your dispatcher if you need access.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
                       ),
-                    ] else ...[
+                    ] else if (_selectedRole == LoginRole.agencyStaff) ...[
                       const SizedBox(height: AppConstants.spaceLg),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -286,9 +264,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           TextButton(
                             onPressed: () => context.go('/register'),
-                            child: const Text('Sign up'),
+                            child: const Text('Register agency'),
                           ),
                         ],
+                      ),
+                    ] else ...[
+                      const SizedBox(height: AppConstants.spaceLg),
+                      const Text(
+                        'New Shipper accounts must be registered through the FreightLink web portal.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.inkMuted, fontSize: 13),
                       ),
                     ],
                   ],

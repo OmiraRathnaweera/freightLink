@@ -61,7 +61,8 @@ const GET_NAV_ITEMS = (role) => [
       { to: '/agencies/verification', label: 'Verification Queue' } 
     ] : role === 'AgencyStaff' ? [
       { to: '/agencies', label: 'Compliance & Profile', end: true },
-      { to: '/agencies/vehicles', label: 'Fleet Vehicles' }
+      { to: '/agencies/vehicles', label: 'Fleet Vehicles' },
+      { to: '/agencies/drivers', label: 'Fleet Drivers' }
     ] : undefined
   },
   { to: '/trips', label: 'Trips', icon: RouteIcon },

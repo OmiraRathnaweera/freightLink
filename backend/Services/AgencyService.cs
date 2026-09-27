@@ -1,13 +1,18 @@
 using System.Net;
+using System.Security.Cryptography;
 using FreightLink.Api.Common.Domain;
+using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
+using FreightLink.Api.Common.Options;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace FreightLink.Api.Services;
@@ -17,12 +22,23 @@ public class AgencyService : IAgencyService
 {
     private readonly AppDbContext _dbContext;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IEmailService? _emailService;
+    private readonly EmailOptions _emailOptions;
+    private readonly ILogger<AgencyService>? _logger;
 
-    /// <summary>Creates the agency service with its DB context and password hasher.</summary>
-    public AgencyService(AppDbContext dbContext, IPasswordHasher passwordHasher)
+    /// <summary>Creates the agency service with its DB context, password hasher, and email sender.</summary>
+    public AgencyService(
+        AppDbContext dbContext,
+        IPasswordHasher passwordHasher,
+        IEmailService? emailService = null,
+        IOptions<EmailOptions>? emailOptions = null,
+        ILogger<AgencyService>? logger = null)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
+        _emailService = emailService;
+        _emailOptions = emailOptions?.Value ?? new EmailOptions();
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -587,6 +603,47 @@ public class AgencyService : IAgencyService
         };
     }
 
+    /// <inheritdoc />
+    public async Task<DriverResponseDto> UpdateDriverStatusAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, UpdateDriverStatusDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var driver = await _dbContext.Drivers
+            .Include(d => d.User)
+            .FirstOrDefaultAsync(d => d.DriverId == driverId && d.AgencyId == agencyId, cancellationToken);
+
+        if (driver == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DRIVER_NOT_FOUND, "Driver not found.");
+        }
+
+        // Trip assignment/execution is the sole authority for OnTrip, mirroring vehicle availability:
+        // staff may only toggle a driver between Active and Inactive.
+        if (request.Status == DriverStatus.OnTrip || driver.Status == DriverStatus.OnTrip)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_DRIVER_STATUS_TRANSITION,
+                "Driver roster status can only move between Active and Inactive. OnTrip is managed by trip execution.");
+        }
+
+        driver.Status = request.Status;
+        driver.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = driver.UserId,
+            AgencyId = driver.AgencyId,
+            Email = driver.User.Email,
+            FullName = driver.User.FullName,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
+    }
+
     private async Task VerifyAgencyOwnershipAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
     {
         if (currentUserRole == UserRole.Admin)
@@ -687,15 +744,21 @@ public class AgencyService : IAgencyService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var temporaryPassword = GenerateTemporaryPassword();
         var user = new User
         {
             UserId = Guid.NewGuid(),
             Role = UserRole.Driver,
             Email = normalizedEmail,
-            PasswordHash = _passwordHasher.Hash(request.Password),
+            PasswordHash = _passwordHasher.Hash(temporaryPassword),
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            // The employing Agency is vouching for this driver's identity/email (there is no
+            // separate driver-side verification step in this flow), so the account must be
+            // immediately usable with the emailed credentials rather than blocked behind
+            // EmailOptions.RequireEmailVerification.
+            EmailVerifiedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -732,6 +795,8 @@ public class AgencyService : IAgencyService
             throw;
         }
 
+        await TrySendDriverCredentialsAsync(user, agency.Name, temporaryPassword, cancellationToken);
+
         return new DriverResponseDto
         {
             DriverId = driver.DriverId,
@@ -743,8 +808,78 @@ public class AgencyService : IAgencyService
             LicenceExpiry = driver.LicenceExpiry,
             Status = driver.Status,
             CreatedAt = driver.CreatedAt,
-            UpdatedAt = driver.UpdatedAt
+            UpdatedAt = driver.UpdatedAt,
+            TemporaryPassword = temporaryPassword
         };
+    }
+
+    /// <summary>
+    /// Generates a cryptographically random password satisfying <see cref="Common.Validation.StrongPasswordAttribute"/>
+    /// (upper, lower, digit, special character, 12 characters) for a newly-onboarded driver.
+    /// </summary>
+    private static string GenerateTemporaryPassword()
+    {
+        const string uppers = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I/O — avoids visual ambiguity
+        const string lowers = "abcdefghijkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        const string specials = "!@#$%^&*?";
+        const string all = uppers + lowers + digits + specials;
+        const int length = 12;
+
+        var chars = new char[length];
+        chars[0] = uppers[RandomNumberGenerator.GetInt32(uppers.Length)];
+        chars[1] = lowers[RandomNumberGenerator.GetInt32(lowers.Length)];
+        chars[2] = digits[RandomNumberGenerator.GetInt32(digits.Length)];
+        chars[3] = specials[RandomNumberGenerator.GetInt32(specials.Length)];
+        for (var i = 4; i < length; i++)
+        {
+            chars[i] = all[RandomNumberGenerator.GetInt32(all.Length)];
+        }
+
+        // Fisher-Yates shuffle so the guaranteed-category characters aren't always in positions 0-3.
+        for (var i = length - 1; i > 0; i--)
+        {
+            var j = RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// Emails the newly-onboarded driver their login email and temporary password. Failures are
+    /// logged, never thrown — the account is fully created and usable (the Agency also sees the
+    /// temporary password once in the API response) even if the email can't be delivered.
+    /// </summary>
+    private async Task TrySendDriverCredentialsAsync(User driverUser, string agencyName, string temporaryPassword, CancellationToken cancellationToken)
+    {
+        if (_emailService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var loginUrl = string.IsNullOrWhiteSpace(_emailOptions.FrontendBaseUrl)
+                ? string.Empty
+                : $"{_emailOptions.FrontendBaseUrl.TrimEnd('/')}/login";
+
+            var (subject, htmlBody, textBody) = EmailTemplates.BuildDriverCredentials(
+                driverUser.FullName, driverUser.Email, temporaryPassword, agencyName, loginUrl);
+
+            await _emailService.SendAsync(new EmailMessage
+            {
+                To = driverUser.Email,
+                Subject = subject,
+                HtmlBody = htmlBody,
+                TextBody = textBody,
+                Metadata = new Dictionary<string, string> { ["template"] = "driver-credentials" }
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unable to send driver-credentials email to {Email}.", driverUser.Email);
+        }
     }
 
     /// <inheritdoc />

@@ -2,6 +2,47 @@ import * as Yup from 'yup'
 import { SRI_LANKAN_VEHICLE_REG_REGEX, VEHICLE_CLASS_CONFIG } from './vehicleClasses.js'
 
 /**
+ * Validation schema for an Agency onboarding a new driver.
+ *
+ * Mirrors the backend's CreateDriverRequestDto: email/fullName/licenceNo are required, phoneE164 is
+ * optional, and licenceExpiry must be a future date. There is no password field — the server
+ * generates a temporary password and emails it to the driver.
+ */
+export const addDriverSchema = Yup.object({
+  fullName: Yup.string()
+    .trim()
+    .min(2, 'Full name must be at least 2 characters')
+    .max(200, 'Full name must be 200 characters or fewer')
+    .required('Full name is required'),
+
+  email: Yup.string()
+    .trim()
+    .email('Enter a valid email address')
+    .max(256, 'Email must be 256 characters or fewer')
+    .required('Email is required'),
+
+  phoneE164: Yup.string()
+    .trim()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .matches(
+      /^\+[1-9]\d{6,14}$/,
+      'Phone number must be in E.164 format with country code (e.g. +94771234567)',
+    )
+    .optional(),
+
+  licenceNo: Yup.string()
+    .trim()
+    .min(2, 'Licence number must be at least 2 characters')
+    .max(100, 'Licence number must be 100 characters or fewer')
+    .required('Licence number is required'),
+
+  licenceExpiry: Yup.date()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .min(new Date(), 'Licence expiry date must be in the future')
+    .required('Licence expiry date is required'),
+})
+
+/**
  * Validation schema for registering a new fleet vehicle in an agency.
  *
  * Rules:

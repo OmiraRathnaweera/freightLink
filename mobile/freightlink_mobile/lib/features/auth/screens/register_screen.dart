@@ -23,16 +23,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   bool _obscurePassword = true;
   
-  // Shipper fields
-  final _companyNameController = TextEditingController();
-
   // Agency fields
   final _agencyNameController = TextEditingController();
   final _businessRegNoController = TextEditingController();
   final _yardAddressController = TextEditingController();
   final _jobTitleController = TextEditingController();
-
-  bool _isAgency = false;
 
   @override
   void dispose() {
@@ -40,7 +35,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _passwordController.dispose();
     _fullNameController.dispose();
     _phoneController.dispose();
-    _companyNameController.dispose();
     _agencyNameController.dispose();
     _businessRegNoController.dispose();
     _yardAddressController.dispose();
@@ -51,35 +45,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submit() async {
     final auth = context.read<AuthProvider>();
     
-    if (_isAgency) {
-      await auth.registerAgency(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        fullName: _fullNameController.text.trim(),
-        phoneE164: _phoneController.text.trim(),
-        jobTitle: _jobTitleController.text.trim(),
-        agencyName: _agencyNameController.text.trim(),
-        businessRegNo: _businessRegNoController.text.trim(),
-        yardAddress: _yardAddressController.text.trim(),
-        yardLat: 34.05, // Defaulting coordinates for quick registration
-        yardLng: -118.25,
-      );
-    } else {
-      await auth.registerShipper(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-        fullName: _fullNameController.text.trim(),
-        phoneE164: _phoneController.text.trim(),
-        companyName: _companyNameController.text.trim(),
-      );
-    }
+    await auth.registerAgency(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      fullName: _fullNameController.text.trim(),
+      phoneE164: _phoneController.text.trim(),
+      jobTitle: _jobTitleController.text.trim(),
+      agencyName: _agencyNameController.text.trim(),
+      businessRegNo: _businessRegNoController.text.trim(),
+      yardAddress: _yardAddressController.text.trim(),
+      yardLat: 34.05, // Defaulting coordinates for quick registration
+      yardLng: -118.25,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create an Account'),
+        title: const Text('Register an Agency Account'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/login'),
@@ -95,29 +79,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Account Type Toggle
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Shipper'),
-                            selected: !_isAgency,
-                            onSelected: (selected) {
-                              if (selected) setState(() => _isAgency = false);
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: AppConstants.spaceMd),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Agency'),
-                            selected: _isAgency,
-                            onSelected: (selected) {
-                              if (selected) setState(() => _isAgency = true);
-                            },
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'Shipper registration is available through the FreightLink web portal.',
+                      style: TextStyle(color: AppColors.inkMuted),
                     ),
                     const SizedBox(height: AppConstants.spaceXxl),
                     
@@ -169,18 +133,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: AppConstants.spaceLg),
 
-                    // Shipper Specific Fields
-                    if (!_isAgency)
-                      AppTextField(
-                        label: 'Company Name',
-                        controller: _companyNameController,
-                        hintText: 'Acme Logistics',
-                        prefixIcon: Icons.business_outlined,
-                        textInputAction: TextInputAction.done,
-                      ),
-
-                    // Agency Specific Fields
-                    if (_isAgency) ...[
+                    // Agency-specific fields. Shipper signup is intentionally web-only.
+                    ...[
                       AppTextField(
                         label: 'Agency Name',
                         controller: _agencyNameController,

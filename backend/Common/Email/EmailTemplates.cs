@@ -37,6 +37,39 @@ public static class EmailTemplates
         return (subject, Wrap(subject, bodyHtml), bodyText);
     }
 
+    /// <summary>Builds the "your agency created a driver account for you" credentials email.</summary>
+    /// <param name="fullName">The new driver's display name.</param>
+    /// <param name="email">The driver's login email (also the recipient).</param>
+    /// <param name="temporaryPassword">The server-generated temporary password, in plain text.</param>
+    /// <param name="agencyName">The employing agency's display name.</param>
+    /// <param name="loginUrl">Absolute URL to the FreightLink sign-in page.</param>
+    public static (string Subject, string HtmlBody, string TextBody) BuildDriverCredentials(
+        string fullName, string email, string temporaryPassword, string agencyName, string loginUrl)
+    {
+        const string subject = "Your FreightLink driver account is ready";
+        var bodyHtml = $"""
+            <p>Hi {Encode(fullName)},</p>
+            <p><strong>{Encode(agencyName)}</strong> has added you as a driver on FreightLink. Use the credentials
+            below to sign in from the FreightLink mobile app:</p>
+            <p>
+              Email: <strong>{Encode(email)}</strong><br>
+              Temporary password: <strong>{Encode(temporaryPassword)}</strong>
+            </p>
+            <p><a href="{Encode(loginUrl)}">Open FreightLink</a></p>
+            <p>For your security, please change this password after you first sign in.</p>
+            """;
+        var bodyText =
+            $"Hi {fullName},\n\n" +
+            $"{agencyName} has added you as a driver on FreightLink. Use the credentials below to sign in " +
+            "from the FreightLink mobile app:\n\n" +
+            $"Email: {email}\n" +
+            $"Temporary password: {temporaryPassword}\n\n" +
+            $"Sign in: {loginUrl}\n\n" +
+            "For your security, please change this password after you first sign in.";
+
+        return (subject, Wrap(subject, bodyHtml), bodyText);
+    }
+
     /// <summary>Builds the "agency declined, we're finding another" email.</summary>
     /// <param name="shipperName">The recipient Shipper's display name.</param>
     /// <param name="loadReference">The declined load's reference code.</param>

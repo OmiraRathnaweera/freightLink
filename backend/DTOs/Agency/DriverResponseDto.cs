@@ -17,4 +17,12 @@ public class DriverResponseDto
     public DriverStatus Status { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>
+    /// The server-generated temporary password, shown exactly once in the response returned from
+    /// creating this driver (as a fallback in case the credentials email is delayed or undeliverable).
+    /// Always <see langword="null"/> on every other response (list/update) — never persisted or
+    /// retrievable again after creation.
+    /// </summary>
+    public string? TemporaryPassword { get; set; }
 }

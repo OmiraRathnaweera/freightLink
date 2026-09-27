@@ -5,6 +5,10 @@ const AGENCY_ERROR_MESSAGES = {
   AGENCY_NOT_ACTIVE: 'Your agency is not active yet. Compliance documents must be verified by an administrator before registering fleet vehicles.',
   AGENCY_NOT_FOUND: 'Agency organization could not be found.',
   FORBIDDEN: 'You are not authorized to perform this fleet management action.',
+  EMAIL_ALREADY_REGISTERED: 'An account with this email already exists.',
+  DRIVER_LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',
+  DRIVER_NOT_FOUND: 'Driver could not be found in your fleet.',
+  INVALID_DRIVER_STATUS_TRANSITION: 'Driver status can only be set to Active or Inactive — OnTrip is managed automatically during trips.',
 }
 
 /**
@@ -13,6 +17,10 @@ const AGENCY_ERROR_MESSAGES = {
  * @returns {string}
  */
 export function getAgencyErrorMessage(error) {
+  if (error?.code && AGENCY_ERROR_MESSAGES[error.code]) {
+    return AGENCY_ERROR_MESSAGES[error.code]
+  }
+
   if (error?.status === 409 || error?.code === 'CONFLICT') {
     return 'A vehicle with this registration number already exists in your fleet.'
   }

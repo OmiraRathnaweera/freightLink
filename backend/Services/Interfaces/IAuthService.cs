@@ -26,15 +26,6 @@ public interface IAuthService
     /// <exception cref="Common.Exceptions.ApiException">409 if the email or business registration number is already registered.</exception>
     Task<RegisterResponseDto> RegisterAgencyAsync(RegisterAgencyRequestDto request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Registers a new Driver under an existing agency: creates the <c>User</c> row and its <c>Driver</c> profile atomically.
-    /// </summary>
-    /// <param name="request">Validated driver registration payload.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A success message with the new user's id and email.</returns>
-    /// <exception cref="Common.Exceptions.ApiException">404 if the agency does not exist; 409 if email or licence number is already registered.</exception>
-    Task<RegisterResponseDto> RegisterDriverAsync(RegisterDriverRequestDto request, CancellationToken cancellationToken = default);
-
     /// <summary>Requests a password-reset email without revealing whether the address belongs to an account.</summary>
     Task RequestPasswordResetAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default);
 

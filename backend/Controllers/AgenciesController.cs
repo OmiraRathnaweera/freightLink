@@ -242,6 +242,18 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Removes or reinstates a driver on the agency's active roster (Active/Inactive only — OnTrip
+    /// is managed exclusively by trip execution).
+    /// </summary>
+    [HttpPatch("{id:guid}/drivers/{driverId:guid}/status")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<DriverResponseDto>> UpdateDriverStatus(Guid id, Guid driverId, [FromBody] UpdateDriverStatusDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateDriverStatusAsync(id, driverId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers),
     /// or for Admin to fetch an agency's fleet by specifying agencyId.
     /// </summary>
