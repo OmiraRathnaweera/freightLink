@@ -716,9 +716,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may update trip assignments. Drivers are not permitted to update trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may update trip assignments. Admins have view-only access to trips, and Drivers are not permitted to update trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -731,19 +731,16 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
         }
 
-        if (currentUserRole == UserRole.AgencyStaff)
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+        if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
         {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
-
-            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
-            }
-
-            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
         }
+
+        AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
 
         if (trip.Status != TripStatus.Assigned)
         {
@@ -851,9 +848,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may cancel trips. Drivers are not permitted to cancel trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may cancel trips. Admins have view-only access to trips, and Drivers are not permitted to cancel trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -868,19 +865,16 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
         }
 
-        if (currentUserRole == UserRole.AgencyStaff)
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+        if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
         {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
-
-            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
-            }
-
-            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
         }
+
+        AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
 
         if (trip.Status == TripStatus.Delivered || trip.Status == TripStatus.Cancelled)
         {
@@ -942,9 +936,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may delete trips. Drivers are not permitted to delete trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may delete trips. Admins have view-only access to trips, and Drivers are not permitted to delete trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -961,16 +955,13 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
         }
 
-        if (currentUserRole == UserRole.AgencyStaff)
-        {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
-            }
+        if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
         }
 
         if (trip.Status == TripStatus.Delivered)

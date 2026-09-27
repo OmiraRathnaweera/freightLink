@@ -4,9 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Building2,
-  Camera,
   Edit2,
-  FileCheck2,
   MapPin,
   RefreshCw,
   Trash2,
@@ -33,7 +31,6 @@ import RouteMapCard from "../../loads/components/RouteMapCard.jsx";
 import TripTimelineCard from "../components/TripTimelineCard.jsx";
 import TripEvidenceCard from "../components/TripEvidenceCard.jsx";
 import ChangeTripStatusDialog from "../components/ChangeTripStatusDialog.jsx";
-import UploadTripEvidenceDialog from "../components/UploadTripEvidenceDialog.jsx";
 import CancelTripDialog from "../components/CancelTripDialog.jsx";
 import DeleteTripDialog from "../components/DeleteTripDialog.jsx";
 import EditTripDialog from "../components/EditTripDialog.jsx";
@@ -42,7 +39,6 @@ function TripDetailPage() {
   const { tripId } = useParams();
   const navigate = useNavigate();
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
-  const [isEvidenceDialogOpen, setIsEvidenceDialogOpen] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -90,13 +86,6 @@ function TripDetailPage() {
   if (!trip) return null;
 
   const canAdvanceStatus =
-    (role === UserRole.AGENCY_STAFF || role === UserRole.DRIVER || role === UserRole.ADMIN) &&
-    trip.status !== TripStatus.DELIVERED &&
-    trip.status !== TripStatus.CANCELLED &&
-    trip.status !== "Delivered" &&
-    trip.status !== "Cancelled";
-
-  const canUploadEvidence =
     (role === UserRole.AGENCY_STAFF || role === UserRole.DRIVER) &&
     trip.status !== TripStatus.DELIVERED &&
     trip.status !== TripStatus.CANCELLED &&
@@ -104,18 +93,18 @@ function TripDetailPage() {
     trip.status !== "Cancelled";
 
   const canEdit =
-    (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) &&
+    role === UserRole.AGENCY_STAFF &&
     (trip.status === TripStatus.ASSIGNED || trip.status === "Assigned");
 
   const canCancel =
-    (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) &&
+    role === UserRole.AGENCY_STAFF &&
     trip.status !== TripStatus.DELIVERED &&
     trip.status !== TripStatus.CANCELLED &&
     trip.status !== "Delivered" &&
     trip.status !== "Cancelled";
 
   const canDelete =
-    (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) &&
+    role === UserRole.AGENCY_STAFF &&
     trip.status !== TripStatus.DELIVERED &&
     trip.status !== "Delivered" &&
     (trip.status === TripStatus.CANCELLED ||
@@ -173,16 +162,6 @@ function TripDetailPage() {
             >
               <Edit2 className="h-4 w-4" />
               Edit / Reassign
-            </Button>
-          )}
-          {canUploadEvidence && (
-            <Button
-              variant="secondary"
-              onClick={() => setIsEvidenceDialogOpen(true)}
-              className="inline-flex items-center gap-1.5"
-            >
-              <Camera className="h-4 w-4" />
-              Upload Evidence
             </Button>
           )}
           {canAdvanceStatus && (
@@ -288,52 +267,6 @@ function TripDetailPage() {
 
         <div className="space-y-6 lg:col-span-1">
           <TripEvidenceCard evidence={trip.evidence} />
-
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <FileCheck2 className="h-5 w-5 text-primary" strokeWidth={1.5} />
-              <h3 className="text-headline-md text-primary">Record Identifiers</h3>
-            </div>
-            <dl className="space-y-3">
-              <div>
-                <dt className="text-label-caps text-on-surface-variant">Trip ID</dt>
-                <dd className="break-all text-data-mono text-xs text-on-surface">
-                  {trip.tripId}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-label-caps text-on-surface-variant">Assignment ID</dt>
-                <dd className="break-all text-data-mono text-xs text-on-surface">
-                  {trip.assignmentId}
-                </dd>
-              </div>
-              {trip.loadId && trip.loadId !== "00000000-0000-0000-0000-000000000000" && (
-                <div>
-                  <dt className="text-label-caps text-on-surface-variant">Load ID</dt>
-                  <dd className="break-all text-data-mono text-xs text-on-surface">
-                    <Link
-                      to={`/loads/${trip.loadId}`}
-                      className="text-primary hover:underline"
-                    >
-                      {trip.loadId}
-                    </Link>
-                  </dd>
-                </div>
-              )}
-              <div>
-                <dt className="text-label-caps text-on-surface-variant">Vehicle ID</dt>
-                <dd className="break-all text-data-mono text-xs text-on-surface">
-                  {trip.vehicleId}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-label-caps text-on-surface-variant">Driver ID</dt>
-                <dd className="break-all text-data-mono text-xs text-on-surface">
-                  {trip.driverId}
-                </dd>
-              </div>
-            </dl>
-          </Card>
         </div>
       </div>
 
@@ -343,16 +276,6 @@ function TripDetailPage() {
           currentStatus={trip.status}
           evidence={trip.evidence}
           onClose={() => setIsStatusDialogOpen(false)}
-        />
-      )}
-
-      {isEvidenceDialogOpen && (
-        <UploadTripEvidenceDialog
-          tripId={trip.tripId}
-          userRole={role}
-          evidence={trip.evidence}
-          onClose={() => setIsEvidenceDialogOpen(false)}
-          onUploaded={() => tripQuery.refetch()}
         />
       )}
 

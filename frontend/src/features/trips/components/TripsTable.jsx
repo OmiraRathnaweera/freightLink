@@ -39,9 +39,7 @@ function SortableHeader({ column, label, sortBy, sortDir, onSortChange }) {
 function TripsTable({ trips, sortBy, sortDir, onSortChange, onDeleteTrip }) {
   const role = useAppSelector((state) => state?.auth?.role);
 
-  const canDeleteTripRole =
-    role === UserRole.AGENCY_STAFF ||
-    role === UserRole.ADMIN;
+  const canDeleteTripRole = role === UserRole.AGENCY_STAFF;
 
   return (
     <div className="overflow-x-auto min-h-[60vh]">

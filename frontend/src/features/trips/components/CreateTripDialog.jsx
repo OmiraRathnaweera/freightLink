@@ -298,7 +298,7 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
               >
                 <option value="">-- Choose an active driver --</option>
                 {drivers.map((d) => {
-                  const isActive = d.isActive && d.status === "Active";
+                  const isActive = d.status === "Active";
                   return (
                     <option key={d.driverId} value={d.driverId} disabled={!isActive}>
                       {d.fullName}
