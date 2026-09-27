@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_top_bar.dart';
+import '../../../shared/widgets/auto_resize_text.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/status_pill.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -250,10 +251,10 @@ class _AgencyHeroBanner extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    AutoResizeText(
                       agencyName,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      minFontSize: 13,
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
@@ -270,10 +271,10 @@ class _AgencyHeroBanner extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Expanded(
-                          child: Text(
+                          child: AutoResizeText(
                             yardAddress,
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            minFontSize: 10,
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.inkMuted,
@@ -298,15 +299,19 @@ class _AgencyHeroBanner extends StatelessWidget {
                 color: AppColors.inkMuted,
               ),
               const SizedBox(width: 6),
-              Text(
-                'Signed in as $staffName',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.inkMuted,
+              Expanded(
+                child: AutoResizeText(
+                  'Signed in as $staffName',
+                  maxLines: 1,
+                  minFontSize: 10,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.inkMuted,
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: 8),
               const Text(
                 'Staff Portal',
                 style: TextStyle(
@@ -452,8 +457,9 @@ class _KpiMetricCard extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  AutoResizeText.kpi(
                     value,
+                    minFontSize: 13,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
@@ -462,10 +468,10 @@ class _KpiMetricCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  AutoResizeText(
                     label,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    minFontSize: 10,
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -474,10 +480,10 @@ class _KpiMetricCard extends StatelessWidget {
                   ),
                 ],
               ),
-              Text(
+              AutoResizeText(
                 footer,
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                minFontSize: 9,
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
@@ -676,8 +682,10 @@ class _ActionTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    AutoResizeText(
                       title,
+                      maxLines: 1,
+                      minFontSize: 12,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -685,10 +693,10 @@ class _ActionTile extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
+                    AutoResizeText(
                       subtitle,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      minFontSize: 10,
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w400,

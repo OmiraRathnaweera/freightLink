@@ -13,6 +13,7 @@ import 'features/notifications/providers/notification_provider.dart';
 import 'features/trips/data/trips_repository.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   final authProvider = AuthProvider()..bootstrap();
   final appRouter = createAppRouter(authProvider);
 

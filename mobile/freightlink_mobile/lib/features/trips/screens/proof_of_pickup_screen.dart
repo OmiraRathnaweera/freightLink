@@ -281,18 +281,28 @@ class _ProofOfPickupScreenState extends State<ProofOfPickupScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'TRIP #$tripCode',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: AppColors.inkMuted,
+              Flexible(
+                child: Text(
+                  'TRIP #$tripCode',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: AppColors.inkMuted,
+                  ),
                 ),
               ),
-              Text(
-                DateFormat('dd MMM yyyy, HH:mm').format(_currentTrip.createdAt),
-                style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+              const SizedBox(width: AppConstants.spaceSm),
+              Flexible(
+                child: Text(
+                  DateFormat('dd MMM yyyy, HH:mm').format(_currentTrip.createdAt),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                ),
               ),
             ],
           ),

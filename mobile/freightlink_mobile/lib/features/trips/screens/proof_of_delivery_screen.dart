@@ -299,24 +299,35 @@ class _ProofOfDeliveryScreenState extends State<ProofOfDeliveryScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'TRIP #$tripCode',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              if (_currentTrip.referenceCode != null)
-                Text(
-                  _currentTrip.referenceCode!,
+              Flexible(
+                child: Text(
+                  'TRIP #$tripCode',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.inkMuted,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                    letterSpacing: 0.5,
                   ),
                 ),
+              ),
+              if (_currentTrip.referenceCode != null) ...[
+                const SizedBox(width: AppConstants.spaceSm),
+                Flexible(
+                  child: Text(
+                    _currentTrip.referenceCode!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkMuted,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const Divider(height: 20),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../shared/widgets/auto_resize_text.dart';
 import '../models/load.dart';
 import '../models/load_status.dart';
 import 'load_status_badge.dart';
@@ -47,10 +48,10 @@ class LoadCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
+                    child: AutoResizeText(
                       load.referenceCode,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      minFontSize: 12,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -67,13 +68,14 @@ class LoadCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
+                    child: AutoResizeText(
                       load.pickupAddress,
+                      maxLines: 1,
+                      minFontSize: 11,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.ink,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const Padding(
@@ -87,13 +89,14 @@ class LoadCard extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: Text(
+                    child: AutoResizeText(
                       load.dropoffAddress,
+                      maxLines: 1,
+                      minFontSize: 11,
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppColors.ink,
                       ),
-                      overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.end,
                     ),
                   ),
@@ -107,19 +110,29 @@ class LoadCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    AppFormatters.weightKg(load.weightKg),
-                    style: const TextStyle(
-                      color: AppColors.inkMuted,
-                      fontSize: 13,
-                      fontFeatures: [FontFeature.tabularFigures()],
+                  Flexible(
+                    child: AutoResizeText(
+                      AppFormatters.weightKg(load.weightKg),
+                      maxLines: 1,
+                      minFontSize: 10,
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 13,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
-                  Text(
-                    'Posted ${AppFormatters.date(load.createdAt)}',
-                    style: const TextStyle(
-                      color: AppColors.inkMuted,
-                      fontSize: 13,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: AutoResizeText(
+                      'Posted ${AppFormatters.date(load.createdAt)}',
+                      maxLines: 1,
+                      minFontSize: 10,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        color: AppColors.inkMuted,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ],
@@ -147,12 +160,18 @@ class _KeyValueRow extends StatelessWidget {
           label,
           style: const TextStyle(color: AppColors.inkMuted, fontSize: 13),
         ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: AppColors.ink,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: 8),
+        Expanded(
+          child: AutoResizeText(
+            value,
+            textAlign: TextAlign.end,
+            maxLines: 1,
+            minFontSize: 10,
+            style: const TextStyle(
+              color: AppColors.ink,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ],

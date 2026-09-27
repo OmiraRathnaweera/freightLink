@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/providers/auth_provider.dart';
+import '../../../shared/widgets/auto_resize_text.dart';
 import '../data/billing_repository.dart';
 
 class PaymentsScreen extends StatefulWidget {
@@ -101,10 +102,18 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(invoice['invoiceNumber'] as String? ?? invoiceId,
-                            style: Theme.of(context).textTheme.titleMedium),
+                        AutoResizeText(
+                          invoice['invoiceNumber'] as String? ?? invoiceId,
+                          maxLines: 1,
+                          minFontSize: 12,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
                         const SizedBox(height: 4),
-                        Text('LKR $amount · ${status ?? 'Unknown'}'),
+                        AutoResizeText(
+                          'LKR $amount · ${status ?? 'Unknown'}',
+                          maxLines: 1,
+                          minFontSize: 11,
+                        ),
                         if (status == 'PaymentPending' && invoice['paymentProofUrl'] != null) ...[
                           const SizedBox(height: 6),
                           Text(
