@@ -774,12 +774,16 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
             children: [
               const Icon(Icons.local_shipping_outlined, size: 20, color: AppColors.primary),
               const SizedBox(width: AppConstants.spaceSm),
-              Text(
-                trip.vehicleRegistrationNo ?? 'Vehicle Assigned',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.ink,
+              Flexible(
+                child: Text(
+                  trip.vehicleRegistrationNo ?? 'Vehicle Assigned',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.ink,
+                  ),
                 ),
               ),
               const Spacer(),

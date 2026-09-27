@@ -178,30 +178,6 @@ class _ProofOfDeliveryScreenState extends State<ProofOfDeliveryScreen> {
               'Proof of delivery has been verified. Trip #${_currentTrip.tripId.length > 8 ? _currentTrip.tripId.substring(0, 8).toUpperCase() : _currentTrip.tripId} is officially Delivered.',
               style: const TextStyle(fontSize: 14, color: AppColors.ink),
             ),
-            const SizedBox(height: AppConstants.spaceMd),
-            Container(
-              padding: const EdgeInsets.all(AppConstants.spaceMd),
-              decoration: BoxDecoration(
-                color: AppColors.statusSuccessBg,
-                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.verified_rounded, color: AppColors.statusSuccessFg, size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Hard-block policy (Y3S01-74) satisfied.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.statusSuccessFg,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
         actions: [
@@ -389,6 +365,8 @@ class _ProofOfDeliveryScreenState extends State<ProofOfDeliveryScreen> {
               const SizedBox(width: 8),
               Text(
                 _currentTrip.vehicleRegistrationNo ?? 'Vehicle Assigned',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -397,11 +375,15 @@ class _ProofOfDeliveryScreenState extends State<ProofOfDeliveryScreen> {
               ),
               if (_currentTrip.driverName != null) ...[
                 const Text(' • ', style: TextStyle(color: AppColors.inkMuted)),
-                Text(
-                  _currentTrip.driverName!,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: AppColors.inkMuted,
+                Flexible(
+                  child: Text(
+                    _currentTrip.driverName!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.inkMuted,
+                    ),
                   ),
                 ),
               ],

@@ -304,7 +304,6 @@ void main() {
 
     // Success dialog
     expect(find.text('Delivery Confirmed!'), findsOneWidget);
-    expect(find.text('Hard-block policy (Y3S01-74) satisfied.'), findsOneWidget);
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
   });
