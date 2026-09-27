@@ -25,8 +25,7 @@ import FuelRatesPage from '../features/pricingConfig/pages/FuelRatesPage.jsx'
 import VehicleEfficiencyPage from '../features/pricingConfig/pages/VehicleEfficiencyPage.jsx'
 import PricingFormulaPage from '../features/pricingConfig/pages/PricingFormulaPage.jsx'
 import AdminDisputesPage from '../features/disputes/pages/AdminDisputesPage.jsx'
-import PaymentSuccessPage from '../features/billing/pages/PaymentSuccessPage.jsx'
-import PaymentCancelledPage from '../features/billing/pages/PaymentCancelledPage.jsx'
+import AdminAnalyticsPage from '../features/analytics/pages/AdminAnalyticsPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
@@ -79,6 +78,7 @@ const router = createBrowserRouter(
           <Route path="/pricing-config/vehicle-efficiency" element={<VehicleEfficiencyPage />} />
           <Route path="/pricing-config/formula" element={<PricingFormulaPage />} />
           <Route path="/disputes" element={<AdminDisputesPage />} />
+          <Route path="/analytics" element={<AdminAnalyticsPage />} />
         </Route>
       </Route>
     </>,

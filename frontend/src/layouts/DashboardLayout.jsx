@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import {
+  BarChart3,
   Building2,
   CircleDollarSign,
   LogOut,
@@ -77,6 +78,7 @@ const GET_NAV_ITEMS = (role) => [
     ],
   },
   { to: '/disputes', label: 'Disputes', icon: Scale },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ]
 
 function DashboardLayout() {

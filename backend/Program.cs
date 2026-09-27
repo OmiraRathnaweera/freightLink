@@ -273,6 +273,7 @@ builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<ILoadProposalService, LoadProposalService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 builder.Services.AddScoped<ITripService, TripService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IRouteService, RouteService>();
 
