@@ -490,8 +490,13 @@ public class MatchConfirmControllerTests
     }
 
     [Fact]
-    public async Task ConfirmMatch_WhenNoPriorWorkflowRun_SynthesizesRunAndConfirmsMatch()
+    public async Task ConfirmMatch_WhenNoPriorWorkflowRun_ReturnsNotFound_NeverFabricatesARun()
     {
+        // Confirming a match with no prior AgentWorkflowRun used to synthesize a fake run with
+        // four "Succeeded" AgentSteps and mark it Completed - letting a Shipper "confirm" a match
+        // no agent ever actually evaluated, while the persisted audit trail claimed otherwise.
+        // That was the single most serious finding of the Sep 27 2026 audit
+        // (plans/04-backend-integration.md §5). Matching must be triggered for real first.
         using var factory = new CustomWebApplicationFactory();
         var client = factory.CreateClient();
 
@@ -505,28 +510,21 @@ public class MatchConfirmControllerTests
         confirmRequest.Content = JsonContent.Create(new ConfirmMatchDto { AgencyId = agencyId });
 
         var response = await client.SendAsync(confirmRequest);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
-        var assignment = await response.Content.ReadFromJsonAsync<AssignmentResponseDto>();
-        Assert.NotNull(assignment);
-        Assert.Equal(agencyId, assignment.AgencyId);
-        Assert.Equal(AssignmentStatus.Proposed.ToString(), assignment.Status);
+        var raw = await response.Content.ReadAsStringAsync();
+        using var errorDoc = JsonDocument.Parse(raw);
+        Assert.Equal("NO_MATCH_RUN_TO_CONFIRM", errorDoc.RootElement.GetProperty("error").GetProperty("code").GetString());
 
-        // Verify DB state: WorkflowRun and ApprovalDecision were synthesized and completed
+        // Verify DB state: absolutely nothing was fabricated
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var dbRun = await db.AgentWorkflowRuns
-                .Include(r => r.ApprovalDecisions)
-                .Include(r => r.Assignments)
-                .Include(r => r.Steps)
-                .FirstOrDefaultAsync(r => r.LoadId == load.LoadId);
+            var dbRun = await db.AgentWorkflowRuns.FirstOrDefaultAsync(r => r.LoadId == load.LoadId);
+            Assert.Null(dbRun);
 
-            Assert.NotNull(dbRun);
-            Assert.Equal(WorkflowRunStatus.Completed, dbRun.Status);
-            Assert.Single(dbRun.ApprovalDecisions);
-            Assert.Equal(ApprovalDecisionType.Approve, dbRun.ApprovalDecisions.First().Decision);
-            Assert.Equal(4, dbRun.Steps.Count);
+            var anyAssignment = await db.Assignments.AnyAsync(a => a.LoadId == load.LoadId);
+            Assert.False(anyAssignment);
         }
     }
 

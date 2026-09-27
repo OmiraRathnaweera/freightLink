@@ -51,8 +51,18 @@ public interface IAssignmentService
 
     /// <summary>
     /// Fetches the AI workflow match recommendation, candidates, validation, and steps for a load.
+    /// Purely read-only: never calls the Python agent service or mutates any state (plans/
+    /// 04-backend-integration.md §1) - use <see cref="TriggerMatchAsync"/> to actually start a run.
     /// </summary>
-    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, bool rerun = false, CancellationToken cancellationToken = default);
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Explicitly triggers the Python Agentic AI pipeline for a load (a deliberate command, not a
+    /// side effect of viewing data - plans/04-backend-integration.md §1). Creates the next
+    /// AgentWorkflowRun attempt, calls the agent service, and returns the resulting recommendation
+    /// once it responds.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> TriggerMatchAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Rejects the load's current match recommendation. Records a Reject <c>ApprovalDecision</c> with the

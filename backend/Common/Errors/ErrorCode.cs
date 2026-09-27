@@ -367,5 +367,27 @@ public enum ErrorCode
     LOAD_NOT_BIDDABLE,
 
     /// <summary>A load-proposal mutation was attempted that violates allowed lifecycle rules (e.g. responding to a non-Pending proposal).</summary>
-    INVALID_LOAD_PROPOSAL_STATUS_TRANSITION
+    INVALID_LOAD_PROPOSAL_STATUS_TRANSITION,
+
+    /// <summary>
+    /// The Python Agentic AI pipeline could not be reached, timed out, or returned a non-success
+    /// response, or the AgentWorkflowRun it should have created isn't in our own database. Thrown
+    /// by <c>AssignmentService</c>'s trigger path - a real, honest failure, never a fabricated
+    /// success (plans/04-backend-integration.md §5).
+    /// </summary>
+    AGENT_SERVICE_UNAVAILABLE,
+
+    /// <summary>
+    /// The backend's own outbound API key for calling the Python agent service
+    /// (<c>AGENT_SERVICE_API_KEY</c>) is not configured. Fails closed rather than falling back to a
+    /// hardcoded default (plans/04-backend-integration.md §6).
+    /// </summary>
+    AGENT_SERVICE_NOT_CONFIGURED,
+
+    /// <summary>
+    /// The Shipper attempted to confirm a match for a load with no existing AgentWorkflowRun -
+    /// matching must be triggered first (<c>POST /loads/{loadId}/match/trigger</c>). Never
+    /// auto-created with a fabricated audit trail (plans/04-backend-integration.md §5).
+    /// </summary>
+    NO_MATCH_RUN_TO_CONFIRM
 }

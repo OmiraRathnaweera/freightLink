@@ -200,6 +200,8 @@ public class AssignmentService : IAssignmentService
         var workflowRun = assignment.WorkflowRun ?? await _dbContext.AgentWorkflowRuns
             .FirstOrDefaultAsync(r => r.WorkflowRunId == assignment.WorkflowRunId || r.LoadId == assignment.LoadId, cancellationToken);
 
+        var shouldRetryNow = false;
+
         if (workflowRun != null)
         {
             if (workflowRun.AttemptNo < 3)
@@ -209,7 +211,12 @@ public class AssignmentService : IAssignmentService
                 {
                     await _emailService.SendAgencyDeclinedAsync(shipperEmail, shipperName, loadRef, agencyName, workflowRun.AttemptNo, cancellationToken);
                 }
-                // Load remains in Posted status for subsequent matching attempt
+                // Load remains in Posted status; the next attempt is triggered directly below
+                // rather than left for some later, unrelated request to accidentally kick off
+                // (plans/04-backend-integration.md §4 - retry ownership belongs to the backend's
+                // own decline-handler, deterministically, not to whether a Shipper happens to
+                // reopen the match view again).
+                shouldRetryNow = true;
             }
             else
             {
@@ -234,6 +241,33 @@ public class AssignmentService : IAssignmentService
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        if (shouldRetryNow && workflowRun != null && assignment.Load != null)
+        {
+            try
+            {
+                var declinedAgencyIds = await _dbContext.Assignments
+                    .Where(a => a.LoadId == assignment.LoadId && a.Status == AssignmentStatus.Declined)
+                    .Select(a => a.AgencyId)
+                    .Distinct()
+                    .ToListAsync(cancellationToken);
+
+                await TriggerAgentWorkflowRunAsync(
+                    assignment.Load,
+                    assignment.Load.ShipperUserId,
+                    workflowRun.AttemptNo + 1,
+                    declinedAgencyIds.ToHashSet(),
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                // A failed auto-retry must not crash the decline response itself, and must not be
+                // presented as a successful new run either - log it honestly and leave the load in
+                // Posted status; the Shipper can still see no active run exists and manually
+                // trigger matching again via POST /loads/{loadId}/match/trigger.
+                _logger?.LogError(ex, "Automatic retry after agency decline failed for load {LoadId}", assignment.LoadId);
+            }
+        }
 
         return MapToDetail(assignment);
     }
@@ -764,43 +798,15 @@ public class AssignmentService : IAssignmentService
 
         if (run == null)
         {
-            var nowUtc = DateTimeOffset.UtcNow;
-            run = new AgentWorkflowRun
-            {
-                WorkflowRunId = Guid.NewGuid(),
-                LoadId = load.LoadId,
-                TriggeredByUserId = currentUserId,
-                AttemptNo = 1,
-                Objective = $"Match and assign suitable carrier for load {load.ReferenceCode}",
-                Status = WorkflowRunStatus.AwaitingApproval,
-                StartedAt = nowUtc,
-                CreatedAt = nowUtc,
-                UpdatedAt = nowUtc
-            };
-            _dbContext.AgentWorkflowRuns.Add(run);
-
-            var defaultCandidate = new MatchCandidate
-            {
-                MatchCandidateId = Guid.NewGuid(),
-                WorkflowRunId = run.WorkflowRunId,
-                AgencyId = chosenAgencyId,
-                Rank = 1,
-                EligibilityScore = 0.95m,
-                Eligible = true,
-                EvaluatedAt = nowUtc
-            };
-            _dbContext.MatchCandidates.Add(defaultCandidate);
-            run.MatchCandidates.Add(defaultCandidate);
-
-            var defaultSteps = new List<AgentStep>
-            {
-                new() { AgentStepId = Guid.NewGuid(), WorkflowRunId = run.WorkflowRunId, StepNo = 1, AgentRole = AgentRole.Planner, Status = AgentStepStatus.Succeeded, StartedAt = nowUtc.AddSeconds(-4), CompletedAt = nowUtc.AddSeconds(-3), DurationMs = 280 },
-                new() { AgentStepId = Guid.NewGuid(), WorkflowRunId = run.WorkflowRunId, StepNo = 2, AgentRole = AgentRole.DomainAnalysis, Status = AgentStepStatus.Succeeded, StartedAt = nowUtc.AddSeconds(-3), CompletedAt = nowUtc.AddSeconds(-2), DurationMs = 150 },
-                new() { AgentStepId = Guid.NewGuid(), WorkflowRunId = run.WorkflowRunId, StepNo = 3, AgentRole = AgentRole.MatchingPricing, Status = AgentStepStatus.Succeeded, StartedAt = nowUtc.AddSeconds(-2), CompletedAt = nowUtc.AddSeconds(-1), DurationMs = 820 },
-                new() { AgentStepId = Guid.NewGuid(), WorkflowRunId = run.WorkflowRunId, StepNo = 4, AgentRole = AgentRole.ValidationSafety, Status = AgentStepStatus.Succeeded, StartedAt = nowUtc.AddSeconds(-1), CompletedAt = nowUtc, DurationMs = 120 }
-            };
-            _dbContext.AgentSteps.AddRange(defaultSteps);
-            foreach (var st in defaultSteps) run.Steps.Add(st);
+            // Never fabricate an AgentWorkflowRun/MatchCandidate/four-Succeeded-AgentSteps here -
+            // that was the audit's single most serious finding (plans/04-backend-integration.md
+            // §5): it let a Shipper "confirm" a match that no agent ever actually evaluated, while
+            // the persisted audit trail claimed otherwise. Matching must be triggered for real via
+            // POST /loads/{loadId}/match/trigger before it can be confirmed.
+            throw new ApiException(
+                HttpStatusCode.NotFound,
+                ErrorCode.NO_MATCH_RUN_TO_CONFIRM,
+                "No match recommendation exists yet for this load. Trigger matching before confirming an agency.");
         }
 
         // Concurrency Guard: guard against double-confirm (shipper double-clicks, or run already moved past AwaitingApproval)
@@ -1056,8 +1062,7 @@ public class AssignmentService : IAssignmentService
 
     /// <summary>
     /// Records a Shipper Reject/Revise decision on the load's latest workflow run, aborting the run
-    /// so a fresh recommendation must be fetched (via <see cref="GetMatchRecommendationAsync"/> with
-    /// <c>rerun: true</c>) before another decision can be made.
+    /// so <see cref="TriggerMatchAsync"/> must be called again before another decision can be made.
     /// </summary>
     private async Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> RecordMatchDecisionAsync(
         Guid loadId,
@@ -1359,11 +1364,193 @@ public class AssignmentService : IAssignmentService
     }
 
     /// <inheritdoc />
+    /// <summary>
+    /// Invokes the Python Agentic AI pipeline for a load and persists the resulting
+    /// AgentWorkflowRun. Throws <see cref="ApiException"/> on any failure (missing config, network
+    /// error, non-success response, or the run Python should have created isn't actually in our
+    /// database) - there is no silent local fallback here. A caller that needs this to have worked
+    /// must see that it didn't (plans/04-backend-integration.md §5), never a fabricated success.
+    /// </summary>
+    private async Task<AgentWorkflowRun> TriggerAgentWorkflowRunAsync(
+        Load load,
+        Guid triggeredByUserId,
+        int attemptNo,
+        IReadOnlySet<Guid> excludeAgencyIds,
+        CancellationToken cancellationToken)
+    {
+        // ADR-020: "Agent 2's eligibility query filters on Active only" - Verified means
+        // KYC/compliance is approved but the agency isn't necessarily accepting jobs yet (no
+        // available vehicle/driver, or availability switched off). excludeAgencyIds carries
+        // agencies that already declined this load on a prior attempt (ADR-018 retry cascade).
+        var activeAgenciesForAgent = await _dbContext.Agencies
+            .Include(a => a.Vehicles)
+            .Include(a => a.Drivers)
+                .ThenInclude(d => d.User)
+            .Where(a => a.Status == AgencyStatus.Active
+                     && !excludeAgencyIds.Contains(a.AgencyId)
+                     && a.Vehicles.Any(v => v.Status == VehicleStatus.Available)
+                     && a.Drivers.Any(d => d.Status == DriverStatus.Active))
+            .OrderBy(a => a.CreatedAt)
+            .Take(7)
+            .ToListAsync(cancellationToken);
+
+        // Fail closed: refuse to call the agent service unauthenticated/misconfigured rather than
+        // silently falling back to a hardcoded default that could mask a real misconfiguration
+        // (plans/04-backend-integration.md §6).
+        var agentApiKey = _configuration?["AGENT_SERVICE_API_KEY"];
+        if (string.IsNullOrWhiteSpace(agentApiKey))
+        {
+            _logger?.LogError("AGENT_SERVICE_API_KEY is not configured; refusing to call the Agentic AI pipeline");
+            throw new ApiException(HttpStatusCode.InternalServerError, ErrorCode.AGENT_SERVICE_NOT_CONFIGURED, "Matching is not available right now. Please contact support.");
+        }
+
+        using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(35) };
+        httpClient.DefaultRequestHeaders.Add("X-Internal-Api-Key", agentApiKey);
+
+        var agentUrl = _configuration?["AGENT_API_BASE_URL"] ?? "http://localhost:8001";
+        var candidatePayloadList = activeAgenciesForAgent.Select(a => new
+        {
+            agencyId = a.AgencyId,
+            name = a.Name,
+            yardAddress = a.YardAddress,
+            yardLat = a.YardLat,
+            yardLng = a.YardLng,
+            availableVehicleClasses = a.Vehicles
+                .Where(v => v.Status == VehicleStatus.Available)
+                .Select(v => v.CapacityKg > 10000m ? "ContainerTruck" : (v.CapacityKg > 1500m ? "MediumLorry" : "MiniTruck"))
+                .Distinct()
+                .ToList(),
+            availableVehicles = a.Vehicles.Where(v => v.Status == VehicleStatus.Available).Select(v => new
+            {
+                vehicleId = v.VehicleId,
+                registrationNo = v.RegistrationNo,
+                vehicleType = v.VehicleType.ToString(),
+                capacityKg = v.CapacityKg,
+                volumeM3 = v.VolumeM3
+            }).ToList(),
+            activeDrivers = a.Drivers.Where(d => d.Status == DriverStatus.Active).Select(d => new
+            {
+                driverId = d.DriverId,
+                name = d.User != null && !string.IsNullOrWhiteSpace(d.User.FullName) ? d.User.FullName : "Licensed Carrier Driver",
+                licenceNo = d.LicenceNo
+            }).ToList()
+        }).ToList();
+
+        var workflowPayload = new
+        {
+            load_id = load.LoadId,
+            triggered_by_user_id = triggeredByUserId != Guid.Empty ? triggeredByUserId : (load.ShipperUserId != Guid.Empty ? load.ShipperUserId : Guid.NewGuid()),
+            attempt_no = attemptNo,
+            candidate_agencies = candidatePayloadList,
+            load_context = new
+            {
+                weightKg = load.WeightKg,
+                volumeM3 = load.VolumeM3,
+                cargoDescription = load.CargoDescription ?? "General Cargo",
+                pickupAddress = load.PickupAddress,
+                dropoffAddress = load.DropoffAddress,
+                pickupLat = load.PickupLat,
+                pickupLng = load.PickupLng,
+                dropoffLat = load.DropoffLat,
+                dropoffLng = load.DropoffLng,
+                candidateAgencies = candidatePayloadList
+            }
+        };
+
+        var jsonContent = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(workflowPayload),
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        // Belt-and-braces bound on top of HttpClient.Timeout above: a plain timer-based
+        // CancellationTokenSource forcibly aborts the call at 35s regardless of platform/network
+        // quirks that might otherwise leave HttpClient.Timeout's own cancellation from firing
+        // promptly - this call must never be able to hang indefinitely.
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(35));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+
+        HttpResponseMessage agentResponse;
+        try
+        {
+            agentResponse = await httpClient.PostAsync($"{agentUrl.TrimEnd('/')}/workflows/run", jsonContent, linkedCts.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to reach the Agentic AI pipeline for load {LoadId}", load.LoadId);
+            throw new ApiException(HttpStatusCode.ServiceUnavailable, ErrorCode.AGENT_SERVICE_UNAVAILABLE, "Matching is temporarily unavailable. Please try again shortly.");
+        }
+
+        if (!agentResponse.IsSuccessStatusCode)
+        {
+            var errorBody = await agentResponse.Content.ReadAsStringAsync(linkedCts.Token);
+            _logger?.LogError("Agent /workflows/run returned status {StatusCode}: {ErrorBody}", agentResponse.StatusCode, errorBody);
+            throw new ApiException(HttpStatusCode.ServiceUnavailable, ErrorCode.AGENT_SERVICE_UNAVAILABLE, "Matching is temporarily unavailable. Please try again shortly.");
+        }
+
+        var persistedRun = await _dbContext.AgentWorkflowRuns
+            .Include(r => r.Steps)
+            .Include(r => r.MatchCandidates)
+                .ThenInclude(mc => mc.Agency)
+            .Where(r => r.LoadId == load.LoadId)
+            .OrderByDescending(r => r.AttemptNo)
+            .ThenByDescending(r => r.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (persistedRun == null)
+        {
+            // Python reported success but the run it should have created via
+            // POST /internal/agent-workflow-runs isn't in our own database - treat as an honest
+            // failure rather than assume success.
+            _logger?.LogError("Agent /workflows/run reported success for load {LoadId} but no AgentWorkflowRun was found", load.LoadId);
+            throw new ApiException(HttpStatusCode.ServiceUnavailable, ErrorCode.AGENT_SERVICE_UNAVAILABLE, "Matching could not be completed. Please try again shortly.");
+        }
+
+        return persistedRun;
+    }
+
+    /// <inheritdoc />
+    public async Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> TriggerMatchAsync(
+        Guid loadId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        var load = await _dbContext.Loads
+            .Include(l => l.ShipperUser)
+            .FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+
+        if (load == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
+        }
+
+        if (currentUserRole != UserRole.Shipper || load.ShipperUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "You do not have permission to trigger match recommendations for this load.");
+        }
+
+        var latestRun = await _dbContext.AgentWorkflowRuns
+            .Where(r => r.LoadId == loadId)
+            .OrderByDescending(r => r.AttemptNo)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var declinedAgencyIds = await _dbContext.Assignments
+            .Where(a => a.LoadId == loadId && a.Status == AssignmentStatus.Declined)
+            .Select(a => a.AgencyId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        var nextAttemptNo = (latestRun?.AttemptNo ?? 0) + 1;
+        await TriggerAgentWorkflowRunAsync(load, currentUserId, nextAttemptNo, declinedAgencyIds.ToHashSet(), cancellationToken);
+
+        return await GetMatchRecommendationAsync(loadId, currentUserId, currentUserRole, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(
         Guid loadId,
         Guid currentUserId,
         UserRole currentUserRole,
-        bool rerun = false,
         CancellationToken cancellationToken = default)
     {
         var load = await _dbContext.Loads
@@ -1385,6 +1572,7 @@ public class AssignmentService : IAssignmentService
             LoadId = load.LoadId,
             ReferenceCode = load.ReferenceCode,
             LoadStatus = load.Status.ToString(),
+            WorkflowStatus = "NotStarted",
             Objective = $"Find and assign suitable carrier for load {load.ReferenceCode}"
         };
 
@@ -1408,7 +1596,8 @@ public class AssignmentService : IAssignmentService
             };
         }
 
-        // 2. Look up the latest AgentWorkflowRun
+        // 2. Look up the latest AgentWorkflowRun - purely a read, this method never calls Python
+        // or mutates anything (plans/04-backend-integration.md §1; use TriggerMatchAsync instead).
         var run = await _dbContext.AgentWorkflowRuns
             .Include(r => r.Steps)
             .Include(r => r.MatchCandidates)
@@ -1417,114 +1606,6 @@ public class AssignmentService : IAssignmentService
             .OrderByDescending(r => r.AttemptNo)
             .ThenByDescending(r => r.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
-
-        var hasValidStep3 = run?.Steps.Any(s => s.AgentRole == AgentRole.MatchingPricing && s.Status == AgentStepStatus.Succeeded) == true;
-
-        // If explicitly requested to rerun, or if no prior workflow run exists, or if prior run did not finish Step 3,
-        // automatically trigger the live Python Agentic AI pipeline (Agent 1-4)
-        if (rerun || run == null || !hasValidStep3)
-        {
-            try
-            {
-                // ADR-020: "Agent 2's eligibility query filters on Active only" - Verified means
-                // KYC/compliance is approved but the agency isn't necessarily accepting jobs yet
-                // (no available vehicle/driver, or availability switched off). Including Verified
-                // here was a regression against that decision - Active already implies Verified
-                // plus real fleet/driver availability, which is exactly what this query checks.
-                var activeAgenciesForAgent = await _dbContext.Agencies
-                    .Include(a => a.Vehicles)
-                    .Include(a => a.Drivers)
-                        .ThenInclude(d => d.User)
-                    .Where(a => a.Status == AgencyStatus.Active
-                             && a.Vehicles.Any(v => v.Status == VehicleStatus.Available)
-                             && a.Drivers.Any(d => d.Status == DriverStatus.Active))
-                    .OrderBy(a => a.CreatedAt)
-                    .Take(7)
-                    .ToListAsync(cancellationToken);
-
-                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(35) };
-                var agentApiKey = _configuration?["AGENT_SERVICE_API_KEY"] ?? "FreightLink-Agent-Secret-9384758239";
-                httpClient.DefaultRequestHeaders.Add("X-Internal-Api-Key", agentApiKey);
-
-                var agentUrl = _configuration?["AGENT_API_BASE_URL"] ?? "http://localhost:8001";
-                var candidatePayloadList = activeAgenciesForAgent.Select(a => new
-                {
-                    agencyId = a.AgencyId,
-                    name = a.Name,
-                    yardAddress = a.YardAddress,
-                    yardLat = a.YardLat,
-                    yardLng = a.YardLng,
-                    availableVehicleClasses = a.Vehicles
-                        .Where(v => v.Status == VehicleStatus.Available)
-                        .Select(v => v.CapacityKg > 10000m ? "ContainerTruck" : (v.CapacityKg > 1500m ? "MediumLorry" : "MiniTruck"))
-                        .Distinct()
-                        .ToList(),
-                    availableVehicles = a.Vehicles.Where(v => v.Status == VehicleStatus.Available).Select(v => new
-                    {
-                        vehicleId = v.VehicleId,
-                        registrationNo = v.RegistrationNo,
-                        vehicleType = v.VehicleType.ToString(),
-                        capacityKg = v.CapacityKg,
-                        volumeM3 = v.VolumeM3
-                    }).ToList(),
-                    activeDrivers = a.Drivers.Where(d => d.Status == DriverStatus.Active).Select(d => new
-                    {
-                        driverId = d.DriverId,
-                        name = d.User != null && !string.IsNullOrWhiteSpace(d.User.FullName) ? d.User.FullName : "Licensed Carrier Driver",
-                        licenceNo = d.LicenceNo
-                    }).ToList()
-                }).ToList();
-
-                var nextAttemptNo = (run?.AttemptNo ?? 0) + 1;
-                var workflowPayload = new
-                {
-                    load_id = load.LoadId,
-                    triggered_by_user_id = currentUserId != Guid.Empty ? currentUserId : (load.ShipperUserId != Guid.Empty ? load.ShipperUserId : Guid.NewGuid()),
-                    attempt_no = nextAttemptNo,
-                    candidate_agencies = candidatePayloadList,
-                    load_context = new
-                    {
-                        weightKg = load.WeightKg,
-                        volumeM3 = load.VolumeM3,
-                        cargoDescription = load.CargoDescription ?? "General Cargo",
-                        pickupAddress = load.PickupAddress,
-                        dropoffAddress = load.DropoffAddress,
-                        pickupLat = load.PickupLat,
-                        pickupLng = load.PickupLng,
-                        dropoffLat = load.DropoffLat,
-                        dropoffLng = load.DropoffLng,
-                        candidateAgencies = candidatePayloadList
-                    }
-                };
-
-                var jsonContent = new StringContent(
-                    System.Text.Json.JsonSerializer.Serialize(workflowPayload),
-                    System.Text.Encoding.UTF8,
-                    "application/json");
-
-                var agentResponse = await httpClient.PostAsync($"{agentUrl.TrimEnd('/')}/workflows/run", jsonContent, cancellationToken);
-                if (agentResponse.IsSuccessStatusCode)
-                {
-                    run = await _dbContext.AgentWorkflowRuns
-                        .Include(r => r.Steps)
-                        .Include(r => r.MatchCandidates)
-                            .ThenInclude(mc => mc.Agency)
-                        .Where(r => r.LoadId == loadId)
-                        .OrderByDescending(r => r.AttemptNo)
-                        .ThenByDescending(r => r.CreatedAt)
-                        .FirstOrDefaultAsync(cancellationToken);
-                }
-                else
-                {
-                    var errorBody = await agentResponse.Content.ReadAsStringAsync(cancellationToken);
-                    _logger?.LogWarning("Agent /workflows/run returned status {StatusCode}: {ErrorBody}", agentResponse.StatusCode, errorBody);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger?.LogWarning(ex, "Failed to invoke Python Agentic AI pipeline; falling back to local calculation");
-            }
-        }
 
         if (run != null)
         {
@@ -1889,39 +1970,11 @@ public class AssignmentService : IAssignmentService
             }
         }
 
-        // Ensure default validation checks exist if not populated
-        if (result.Validation == null)
-        {
-            result.Validation = new FreightLink.Api.DTOs.Loads.ValidationSummaryDto
-            {
-                Recommendation = "Approve",
-                Explanation = "All pre-assignment compliance, safety, and price validation checks passed successfully.",
-                Checks = new List<FreightLink.Api.DTOs.Loads.ValidationCheckItemDto>
-                {
-                    new() { Name = "carrier_eligibility", Passed = true, Details = "Carrier is verified and active with required fleet." },
-                    new() { Name = "price_bounds", Passed = true, Details = "Proposed price is positive and within acceptable formula bounds." },
-                    new() { Name = "routing_sanity", Passed = true, Details = "Route distance and positioning ETA verified via road network." },
-                    new() { Name = "vehicle_capacity", Passed = true, Details = $"Assigned vehicle class accommodates {load.WeightKg:N0} kg payload." }
-                }
-            };
-        }
-
-        // Ensure default step statuses exist if not populated
-        if (result.Steps.Count == 0)
-        {
-            result.Steps = new List<FreightLink.Api.DTOs.Loads.WorkflowStepSummaryDto>
-            {
-                new() { StepNo = 1, AgentRole = "Planner", Status = "Succeeded", DurationMs = 280 },
-                new() { StepNo = 2, AgentRole = "DomainAnalysis", Status = "Succeeded", DurationMs = 150 },
-                new() { StepNo = 3, AgentRole = "MatchingPricing", Status = "Succeeded", DurationMs = 820 },
-                new() { StepNo = 4, AgentRole = "ValidationSafety", Status = "Succeeded", DurationMs = 120 }
-            };
-        }
-
-        if (string.IsNullOrEmpty(result.WorkflowStatus))
-        {
-            result.WorkflowStatus = "AwaitingApproval";
-        }
+        // No fabricated validation/step defaults here (plans/04-backend-integration.md §5): when
+        // there's no real, persisted AgentWorkflowRun/AgentStep behind this recommendation,
+        // result.Validation stays null and result.Steps stays empty - WorkflowStatus is already
+        // "NotStarted" from the DTO's construction above, an honest signal to the Shipper (and the
+        // WorkflowStepper UI) that no agent has actually validated this preview yet.
 
         return result;
     }

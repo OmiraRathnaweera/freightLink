@@ -138,6 +138,8 @@ public class LoadsController : ControllerBase
     /// Gets the match recommendation, candidates, validation checks, and workflow steps for a load.
     /// Accessible only by the Shipper who owns the load. Admins oversee agencies and pricing but
     /// must not view, rerun, approve, reject, or revise a shipper's AI match decision.
+    /// Purely read-only — never triggers the Agentic AI pipeline as a side effect (plans/
+    /// 04-backend-integration.md §1); use <see cref="TriggerMatch"/> to actually start a run.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -146,14 +148,36 @@ public class LoadsController : ControllerBase
     [Authorize(Roles = ShipperRole)]
     public async Task<ActionResult<LoadMatchRecommendationDto>> GetMatchRecommendation(
         Guid loadId,
-        [FromQuery] bool rerun = false,
         CancellationToken cancellationToken = default)
     {
         var result = await _assignmentService.GetMatchRecommendationAsync(
             loadId,
             GetCurrentUserId(),
             GetCurrentUserRole(),
-            rerun,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Explicitly triggers the Agentic AI pipeline for a load — a deliberate command, not a side
+    /// effect of viewing data (plans/04-backend-integration.md §1). Creates the next
+    /// AgentWorkflowRun attempt and returns the resulting recommendation once the agent service
+    /// responds. Only the owning Shipper may trigger matching for their own load.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the resulting <see cref="LoadMatchRecommendationDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/trigger")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<LoadMatchRecommendationDto>> TriggerMatch(
+        Guid loadId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _assignmentService.TriggerMatchAsync(
+            loadId,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
             cancellationToken);
 
         return Ok(result);
