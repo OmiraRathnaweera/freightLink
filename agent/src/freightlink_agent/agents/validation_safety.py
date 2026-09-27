@@ -77,10 +77,16 @@ def evaluate_deterministic_rules(state: WorkflowState) -> tuple[bool, list[str],
     eta_minutes = state.eta_minutes
     vehicle_class = str(state.suggested_vehicle_class or ctx.get("suggestedVehicleClass") or "")
 
-    # Check 1: Carrier eligibility & presence
+    # Check 1: Carrier eligibility & presence. Fails closed on a missing/empty shortlist -
+    # a run reaching Agent 4 without Agent 2's shortlist threaded through cannot actually
+    # prove the selected agency was ever screened, so it must not pass by default
+    # (previously `not eligible_agency_ids` made this pass whenever the shortlist was
+    # simply absent, the exact false-pass the audit flagged as most safety-critical).
     eligible_agency_ids = {c.agency_id for c in state.candidate_shortlist} if state.candidate_shortlist else set()
-    carrier_passed = selected_agency_id is not None and (
-        selected_agency_id in eligible_agency_ids or not eligible_agency_ids
+    carrier_passed = (
+        selected_agency_id is not None
+        and bool(eligible_agency_ids)
+        and selected_agency_id in eligible_agency_ids
     )
     if not carrier_passed:
         flags.append(f"CARRIER_ELIGIBILITY_FAILED: Agency {selected_agency_id} not eligible.")
@@ -108,9 +114,13 @@ def evaluate_deterministic_rules(state: WorkflowState) -> tuple[bool, list[str],
         ),
     })
 
-    # Check 3: Routing & ETA sanity
+    # Check 3: Routing & ETA sanity. A missing cargo_distance_km must fail this check, not
+    # pass it - the previous `cargo_distance_km is None or ...` let a run with no distance
+    # data at all sail through (the audit's "missing cargo distance may pass routing
+    # sanity" finding).
     route_passed = (
-        (cargo_distance_km is None or cargo_distance_km > 0.0)
+        cargo_distance_km is not None
+        and cargo_distance_km > 0.0
         and eta_minutes is not None
         and eta_minutes > 0
     )
@@ -154,66 +164,60 @@ def evaluate_deterministic_rules(state: WorkflowState) -> tuple[bool, list[str],
         "details": capacity_reason,
     })
 
-    # Check 5: Active Licensed Driver Compliance
+    # Check 5: Active Licensed Driver Compliance. A missing assignment must fail, not pass -
+    # the previous `True if not assigned_driver else ...` treated "nothing assigned" as
+    # automatically compliant (the audit's "missing driver/vehicle assignments pass their
+    # checks" finding).
     assigned_driver = state.assigned_driver
-    driver_passed = True if not assigned_driver else bool(assigned_driver.get("driverId") or assigned_driver.get("name"))
-    if assigned_driver and not driver_passed:
-        flags.append("DRIVER_COMPLIANCE_FAILED: Assigned driver unverified or inactive.")
+    driver_passed = bool(assigned_driver) and bool(
+        assigned_driver.get("driverId") or assigned_driver.get("name")
+    )
+    if not driver_passed:
+        flags.append("DRIVER_COMPLIANCE_FAILED: No verified driver assigned.")
     checks.append({
         "name": "driver_compliance",
         "passed": driver_passed,
         "details": (
             f"Driver '{assigned_driver.get('name', 'Active Commercial Driver')}' verified licensed."
-            if assigned_driver and driver_passed
-            else "Driver assignment verified or pending dispatch confirmation."
+            if driver_passed
+            else "No assigned driver found - cannot verify licensed driver compliance."
         ),
     })
 
-    # Check 6: Verified Fleet Vehicle
+    # Check 6: Verified Fleet Vehicle. Same fail-closed fix as Check 5.
     assigned_vehicle = state.assigned_vehicle
-    vehicle_passed = True if not assigned_vehicle else bool(assigned_vehicle.get("vehicleId") or assigned_vehicle.get("registrationNo"))
-    if assigned_vehicle and not vehicle_passed:
-        flags.append("VEHICLE_VERIFICATION_FAILED: Assigned fleet vehicle unavailable.")
+    vehicle_passed = bool(assigned_vehicle) and bool(
+        assigned_vehicle.get("vehicleId") or assigned_vehicle.get("registrationNo")
+    )
+    if not vehicle_passed:
+        flags.append("VEHICLE_VERIFICATION_FAILED: No verified fleet vehicle assigned.")
     checks.append({
         "name": "vehicle_verification",
         "passed": vehicle_passed,
         "details": (
             f"Fleet vehicle '{assigned_vehicle.get('registrationNo', 'Verified Plate')}' verified available."
-            if assigned_vehicle and vehicle_passed
-            else "Fleet vehicle category verified available in carrier fleet."
+            if vehicle_passed
+            else "No assigned fleet vehicle found - cannot verify vehicle availability."
         ),
     })
 
-    # 7. Deterministic Price Deviation Arithmetic
+    # Price-deviation check: deliberately dropped (plans/02-contracts-and-agent-fixes.md §5 /
+    # 00-master-plan.md open question #1). The audit confirmed Load creation has no
+    # shipperBudget/budget field anywhere in the normal payload, so this arithmetic was
+    # always silently a no-op in production - not a real check anyone could rely on. Rather
+    # than add a new shipper-budget field across load creation (backend + both clients) to
+    # give it something genuine to compare against, the check is removed; the field is kept
+    # (always None) since nothing downstream reads it as anything but optional.
     price_deviation_percent: float | None = None
-    shipper_budget = (
-        ctx.get("shipper_budget")
-        or ctx.get("shipperBudget")
-        or ctx.get("budget")
-    )
-    if shipper_budget is not None and proposed_price is not None and proposed_price > 0.0:
-        try:
-            budget_val = float(shipper_budget)
-            if budget_val > 0:
-                deviation = ((proposed_price - budget_val) / budget_val) * 100.0
-                price_deviation_percent = round(deviation, 2)
 
-                if price_deviation_percent > 0:
-                    flags.append(
-                        f"PRICE_EXCEEDS_BUDGET: Proposed price LKR {proposed_price:,.2f} exceeds shipper budget by {price_deviation_percent:+0.2f}%."
-                    )
-                    if price_deviation_percent > 20.0:
-                        flags.append(
-                            f"HIGH_PRICE_DEVIATION: Price deviation exceeds +20% threshold ({price_deviation_percent:+0.2f}%)."
-                        )
-                elif price_deviation_percent < 0:
-                    flags.append(
-                        f"PRICE_UNDER_BUDGET: Proposed price is {abs(price_deviation_percent):.2f}% under target budget."
-                    )
-        except (ValueError, TypeError):
-            flags.append("INVALID_BUDGET_FORMAT: Shipper budget is not a valid number.")
-
-    critical_check_names = {"carrier_eligibility", "price_bounds", "routing_sanity", "vehicle_capacity"}
+    critical_check_names = {
+        "carrier_eligibility",
+        "price_bounds",
+        "routing_sanity",
+        "vehicle_capacity",
+        "driver_compliance",
+        "vehicle_verification",
+    }
     critical_failed = any(not c["passed"] for c in checks if c["name"] in critical_check_names)
     is_valid = not critical_failed
 
@@ -262,8 +266,9 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "checks": checks,
     }
 
-    # 3. LLM Reasoning Call (gemini-2.5-flash default, Ollama fallback)
+    # 3. LLM Reasoning Call (OpenAI default, Gemini/Ollama fallback per config)
     llm = get_llm()
+    llm_provenance: dict[str, Any] | None = None
     try:
         llm_output = await llm.generate_validation_summary_and_proposal(
             system_prompt=_SYSTEM_PROMPT,
@@ -272,6 +277,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         validation_summary = llm_output["validation_summary"]
         proposal_email_subject = llm_output["proposal_email_subject"]
         proposal_email_body = llm_output["proposal_email_body"]
+        llm_provenance = getattr(llm, "last_call_meta", None)
     except Exception as exc:
         logger.exception("LLM call in Agent 4 failed, generating structured fallback")
         fallback = llm._fallback_validation_copy(llm_context)
@@ -292,6 +298,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "proposalEmailSubject": proposal_email_subject,
         "proposalEmailBody": proposal_email_body,
         "status": status,
+        "llmProvenance": llm_provenance,
     }
 
     input_data = {
@@ -308,19 +315,14 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "loadContext": state.load_context,
     }
 
-    # 4. Consolidated step record
-    steps.append({
-        "stepNo": _STEP_NO,
-        "agentRole": _AGENT_ROLE,
-        "status": "Succeeded" if is_valid else "Failed",
-        "inputJson": input_data,
-        "outputJson": validation,
-        "errorMessage": None if is_valid else explanation,
-        "startedAt": started.isoformat(),
-        "completedAt": now().isoformat(),
-    })
-
-    # 5. Persistence Pattern (Channel 1): Incremental step report to internal ASP.NET endpoint
+    # 4. Persistence Pattern (Channel 1): Incremental step report to internal ASP.NET endpoint,
+    # done *before* recording this step as Succeeded in the returned state. A run must never
+    # report AwaitingApproval/Succeeded when its own AgentStep row was never actually persisted -
+    # that's precisely the fabricated-success problem this pipeline exists to avoid. If the report
+    # call fails, this run fails too, even if validation itself passed
+    # (plans/02-contracts-and-agent-fixes.md §1.5 - Agent 4's "step-report failure is logged and
+    # ignored" pattern, same fix as Agent 1's).
+    report_failed = False
     if state.workflow_run_id:
         try:
             await report(
@@ -335,18 +337,37 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             )
             logger.info("Persisted Agent 4 step %s for workflow %s", _STEP_NO, state.workflow_run_id)
         except BackendClientError as exc:
-            logger.warning("Failed to report step %s for run %s: %s", _STEP_NO, state.workflow_run_id, exc)
+            logger.error("Failed to report step %s for run %s: %s", _STEP_NO, state.workflow_run_id, exc)
+            report_failed = True
+
+    final_is_valid = is_valid and not report_failed
+    final_status = "Failed" if report_failed else status
+    final_explanation = (
+        f"report_step_failed: could not persist Agent 4's step" if report_failed else explanation
+    )
+
+    # 5. Consolidated step record
+    steps.append({
+        "stepNo": _STEP_NO,
+        "agentRole": _AGENT_ROLE,
+        "status": "Succeeded" if final_is_valid else "Failed",
+        "inputJson": input_data,
+        "outputJson": validation,
+        "errorMessage": None if final_is_valid else final_explanation,
+        "startedAt": started.isoformat(),
+        "completedAt": now().isoformat(),
+    })
 
     return {
-        "is_valid": is_valid,
+        "is_valid": final_is_valid,
         "validation_flags": validation_flags,
         "price_deviation_percent": price_deviation_percent,
         "validation_summary": validation_summary,
-        "status": status,
+        "status": final_status,
         "proposal_email_subject": proposal_email_subject,
         "proposal_email_body": proposal_email_body,
         "validation": validation,
         "steps": steps,
-        "failed": not is_valid,
-        "failure_reason": None if is_valid else explanation,
+        "failed": not final_is_valid,
+        "failure_reason": None if final_is_valid else final_explanation,
     }

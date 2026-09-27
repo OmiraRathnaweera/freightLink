@@ -181,6 +181,74 @@ async def test_matching_pricing_empty_candidates():
 
 
 @pytest.mark.anyio
+async def test_pricing_failure_fails_run_cleanly_not_fabricated_price():
+    """Verifies that when backend pricing fails, Agent 3 fails the run rather than
+    fabricating a price via a local formula (plans/02-contracts-and-agent-fixes.md §1.3).
+    """
+    load_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    shipper_id = uuid.uuid4()
+
+    agency = CandidateAgency(
+        agency_id=uuid.uuid4(),
+        name="Peliyagoda Logistics",
+        yard_lat=6.9667,
+        yard_lng=79.8917,
+        yard_address="123 Negombo Rd, Peliyagoda",
+        available_vehicle_classes=["MediumLorry"],
+    )
+
+    state = WorkflowState(
+        load_id=load_id,
+        triggered_by_user_id=shipper_id,
+        attempt_no=1,
+        workflow_run_id=run_id,
+        load_context={
+            "pickupLat": 6.9271,
+            "pickupLng": 79.8612,
+            "dropoffLat": 7.2906,
+            "dropoffLng": 80.6337,
+            "weightKg": 2500,
+            "volumeM3": 8.0,
+        },
+        candidate_shortlist=[agency],
+    )
+
+    with (
+        patch(
+            "freightlink_agent.agents.matching_pricing.get_price_estimate",
+            new=AsyncMock(
+                return_value=(None, {"error": "backend pricing unreachable", "httpStatusCode": 500})
+            ),
+        ),
+        patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
+        patch(
+            "freightlink_agent.agents.matching_pricing.record_tool_call",
+            new=AsyncMock(),
+        ) as mock_record_call,
+    ):
+        result = await matching_pricing.run(state)
+
+    # Fails cleanly - no proposed_price/most_suitable ever gets fabricated
+    assert result.get("failed") is True
+    assert "pricing estimation failed" in result.get("failure_reason", "").lower()
+    assert "proposed_price" not in result
+    assert "most_suitable" not in result
+
+    # The failed pricing tool call is still recorded for the audit trail, alongside the
+    # two routing tool calls (positioning leg + cargo leg) made before pricing ran
+    pricing_calls = [
+        call.args[1] for call in mock_record_call.await_args_list if call.args[1].tool_name == "estimate_price"
+    ]
+    assert len(pricing_calls) == 1
+    assert pricing_calls[0].success is False
+
+    steps = result.get("steps", [])
+    assert steps[-1]["status"] == "Failed"
+    assert steps[-1]["agentRole"] == "MatchingPricing"
+
+
+@pytest.mark.anyio
 async def test_tool_failure_routing_safe_hold_for_review():
     """Verifies that when routing tool calls fail after retry, safe 'hold for review' is recorded."""
     load_id = uuid.uuid4()

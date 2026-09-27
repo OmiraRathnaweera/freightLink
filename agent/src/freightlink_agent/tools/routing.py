@@ -124,6 +124,8 @@ async def get_route_and_eta(
             distance_km=distance_km,
             eta_minutes=eta_minutes,
             success=True,
+            is_simulated=True,
+            simulation_source="no_api_key",
         )
         _route_cache[cache_key] = response
         telemetry = {
@@ -217,6 +219,8 @@ async def get_route_and_eta(
         distance_km=distance_km,
         eta_minutes=eta_minutes,
         success=True,
+        is_simulated=True,
+        simulation_source="ors_quota_exceeded" if _ors_quota_exceeded else "ors_failed",
     )
     _route_cache[cache_key] = fallback_res
     return fallback_res, {

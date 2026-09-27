@@ -1426,11 +1426,16 @@ public class AssignmentService : IAssignmentService
         {
             try
             {
+                // ADR-020: "Agent 2's eligibility query filters on Active only" - Verified means
+                // KYC/compliance is approved but the agency isn't necessarily accepting jobs yet
+                // (no available vehicle/driver, or availability switched off). Including Verified
+                // here was a regression against that decision - Active already implies Verified
+                // plus real fleet/driver availability, which is exactly what this query checks.
                 var activeAgenciesForAgent = await _dbContext.Agencies
                     .Include(a => a.Vehicles)
                     .Include(a => a.Drivers)
                         .ThenInclude(d => d.User)
-                    .Where(a => (a.Status == AgencyStatus.Active || a.Status == AgencyStatus.Verified)
+                    .Where(a => a.Status == AgencyStatus.Active
                              && a.Vehicles.Any(v => v.Status == VehicleStatus.Available)
                              && a.Drivers.Any(d => d.Status == DriverStatus.Active))
                     .OrderBy(a => a.CreatedAt)

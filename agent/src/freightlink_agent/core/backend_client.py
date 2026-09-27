@@ -10,7 +10,7 @@ from uuid import UUID
 import httpx
 
 from freightlink_agent.core.config import get_settings
-from freightlink_agent.schemas.callback import ReportAgentStepRequest
+from freightlink_agent.schemas.callback import MatchCandidateRequest, ReportAgentStepRequest
 from freightlink_agent.schemas.matching import (
     CreateToolCallRequest,
     EstimatePricingRequest,
@@ -88,6 +88,37 @@ async def report_step(workflow_run_id: UUID, step: ReportAgentStepRequest) -> UU
     raise BackendClientError(
         f"POST /internal/agent-workflow-runs/{workflow_run_id}/steps failed after retry: {last_error}"
     )
+
+
+async def record_match_candidates(workflow_run_id: UUID, candidates: list[MatchCandidateRequest]) -> None:
+    """POST /internal/agent-workflow-runs/{workflowRunId}/candidates - persists Agent 2's
+
+    full evaluated-candidate list as MatchCandidate audit rows in one call. If the backend
+    endpoint is not yet deployed, logs a warning rather than failing Agent 2's whole run -
+    the shortlist Agent 2 hands to Agent 3 in-memory is unaffected either way.
+    """
+    settings = get_settings()
+    url = f"{settings.backend_base_url}/internal/agent-workflow-runs/{workflow_run_id}/candidates"
+    body = [c.model_dump(mode="json", by_alias=True) for c in candidates]
+
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS) as client:
+            response = await client.post(url, json=body, headers=_headers())
+        if response.status_code == 404:
+            logger.warning(
+                "POST /internal/agent-workflow-runs/%s/candidates returned 404 (endpoint not yet deployed)",
+                workflow_run_id,
+            )
+            return
+        if response.status_code >= 300:
+            raise BackendClientError(
+                f"POST /internal/agent-workflow-runs/{workflow_run_id}/candidates returned "
+                f"{response.status_code}: {response.text[:500]}"
+            )
+    except httpx.HTTPError as exc:
+        raise BackendClientError(
+            f"POST /internal/agent-workflow-runs/{workflow_run_id}/candidates failed: {exc}"
+        ) from exc
 
 
 async def estimate_pricing(request: EstimatePricingRequest) -> EstimatePricingResponse:

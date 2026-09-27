@@ -243,6 +243,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             "agencyId": str(cand.agency_id),
             "etaMinutes": r.eta_minutes or 0,
             "distanceKm": r.distance_km or 0.0,
+            "isSimulatedRoute": r.is_simulated,
         }
         for cand, r in sorted_routed[:5]
     ]
@@ -375,25 +376,62 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     }
     tool_calls.append(pricing_tool_call_dict)
 
+    try:
+        await record_tool_call(
+            workflow_run_id,
+            CreateToolCallRequest(
+                tool_name="estimate_price",
+                attempt_no=1,
+                request_json=pricing_req_json,
+                response_json=pricing_res_json,
+                success=pricing_res is not None,
+                http_status_code=pricing_telemetry.get("httpStatusCode"),
+                duration_ms=pricing_telemetry.get("durationMs"),
+                error_message=pricing_err_msg if not pricing_res else None,
+                called_at=now(),
+            ),
+        )
+    except BackendClientError:
+        pass
+
+    # Pricing is a hard business number, never an LLM/local guess (deterministic-vs-LLM
+    # boundary, see plans/00-master-plan.md §6.5): if the backend estimator fails, fail
+    # this run cleanly rather than fabricate a price. The previous fallback here also
+    # referenced VehicleClass.MiniTruck as if VehicleClass were an enum with attributes -
+    # it's a Literal type alias, so that comparison always raised AttributeError before
+    # it could even construct its (separately shape-mismatched) fallback response.
     if not pricing_res:
-        logger.warning(
-            "Backend price estimate returned empty or error (%s). Falling back to ADR-015 shared rate formula.",
-            pricing_err_msg,
-        )
-        rate_km = 120.0 if suggested_vehicle_class == VehicleClass.MiniTruck else (150.0 if suggested_vehicle_class == VehicleClass.MediumLorry else 220.0)
-        fallback_est = round(5000.0 + (cargo_distance_km * rate_km) + (weight_kg * 2.0), 2)
-        pricing_res = EstimatePricingResponse(
-            estimated_price=fallback_est,
-            currency="LKR",
-            distance_km=cargo_distance_km,
-            suggested_vehicle_class=suggested_vehicle_class,
-            breakdown={
-                "baseFare": 5000.0,
-                "distanceRate": rate_km,
-                "weightRate": 2.0,
-                "source": "fallback_shared_formula",
-            },
-        )
+        msg = f"hold for review: pricing estimation failed: {pricing_err_msg}"
+        logger.error(msg)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": input_data,
+            "outputJson": {"status": "hold for review", "reason": msg},
+            "errorMessage": msg,
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
+        try:
+            await report(
+                workflow_run_id=workflow_run_id,
+                step_no=_STEP_NO,
+                agent_role=_AGENT_ROLE,
+                status="Failed",
+                started_at=started,
+                input_data=input_data,
+                error_message=msg,
+            )
+        except BackendClientError:
+            pass
+        return {
+            "failed": True,
+            "failure_reason": msg,
+            "tool_calls": tool_calls,
+            "ranked_five": ranked_five,
+            "steps": steps,
+        }
 
     # Resolve real assigned fleet vehicle and licensed driver from database entities
     assigned_vehicle = None
@@ -443,6 +481,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         ],
     }
 
+    llm_provenance: dict[str, Any] | None = None
     try:
         llm = get_llm()
         llm_out = await llm.justify_selection(
@@ -452,6 +491,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         headline = llm_out.get("headline", "")
         detailed = llm_out.get("detailed_reasoning", "")
         justification = f"{headline}\n\n{detailed}".strip()
+        llm_provenance = getattr(llm, "last_call_meta", None)
     except Exception as exc:  # noqa: BLE001
         logger.warning("LLM selection justification failed (%s); using deterministic explanation", exc)
         veh_reg = (
@@ -473,13 +513,16 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "suggestedVehicleClass": suggested_vehicle_class,
         "etaMinutes": winner_route.eta_minutes,
         "positioningDistanceKm": winner_route.distance_km,
+        "positioningRouteSimulated": winner_route.is_simulated,
         "cargoDistanceKm": cargo_distance_km,
+        "cargoRouteSimulated": cargo_route.is_simulated,
         "proposedPrice": float(pricing_res.estimated_price),
         "pricingBreakdown": pricing_res.model_dump(by_alias=True),
         "selectionJustification": justification,
         "assignedVehicle": assigned_vehicle,
         "assignedDriver": assigned_driver,
         "rankedCandidates": ranked_five,
+        "llmProvenance": llm_provenance,
     }
 
     # vehicleClass integer mapping: 0=MiniTruck, 1=MediumLorry, 2=ContainerTruck
@@ -488,6 +531,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "agencyId": str(winner.agency_id),
         "estimatedPrice": float(pricing_res.estimated_price),
         "distanceKm": float(cargo_distance_km),
+        "cargoRouteSimulated": cargo_route.is_simulated,
         "vehicleClass": v_class_map.get(suggested_vehicle_class, 0),
         "vehicleId": str(assigned_vehicle["vehicleId"]) if assigned_vehicle and "vehicleId" in assigned_vehicle else None,
         "registrationNo": assigned_vehicle.get("registrationNo") if assigned_vehicle else None,

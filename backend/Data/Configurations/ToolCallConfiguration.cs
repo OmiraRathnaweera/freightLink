@@ -25,7 +25,7 @@ public class ToolCallConfiguration : IEntityTypeConfiguration<ToolCall>
 
         builder.ToTable(t =>
         {
-            t.HasCheckConstraint("ck_toolcall_allowlist", "\"ToolName\" IN ('get_route_and_eta')");
+            t.HasCheckConstraint("ck_toolcall_allowlist", "\"ToolName\" IN ('get_route_and_eta', 'estimate_price')");
             t.HasCheckConstraint("ck_toolcall_attempt", "\"AttemptNo\" >= 1");
             t.HasCheckConstraint("ck_toolcall_failure", "\"Success\" = true OR \"ErrorMessage\" IS NOT NULL");
         });

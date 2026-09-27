@@ -110,6 +110,7 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
     mock_step2_report = AsyncMock()
     mock_step3_report = AsyncMock()
     mock_step4_report = AsyncMock()
+    mock_record_match_candidates = AsyncMock()
 
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
@@ -118,8 +119,13 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
             "freightlink_agent.agents.matching_pricing.get_price_estimate",
             new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200, "durationMs": 45})),
         ),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
         patch("freightlink_agent.agents.planner.report", new=mock_step1_report),
         patch("freightlink_agent.agents.domain_analysis.report", new=mock_step2_report),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=mock_record_match_candidates),
         patch("freightlink_agent.agents.matching_pricing.report", new=mock_step3_report),
         patch("freightlink_agent.agents.validation_safety.report", new=mock_step4_report),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
@@ -167,6 +173,13 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
     candidates = result.get("candidates", [])
     assert len(candidates) == 2
     assert all(c["eligible"] is True for c in candidates)
+
+    # Agent 2 persists the full evaluated shortlist as real MatchCandidate audit rows
+    # (POST /internal/agent-workflow-runs/{id}/candidates), not just embedded step JSON.
+    mock_record_match_candidates.assert_awaited_once()
+    recorded = mock_record_match_candidates.await_args.args[1]
+    assert len(recorded) == 2
+    assert all(r.eligible for r in recorded)
 
     tool_calls = result.get("tool_calls", [])
     assert len(tool_calls) >= 3  # 2 candidate routes + 1 cargo route + 1 pricing
@@ -255,8 +268,13 @@ async def test_short_circuit_agent_2_zero_eligible_agencies(mock_planner_llm):
 
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
         patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=AsyncMock()),
     ):
         pipeline = get_pipeline()
         result = await pipeline.ainvoke(state)
@@ -306,8 +324,13 @@ async def test_short_circuit_agent_3_routing_failure(mock_planner_llm, sample_ca
 
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
         patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=AsyncMock()),
         patch(
             "freightlink_agent.agents.matching_pricing.get_route_and_eta",
             new=AsyncMock(return_value=(failed_route, {"httpStatusCode": 504, "request": {}})),
@@ -390,6 +413,7 @@ async def test_post_workflows_run_endpoint(mock_planner_llm, sample_candidates):
         ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
         patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
         patch("freightlink_agent.agents.validation_safety.report", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
