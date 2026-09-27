@@ -167,7 +167,6 @@ function LoadsPage() {
               onSortChange={handleSortChange}
               showShipperColumn={role === UserRole.ADMIN || isAgencyStaff}
               role={role}
-              onAcceptLoad={isMarketplaceMode ? (load) => setSelectedAcceptLoad(load) : undefined}
               onSendProposal={isMarketplaceMode ? (load) => setSelectedProposalLoad(load) : undefined}
               onDispatchLoad={isAgencyStaff && activeTab === 'assigned' ? (load) => load : undefined}
             />
