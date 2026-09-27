@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/auth/screens/login_screen.dart';
-import '../../features/auth/screens/register_screen.dart';
 import '../../features/loads/screens/my_loads_screen.dart';
 import '../../features/trips/screens/driver_assigned_trip_screen.dart';
 import '../../features/trips/screens/job_proposals_screen.dart';
@@ -76,20 +75,19 @@ GoRouter createAppRouter(AuthProvider authProvider) {
     redirect: (context, state) {
       final status = authProvider.status;
       final isGoingToLogin = state.matchedLocation == '/login';
-      final isGoingToRegister = state.matchedLocation == '/register';
 
       if (status == AuthStatus.unknown) {
         // Fail closed while secure storage/session validation is still running.
         // Returning null here exposed protected shell routes briefly (and on a
         // failed bootstrap) to direct URL navigation such as /dashboard.
-        return (isGoingToLogin || isGoingToRegister) ? null : '/login';
+        return isGoingToLogin ? null : '/login';
       }
 
-      if (status == AuthStatus.guest && !isGoingToLogin && !isGoingToRegister) {
+      if (status == AuthStatus.guest && !isGoingToLogin) {
         return '/login';
       }
 
-      if (status == AuthStatus.authenticated && (isGoingToLogin || isGoingToRegister)) {
+      if (status == AuthStatus.authenticated && isGoingToLogin) {
         return mobileRoleHome(authProvider.user?.role);
       }
 
@@ -104,10 +102,6 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
-      ),
-      GoRoute(
-        path: '/register',
-        builder: (context, state) => const RegisterScreen(),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {

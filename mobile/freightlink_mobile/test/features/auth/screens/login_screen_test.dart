@@ -9,7 +9,7 @@ import '../../../helpers/fakes.dart';
 void main() {
   setUpAll(registerFallbackValues);
 
-  testWidgets('renders one common login form and the agency registration link', (tester) async {
+  testWidgets('renders one common login form with no registration link', (tester) async {
     final authProvider = AuthProvider(tokenStorage: MockTokenStorage());
 
     await tester.pumpWidget(
@@ -22,7 +22,7 @@ void main() {
     expect(find.text('Email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Sign in'), findsOneWidget);
-    expect(find.text('Register agency'), findsOneWidget);
+    expect(find.text('Register agency'), findsNothing);
     expect(find.text('Shipper'), findsNothing);
     expect(find.text('Driver'), findsNothing);
   });

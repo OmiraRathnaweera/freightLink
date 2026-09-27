@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -138,19 +137,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     const SizedBox(height: AppConstants.spaceXl),
                     PrimaryButton(label: 'Sign in', isLoading: auth.isSubmitting, onPressed: _submit),
-                    const SizedBox(height: AppConstants.spaceLg),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 4,
-                      children: [
-                        const Text("Registering an agency?", style: TextStyle(color: AppColors.inkMuted, fontSize: 13)),
-                        TextButton(
-                          onPressed: () => context.go('/register'),
-                          child: const Text('Register agency'),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),

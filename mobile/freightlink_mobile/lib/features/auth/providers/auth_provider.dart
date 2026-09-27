@@ -91,46 +91,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Agency-only mobile registration. A successful registration does not
-  /// force login because the backend may require email verification first.
-  Future<bool> registerAgency({
-    required String email,
-    required String password,
-    required String fullName,
-    String? phoneE164,
-    String? jobTitle,
-    required String agencyName,
-    required String businessRegNo,
-    required String yardAddress,
-    required double yardLat,
-    required double yardLng,
-  }) async {
-    _isSubmitting = true;
-    _errorMessage = null;
-    notifyListeners();
-    try {
-      await _apiClient.post('/auth/register/agency', body: {
-        'email': email,
-        'password': password,
-        'fullName': fullName,
-        if (phoneE164 != null && phoneE164.isNotEmpty) 'phoneE164': phoneE164,
-        if (jobTitle != null && jobTitle.isNotEmpty) 'jobTitle': jobTitle,
-        'agencyName': agencyName,
-        'businessRegNo': businessRegNo,
-        'yardAddress': yardAddress,
-        'yardLat': yardLat,
-        'yardLng': yardLng,
-      }, retryOnUnauthorized: false);
-      return true;
-    } on ApiException catch (error) {
-      _errorMessage = error.message;
-      return false;
-    } finally {
-      _isSubmitting = false;
-      notifyListeners();
-    }
-  }
-
   void clearErrorMessage() {
     _errorMessage = null;
     notifyListeners();
