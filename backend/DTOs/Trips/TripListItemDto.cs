@@ -38,6 +38,15 @@ public class TripListItemDto
     /// <summary>The assigned driver's full name, if resolved.</summary>
     public string? DriverName { get; set; }
 
+    /// <summary>Origin / pickup address from the load, denormalized for list views.</summary>
+    public string? PickupAddress { get; set; }
+
+    /// <summary>Destination / dropoff address from the load, denormalized for list views.</summary>
+    public string? DropoffAddress { get; set; }
+
+    /// <summary>Shipper load reference code (e.g. LD-CMB-KDY-01).</summary>
+    public string? ReferenceCode { get; set; }
+
     /// <summary>The trip's current status (e.g. "Assigned", "PickedUp", "InTransit", "Delivered").</summary>
     public string Status { get; set; } = string.Empty;
 

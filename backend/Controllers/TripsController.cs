@@ -29,10 +29,12 @@ namespace FreightLink.Api.Controllers;
 [Authorize]
 public class TripsController : ControllerBase
 {
-    /// <summary>See remarks on <see cref="ShipperOrAdminRoles"/> for why these are <see langword="nameof"/>-built, not string literals.</summary>
     private const string AgencyStaffOrDriverRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver);
 
-    /// <summary>Roles authorized to create or reassign trips.</summary>
+    /// <summary>Role authorized to dispatch trips (Requirement 3: only agencies dispatch trips).</summary>
+    private const string AgencyStaffRole = nameof(UserRole.AgencyStaff);
+
+    /// <summary>Roles authorized to update, cancel, or delete trips (Requirement 4: drivers strictly excluded).</summary>
     private const string AgencyStaffOrAdminRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
 
     /// <summary>See remarks on <see cref="ShipperOrAdminRoles"/> for why these are <see langword="nameof"/>-built, not string literals.</summary>
@@ -59,12 +61,13 @@ public class TripsController : ControllerBase
 
     /// <summary>
     /// Dispatches and creates a new trip, assigning an agency vehicle and driver to an accepted assignment.
+    /// Only the respective agency staff may dispatch trips (Requirement 3).
     /// </summary>
     /// <param name="request">The creation payload including assignment, vehicle, and driver ids.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 Created with the created <see cref="TripResponseDto"/>.</returns>
     [HttpPost]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<ActionResult<TripResponseDto>> Create([FromBody] CreateTripDto request, CancellationToken cancellationToken)
     {
         var result = await _tripService.CreateAsync(request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -135,30 +138,30 @@ public class TripsController : ControllerBase
     }
 
     /// <summary>
-    /// Cancels an active trip (Assigned, PickedUp, or InTransit). Soft-delete / lifecycle cancellation per ADR-019.
+    /// Permanently deletes a trip record and unclaims the associated shipment load (reverting its status to Posted).
+    /// Only Agency Staff may delete trips (Requirement 4).
     /// </summary>
     /// <param name="id">The trip's id.</param>
-    /// <param name="reason">Optional cancellation reason query parameter.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>200 OK with the cancelled <see cref="TripResponseDto"/>.</returns>
+    /// <returns>204 NoContent upon successful deletion.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = AgencyStaffOrDriverOrAdminRoles)]
-    public async Task<ActionResult<TripResponseDto>> Delete(Guid id, [FromQuery] string? reason, CancellationToken cancellationToken)
+    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var request = string.IsNullOrWhiteSpace(reason) ? null : new CancelTripDto { Reason = reason };
-        var result = await _tripService.CancelAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
-        return Ok(result);
+        await _tripService.DeleteAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return NoContent();
     }
 
     /// <summary>
-    /// Cancels an active trip (Assigned, PickedUp, or InTransit) with an optional request body. Semantic alias for cancel.
+    /// Cancels an active trip (Assigned, PickedUp, or InTransit) with an optional request body.
+    /// Only Agency Staff may cancel trips (Requirement 4).
     /// </summary>
     /// <param name="id">The trip's id.</param>
     /// <param name="request">Optional cancellation payload.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the cancelled <see cref="TripResponseDto"/>.</returns>
     [HttpPatch("{id:guid}/cancel")]
-    [Authorize(Roles = AgencyStaffOrDriverOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffOrAdminRoles)]
     public async Task<ActionResult<TripResponseDto>> Cancel(Guid id, [FromBody] CancelTripDto? request, CancellationToken cancellationToken)
     {
         var result = await _tripService.CancelAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);

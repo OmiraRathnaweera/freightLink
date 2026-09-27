@@ -10,7 +10,12 @@ function InvoiceFilterBar({
   onDateRangeChange,
   onResetFilters,
   hasActiveFilters,
+  isShipper = false,
 }) {
+  const statusOptions = isShipper
+    ? STATUS_FILTER_OPTIONS.filter((opt) => opt.value !== 'Draft')
+    : STATUS_FILTER_OPTIONS
+
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-slate-border bg-surface-container-lowest p-3 shadow-soft sm:flex-row sm:items-center sm:justify-between">
       {/* Search Input */}
@@ -47,7 +52,7 @@ function InvoiceFilterBar({
             onChange={(e) => onStatusChange(e.target.value)}
             className="h-10 appearance-none rounded-md border border-slate-300 bg-white pl-3.5 pr-8 text-body-md font-medium text-on-surface transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer"
           >
-            {STATUS_FILTER_OPTIONS.map((opt) => (
+            {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>

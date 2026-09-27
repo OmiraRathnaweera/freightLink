@@ -33,6 +33,7 @@ public class AppDbContext : DbContext
     public DbSet<TripEvidence> TripEvidences => Set<TripEvidence>();
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
     public DbSet<Payment> Payments => Set<Payment>();
     public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
     public DbSet<Dispute> Disputes => Set<Dispute>();

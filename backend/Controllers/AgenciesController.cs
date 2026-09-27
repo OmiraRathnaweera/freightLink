@@ -6,6 +6,7 @@ using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FreightLink.Api.Controllers;
@@ -71,6 +72,18 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// Retrieves every Pending agency together with the compliance documents it has uploaded so far,
+    /// for the admin verification queue.
+    /// </summary>
+    [HttpGet("verification-queue")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IEnumerable<AgencyVerificationQueueItemDto>>> GetVerificationQueue(CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetVerificationQueueAsync(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Updates an existing agency's profile details.
     /// </summary>
     [HttpPut("{id:guid}")]
@@ -114,26 +127,127 @@ public class AgenciesController : ControllerBase
         return Ok();
     }
 
-    /// <summary>
-    /// Adds a vehicle to the agency's fleet.
-    /// </summary>
-    [HttpPost("{id:guid}/vehicles")]
-    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
-    public async Task<ActionResult<VehicleResponseDto>> AddVehicle(Guid id, [FromBody] VehicleCreateDto request, CancellationToken cancellationToken)
+    [HttpPost("{id:guid}/compliance-docs")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> AddComplianceDoc(Guid id, [FromBody] ComplianceDocCreateDto request, CancellationToken cancellationToken)
     {
-        var result = await _agencyService.AddVehicleAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
-        return Ok(result); // Return 200 OK with the created vehicle
+        var result = await _agencyService.AddComplianceDocAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    [HttpGet("{id:guid}/compliance-docs")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<IEnumerable<ComplianceDocResponseDto>>> GetComplianceDocs(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetComplianceDocsAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>
-    /// Retrieves all vehicles for the specified agency.
+    /// Replaces an existing compliance document's file/number/dates in place (e.g. re-uploading after
+    /// a rejection, or renewing an expiring document). Resets the document back to Pending for
+    /// re-verification. Distinct from <see cref="AddComplianceDoc"/>, which always inserts a new row
+    /// and would collide with the one-live-document-per-type constraint if reused for replacement.
+    /// </summary>
+    [HttpPut("{id:guid}/compliance-docs/{docId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> UpdateComplianceDoc(Guid id, Guid docId, [FromBody] ComplianceDocUpdateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only: marks a Pending compliance document as Verified.</summary>
+    [HttpPost("{id:guid}/compliance-docs/{docId:guid}/verify")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> VerifyComplianceDoc(Guid id, Guid docId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.VerifyComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only: marks a Pending compliance document as Rejected.</summary>
+    [HttpPost("{id:guid}/compliance-docs/{docId:guid}/reject")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<ComplianceDocResponseDto>> RejectComplianceDoc(Guid id, Guid docId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.RejectComplianceDocAsync(id, docId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/vehicles")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<VehicleResponseDto>> AddVehicle(Guid id, [FromBody] VehicleCreateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddVehicleAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// Lists all vehicles in an agency's fleet.
     /// </summary>
     [HttpGet("{id:guid}/vehicles")]
     [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
-    public async Task<ActionResult<IEnumerable<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<List<VehicleResponseDto>>> GetVehicles(Guid id, CancellationToken cancellationToken)
     {
         var result = await _agencyService.GetVehiclesAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Lists all drivers employed by an agency.
+    /// </summary>
+    [HttpGet("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<List<DriverResponseDto>>> GetDrivers(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetDriversAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Onboards/adds a driver to an agency.
+    /// </summary>
+    [HttpPost("{id:guid}/drivers")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<DriverResponseDto>> AddDriver(Guid id, [FromBody] CreateDriverRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.AddDriverAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// Convenience endpoint for Agency Staff to fetch their own agency's fleet (vehicles + drivers),
+    /// or for Admin to fetch an agency's fleet by specifying agencyId.
+    /// </summary>
+    [HttpGet("my/fleet")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetMyFleet([FromQuery] Guid? agencyId, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetFleetAsync(agencyId, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Retrieves full fleet resources (vehicles + drivers) for a specific agency.
+    /// </summary>
+    [HttpGet("{id:guid}/fleet")]
+    [Authorize(Roles = $"{nameof(UserRole.AgencyStaff)},{nameof(UserRole.Admin)}")]
+    public async Task<ActionResult<AgencyFleetResponseDto>> GetFleet(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetFleetAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Seeds default active carrier agencies across Sri Lanka for testing and demonstration.
+    /// </summary>
+    [HttpPost("seed-defaults")]
+    [AllowAnonymous]
+    public async Task<ActionResult> SeedDefaultAgencies(CancellationToken cancellationToken)
+    {
+        await _agencyService.SeedDefaultAgenciesIfNotExistsAsync(cancellationToken);
+        return Ok(new { message = "Default active carrier agencies seeded successfully." });
     }
 
     private Guid GetCurrentUserId()

@@ -12,6 +12,7 @@ import PostLoadPage from '../features/loads/pages/PostLoadPage.jsx'
 import LoadDetailPage from '../features/loads/pages/LoadDetailPage.jsx'
 import EditLoadPage from '../features/loads/pages/EditLoadPage.jsx'
 import AgenciesPage from '../features/agencies/pages/AgenciesPage.jsx'
+import FleetVehiclesPage from '../features/agencies/pages/FleetVehiclesPage.jsx'
 import AgencyVerificationPage from '../features/agencies/pages/AgencyVerificationPage.jsx'
 import TripsPage from '../features/trips/pages/TripsPage.jsx'
 import TripDetailPage from '../features/trips/pages/TripDetailPage.jsx'
@@ -21,6 +22,8 @@ import FuelRatesPage from '../features/pricingConfig/pages/FuelRatesPage.jsx'
 import VehicleEfficiencyPage from '../features/pricingConfig/pages/VehicleEfficiencyPage.jsx'
 import PricingFormulaPage from '../features/pricingConfig/pages/PricingFormulaPage.jsx'
 import AdminDisputesPage from '../features/disputes/pages/AdminDisputesPage.jsx'
+import PaymentSuccessPage from '../features/billing/pages/PaymentSuccessPage.jsx'
+import PaymentCancelledPage from '../features/billing/pages/PaymentCancelledPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
@@ -54,10 +57,15 @@ const router = createBrowserRouter(
           <Route path="/loads/:loadId/edit" element={<EditLoadPage />} />
 
           <Route path="/agencies" element={<AgenciesPage />} />
+          <Route path="/agencies/vehicles" element={<FleetVehiclesPage />} />
           <Route path="/agencies/verification" element={<AgencyVerificationPage />} />
           <Route path="/trips" element={<TripsPage />} />
           <Route path="/trips/:tripId" element={<TripDetailPage />} />
           <Route path="/billing" element={<BillingPage />} />
+          <Route path="/invoices/:id/payment-success" element={<PaymentSuccessPage />} />
+          <Route path="/invoices/:id/payment-cancelled" element={<PaymentCancelledPage />} />
+          <Route path="/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/payment/cancel" element={<PaymentCancelledPage />} />
           <Route path="/agent-workflows" element={<AgentWorkflowConsolePage />} />
 
           <Route path="/pricing-config" element={<Navigate to="/pricing-config/fuel-rates" replace />} />

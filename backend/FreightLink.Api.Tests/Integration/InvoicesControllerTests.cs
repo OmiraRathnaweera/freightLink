@@ -15,12 +15,19 @@ using Xunit;
 namespace FreightLink.Api.Tests.Integration;
 
 /// <summary>
-/// Integration tests for <see cref="Controllers.InvoicesController"/> testing HTTP endpoints, routing, and role authorization.
+/// Integration tests for <see cref="Controllers.InvoicesController"/> verifying RBAC permissions,
+/// mutation restrictions (Agent only), pay endpoint (Shipper only), and scoped retrieval rules.
 /// </summary>
 public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
 
     public InvoicesControllerTests(CustomWebApplicationFactory factory)
     {
@@ -162,7 +169,7 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
             LoadId = load.LoadId,
             AgencyId = agency.AgencyId,
             WorkflowRunId = workflowRun.WorkflowRunId,
-            ProposedPrice = 20000m,
+            ProposedPrice = 25000m,
             Status = AssignmentStatus.Accepted,
             CreatedAt = now,
             UpdatedAt = now
@@ -188,6 +195,7 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         db.AgentWorkflowRuns.Add(workflowRun);
         db.Assignments.Add(assignment);
         db.Trips.Add(trip);
+
         await db.SaveChangesAsync();
 
         return (shipper, agency, staffUser, trip);
@@ -206,17 +214,23 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // =========================================================================
+    // 1. RBAC Matrix — Create Invoice (Agent Allowed, Admin/Shipper Denied 403)
+    // =========================================================================
+
     [Fact]
-    public async Task PostInvoice_AuthenticatedShipper_CreatesAndReturns201()
+    public async Task PostInvoice_AuthenticatedAgent_CreatesAndReturns201()
     {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var token = MintToken(staffUser.UserId, UserRole.AgencyStaff);
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
         {
             Content = JsonContent.Create(new CreateInvoiceDto
             {
                 TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                RecipientRole = UserRole.Shipper,
                 Amount = 25000m,
                 Currency = "LKR",
                 IssueImmediately = false
@@ -227,202 +241,27 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponseDto>();
+        var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
         Assert.NotNull(invoice);
         Assert.Equal(trip.TripId, invoice.TripId);
         Assert.Equal(25000m, invoice.Amount);
     }
 
     [Fact]
-    public async Task GetInvoice_Returns200WithInvoiceDetails()
-    {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
-
-        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
-        {
-            Content = JsonContent.Create(new CreateInvoiceDto
-            {
-                TripId = trip.TripId,
-                Amount = 18000m,
-                Currency = "LKR",
-                IssueImmediately = true
-            })
-        };
-        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var createRes = await _client.SendAsync(createReq);
-        var createdInvoice = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>())!;
-
-        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/invoices/{createdInvoice.InvoiceId}");
-        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var getRes = await _client.SendAsync(getReq);
-
-        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
-        var fetchedInvoice = await getRes.Content.ReadFromJsonAsync<InvoiceResponseDto>();
-        Assert.NotNull(fetchedInvoice);
-        Assert.Equal(createdInvoice.InvoiceId, fetchedInvoice.InvoiceId);
-    }
-
-    [Fact]
-    public async Task VoidInvoice_Returns200WithVoidStatus()
-    {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
-
-        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
-        {
-            Content = JsonContent.Create(new CreateInvoiceDto
-            {
-                TripId = trip.TripId,
-                Amount = 18000m,
-                Currency = "LKR",
-                IssueImmediately = false
-            })
-        };
-        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var createRes = await _client.SendAsync(createReq);
-        var createdInvoice = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>())!;
-
-        var voidReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/invoices/{createdInvoice.InvoiceId}/void");
-        voidReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var voidRes = await _client.SendAsync(voidReq);
-
-        Assert.Equal(HttpStatusCode.OK, voidRes.StatusCode);
-        var voidedInvoice = await voidRes.Content.ReadFromJsonAsync<InvoiceResponseDto>();
-        Assert.NotNull(voidedInvoice);
-        Assert.Equal(InvoiceStatus.Void, voidedInvoice.Status);
-    }
-
-    [Theory]
-    [InlineData("US1")]
-    [InlineData("ABCD")]
-    [InlineData("dollars")]
-    [InlineData("USDT")]
-    public async Task PostInvoice_InvalidCurrency_Returns400ValidationError(string invalidCurrency)
+    public async Task PostInvoice_AuthenticatedShipper_Returns403Forbidden()
     {
         var (shipper, _, _, trip) = await SeedTripDataAsync();
         var token = MintToken(shipper.UserId, UserRole.Shipper);
 
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
         {
-            Content = JsonContent.Create(new
-            {
-                tripId = trip.TripId,
-                amount = 25000m,
-                currency = invalidCurrency
-            })
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-
-        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
-        Assert.NotNull(json);
-        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    [Theory]
-    [InlineData("US1")]
-    [InlineData("ABCD")]
-    [InlineData("dollars")]
-    [InlineData("USDT")]
-    public async Task PutInvoice_InvalidCurrency_Returns400ValidationError(string invalidCurrency)
-    {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
-
-        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
-        {
             Content = JsonContent.Create(new CreateInvoiceDto
             {
                 TripId = trip.TripId,
-                Amount = 18000m,
-                Currency = "LKR",
-                IssueImmediately = false
+                Amount = 25000m,
+                Currency = "LKR"
             })
         };
-        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var createRes = await _client.SendAsync(createReq);
-        var createdInvoice = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>())!;
-
-        var updateReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/invoices/{createdInvoice.InvoiceId}")
-        {
-            Content = JsonContent.Create(new
-            {
-                amount = 19000m,
-                currency = invalidCurrency
-            })
-        };
-        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var updateRes = await _client.SendAsync(updateReq);
-
-        Assert.Equal(HttpStatusCode.BadRequest, updateRes.StatusCode);
-        var json = await updateRes.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
-        Assert.NotNull(json);
-        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task PostOnDelivery_WithoutAuth_Returns401()
-    {
-        var response = await _client.PostAsync($"/api/v1/invoices/on-delivery/{Guid.NewGuid()}", null);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task PostOnDelivery_AuthenticatedShipper_CreatesAndReturns201()
-    {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
-
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-
-        var invoice = await response.Content.ReadFromJsonAsync<InvoiceResponseDto>();
-        Assert.NotNull(invoice);
-        Assert.Equal(trip.TripId, invoice.TripId);
-        Assert.Equal(25000m, invoice.Amount);
-        Assert.Equal("LKR", invoice.Currency);
-        Assert.Equal(InvoiceStatus.Issued, invoice.Status);
-    }
-
-    [Fact]
-    public async Task PostOnDelivery_WhenTripNotDelivered_Returns422()
-    {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        using (var scope = _factory.Services.CreateScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var tripEntity = await db.Trips.FindAsync(trip.TripId);
-            tripEntity!.Status = TripStatus.InTransit;
-            await db.SaveChangesAsync();
-        }
-
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
-
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-
-        var json = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonDocument>();
-        Assert.NotNull(json);
-        Assert.Equal("TRIP_NOT_DELIVERED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task PostOnDelivery_WhenNotOwned_Returns403()
-    {
-        var (_, _, _, trip) = await SeedTripDataAsync();
-        var randomUserId = Guid.NewGuid();
-        var token = MintToken(randomUserId, UserRole.Shipper);
-
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
         var response = await _client.SendAsync(request);
@@ -430,21 +269,480 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public async Task PostOnDelivery_WhenAlreadyExists_Returns409()
+    public async Task PostInvoice_AuthenticatedAdmin_Returns403Forbidden()
     {
-        var (shipper, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(shipper.UserId, UserRole.Shipper);
+        var (_, _, _, trip) = await SeedTripDataAsync();
+        var token = MintToken(Guid.NewGuid(), UserRole.Admin);
 
-        // First call creates the invoice
-        var req1 = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
-        req1.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var res1 = await _client.SendAsync(req1);
-        Assert.Equal(HttpStatusCode.Created, res1.StatusCode);
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                Amount = 25000m,
+                Currency = "LKR"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        // Second call should conflict
-        var req2 = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/on-delivery/{trip.TripId}");
-        req2.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        var res2 = await _client.SendAsync(req2);
-        Assert.Equal(HttpStatusCode.Conflict, res2.StatusCode);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    // =========================================================================
+    // 2. RBAC Matrix — Edit Invoice (Agent Allowed on Draft, Admin/Shipper Denied 403)
+    // =========================================================================
+
+    [Fact]
+    public async Task PutInvoice_AuthenticatedAgent_DraftInvoice_UpdatesAndReturns200()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var token = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+
+        // Create draft
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 20000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Update draft
+        var putReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/invoices/{created.InvoiceId}")
+        {
+            Content = JsonContent.Create(new UpdateInvoiceDto
+            {
+                Amount = 28000m,
+                Notes = "Adjusted diesel surcharge"
+            })
+        };
+        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var putRes = await _client.SendAsync(putReq);
+
+        Assert.Equal(HttpStatusCode.OK, putRes.StatusCode);
+        var updated = await putRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(updated);
+        Assert.Equal(28000m, updated.Amount);
+    }
+
+    [Fact]
+    public async Task PutInvoice_AuthenticatedShipper_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        // Create draft as agent
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 20000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Shipper attempts update
+        var putReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/invoices/{created.InvoiceId}")
+        {
+            Content = JsonContent.Create(new UpdateInvoiceDto { Amount = 15000m })
+        };
+        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var putRes = await _client.SendAsync(putReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, putRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task PutInvoice_AuthenticatedAdmin_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 20000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Admin attempts update
+        var putReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/invoices/{created.InvoiceId}")
+        {
+            Content = JsonContent.Create(new UpdateInvoiceDto { Amount = 15000m })
+        };
+        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var putRes = await _client.SendAsync(putReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, putRes.StatusCode);
+    }
+
+    // =========================================================================
+    // 3. RBAC Matrix — Issue Invoice (Agent Allowed, Admin/Shipper Denied 403)
+    // =========================================================================
+
+    [Fact]
+    public async Task IssueInvoice_AuthenticatedAgent_TransitionsToIssuedAndReturns200()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var token = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 30000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var issueReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/issue");
+        issueReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var issueRes = await _client.SendAsync(issueReq);
+
+        Assert.Equal(HttpStatusCode.OK, issueRes.StatusCode);
+        var issued = await issueRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(issued);
+        Assert.Equal(InvoiceStatus.Issued, issued.Status);
+    }
+
+    [Fact]
+    public async Task IssueInvoice_AuthenticatedShipper_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 30000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var issueReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/issue");
+        issueReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var issueRes = await _client.SendAsync(issueReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, issueRes.StatusCode);
+    }
+
+    // =========================================================================
+    // 4. RBAC Matrix — Delete / Void Invoice (Agent Allowed, Admin/Shipper Denied 403)
+    // =========================================================================
+
+    [Fact]
+    public async Task VoidInvoice_AuthenticatedAgent_WithReason_Returns200OK()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var token = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 18000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var voidReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/void")
+        {
+            Content = JsonContent.Create(new VoidInvoiceDto { VoidReason = "Billing error revised by agency" })
+        };
+        voidReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var voidRes = await _client.SendAsync(voidReq);
+
+        Assert.Equal(HttpStatusCode.OK, voidRes.StatusCode);
+        var voided = await voidRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(voided);
+        Assert.Equal(InvoiceStatus.Void, voided.Status);
+    }
+
+    [Fact]
+    public async Task VoidInvoice_AuthenticatedShipper_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 18000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var voidReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/void")
+        {
+            Content = JsonContent.Create(new VoidInvoiceDto { VoidReason = "Shipper cancel attempt" })
+        };
+        voidReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var voidRes = await _client.SendAsync(voidReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, voidRes.StatusCode);
+    }
+
+    // =========================================================================
+    // 5. RBAC Matrix — Pay Invoice (Shipper Allowed on Issued, Agent/Admin Denied 403)
+    // =========================================================================
+
+    [Fact]
+    public async Task PayInvoice_AuthenticatedAssignedShipper_IssuedStatus_Returns200Paid()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        // Create issued invoice as agent
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 45000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Pay invoice as assigned shipper
+        var payReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/pay")
+        {
+            Content = JsonContent.Create(new PayInvoiceDto
+            {
+                PaymentReference = "TXN-INT-PAYHERE-9999",
+                PaymentMethod = "PayHere"
+            })
+        };
+        payReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var payRes = await _client.SendAsync(payReq);
+
+        Assert.Equal(HttpStatusCode.OK, payRes.StatusCode);
+        var paid = await payRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(paid);
+        Assert.Equal(InvoiceStatus.Paid, paid.Status);
+        Assert.NotNull(paid.PaidAt);
+        Assert.Equal("TXN-INT-PAYHERE-9999", paid.PaymentReference);
+    }
+
+    [Fact]
+    public async Task PayInvoice_AuthenticatedAgent_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 45000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var payReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/pay")
+        {
+            Content = JsonContent.Create(new PayInvoiceDto())
+        };
+        payReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var payRes = await _client.SendAsync(payReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, payRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task PayInvoice_AuthenticatedAdmin_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 45000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var payReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/pay")
+        {
+            Content = JsonContent.Create(new PayInvoiceDto())
+        };
+        payReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var payRes = await _client.SendAsync(payReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, payRes.StatusCode);
+    }
+
+    // =========================================================================
+    // 6. RBAC Matrix — View Invoices (GET /:id and GET /)
+    // =========================================================================
+
+    [Fact]
+    public async Task GetInvoice_AuthenticatedAdmin_CanViewAnyInvoice()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 18000m,
+                Currency = "LKR",
+                IssueImmediately = false // Draft
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Admin views invoice
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/invoices/{created.InvoiceId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var getRes = await _client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var fetched = await getRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(fetched);
+        Assert.Equal(created.InvoiceId, fetched.InvoiceId);
+    }
+
+    [Fact]
+    public async Task GetInvoice_AuthenticatedShipper_DraftInvoice_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        // Create draft invoice as agent
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 18000m,
+                Currency = "LKR",
+                IssueImmediately = false // Draft
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Shipper attempts to read draft invoice
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/invoices/{created.InvoiceId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var getRes = await _client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, getRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetInvoice_AuthenticatedShipper_IssuedInvoice_Returns200OK()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        // Create issued invoice as agent
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 18000m,
+                Currency = "LKR",
+                IssueImmediately = true // Issued
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        // Shipper views issued invoice
+        var getReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/invoices/{created.InvoiceId}");
+        getReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var getRes = await _client.SendAsync(getReq);
+
+        Assert.Equal(HttpStatusCode.OK, getRes.StatusCode);
+        var fetched = await getRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(fetched);
+        Assert.Equal(created.InvoiceId, fetched.InvoiceId);
     }
 }

@@ -8,7 +8,11 @@ import * as tripsApi from "../../api/tripsApi.js";
 
 vi.mock("../../api/tripsApi.js", async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, useTripsQuery: vi.fn() };
+  return {
+    ...actual,
+    useTripsQuery: vi.fn(),
+    useDeleteTripMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  };
 });
 
 function sampleTrip(overrides = {}) {
@@ -101,5 +105,68 @@ describe("TripsPage — loaded state with table", () => {
 
     const detailLinks = screen.getAllByRole("link", { name: /view/i });
     expect(detailLinks[0]).toHaveAttribute("href", `/trips/${trip.tripId}`);
+  });
+
+  it("renders delete button on active dispatched trip and opens DeleteTripDialog", async () => {
+    const trip = sampleTrip({ status: "Assigned" });
+    tripsApi.useTripsQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { items: [trip], page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
+      refetch: vi.fn(),
+    });
+
+    renderTripsPage(UserRole.AGENCY_STAFF);
+
+    const deleteBtn = screen.getByRole("button", { name: /delete trip/i });
+    expect(deleteBtn).toBeInTheDocument();
+
+    await userEvent.click(deleteBtn);
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText("Delete Trip")).toBeInTheDocument();
+  });
+
+  it("does not render delete button for trips in Delivered status, but allows deletion of Cancelled trips", () => {
+    const deliveredTrip = sampleTrip({ tripId: "del-1111-1111", status: "Delivered" });
+    const cancelledTrip = sampleTrip({ tripId: "canc-1111-1111", status: "Cancelled" });
+
+    tripsApi.useTripsQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { items: [deliveredTrip, cancelledTrip], page: 1, pageSize: 20, totalItems: 2, totalPages: 1 },
+    });
+
+    renderTripsPage(UserRole.AGENCY_STAFF);
+
+    expect(screen.queryByRole("button", { name: /delete trip del-111/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /delete trip canc-111/i })).toBeInTheDocument();
+  });
+
+  it("renders Dispatch Trip button for AgencyStaff, but hides it for Admin per Requirement 3", () => {
+    tripsApi.useTripsQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { items: [], page: 1, pageSize: 20, totalItems: 0, totalPages: 0 },
+    });
+
+    const { unmount } = renderTripsPage(UserRole.AGENCY_STAFF);
+    expect(screen.getByRole("button", { name: /dispatch trip/i })).toBeInTheDocument();
+    unmount();
+
+    renderTripsPage(UserRole.ADMIN);
+    expect(screen.queryByRole("button", { name: /dispatch trip/i })).not.toBeInTheDocument();
+  });
+
+  it("does not render delete button for Driver role per Requirement 4", () => {
+    const trip = sampleTrip({ status: "Assigned" });
+    tripsApi.useTripsQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { items: [trip], page: 1, pageSize: 20, totalItems: 1, totalPages: 1 },
+    });
+
+    renderTripsPage(UserRole.DRIVER);
+    expect(screen.queryByRole("button", { name: /delete trip/i })).not.toBeInTheDocument();
   });
 });

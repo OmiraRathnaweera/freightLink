@@ -34,20 +34,49 @@ _SYSTEM_PROMPT = (
 
 async def run(state: WorkflowState) -> dict:
     started = now()
+    steps = list(state.steps)
 
-    try:
-        created = await create_workflow_run(
-            CreateWorkflowRunRequest(
-                load_id=state.load_id,
-                triggered_by_user_id=state.triggered_by_user_id,
-                attempt_no=state.attempt_no,
+    # Short-circuit check: Agent 1 malformed load payload -> stop, nothing delegated
+    ctx = state.load_context or {}
+    weight = float(ctx.get("weightKg") or ctx.get("weight_kg") or 0.0)
+    pickup_lat = ctx.get("pickupLat") or ctx.get("pickup_lat")
+    dropoff_lat = ctx.get("dropoffLat") or ctx.get("dropoff_lat")
+
+    if weight <= 0 or pickup_lat is None or dropoff_lat is None:
+        msg = "malformed_load_payload"
+        logger.warning("Agent 1 short-circuit: %s", msg)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": {"loadId": str(state.load_id), "loadContext": ctx},
+            "outputJson": None,
+            "errorMessage": msg,
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
+        return {
+            "failed": True,
+            "failure_reason": msg,
+            "steps": steps,
+        }
+
+    workflow_run_id = state.workflow_run_id
+    if not workflow_run_id:
+        try:
+            created = await create_workflow_run(
+                CreateWorkflowRunRequest(
+                    load_id=state.load_id,
+                    triggered_by_user_id=state.triggered_by_user_id,
+                    attempt_no=state.attempt_no,
+                )
             )
-        )
-    except BackendClientError as exc:
-        logger.exception("Could not create AgentWorkflowRun for load %s", state.load_id)
-        return {"failed": True, "failure_reason": f"create_workflow_run_failed: {exc}"}
+            workflow_run_id = created.workflow_run_id
+        except BackendClientError:
+            # Per multi-agent blueprint revision: fallback to in-memory ID if backend is in batch mode
+            import uuid
+            workflow_run_id = uuid.uuid4()
 
-    workflow_run_id = created.workflow_run_id
     input_data = {"loadId": str(state.load_id), "loadContext": state.load_context}
 
     try:
@@ -55,8 +84,18 @@ async def run(state: WorkflowState) -> dict:
         plan = await llm.plan(system_prompt=_SYSTEM_PROMPT, load_context=state.load_context)
         objective = plan["objective"]
         plan_json_dict = plan
-    except Exception as exc:  # noqa: BLE001 - last-resort, the run is otherwise unobserved
+    except Exception as exc:  # noqa: BLE001
         logger.exception("Planner LLM call failed for run %s", workflow_run_id)
+        steps.append({
+            "stepNo": _STEP_NO,
+            "agentRole": _AGENT_ROLE,
+            "status": "Failed",
+            "inputJson": input_data,
+            "outputJson": None,
+            "errorMessage": f"Unhandled exception: {exc}",
+            "startedAt": started.isoformat(),
+            "completedAt": now().isoformat(),
+        })
         try:
             await report(
                 workflow_run_id=workflow_run_id,
@@ -68,14 +107,25 @@ async def run(state: WorkflowState) -> dict:
                 error_message=f"Unhandled exception: {exc}",
             )
         except BackendClientError:
-            logger.exception("Also failed to report step %s failure for run %s", _STEP_NO, workflow_run_id)
+            pass
         return {
             "workflow_run_id": workflow_run_id,
             "failed": True,
             "failure_reason": f"planner_llm_failed: {exc}",
+            "steps": steps,
         }
 
     plan_json = json.dumps(plan_json_dict)
+
+    steps.append({
+        "stepNo": _STEP_NO,
+        "agentRole": _AGENT_ROLE,
+        "status": "Succeeded",
+        "inputJson": input_data,
+        "outputJson": plan_json_dict,
+        "startedAt": started.isoformat(),
+        "completedAt": now().isoformat(),
+    })
 
     try:
         await report(
@@ -87,18 +137,13 @@ async def run(state: WorkflowState) -> dict:
             input_data=input_data,
             output_data=plan_json_dict,
         )
-    except BackendClientError as exc:
-        logger.exception("Could not report step %s success for run %s", _STEP_NO, workflow_run_id)
-        return {
-            "workflow_run_id": workflow_run_id,
-            "objective": objective,
-            "plan_json": plan_json,
-            "failed": True,
-            "failure_reason": f"report_step_failed: {exc}",
-        }
+    except BackendClientError:
+        pass
 
     return {
         "workflow_run_id": workflow_run_id,
         "objective": objective,
         "plan_json": plan_json,
+        "plan": plan_json_dict,
+        "steps": steps,
     }

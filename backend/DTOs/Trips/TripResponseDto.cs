@@ -62,6 +62,30 @@ public class TripResponseDto
     /// <summary>When the trip was last updated.</summary>
     public DateTimeOffset UpdatedAt { get; set; }
 
+    /// <summary>Originating cargo description from the load.</summary>
+    public string? CargoDescription { get; set; }
+
+    /// <summary>Total cargo weight in kilograms.</summary>
+    public decimal? WeightKg { get; set; }
+
+    /// <summary>Total cargo volume in cubic meters.</summary>
+    public decimal? VolumeM3 { get; set; }
+
+    /// <summary>Pickup window start time.</summary>
+    public DateTimeOffset? PickupWindowStart { get; set; }
+
+    /// <summary>Pickup window end time.</summary>
+    public DateTimeOffset? PickupWindowEnd { get; set; }
+
+    /// <summary>Shipper load reference code (e.g. LD-CMB-KDY-01).</summary>
+    public string? ReferenceCode { get; set; }
+
+    /// <summary>Routed distance in kilometers from assignment.</summary>
+    public decimal? RoutedDistanceKm { get; set; }
+
+    /// <summary>Proposed ETA in minutes from assignment.</summary>
+    public int? ProposedEtaMinutes { get; set; }
+
     /// <summary>The trip's full status-change timeline, newest first.</summary>
     public List<TripEventResponseDto> Events { get; set; } = new();
 

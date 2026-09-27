@@ -1,0 +1,2 @@
+python-interpreter-path = "agent/.venv/Scripts/python.exe"
+search-path = ["agent/src", "agent/.venv/Lib/site-packages"]

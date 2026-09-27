@@ -1,10 +1,12 @@
 export const InvoiceStatus = {
+  DRAFT: 'Draft',
   ISSUED: 'Issued',
   PAID: 'Paid',
   PAYMENT_PENDING: 'Payment Pending',
-  DRAFT: 'Draft',
   FAILED: 'Failed',
   OVERDUE: 'Overdue',
+  VOIDED: 'Voided',
+  VOID: 'Void',
 }
 
 /**
@@ -21,6 +23,8 @@ export function getInvoiceStatusTone(status) {
       return 'amber'
     case InvoiceStatus.DRAFT:
       return 'neutral'
+    case InvoiceStatus.VOIDED:
+    case InvoiceStatus.VOID:
     case InvoiceStatus.FAILED:
     case InvoiceStatus.OVERDUE:
       return 'red'
@@ -31,10 +35,11 @@ export function getInvoiceStatusTone(status) {
 
 export const STATUS_FILTER_OPTIONS = [
   { value: 'ALL', label: 'All Statuses' },
+  { value: 'Draft', label: 'Draft' },
+  { value: 'Issued', label: 'Issued' },
   { value: 'Paid', label: 'Paid' },
   { value: 'Payment Pending', label: 'Payment Pending' },
-  { value: 'Issued', label: 'Issued' },
-  { value: 'Draft', label: 'Draft' },
+  { value: 'Voided', label: 'Voided' },
   { value: 'Failed', label: 'Failed' },
   { value: 'Overdue', label: 'Overdue' },
 ]

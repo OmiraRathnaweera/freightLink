@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Truck } from "lucide-react";
+import { Plus, RefreshCw, Truck } from "lucide-react";
 import PageHeader from "../../../components/PageHeader.jsx";
 import Button from "../../../components/Button.jsx";
 import Card from "../../../components/Card.jsx";
@@ -15,13 +15,18 @@ import TripsTable from "../components/TripsTable.jsx";
 import TripFilterBar from "../components/TripFilterBar.jsx";
 import Pagination from "../components/Pagination.jsx";
 import CreateTripDialog from "../components/CreateTripDialog.jsx";
+import DeleteTripDialog from "../components/DeleteTripDialog.jsx";
 
 const DEFAULT_PAGE_SIZE = 20;
 
 function TripsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const role = useAppSelector((state) => state.auth.role);
+  const dispatchAssignmentId = searchParams.get("dispatch") || searchParams.get("assignmentId");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(
+    Boolean(dispatchAssignmentId && role === UserRole.AGENCY_STAFF)
+  );
+  const [tripToDelete, setTripToDelete] = useState(null);
 
   const page = Number(searchParams.get("page") ?? "1");
   const pageSize = Number(searchParams.get("pageSize") ?? String(DEFAULT_PAGE_SIZE));
@@ -40,7 +45,7 @@ function TripsPage() {
     [page, pageSize, sortBy, sortDir, status]
   );
 
-  const tripsQuery = useTripsQuery(apiParams);
+  const tripsQuery = useTripsQuery(apiParams, { refetchInterval: 10000 });
 
   function updateParams(patch, { resetPage = true } = {}) {
     const next = new URLSearchParams(searchParams);
@@ -69,16 +74,28 @@ function TripsPage() {
         title="Active Trips"
         description="Monitor active and in-progress trips, track statuses, and view proof evidence."
         actions={
-          (role === UserRole.AGENCY_STAFF || role === UserRole.ADMIN) && (
+          <div className="flex items-center gap-2">
             <Button
-              variant="primary"
-              onClick={() => setIsCreateDialogOpen(true)}
+              variant="secondary"
+              onClick={() => tripsQuery.refetch()}
+              disabled={tripsQuery.isFetching}
               className="inline-flex items-center gap-1.5"
+              title="Refresh active trips"
             >
-              <Plus className="h-4 w-4" />
-              Dispatch Trip
+              <RefreshCw className={`h-4 w-4 ${tripsQuery.isFetching ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
-          )
+            {role === UserRole.AGENCY_STAFF && (
+              <Button
+                variant="primary"
+                onClick={() => setIsCreateDialogOpen(true)}
+                className="inline-flex items-center gap-1.5"
+              >
+                <Plus className="h-4 w-4" />
+                Dispatch Trip
+              </Button>
+            )}
+          </div>
         }
       />
 
@@ -103,6 +120,7 @@ function TripsPage() {
               sortBy={sortBy}
               sortDir={sortDir}
               onSortChange={handleSortChange}
+              onDeleteTrip={(trip) => setTripToDelete(trip)}
             />
           </div>
         ) : (
@@ -131,8 +149,21 @@ function TripsPage() {
 
       {isCreateDialogOpen && (
         <CreateTripDialog
+          defaultAssignmentId={dispatchAssignmentId || ""}
           onClose={() => setIsCreateDialogOpen(false)}
           onCreated={() => tripsQuery.refetch()}
+        />
+      )}
+
+      {tripToDelete && (
+        <DeleteTripDialog
+          tripId={tripToDelete.tripId}
+          trip={tripToDelete}
+          onClose={() => setTripToDelete(null)}
+          onDeleted={() => {
+            setTripToDelete(null);
+            tripsQuery.refetch();
+          }}
         />
       )}
     </div>
