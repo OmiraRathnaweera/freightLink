@@ -30,18 +30,18 @@ public class LoadsController : ControllerBase
     /// </summary>
     private const string ShipperRole = nameof(UserRole.Shipper);
 
-    /// <summary>See <see cref="ShipperRole"/>.</summary>
-    private const string ShipperOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.Admin);
     private const string ShipperOrAgencyStaffOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
 
     private readonly ILoadService _loadService;
     private readonly IAssignmentService _assignmentService;
+    private readonly IPricingEstimatorService _pricingEstimatorService;
 
     /// <summary>Creates the controller with its injected services.</summary>
-    public LoadsController(ILoadService loadService, IAssignmentService assignmentService)
+    public LoadsController(ILoadService loadService, IAssignmentService assignmentService, IPricingEstimatorService pricingEstimatorService)
     {
         _loadService = loadService;
         _assignmentService = assignmentService;
+        _pricingEstimatorService = pricingEstimatorService;
     }
 
     /// <summary>Creates a new load owned by the authenticated Shipper.</summary>
@@ -118,14 +118,32 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
+    /// Computes a rough, pre-matching price quote for the load using the straight-line (haversine)
+    /// distance between its own pickup/dropoff coordinates — no external routing call, no agency/vehicle
+    /// chosen yet. Accessible only by the owning Shipper. This is a preview only: it does not persist
+    /// anything onto the load, and is distinct from the AI agent's own <c>Load.EstimatedPrice</c>.
+    /// </summary>
+    /// <param name="id">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="LoadPriceEstimateResponseDto"/>.</returns>
+    [HttpPost("{id:guid}/estimate")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<LoadPriceEstimateResponseDto>> EstimatePrice(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _pricingEstimatorService.EstimateForShipperAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets the match recommendation, candidates, validation checks, and workflow steps for a load.
-    /// Accessible by Shippers (who own the load) and Admins.
+    /// Accessible only by the Shipper who owns the load. Admins oversee agencies and pricing but
+    /// must not view, rerun, approve, reject, or revise a shipper's AI match decision.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the <see cref="LoadMatchRecommendationDto"/>.</returns>
     [HttpGet("{loadId:guid}/match")]
-    [Authorize(Roles = ShipperOrAdminRoles)]
+    [Authorize(Roles = ShipperRole)]
     public async Task<ActionResult<LoadMatchRecommendationDto>> GetMatchRecommendation(
         Guid loadId,
         [FromQuery] bool rerun = false,

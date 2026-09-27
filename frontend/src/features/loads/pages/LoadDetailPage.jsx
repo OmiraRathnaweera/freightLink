@@ -18,6 +18,7 @@ import LoadFilesSection from '../components/LoadFilesSection.jsx'
 import LoadStatusHistoryCard from '../components/LoadStatusHistoryCard.jsx'
 import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
 import AcceptShipmentDialog from '../components/AcceptShipmentDialog.jsx'
+import PriceEstimateCard from '../components/PriceEstimateCard.jsx'
 
 // Load detail — GET /api/v1/loads/{id}, full LoadResponseDto
 // (docs/load-management-api.md Section 3.6). RateBreakdownCard/
@@ -195,6 +196,8 @@ function LoadDetailPage() {
             destinationLat={load.dropoffLat}
             destinationLng={load.dropoffLng}
           />
+
+          {role === UserRole.SHIPPER && <PriceEstimateCard loadId={load.loadId} />}
 
           <LoadFilesSection loadId={load.loadId} role={role} />
         </div>

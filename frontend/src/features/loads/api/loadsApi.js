@@ -96,6 +96,15 @@ export async function publishLoad(id) {
 }
 
 /**
+ * POST /loads/{id}/estimate â€” a rough, pre-matching price quote using the load's own
+ * pickup/dropoff coordinates (haversine distance, no routing call). Preview only: it is not
+ * persisted, and is distinct from the load's own `estimatedPrice` field (the AI agent's price).
+ */
+export async function estimateLoadPrice(id) {
+  return api.post(`/loads/${id}/estimate`)
+}
+
+/**
  * POST /files/single â€” the upload half of the two-step attach flow
  * (Section 4.0). Goes through `axiosClient` directly, not the JSON-only
  * `api.post` helper, since this needs a `multipart/form-data` body â€” axios
@@ -187,6 +196,14 @@ export function usePublishLoadMutation(id, options) {
       queryClient.invalidateQueries({ queryKey: loadKeys.detail(id) })
       options?.onSuccess?.(data, variables, context)
     },
+    ...options,
+  })
+}
+
+/** Price-estimate mutation, scoped to one load â€” no cache invalidation, since nothing is persisted. */
+export function useEstimateLoadPriceMutation(id, options) {
+  return useMutation({
+    mutationFn: () => estimateLoadPrice(id),
     ...options,
   })
 }

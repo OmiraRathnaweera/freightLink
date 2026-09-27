@@ -302,4 +302,119 @@ public class PricingEstimatorServiceTests
         Assert.Equal(HttpStatusCode.Conflict, exception.StatusCode);
         Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
     }
+
+    // --- EstimateForShipperAsync: the Shipper-facing, haversine-based POST /loads/{id}/estimate ---
+
+    /// <summary>
+    /// Exact-arithmetic check against known seeded inputs and <see cref="SeedLoadAsync"/>'s fixed
+    /// Colombo→Kandy coordinates (haversine distance ≈ 94.34 km) with WeightKg=100:
+    /// ratePerKm = ((350/100)*15 + 20 + 5) * 1.15 = 89.125 (same config as <c>EstimateAsync</c>'s test)
+    /// estimatedPrice = 500 + (94.34*89.125) + (100*10) = 500 + 8408.0525 + 1000 = 9908.0525
+    /// </summary>
+    [Fact]
+    public async Task EstimateForShipperAsync_ComputesExactPrice_FromHaversineDistanceAndKnownInputs()
+    {
+        using var dbContext = await CreateContextAsync();
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var shipperId = await SeedShipperUserAsync(dbContext);
+        await SeedFullPricingConfigAsync(dbContext, adminId);
+        var load = await SeedLoadAsync(dbContext, shipperId, weightKg: 100m);
+        var sut = CreateSut(dbContext);
+
+        var result = await sut.EstimateForShipperAsync(load.LoadId, shipperId, UserRole.Shipper);
+
+        Assert.Equal(94.34m, result.DistanceKm);
+        Assert.Equal(89.125m, result.RatePerKm);
+        Assert.Equal(9908.0525m, result.EstimatedPrice);
+        Assert.Equal(load.LoadId, result.LoadId);
+        Assert.Equal(VehicleClass.MiniTruck, result.VehicleClass);
+        Assert.Equal(10m, result.RatePerKg);
+        Assert.Equal(500m, result.BaseFare);
+    }
+
+    /// <summary>
+    /// Unlike <see cref="PricingEstimatorService.EstimateAsync"/>, this rough Shipper preview must
+    /// never write to <c>Load.EstimatedPrice</c> — that column belongs to the AI agent's own estimate.
+    /// </summary>
+    [Fact]
+    public async Task EstimateForShipperAsync_DoesNotPersistEstimatedPrice_OnTheLoad()
+    {
+        using var dbContext = await CreateContextAsync();
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var shipperId = await SeedShipperUserAsync(dbContext);
+        await SeedFullPricingConfigAsync(dbContext, adminId);
+        var load = await SeedLoadAsync(dbContext, shipperId);
+        var sut = CreateSut(dbContext);
+
+        await sut.EstimateForShipperAsync(load.LoadId, shipperId, UserRole.Shipper);
+
+        var row = await dbContext.Loads.AsNoTracking().SingleAsync(l => l.LoadId == load.LoadId);
+        Assert.Null(row.EstimatedPrice);
+    }
+
+    [Fact]
+    public async Task EstimateForShipperAsync_Throws404_WhenLoadNotFound()
+    {
+        using var dbContext = await CreateContextAsync();
+        var adminId = await SeedAdminUserAsync(dbContext);
+        await SeedFullPricingConfigAsync(dbContext, adminId);
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateForShipperAsync(Guid.NewGuid(), Guid.NewGuid(), UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.NotFound, exception.StatusCode);
+        Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
+    }
+
+    [Fact]
+    public async Task EstimateForShipperAsync_Throws403_ForNonOwningShipper()
+    {
+        using var dbContext = await CreateContextAsync();
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var shipperId = await SeedShipperUserAsync(dbContext);
+        await SeedFullPricingConfigAsync(dbContext, adminId);
+        var load = await SeedLoadAsync(dbContext, shipperId);
+        var otherShipperId = await SeedShipperUserAsync(dbContext);
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateForShipperAsync(load.LoadId, otherShipperId, UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
+    }
+
+    [Fact]
+    public async Task EstimateForShipperAsync_Throws403_ForNonShipperRole()
+    {
+        using var dbContext = await CreateContextAsync();
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var shipperId = await SeedShipperUserAsync(dbContext);
+        await SeedFullPricingConfigAsync(dbContext, adminId);
+        var load = await SeedLoadAsync(dbContext, shipperId);
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateForShipperAsync(load.LoadId, shipperId, UserRole.Admin));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
+    }
+
+    [Fact]
+    public async Task EstimateForShipperAsync_Throws503_WhenNoVehicleClassTierMatches()
+    {
+        using var dbContext = await CreateContextAsync();
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var shipperId = await SeedShipperUserAsync(dbContext);
+        var load = await SeedLoadAsync(dbContext, shipperId);
+        // No VehicleClassEfficiency seeded at all, so no tier can cover the load's weight/volume.
+        var configService = new PricingConfigService(dbContext);
+        await configService.CreateFuelPriceRate(new CreateFuelPriceRateDto { FuelType = FuelType.AutoDiesel, PricePerLitre = 350m, Source = "test", EffectiveFrom = DateTimeOffset.UtcNow.AddDays(-1) }, adminId);
+        await configService.CreatePricingFormulaConfig(new CreatePricingFormulaConfigDto { BaseFare = 500m, RatePerKg = 10m, DriverCostPerKm = 20m, MaintenanceAllowancePerKm = 5m, MarginPercent = 0.15m, Source = "test", EffectiveFrom = DateTimeOffset.UtcNow.AddDays(-1) }, adminId);
+        var sut = CreateSut(dbContext);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateForShipperAsync(load.LoadId, shipperId, UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
+        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
+    }
 }
