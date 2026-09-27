@@ -237,6 +237,23 @@ Use **NVIDIA NIM** (`build.nvidia.com`) as the primary LLM provider — a free t
 - **Paid OpenAI/Anthropic API key:** Rejected — not required by the spec and adds unnecessary cost/dependency for a student project.
 - **Ollama as the sole/primary provider:** Rejected as primary (kept as fallback only) — local model quality and setup consistency across four students' machines was judged less reliable than a shared hosted free-tier endpoint for day-to-day development.
 
+### Addendum (September 2026): NVIDIA NIM → Gemini → OpenAI
+
+**Status:** Superseded (this addendum is the current decision; the NVIDIA NIM section above is kept for history)
+
+The provider actually in use has moved twice since the original decision above, and neither move was documented at the time it happened — this addendum tells the whole story in one place instead of leaving three scattered, silently-drifting edits, per the Sep 27 2026 multi-agent implementation audit's recommendation.
+
+**Move 1 — NVIDIA NIM → Gemini (undocumented at the time).** The team switched the primary provider to Google Gemini (`gemini-2.5-flash`, later `gemini-3.6-flash` once `2.5-flash` was retired for new API keys), keeping the free-tier/no-cost rationale from the original decision and keeping Ollama as the fallback. No ADR update was made when this happened; `config.py`/`llm.py` comments referencing "ADR-008 addendum" predate this addendum actually existing.
+
+**Move 2 — Gemini → OpenAI (this addendum, decided during P0/P1 stabilization).** The team found Gemini's free-tier rate limits and structured-output reliability insufficient for a dependable 4-agent sequential run across repeated development/test cycles, and moved the primary provider to **OpenAI**, specifically **`gpt-4o-mini`** — the cheapest current OpenAI tier that reliably supports structured output via LangChain's `with_structured_output`. This is a genuine, acknowledged deviation from the original free-tier-only constraint (Section 14's spirit), made consciously rather than silently:
+
+- **Cost control, in code, not just trust:** `AgentLLM` enforces a hard per-process call cap (`OPENAI_MAX_CALLS_PER_PROCESS`, default 200) — once hit, calls fall through to Ollama rather than continuing to call OpenAI, so a bug that loops or retries the pipeline cannot run up unbounded spend during development.
+- **Cost control, outside code:** whoever holds the OpenAI API key is expected to set a hard spend limit / billing alert on the OpenAI account itself, as a second, independent layer of protection.
+- **Ollama remains the offline/no-cost fallback**, preserving the original design intent (resilience against an internet/API outage during the live demo) even though the primary provider is no longer free. `LLM_PROVIDER` also still accepts `gemini` as a config-only switch (no code change) for anyone who wants to run without an OpenAI key.
+- **Provider provenance is now recorded on every call.** Previously a successful agent step carried no proof of which (if any) model actually responded. Every `AgentLLM` call now records `{provider, model, usedFallback}` (via `AgentLLM.last_call_meta`), which the calling agent attaches to its own `AgentStep.outputJson` as `llmProvenance` — real, checkable evidence per run of which provider/model responded, not just an assumption.
+
+**Consequences — Negative (accepted trade-off):** This is a real, non-free deviation from the original Section 14 no-cost framing. It is accepted because (a) the per-process call cap plus account-level spend limits bound the risk to a small, known amount even under a bug, (b) `gpt-4o-mini` is priced for exactly this kind of repeated low-volume development/demo usage, and (c) Ollama's continued presence as a fallback means a total OpenAI outage or a deliberately-disabled key still leaves the pipeline runnable, fully locally, at zero cost, for the live demo specifically.
+
 ---
 
 ## ADR-009: Agentic AI Runs as a Separate Python Service (Called Only by ASP.NET Core)

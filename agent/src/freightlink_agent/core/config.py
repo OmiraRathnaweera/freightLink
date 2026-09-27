@@ -21,8 +21,16 @@ class Settings(BaseSettings):
     agent_service_port: int = 8001
     log_level: str = "INFO"
 
-    # LLM provider (ADR-008 addendum: Gemini free tier primary, Ollama fallback)
-    llm_provider: Literal["gemini", "ollama"] = "gemini"
+    # LLM provider (ADR-008 addendum #2: OpenAI primary, Ollama offline/no-cost fallback -
+    # supersedes the earlier NVIDIA NIM -> Gemini history, see ADR-008 for the full story)
+    llm_provider: Literal["openai", "gemini", "ollama"] = "openai"
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    # Hard per-run cap on OpenAI calls, independent of any provider-side rate limit - a bug
+    # that loops/retries the pipeline must not be able to run up an unbounded bill during
+    # development (plans/03-openai-migration.md §5). Each agent's LLM call increments a
+    # per-process counter in llm.py; exceeding this raises rather than calling the API again.
+    openai_max_calls_per_process: int = 200
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-2.5-flash"
     ollama_model: str = "llama3.2"

@@ -1,10 +1,17 @@
 """LLM access shared by Agents 1, 3, and 4.
 
-ADR-008 addendum: Gemini (free tier) primary, Ollama fallback (covers the
-network-dependency risk of a hosted API during a live demo). LLM_PROVIDER
-picks the primary provider; when it's Gemini, a failed call additionally
-falls back to Ollama rather than propagating straight away. Always uses
-structured output (a typed Pydantic schema), never free-form text parsing.
+ADR-008 addendum #2: OpenAI (gpt-4o-mini by default) is the primary provider, Ollama
+remains the offline/no-cost fallback (covers both a genuine OpenAI outage during a live
+demo and the network-dependency risk of any hosted API). LLM_PROVIDER also still accepts
+"gemini" (the prior primary) for anyone who wants to run without an OpenAI key. Always
+uses structured output (a typed Pydantic schema), never free-form text parsing.
+
+Every call records which provider and model actually responded, and whether a fallback
+was used, on `self.last_call_meta` - callers read this immediately after awaiting a call
+and attach it to their own AgentStep's outputJson, so a "Succeeded" step carries real,
+checkable proof a model call happened (plans/03-openai-migration.md §4). This is an
+attribute rather than a return-value tuple specifically so it doesn't change the existing
+call signatures every agent (and every existing test's mock) already depends on.
 
 Agent 2 (DomainAnalysis) does not call the LLM - its output is a
 deterministic eligibility filter (see agents/domain_analysis.py).
@@ -57,6 +64,18 @@ class ValidationLLMOutput(BaseModel):
 class AgentLLM:
     def __init__(self) -> None:
         self._settings = get_settings()
+        self.last_call_meta: dict[str, Any] = {}
+        self._openai_call_count = 0
+
+    def _openai(self, model_name: str | None = None):
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(
+            model=model_name or self._settings.openai_model,
+            api_key=self._settings.openai_api_key,
+            timeout=15.0,
+            max_retries=1,
+        )
 
     def _gemini(self, model_name: str | None = None):
         from langchain_google_genai import ChatGoogleGenerativeAI
@@ -74,38 +93,73 @@ class AgentLLM:
 
         return ChatOllama(model=self._settings.ollama_model, base_url=self._settings.ollama_base_url)
 
+    def _record_meta(self, provider: str, model: str | None, *, used_fallback: bool) -> None:
+        self.last_call_meta = {"provider": provider, "model": model, "usedFallback": used_fallback}
+
+    async def _invoke_structured(self, schema: type[BaseModel], messages: list[tuple[str, str]], label: str):
+        """Tries the configured primary provider, falls back to Ollama on failure, and
+        records provenance on self.last_call_meta. Raises the last error if every
+        provider (including Ollama) fails - callers keep their own deterministic
+        fallback and are responsible for recording the final "deterministic_fallback"
+        provenance themselves, since only they know that fallback's shape.
+        """
+        provider = self._settings.llm_provider
+
+        if provider == "ollama":
+            model = self._ollama().with_structured_output(schema)
+            result = await model.ainvoke(messages)
+            self._record_meta("ollama", self._settings.ollama_model, used_fallback=False)
+            return result
+
+        if provider == "openai":
+            if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+                logger.error(
+                    "OpenAI per-process call cap (%s) reached; refusing further calls for %s",
+                    self._settings.openai_max_calls_per_process,
+                    label,
+                )
+            else:
+                try:
+                    self._openai_call_count += 1
+                    model = self._openai().with_structured_output(schema)
+                    result = await model.ainvoke(messages)
+                    self._record_meta("openai", self._settings.openai_model, used_fallback=False)
+                    return result
+                except Exception as exc:
+                    logger.warning("OpenAI model %s failed for %s: %s", self._settings.openai_model, label, exc)
+        else:  # gemini
+            candidate_models = [self._settings.gemini_model]
+            for m in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash"):
+                if m not in candidate_models:
+                    candidate_models.append(m)
+
+            for gem_model in candidate_models:
+                try:
+                    model = self._gemini(gem_model).with_structured_output(schema)
+                    result = await model.ainvoke(messages)
+                    self._record_meta("gemini", gem_model, used_fallback=False)
+                    return result
+                except Exception as exc:
+                    logger.warning("Gemini model %s failed for %s: %s", gem_model, label, exc)
+                    continue
+
+        logger.warning("Primary provider (%s) failed for %s, attempting Ollama fallback", provider, label)
+        model = self._ollama().with_structured_output(schema)
+        result = await model.ainvoke(messages)
+        self._record_meta("ollama", self._settings.ollama_model, used_fallback=True)
+        return result
+
     async def plan(self, system_prompt: str, load_context: dict[str, Any]) -> dict:
         messages = [
             ("system", system_prompt),
             ("human", json.dumps(load_context, default=str)),
         ]
-
-        if self._settings.llm_provider == "ollama":
-            model = self._ollama().with_structured_output(PlanOutput)
-            result: PlanOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
-
-        candidate_models = [self._settings.gemini_model]
-        for m in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash"):
-            if m not in candidate_models:
-                candidate_models.append(m)
-
-        for gem_model in candidate_models:
-            try:
-                model = self._gemini(gem_model).with_structured_output(PlanOutput)
-                result = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception as exc:
-                logger.warning("Gemini model %s failed for plan: %s", gem_model, exc)
-                continue
-
-        logger.warning("All Gemini candidate models failed, attempting Ollama fallback")
         try:
-            model = self._ollama().with_structured_output(PlanOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
+            result: PlanOutput = await self._invoke_structured(PlanOutput, messages, "plan")
             return result.model_dump()
         except Exception:
-            logger.warning("Ollama fallback unavailable, using deterministic rule-based plan", exc_info=True)
+            logger.warning("All LLM providers failed for plan, using deterministic rule-based plan", exc_info=True)
+            self._record_meta("deterministic_fallback", None, used_fallback=True)
             return {
                 "objective": "Evaluate candidate agencies, select optimal carrier via routing, validate safety compliance, and confirm dispatch.",
                 "steps": [
@@ -121,32 +175,14 @@ class AgentLLM:
             ("system", system_prompt),
             ("human", json.dumps(context, default=str)),
         ]
-
-        if self._settings.llm_provider == "ollama":
-            model = self._ollama().with_structured_output(SelectionJustificationOutput)
-            result: SelectionJustificationOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
-
-        candidate_models = [self._settings.gemini_model]
-        for m in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash"):
-            if m not in candidate_models:
-                candidate_models.append(m)
-
-        for gem_model in candidate_models:
-            try:
-                model = self._gemini(gem_model).with_structured_output(SelectionJustificationOutput)
-                result = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception as exc:
-                logger.warning("Gemini model %s failed for selection justification: %s", gem_model, exc)
-                continue
-
-        logger.warning("All Gemini models failed, attempting Ollama fallback")
         try:
-            model = self._ollama().with_structured_output(SelectionJustificationOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
+            result: SelectionJustificationOutput = await self._invoke_structured(
+                SelectionJustificationOutput, messages, "justify_selection"
+            )
             return result.model_dump()
         except Exception:
+            logger.warning("All LLM providers failed for justify_selection, using deterministic explanation", exc_info=True)
+            self._record_meta("deterministic_fallback", None, used_fallback=True)
             selected_agency = context.get("selectedAgency") if isinstance(context.get("selectedAgency"), dict) else {}
             agency_name = selected_agency.get("name") or context.get("agency_name") or context.get("agencyName") or "Recommended Carrier"
             yard_address = selected_agency.get("yardAddress") or "Verified Yard"
@@ -178,36 +214,14 @@ class AgentLLM:
             ("system", system_prompt),
             ("human", json.dumps(context, default=str)),
         ]
-
-        if self._settings.llm_provider == "ollama":
-            try:
-                model = self._ollama().with_structured_output(ValidationLLMOutput)
-                result: ValidationLLMOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception:
-                logger.warning("Ollama LLM call failed, utilizing template fallback", exc_info=True)
-                return self._fallback_validation_copy(context)
-
-        candidate_models = [self._settings.gemini_model]
-        for m in ("gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"):
-            if m not in candidate_models:
-                candidate_models.append(m)
-
-        for gem_model in candidate_models:
-            try:
-                model = self._gemini(gem_model).with_structured_output(ValidationLLMOutput)
-                result = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception as exc:
-                logger.warning("Gemini model %s failed for validation proposal: %s", gem_model, exc)
-                continue
-
-        logger.warning("All Gemini models failed, attempting Ollama fallback")
         try:
-            model = self._ollama().with_structured_output(ValidationLLMOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
+            result: ValidationLLMOutput = await self._invoke_structured(
+                ValidationLLMOutput, messages, "generate_validation_summary_and_proposal"
+            )
             return result.model_dump()
         except Exception:
+            logger.warning("All LLM providers failed for validation proposal, using template fallback", exc_info=True)
+            self._record_meta("deterministic_fallback", None, used_fallback=True)
             return self._fallback_validation_copy(context)
 
     def _fallback_validation_copy(self, context: dict[str, Any]) -> dict[str, str]:
