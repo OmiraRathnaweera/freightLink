@@ -126,6 +126,11 @@ public class DisputeService : IDisputeService
                         .ThenInclude(ag => ag.Staff)
             .Include(d => d.Trip)
                 .ThenInclude(t => t.Driver)
+            .Include(d => d.Trip)
+                .ThenInclude(t => t.Vehicle)
+            .Include(d => d.RaisedByUser)
+            .Include(d => d.Resolution)
+                .ThenInclude(r => r!.ResolvedByUser)
             .Include(d => d.Resolution)
             .FirstOrDefaultAsync(d => d.DisputeId == disputeId, cancellationToken);
 
@@ -205,11 +210,25 @@ public class DisputeService : IDisputeService
                 DisputeId = d.DisputeId,
                 TripId = d.TripId,
                 RaisedByUserId = d.RaisedByUserId,
+                RaisedByName = d.RaisedByUser.FullName,
+                RaisedByEmail = d.RaisedByUser.Email,
+                RaisedByRole = d.RaisedByUser.Role.ToString(),
                 Category = d.Category,
                 Description = d.Description,
                 Status = d.Status,
                 CreatedAt = d.CreatedAt,
-                HasResolution = d.Resolution != null
+                HasResolution = d.Resolution != null,
+                TripRouteSummary = d.Trip.Assignment.Load.PickupAddress + " → " + d.Trip.Assignment.Load.DropoffAddress,
+                CarrierAgencyName = d.Trip.Assignment.Agency.Name,
+                VehicleRegistrationNo = d.Trip.Vehicle.RegistrationNo,
+                Resolution = d.Resolution == null ? null : new DisputeResolutionResponseDto
+                {
+                    DisputeId = d.Resolution.DisputeId,
+                    ResolvedByUserId = d.Resolution.ResolvedByUserId,
+                    Outcome = d.Resolution.Outcome,
+                    Notes = d.Resolution.Notes,
+                    ResolvedAt = d.Resolution.ResolvedAt
+                }
             })
             .ToListAsync(cancellationToken);
 

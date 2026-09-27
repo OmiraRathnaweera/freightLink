@@ -63,8 +63,10 @@ function AdminAgenciesDashboard() {
   })
 
   // GetListAsync returns a paged envelope ({ items, page, pageSize, ... }),
-  // not a raw array — see backend/Services/AgencyService.cs.
-  const rawAgencies = agenciesQuery.data?.items ?? []
+  // not a raw array — see backend/Services/AgencyService.cs. Memoized so its reference stays
+  // stable across renders where the underlying items haven't changed, since the two useMemo
+  // hooks below depend on it.
+  const rawAgencies = useMemo(() => agenciesQuery.data?.items ?? [], [agenciesQuery.data?.items])
 
   const filteredAgencies = useMemo(() => {
     return rawAgencies.filter((agency) => {

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
   DisputeStatus,
-  DisputeOutcome,
   canStartReview,
   canResolveDispute,
   isDisputeResolved,

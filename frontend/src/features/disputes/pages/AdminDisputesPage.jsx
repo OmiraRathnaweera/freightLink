@@ -3,20 +3,16 @@ import { Link, Navigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
   Search,
-  Filter,
   AlertTriangle,
   Clock,
   CheckCircle2,
   FileText,
-  RotateCcw,
   Truck,
   ExternalLink,
   ChevronDown,
   ChevronUp,
   Scale,
-  ShieldAlert,
   Loader2,
-  Info,
 } from 'lucide-react'
 
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
@@ -25,7 +21,6 @@ import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
-import Input from '../../../components/Input.jsx'
 
 import DisputeStatusBadge from '../components/DisputeStatusBadge.jsx'
 import DisputeCategoryBadge from '../components/DisputeCategoryBadge.jsx'
@@ -37,7 +32,6 @@ import {
   useDisputesQuery,
   useStartReviewMutation,
   useResolveDisputeMutation,
-  useResetDisputesMutation,
 } from '../api/disputesApi.js'
 import {
   DisputeStatus,
@@ -74,7 +68,6 @@ export default function AdminDisputesPage() {
 
   const startReviewMutation = useStartReviewMutation()
   const resolveMutation = useResolveDisputeMutation()
-  const resetMutation = useResetDisputesMutation()
 
   // Calculate live metric counters
   const counts = useMemo(() => {
@@ -117,15 +110,6 @@ export default function AdminDisputesPage() {
     }
   }
 
-  const handleResetData = async () => {
-    try {
-      await resetMutation.mutateAsync()
-      toast.info('Dispute records reset to initial demo state')
-    } catch {
-      toast.error('Failed to reset records')
-    }
-  }
-
   const toggleRowExpanded = (id) => {
     setExpandedRowId((prev) => (prev === id ? null : id))
   }
@@ -142,20 +126,6 @@ export default function AdminDisputesPage() {
         eyebrow="Operations & Compliance"
         title="Admin Dispute Management"
         description="Adjudicate and resolve freight claims adhering strictly to ticket Y3S01-81 lifecycle rules (Raised ➔ UnderReview ➔ Resolved)."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleResetData}
-              disabled={resetMutation.isPending}
-              className="text-xs"
-              title="Reset mock data to initial demo state"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Reset Demo Records
-            </Button>
-          </div>
-        }
       />
 
       {/* Lifecycle Rules Info Banner */}
