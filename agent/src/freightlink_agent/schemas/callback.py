@@ -20,3 +20,12 @@ class ReportAgentStepRequest(CamelModel):
     duration_ms: int | None = None
     started_at: datetime
     completed_at: datetime | None = None
+
+from uuid import UUID
+
+class CreateMatchCandidateRequest(CamelModel):
+    """Payload for POST /internal/agent-workflow-runs/{workflowRunId}/match-candidates"""
+    agency_id: UUID
+    is_eligible: bool
+    rejection_reason: str | None = None
+    rank_score: float | None = None
