@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/agencies_repository.dart';
 
 enum DriversState { loading, loaded, empty, error }
@@ -28,9 +29,12 @@ class DriversProvider extends ChangeNotifier {
       } else {
         _state = DriversState.loaded;
       }
-    } catch (e) {
+    } on ApiException catch (e) {
       _state = DriversState.error;
-      _errorMessage = e.toString();
+      _errorMessage = e.message;
+    } catch (_) {
+      _state = DriversState.error;
+      _errorMessage = 'Failed to load drivers. Please try again.';
     }
     notifyListeners();
   }

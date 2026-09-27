@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/agencies_repository.dart';
 
 enum FleetState { loading, loaded, empty, error }
@@ -28,9 +29,12 @@ class FleetProvider extends ChangeNotifier {
       } else {
         _state = FleetState.loaded;
       }
-    } catch (e) {
+    } on ApiException catch (e) {
       _state = FleetState.error;
-      _errorMessage = e.toString();
+      _errorMessage = e.message;
+    } catch (_) {
+      _state = FleetState.error;
+      _errorMessage = 'Failed to load fleet. Please try again.';
     }
     notifyListeners();
   }
@@ -44,8 +48,13 @@ class FleetProvider extends ChangeNotifier {
       _state = FleetState.loaded;
       notifyListeners();
       return true;
-    } catch (e) {
-      _errorMessage = e.toString();
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _state = _vehicles.isEmpty ? FleetState.empty : FleetState.loaded;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Failed to add vehicle. Please try again.';
       _state = _vehicles.isEmpty ? FleetState.empty : FleetState.loaded;
       notifyListeners();
       return false;
@@ -61,8 +70,12 @@ class FleetProvider extends ChangeNotifier {
         notifyListeners();
       }
       return true;
-    } catch (error) {
-      _errorMessage = error.toString();
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Failed to update vehicle status. Please try again.';
       notifyListeners();
       return false;
     }

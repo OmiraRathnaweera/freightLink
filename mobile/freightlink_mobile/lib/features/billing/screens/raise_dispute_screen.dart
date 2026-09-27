@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../data/billing_repository.dart';
 
 class RaiseDisputeScreen extends StatefulWidget {
@@ -39,9 +40,14 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
         const SnackBar(content: Text('Dispute raised and sent for review.')),
       );
       context.pop();
-    } catch (error) {
+    } on ApiException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message)));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to raise dispute. Please try again.')),
+      );
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

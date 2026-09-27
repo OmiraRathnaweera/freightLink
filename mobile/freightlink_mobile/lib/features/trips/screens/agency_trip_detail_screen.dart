@@ -12,7 +12,6 @@ import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/section_card.dart';
 import '../data/trips_repository.dart';
 import '../models/trip_event.dart';
-import '../models/trip_evidence.dart';
 import '../models/trip_models.dart';
 import '../widgets/trip_status_pill.dart';
 
@@ -334,196 +333,22 @@ class _AgencyTripDetailScreenState extends State<AgencyTripDetailScreen> {
     return SectionCard(
       title: 'Trip Evidence',
       icon: Icons.camera_alt_outlined,
-      child: Column(
-        children: [
-          _buildEvidenceTile(
-            title: 'Proof of Pickup',
-            subtitle: 'Captured at dispatch from yard',
-            evidence: trip.pickupProof,
-            awaitingText: 'Awaiting upload by Agency Staff during trip execution.',
-          ),
-          const SizedBox(height: AppConstants.spaceMd),
-          _buildEvidenceTile(
-            title: 'Proof of Delivery',
-            subtitle: 'Captured upon delivery completion',
-            evidence: trip.deliveryProof,
-            awaitingText: 'Awaiting upload by Driver during trip execution.',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEvidenceTile({
-    required String title,
-    required String subtitle,
-    required TripEvidence? evidence,
-    required String awaitingText,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(AppConstants.spaceMd),
-      decoration: BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
-                    Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.inkMuted)),
-                  ],
-                ),
-              ),
-              if (evidence != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.statusSuccessBg,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.check_circle_rounded, size: 13, color: AppColors.statusSuccessFg),
-                      SizedBox(width: 4),
-                      Text(
-                        'Verified',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.statusSuccessFg),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.statusInTransitBg,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.schedule_rounded, size: 13, color: AppColors.statusInTransitFg),
-                      SizedBox(width: 4),
-                      Text(
-                        'Pending',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.statusInTransitFg),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          if (evidence != null) ...[
-            const SizedBox(height: AppConstants.spaceMd),
-            GestureDetector(
-              onTap: () => _showEvidenceViewer(evidence, title),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: evidence.secureUrl != null
-                      ? Image.network(
-                          evidence.secureUrl!,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, progress) =>
-                              progress == null ? child : const Center(child: CircularProgressIndicator()),
-                          errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(evidence.storageKey),
-                        )
-                      : _buildImagePlaceholder(evidence.storageKey),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppConstants.spaceSm),
-            Row(
-              children: [
-                const Icon(Icons.schedule_rounded, size: 12, color: AppColors.inkFaint),
-                const SizedBox(width: 4),
-                Text(
-                  'Captured: ${AppFormatters.dateTime(evidence.capturedAt)}',
-                  style: const TextStyle(fontSize: 11, color: AppColors.inkMuted),
-                ),
-              ],
-            ),
-            if (evidence.capturedLat != null && evidence.capturedLng != null) ...[
-              const SizedBox(height: 4),
-              _buildGpsChip(evidence.capturedLat!, evidence.capturedLng!),
-            ],
-          ] else ...[
-            const SizedBox(height: AppConstants.spaceMd),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: AppConstants.spaceXl),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(AppConstants.radiusSm),
-                border: Border.all(color: AppColors.border, style: BorderStyle.solid),
-              ),
-              child: Column(
-                children: [
-                  const Icon(Icons.camera_alt_outlined, size: 28, color: AppColors.inkFaint),
-                  const SizedBox(height: AppConstants.spaceSm),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppConstants.spaceLg),
-                    child: Text(
-                      awaitingText,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImagePlaceholder(String storageKey) {
-    return Container(
-      color: AppColors.statusNeutralBg,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(AppConstants.spaceSm),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.image_not_supported_outlined, color: AppColors.inkFaint, size: 28),
-          const SizedBox(height: 4),
-          Text(
-            storageKey,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 10, color: AppColors.inkFaint, fontFamily: 'monospace'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEvidenceViewer(TripEvidence evidence, String title) {
-    if (evidence.secureUrl == null) return;
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: Colors.black,
-        insetPadding: const EdgeInsets.all(AppConstants.spaceMd),
-        child: Stack(
-          alignment: Alignment.topRight,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(AppConstants.spaceLg),
+        decoration: BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
           children: [
-            InteractiveViewer(
-              child: Image.network(evidence.secureUrl!, fit: BoxFit.contain),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close_rounded, color: Colors.white),
-              onPressed: () => Navigator.of(dialogContext).pop(),
+            const Icon(Icons.desktop_windows_outlined, size: 28, color: AppColors.inkFaint),
+            const SizedBox(height: AppConstants.spaceSm),
+            const Text(
+              'Please use the web application to view proof-of-pickup and proof-of-delivery photos for this trip.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: AppColors.inkMuted),
             ),
           ],
         ),

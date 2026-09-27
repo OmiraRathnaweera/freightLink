@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/app_validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -112,11 +113,17 @@ class _AddDriverScreenState extends State<AddDriverScreen> {
         const SnackBar(content: Text('Driver registered successfully!')),
       );
       context.go('/dashboard/driver-onboarding');
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!context.mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        const SnackBar(content: Text('Failed to register driver. Please try again.')),
       );
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/agencies_repository.dart';
 
 class DriverOnboardingProvider extends ChangeNotifier {
@@ -23,8 +24,11 @@ class DriverOnboardingProvider extends ChangeNotifier {
     try {
       await _repository.addDriver(driverData);
       _isSuccess = true;
-    } catch (e) {
-      _errorMessage = e.toString();
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isSuccess = false;
+    } catch (_) {
+      _errorMessage = 'Failed to register driver. Please try again.';
       _isSuccess = false;
     } finally {
       _isSubmitting = false;

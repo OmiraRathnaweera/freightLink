@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/utils/app_validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/app_top_bar.dart';
@@ -83,11 +84,17 @@ class _AddVehicleScreenState extends State<AddVehicleScreen> {
         const SnackBar(content: Text('Vehicle added successfully!')),
       );
       context.go('/dashboard/fleet');
+    } on ApiException catch (e) {
+      if (!context.mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
     } catch (e) {
       if (!context.mounted) return;
       setState(() => _isSubmitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(e.toString())),
+        const SnackBar(content: Text('Failed to add vehicle. Please try again.')),
       );
     }
   }

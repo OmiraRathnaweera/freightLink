@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/agencies_repository.dart';
 
 enum DashboardState { loading, loaded, error }
@@ -34,9 +35,12 @@ class AgencyDashboardProvider extends ChangeNotifier {
         _agencyProfile = profile;
       }
       _state = DashboardState.loaded;
-    } catch (e) {
+    } on ApiException catch (e) {
       _state = DashboardState.error;
-      _errorMessage = e.toString();
+      _errorMessage = e.message;
+    } catch (_) {
+      _state = DashboardState.error;
+      _errorMessage = 'Failed to load dashboard. Please try again.';
     }
     notifyListeners();
   }

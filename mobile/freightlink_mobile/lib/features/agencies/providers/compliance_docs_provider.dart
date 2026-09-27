@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/agencies_repository.dart';
 
 enum ComplianceDocsState { initial, loading, loaded, error }
@@ -28,9 +29,12 @@ class ComplianceDocsProvider extends ChangeNotifier {
     try {
       _docs = await _repository.getComplianceDocs();
       _state = ComplianceDocsState.loaded;
-    } catch (e) {
+    } on ApiException catch (e) {
       _state = ComplianceDocsState.error;
-      _errorMessage = e.toString();
+      _errorMessage = e.message;
+    } catch (_) {
+      _state = ComplianceDocsState.error;
+      _errorMessage = 'Failed to load compliance documents. Please try again.';
     }
     notifyListeners();
   }
@@ -55,8 +59,13 @@ class ComplianceDocsProvider extends ChangeNotifier {
       notifyListeners();
       await loadDocs(); // Reload the list to include the new/updated one
       return true;
-    } catch (e) {
-      _errorMessage = e.toString();
+    } on ApiException catch (e) {
+      _errorMessage = e.message;
+      _isUploading = false;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _errorMessage = 'Failed to upload compliance document. Please try again.';
       _isUploading = false;
       notifyListeners();
       return false;
