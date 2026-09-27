@@ -326,16 +326,17 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
+    /// <summary>Agency Staff no longer submits trip evidence — the assigned Driver captures both
+    /// Proof of Pickup and Proof of Delivery — so this is rejected at the role-authorization level
+    /// before the service layer, regardless of whether the trip exists.</summary>
     [Fact]
-    public async Task UploadEvidence_Returns404_ForAgencyStaff()
+    public async Task UploadEvidence_Returns403_ForAgencyStaff()
     {
         using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("AgencyStaff"));
         request.Content = JsonContent.Create(ValidUploadEvidenceDto());
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
@@ -1006,7 +1007,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task SecondaryWorkflow_AgencyStaffCapturesProofOfPickup_ReflectedInAdminTripMonitor()
+    public async Task SecondaryWorkflow_DriverCapturesProofOfPickup_ReflectedInAdminTripMonitor()
     {
         // Arrange
         using var scope = _factory.Services.CreateScope();
@@ -1185,6 +1186,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         await db.SaveChangesAsync();
 
         var staffToken = MintTokenForUser(staffUserId, UserRole.AgencyStaff);
+        var driverToken = MintTokenForUser(driverUserId, UserRole.Driver);
         var adminToken = MintTokenForUser(adminUserId, UserRole.Admin);
 
         // Step 1: Enforce policy - Try advancing to PickedUp without evidence (must fail with 422 TRIP_EVIDENCE_REQUIRED)
@@ -1202,7 +1204,8 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.UnprocessableEntity, earlyStatusRes.StatusCode);
         Assert.Equal("TRIP_EVIDENCE_REQUIRED", await ReadErrorCodeAsync(earlyStatusRes));
 
-        // Step 2: Agency Staff captures Proof-of-Pickup on Flutter (Y3S01-75) and posts evidence
+        // Step 2: The assigned Driver captures Proof-of-Pickup on Flutter and posts evidence
+        // (Agency Staff no longer submits evidence — the Driver captures both proof types).
         const string storageKey = "proof_pickup_biyagama_98214";
         const decimal capturedLat = 6.938500m;
         const decimal capturedLng = 79.992500m;
@@ -1217,7 +1220,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
                 CapturedLng = capturedLng
             })
         };
-        evidenceReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+        evidenceReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", driverToken);
 
         var evidenceRes = await _client.SendAsync(evidenceReq);
         Assert.Equal(HttpStatusCode.Created, evidenceRes.StatusCode);
@@ -1228,9 +1231,9 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(storageKey, evidenceBody.StorageKey);
         Assert.Equal(capturedLat, evidenceBody.CapturedLat);
         Assert.Equal(capturedLng, evidenceBody.CapturedLng);
-        Assert.Equal(staffUserId, evidenceBody.CapturedByUserId);
+        Assert.Equal(driverUserId, evidenceBody.CapturedByUserId);
 
-        // Step 3: Agency Staff advances status to PickedUp via Flutter (Y3S01-75)
+        // Step 3: The Driver advances status to PickedUp ("Start Trip" flow) via Flutter
         const string transitionNotes = "Cargo loaded, strapped down, and inspected at Biyagama EPZ.";
         var advanceStatusReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/trips/{tripId}/status")
         {
@@ -1242,7 +1245,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
                 SnapshotLng = capturedLng
             })
         };
-        advanceStatusReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+        advanceStatusReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", driverToken);
 
         var advanceStatusRes = await _client.SendAsync(advanceStatusReq);
         Assert.Equal(HttpStatusCode.OK, advanceStatusRes.StatusCode);
@@ -1274,7 +1277,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(pickupEvidence.SecureUrl);
         Assert.Equal(capturedLat, pickupEvidence.CapturedLat);
         Assert.Equal(capturedLng, pickupEvidence.CapturedLng);
-        Assert.Equal(staffUserId, pickupEvidence.CapturedByUserId);
+        Assert.Equal(driverUserId, pickupEvidence.CapturedByUserId);
 
         // Verify event timeline transition for React TripTimelineCard
         Assert.NotNull(tripMonitor.Events);
@@ -1283,7 +1286,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(pickedUpEvent);
         Assert.Equal("Assigned", pickedUpEvent.FromStatus);
         Assert.Equal(transitionNotes, pickedUpEvent.Notes);
-        Assert.Equal(staffUserId, pickedUpEvent.RecordedByUserId);
+        Assert.Equal(driverUserId, pickedUpEvent.RecordedByUserId);
         Assert.Equal(capturedLat, pickedUpEvent.SnapshotLat);
         Assert.Equal(capturedLng, pickedUpEvent.SnapshotLng);
     }

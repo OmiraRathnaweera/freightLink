@@ -314,24 +314,25 @@ public class TripServiceTests
     }
 
     [Fact]
-    public async Task UploadEvidenceAsync_EnforcesRolePairing_AndAdvancesStatus()
+    public async Task UploadEvidenceAsync_IsDriverOnly_AndAdvancesStatus()
     {
         using var db = CreateContext();
         var sut = CreateSut(db);
         var (trip, _, staffUserId, driverUserId, _) = await SeedTripHierarchyAsync(db, TripStatus.Assigned);
 
-        // Driver cannot submit PickupProof
+        // Agency Staff can no longer submit evidence at all — the assigned Driver captures both
+        // Proof of Pickup and Proof of Delivery over the course of a trip.
         var roleEx = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.UploadEvidenceAsync(trip.TripId, driverUserId, UserRole.Driver, new UploadTripEvidenceDto
+            sut.UploadEvidenceAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new UploadTripEvidenceDto
             {
                 EvidenceType = EvidenceType.PickupProof,
                 PublicId = "pickup-photo-1"
             }));
         Assert.Equal(HttpStatusCode.Forbidden, roleEx.StatusCode);
-        Assert.Equal(ErrorCode.TRIP_EVIDENCE_ROLE_MISMATCH, roleEx.Code);
+        Assert.Equal(ErrorCode.TRIP_ACCESS_DENIED, roleEx.Code);
 
-        // AgencyStaff successfully uploads PickupProof
-        var uploadResult = await sut.UploadEvidenceAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new UploadTripEvidenceDto
+        // The assigned Driver successfully uploads PickupProof
+        var uploadResult = await sut.UploadEvidenceAsync(trip.TripId, driverUserId, UserRole.Driver, new UploadTripEvidenceDto
         {
             EvidenceType = EvidenceType.PickupProof,
             PublicId = "pickup-photo-1"
@@ -340,7 +341,7 @@ public class TripServiceTests
 
         // Duplicate pickup evidence rejected
         var dupEx = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.UploadEvidenceAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new UploadTripEvidenceDto
+            sut.UploadEvidenceAsync(trip.TripId, driverUserId, UserRole.Driver, new UploadTripEvidenceDto
             {
                 EvidenceType = EvidenceType.PickupProof,
                 PublicId = "pickup-photo-2"
@@ -348,8 +349,8 @@ public class TripServiceTests
         Assert.Equal(HttpStatusCode.Conflict, dupEx.StatusCode);
         Assert.Equal(ErrorCode.TRIP_EVIDENCE_ALREADY_EXISTS, dupEx.Code);
 
-        // Now status advance to PickedUp succeeds
-        var statusResult = await sut.ChangeStatusAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new ChangeTripStatusDto
+        // Now status advance to PickedUp succeeds (still callable by AgencyStaff or Driver)
+        var statusResult = await sut.ChangeStatusAsync(trip.TripId, driverUserId, UserRole.Driver, new ChangeTripStatusDto
         {
             TargetStatus = TripStatus.PickedUp,
             Notes = "Loaded at port"

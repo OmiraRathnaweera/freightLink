@@ -16,6 +16,7 @@ import '../../notifications/providers/notification_provider.dart';
 import '../data/trips_repository.dart';
 import '../models/trip_models.dart';
 import 'proof_of_delivery_screen.dart';
+import 'proof_of_pickup_screen.dart';
 import 'trip_route_map_screen.dart';
 
 /// Screen displayed to authenticated users with the Driver role.
@@ -871,8 +872,8 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
                 const SizedBox(height: 2),
                 Text(
                   hasProof
-                      ? 'Photo evidence was captured and validated by the agency dispatcher. This trip is cleared for departure.'
-                      : 'Per FreightLink policy (Y3S01-74), photo evidence must be captured by agency staff before this trip can advance.',
+                      ? 'Photo evidence was captured and linked. This trip is cleared for departure.'
+                      : 'Per FreightLink policy (Y3S01-74), you must capture proof-of-pickup evidence — tap "Start Trip" below — before this trip can advance.',
                   style: TextStyle(
                     fontSize: 12,
                     color: hasProof
@@ -891,55 +892,23 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
 
   Widget _buildActionCard(TripResponse trip) {
     if (trip.isAssigned) {
-      return Container(
-        key: const Key('assigned_status_card'),
-        padding: const EdgeInsets.all(AppConstants.spaceLg),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppConstants.radiusMd),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.statusMatchedBg,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.hourglass_top_rounded,
-                color: AppColors.statusMatchedFg,
-                size: 20,
+      return PrimaryButton(
+        key: const Key('start_trip_button'),
+        label: 'Start Trip',
+        icon: Icons.play_circle_outline_rounded,
+        onPressed: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ProofOfPickupScreen(
+                trip: trip,
+                onPickupConfirmed: (updated) {
+                  setState(() => _trip = updated);
+                },
               ),
             ),
-            const SizedBox(width: AppConstants.spaceMd),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Awaiting Pickup Verification',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
-                    ),
-                  ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Trip finalized post-approval. Waiting for agency dispatcher to confirm cargo loading and record pickup photo proof.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.inkMuted,
-                      height: 1.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          );
+          _loadTrip();
+        },
       );
     }
 

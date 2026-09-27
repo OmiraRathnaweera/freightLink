@@ -168,15 +168,16 @@ public class TripsController : ControllerBase
 
     /// <summary>
     /// Captures proof-of-pickup or proof-of-delivery by linking an already-uploaded file (from
-    /// <c>POST /api/v1/files/single</c>). AgencyStaff may only submit <c>PickupProof</c>; Driver may
-    /// only submit <c>DeliveryProof</c> — enforced by the service layer, not this controller.
+    /// <c>POST /api/v1/files/single</c>). Driver-only: the assigned Driver captures both evidence
+    /// types over the course of a trip (pickup at departure, delivery at handover) — Agency Staff no
+    /// longer submits evidence directly.
     /// </summary>
     /// <param name="id">The trip's id.</param>
     /// <param name="request">The uploaded file's public id, evidence type, and optional GPS coordinates.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 with the created <see cref="TripEvidenceResponseDto"/>.</returns>
     [HttpPost("{id:guid}/evidence")]
-    [Authorize(Roles = AgencyStaffOrDriverRoles)]
+    [Authorize(Roles = nameof(UserRole.Driver))]
     public async Task<ActionResult<TripEvidenceResponseDto>> UploadEvidence(Guid id, [FromBody] UploadTripEvidenceDto request, CancellationToken cancellationToken)
     {
         var result = await _tripService.UploadEvidenceAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);

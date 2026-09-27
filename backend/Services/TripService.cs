@@ -274,10 +274,7 @@ public class TripService : ITripService
         UploadTripEvidenceDto request,
         CancellationToken cancellationToken = default)
     {
-        var trip = await _dbContext.Trips
-            .Include(t => t.Assignment)
-                .ThenInclude(a => a.Agency)
-            .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
+        var trip = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
         {
@@ -289,44 +286,22 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "EvidenceType is required.");
         }
 
-        if (actingUserRole == UserRole.AgencyStaff && request.EvidenceType.Value != EvidenceType.PickupProof)
+        // The assigned Driver captures both evidence types over the course of a trip — Proof of
+        // Pickup at departure and Proof of Delivery at handover. Agency Staff no longer submits
+        // evidence directly (also enforced at the controller via [Authorize(Roles = Driver)]; this
+        // is defense-in-depth, matching the pattern established elsewhere in this service).
+        if (actingUserRole != UserRole.Driver)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_EVIDENCE_ROLE_MISMATCH, "Agency staff may only submit Proof of Pickup.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only the assigned Driver may submit trip evidence.");
         }
 
-        if (actingUserRole == UserRole.Driver && request.EvidenceType.Value != EvidenceType.DeliveryProof)
+        var driver = await _dbContext.Drivers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.UserId == actingUserId, cancellationToken);
+
+        if (driver == null || trip.DriverId != driver.DriverId)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_EVIDENCE_ROLE_MISMATCH, "Drivers may only submit Proof of Delivery.");
-        }
-
-        if (actingUserRole != UserRole.AgencyStaff && actingUserRole != UserRole.Driver)
-        {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only AgencyStaff and Drivers may submit trip evidence.");
-        }
-
-        if (actingUserRole == UserRole.AgencyStaff)
-        {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == actingUserId, cancellationToken);
-
-            if (agencyStaff == null || trip.Assignment.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
-            }
-
-            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
-        }
-        else if (actingUserRole == UserRole.Driver)
-        {
-            var driver = await _dbContext.Drivers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(d => d.UserId == actingUserId, cancellationToken);
-
-            if (driver == null || trip.DriverId != driver.DriverId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
-            }
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
         }
 
         var alreadyExists = await _dbContext.TripEvidences

@@ -17,7 +17,6 @@ import '../data/trips_repository.dart';
 import '../models/fleet_resources.dart';
 import '../models/job_proposal.dart';
 import '../models/trip_models.dart';
-import 'proof_of_pickup_screen.dart';
 
 /// Screen where Agency Staff reviews an AI-proposed load and assigns a specific
 /// vehicle and driver from their fleet using the concurrency-safe endpoint (Y3S01-54).
@@ -165,27 +164,16 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
           title: const Text('Trip Dispatched!'),
           content: Text(
             'Load #${_proposal!.referenceCode ?? _proposal!.loadId.substring(0, 8)} has been assigned '
-            'to ${_selectedDriver!.fullName} on vehicle ${_selectedVehicle!.registrationNo}.',
+            'to ${_selectedDriver!.fullName} on vehicle ${_selectedVehicle!.registrationNo}. '
+            '${_selectedDriver!.fullName} will start the trip and capture proof of pickup from their app.',
           ),
           actions: [
-            TextButton(
+            FilledButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 Navigator.of(context).pop(true);
               },
               child: const Text('Done'),
-            ),
-            FilledButton.icon(
-              icon: const Icon(Icons.camera_alt_rounded, size: 16),
-              label: const Text('Capture Proof of Pickup'),
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<bool>(
-                    builder: (_) => ProofOfPickupScreen(trip: trip),
-                  ),
-                );
-              },
             ),
           ],
         ),
