@@ -1,6 +1,37 @@
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel
+from freightlink_agent.schemas.domain import Agency, EvaluatedAgency, RankedCandidate
+
+
+class WorkflowState(BaseModel):
+    """State threaded through the pipeline. Only carries what Agent 1
+    itself reads or writes - fields a later agent (2-4) would need don't
+    belong here until that agent actually exists."""
+
+    load_id: UUID
+    triggered_by_user_id: UUID
+    attempt_no: int
+    load_context: dict[str, Any]
+    candidate_agencies: list[Agency] = []
+    
+    # Agent 2 Outputs
+    shortlisted_agencies: list[RankedCandidate] = []
+    evaluated_agencies: list[EvaluatedAgency] = []
+    domain_analysis_explanation: str | None = None
+
+    workflow_run_id: UUID | None = None
+    """Null until Agent 1 creates the AgentWorkflowRun row on the backend
+    and gets the real id back."""
+    objective: str | None = None
+    plan_json: str | None = None
+
+    failed: bool = False
+    failure_reason: str | None = None
+from typing import Any
+from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from freightlink_agent.schemas.enums import VehicleClass
@@ -47,7 +78,14 @@ class WorkflowState(BaseModel):
     assigned_vehicle: dict[str, Any] | None = None
     assigned_driver: dict[str, Any] | None = None
 
-    # --- Agent 4: Validation & Safety ---
+    # --- Agent 4: Validation & Safety (Component D, Owner: Balasooriya) ---
+    is_valid: bool = False
+    validation_flags: list[str] = Field(default_factory=list)
+    price_deviation_percent: float | None = None
+    validation_summary: str | None = None
+    status: str = "Pending"  # e.g., "AwaitingApproval", "Completed", "Failed"
+    proposal_email_subject: str | None = None
+    proposal_email_body: str | None = None
     validation: dict[str, Any] | None = None
 
     # --- Pipeline Status & Failure Tracking ---
