@@ -1,13 +1,4 @@
-export const InvoiceStatus = {
-  DRAFT: 'Draft',
-  ISSUED: 'Issued',
-  PAID: 'Paid',
-  PAYMENT_PENDING: 'Payment Pending',
-  FAILED: 'Failed',
-  OVERDUE: 'Overdue',
-  VOIDED: 'Voided',
-  VOID: 'Void',
-}
+import { InvoiceStatus } from '../../../lib/enums.js'
 
 /**
  * Returns the semantic design system tone corresponding to the invoice status.
@@ -23,10 +14,8 @@ export function getInvoiceStatusTone(status) {
       return 'amber'
     case InvoiceStatus.DRAFT:
       return 'neutral'
-    case InvoiceStatus.VOIDED:
     case InvoiceStatus.VOID:
     case InvoiceStatus.FAILED:
-    case InvoiceStatus.OVERDUE:
       return 'red'
     default:
       return 'neutral'
@@ -35,13 +24,12 @@ export function getInvoiceStatusTone(status) {
 
 export const STATUS_FILTER_OPTIONS = [
   { value: 'ALL', label: 'All Statuses' },
-  { value: 'Draft', label: 'Draft' },
-  { value: 'Issued', label: 'Issued' },
-  { value: 'Paid', label: 'Paid' },
-  { value: 'Payment Pending', label: 'Payment Pending' },
-  { value: 'Voided', label: 'Voided' },
-  { value: 'Failed', label: 'Failed' },
-  { value: 'Overdue', label: 'Overdue' },
+  { value: InvoiceStatus.DRAFT, label: 'Draft' },
+  { value: InvoiceStatus.ISSUED, label: 'Issued' },
+  { value: InvoiceStatus.PAYMENT_PENDING, label: 'Payment Pending' },
+  { value: InvoiceStatus.PAID, label: 'Paid' },
+  { value: InvoiceStatus.FAILED, label: 'Failed' },
+  { value: InvoiceStatus.VOID, label: 'Void' },
 ]
 
 export const DATE_RANGE_OPTIONS = [

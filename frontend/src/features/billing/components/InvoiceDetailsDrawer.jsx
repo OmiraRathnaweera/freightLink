@@ -18,7 +18,7 @@ import {
 import { toast } from 'sonner'
 import InvoiceStatusBadge from './InvoiceStatusBadge.jsx'
 import { formatCurrency, formatInvoiceDate } from '../lib/formatters.js'
-import { InvoiceStatus } from '../lib/invoiceStatus.js'
+import { InvoiceStatus } from '../../../lib/enums.js'
 import Dropzone from '../../../components/Dropzone.jsx'
 import Button from '../../../components/Button.jsx'
 import { useUploadFileMutation } from '../../loads/api/loadsApi.js'
@@ -41,29 +41,18 @@ function InvoiceDetailsDrawer({
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false)
   const uploadFile = useUploadFileMutation()
 
-  const isDraft = invoice?.status === InvoiceStatus.DRAFT || invoice?.status === 'Draft'
-  const isIssued = invoice?.status === InvoiceStatus.ISSUED || invoice?.status === 'Issued'
-  const isPaymentPending =
-    invoice?.status === InvoiceStatus.PAYMENT_PENDING || invoice?.status === 'PaymentPending'
-  const isPaid = invoice?.status === InvoiceStatus.PAID || invoice?.status === 'Paid'
-  const isVoided =
-    invoice?.status === InvoiceStatus.VOIDED ||
-    invoice?.status === InvoiceStatus.VOID ||
-    invoice?.status === 'Voided' ||
-    invoice?.status === 'Void'
+  const isDraft = invoice?.status === InvoiceStatus.DRAFT
+  const isIssued = invoice?.status === InvoiceStatus.ISSUED
+  const isPaymentPending = invoice?.status === InvoiceStatus.PAYMENT_PENDING
+  const isPaid = invoice?.status === InvoiceStatus.PAID
+  const isFailed = invoice?.status === InvoiceStatus.FAILED
+  const isVoided = invoice?.status === InvoiceStatus.VOID
   const isUnpaid = isIssued || isPaymentPending
 
   // Strict RBAC Capabilities
   const canEdit = isAgent && isDraft
   const canIssue = isAgent && isDraft
-  const canVoid =
-    isAgent &&
-    (isDraft ||
-      isIssued ||
-      isPaymentPending ||
-      invoice?.status === InvoiceStatus.FAILED ||
-      invoice?.status === 'Draft' ||
-      invoice?.status === 'Issued')
+  const canVoid = isAgent && (isDraft || isIssued || isPaymentPending || isFailed)
   const canSubmitReceipt = isShipper && isUnpaid && !isVoided
   const canConfirmPayment = isAgent && isPaymentPending && Boolean(invoice?.paymentProofUrl)
 

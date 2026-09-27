@@ -5,6 +5,5 @@ public enum UserRole
     Shipper,
     AgencyStaff,
     Driver,
-    Admin,
-    Agent = AgencyStaff
+    Admin
 }

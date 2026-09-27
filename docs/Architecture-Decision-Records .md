@@ -337,7 +337,7 @@ Section 11 of the specification requires at least one meaningful third-party API
 ### Decision
 Integrate **three** third-party services, all called exclusively from the ASP.NET Core backend (never directly by React or Flutter):
 1. **OpenRouteService** — distance and ETA calculation between an agency's yard and a load's pickup location; this call **doubles as the Agentic AI's allow-listed tool** (`get_route_and_eta`), used by Agent 3.
-2. **PayHere (sandbox/test mode)** — invoice payment on Component D: checkout session creation and webhook-driven payment confirmation.
+2. **PayHere (sandbox/test mode)** — invoice payment on Component D: checkout session creation and webhook-driven payment confirmation. *(Superseded — see ADR-021: this mechanism was replaced by manual payment-proof upload and Agency confirmation before implementation of Component D was complete.)*
 3. **Transactional email API** (e.g. Brevo or Resend, free tier) — shipper notifications on the decline/retry loop introduced in ADR-018 (agency declined, new match found, no auto-match found), sent via a shared `IEmailService` owned by Component A.
 
 ### Consequences
@@ -649,6 +649,38 @@ Two substantive points were settled while producing the inventory:
 
 ---
 
+## ADR-021: Payment Confirmation — Manual Payment-Proof Upload (Supersedes the Payment-Gateway Clause of ADR-012)
+
+**Status:** Accepted
+**Date:** September 2026
+
+### Context
+ADR-012 (accepted, August 2026) documented **PayHere sandbox checkout + webhook-driven payment confirmation** as one of three third-party integrations. A September 27, 2026 implementation audit found that this is no longer what the system does: the `webview_flutter` dependency (used for the PayHere checkout flow on mobile) is present but **unused** — dead weight left over from a removed integration — and both the web and backend now implement a **manual payment-proof upload** flow instead: the Shipper uploads a receipt/screenshot, and the Agency Staff manually reviews it and confirms payment via a dedicated endpoint (`POST /{id}/confirm-payment`).
+
+This is not hypothetical — it is the actual, tested, working behavior of the current backend (48 tests covering this exact flow) and web frontend. The ADR file was simply never updated when the team pivoted away from PayHere. Left uncorrected, this is a real viva risk: a reviewer reading this document would expect to find a live payment gateway integration that does not exist in the codebase.
+
+### Decision
+**Payment confirmation is manual, not gateway-driven.** The Shipper uploads a payment-proof file as evidence of an external payment (bank transfer, cash, etc.); the Agency Staff reviews it and manually confirms via `POST /{id}/confirm-payment`, transitioning the invoice `PaymentPending → Paid`. **No payment gateway (PayHere or otherwise) is integrated.** This clause **supersedes** the PayHere-specific portion of ADR-012 §Decision item 2. ADR-012's other two integrations (OpenRouteService, transactional email) are unaffected and remain as originally decided.
+
+The Admin's role with respect to invoices is **read-only** across the full cashflow — all invoices, all statuses, aggregate totals — with no write access of any kind, consistent with ADR-016's narrowing of Admin to non-transactional oversight functions.
+
+### Consequences
+**Positive**
+- Removes a real documentation/implementation mismatch before it becomes a viva surprise.
+- Simpler and more reliable for a live demo than a sandbox payment gateway: no external service dependency, no webhook signature verification, no risk of a gateway outage during evaluation — consistent with the same demo-reliability reasoning already applied to the LLM (ADR-008), email (ADR-012), and pricing-config (ADR-019) fallback decisions.
+- Still demonstrates a genuine, testable business workflow with a real human-verification step (Agency Staff reviewing evidence before confirming) — a strong "business logic beyond CRUD" story for the rubric.
+- Frees `webview_flutter` for removal from the mobile app's `pubspec.yaml`, reducing unused dependency surface.
+
+**Negative**
+- Loses the "real third-party payment integration" depth point that ADR-012 originally claimed as scope addition beyond the rubric's minimum requirement. The rubric's minimum third-party-integration requirement is unaffected (OpenRouteService alone already satisfies it, per ADR-012's own original reasoning).
+- Payment confirmation now depends on Agency Staff diligence (reviewing the uploaded proof) rather than automated gateway verification — a manual-process risk, but an accepted and realistic one for a Sri Lankan B2B freight context where many payments are bank transfers outside any single gateway's reach anyway.
+
+### Alternatives Considered
+- **Revive the PayHere integration to match ADR-012 as originally written:** Rejected — the team's confirmed intended flow (manual proof upload, agency confirmation) does not use a gateway at all; reviving PayHere would mean building a feature the team has already decided not to use, purely to match a stale document instead of updating the document to match the actual decision.
+- **Leave ADR-012 unedited and treat this as an undocumented implementation detail:** Rejected — an ADR that doesn't match the shipped system is worse than no ADR.
+
+---
+
 ## Summary of Decisions
 
 | ADR No. | Title | Status |
@@ -673,6 +705,7 @@ Two substantive points were settled while producing the inventory:
 | ADR-018 | Automatic retry with a capped attempt limit, and Shipper email notifications, on agency decline | Accepted |
 | ADR-019 | Admin-managed pricing configuration — fuel price & vehicle-class efficiency reference tables | Accepted |
 | ADR-020 | Enumerated value sets as native enum types, not lookup tables | Accepted |
+| ADR-021 | Payment confirmation — manual payment-proof upload (supersedes ADR-012's payment-gateway clause) | Accepted |
 
 ---
 

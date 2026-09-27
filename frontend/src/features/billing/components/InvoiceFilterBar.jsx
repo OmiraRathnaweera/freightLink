@@ -1,5 +1,6 @@
 import { Calendar, ChevronDown, RotateCcw, Search, X } from 'lucide-react'
-import { STATUS_FILTER_OPTIONS, DATE_RANGE_OPTIONS } from '../lib/invoiceStatus.js'
+import { STATUS_FILTER_OPTIONS, DATE_RANGE_OPTIONS } from '../lib/invoiceStatusMeta.js'
+import { InvoiceStatus } from '../../../lib/enums.js'
 
 function InvoiceFilterBar({
   searchQuery,
@@ -13,7 +14,7 @@ function InvoiceFilterBar({
   isShipper = false,
 }) {
   const statusOptions = isShipper
-    ? STATUS_FILTER_OPTIONS.filter((opt) => opt.value !== 'Draft')
+    ? STATUS_FILTER_OPTIONS.filter((opt) => opt.value !== InvoiceStatus.DRAFT)
     : STATUS_FILTER_OPTIONS
 
   return (

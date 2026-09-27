@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
@@ -10,46 +10,45 @@ import {
 import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader.jsx'
 import Card from '../../../components/Card.jsx'
+import ErrorState from '../../../components/ErrorState.jsx'
 import InvoiceFilterBar from '../components/InvoiceFilterBar.jsx'
 import InvoiceListTable from '../components/InvoiceListTable.jsx'
 import InvoiceDetailsDrawer from '../components/InvoiceDetailsDrawer.jsx'
 import InvoiceEmptyState from '../components/InvoiceEmptyState.jsx'
 import InvoiceFormModal from '../components/InvoiceFormModal.jsx'
 import VoidInvoiceDialog from '../components/VoidInvoiceDialog.jsx'
-import { MOCK_INVOICES } from '../data/mockInvoices.js'
-import { InvoiceStatus } from '../lib/invoiceStatus.js'
+import InvoiceCashflowDashboard from '../components/InvoiceCashflowDashboard.jsx'
+import { InvoiceStatus } from '../../../lib/enums.js'
 import { formatCurrency } from '../lib/formatters.js'
 import { cx } from '../../../lib/cx.js'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
 import {
-  fetchInvoices,
-  fetchInvoiceById,
-  createInvoice,
-  updateInvoice,
-  issueInvoice,
-  voidInvoice,
-  uploadPaymentProof,
-  confirmPayment,
+  useInvoicesQuery,
+  useInvoiceQuery,
+  useCreateInvoiceMutation,
+  useUpdateInvoiceMutation,
+  useIssueInvoiceMutation,
+  useVoidInvoiceMutation,
+  useSubmitPaymentProofMutation,
+  useConfirmPaymentMutation,
 } from '../api/invoiceApi.js'
 
 const PAGE_SIZE = 8
 
 function BillingPage() {
   const { role } = useAppSelector((state) => state.auth)
-  const isAgent = role === UserRole.AGENCY_STAFF || role === 'Agent' || role === 'AgencyStaff'
+  const isAgent = role === UserRole.AGENCY_STAFF
   const isAdmin = role === UserRole.ADMIN
   const isShipper = role === UserRole.SHIPPER
-  const [invoices, setInvoices] = useState(MOCK_INVOICES)
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [dateRange, setDateRange] = useState('30d')
   const [currentPage, setCurrentPage] = useState(1)
 
-  const [selectedInvoice, setSelectedInvoice] = useState(null)
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null)
+  const [selectedInvoiceFallback, setSelectedInvoiceFallback] = useState(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false)
@@ -60,70 +59,43 @@ function BillingPage() {
 
   const [isExporting, setIsExporting] = useState(false)
 
-  // Fetches invoices from the API (with mock fallback). Used by the manual Refresh button below,
-  // via an ordinary event handler, so setting isLoading(true) synchronously up front is fine here
-  // (unlike the mount effect, which inlines its own copy of this fetch below rather than calling
-  // this function, so its setState calls stay nested in .then()/.catch()/.finally() callbacks â€”
-  // see react-hooks/set-state-in-effect).
-  const fetchAndSetInvoices = async () => {
-    try {
-      const response = await fetchInvoices()
-      if (response && response.items && response.items.length > 0) {
-        setInvoices(response.items)
-      } else {
-        // Keep initial mock if API returned empty
-        setInvoices(MOCK_INVOICES)
-      }
-    } catch {
-      // Backend not yet reachable or offline -> keep mock invoices
-      setInvoices(MOCK_INVOICES)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const {
+    data: invoicesResponse,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useInvoicesQuery({ pageSize: 100 })
+  const invoices = useMemo(() => invoicesResponse?.items ?? [], [invoicesResponse])
 
-  // Manual reload (e.g. the Refresh button) â€” sets the loading flag itself before re-fetching,
-  // since it's called from an event handler, not an effect.
-  const loadInvoices = () => {
-    setIsLoading(true)
-    fetchAndSetInvoices()
-  }
+  const { data: selectedInvoiceDetail } = useInvoiceQuery(selectedInvoiceId)
+  const selectedInvoice = selectedInvoiceDetail || selectedInvoiceFallback
 
-  useEffect(() => {
-    let isMounted = true
-    fetchInvoices()
-      .then((response) => {
-        if (!isMounted) return
-        if (response && response.items && response.items.length > 0) {
-          setInvoices(response.items)
-        } else {
-          setInvoices(MOCK_INVOICES)
-        }
-      })
-      .catch(() => {
-        if (isMounted) setInvoices(MOCK_INVOICES)
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false)
-      })
-    return () => {
-      isMounted = false
-    }
-  }, [])
+  const createInvoiceMutation = useCreateInvoiceMutation()
+  const updateInvoiceMutation = useUpdateInvoiceMutation()
+  const issueInvoiceMutation = useIssueInvoiceMutation()
+  const voidInvoiceMutation = useVoidInvoiceMutation()
+  const submitPaymentProofMutation = useSubmitPaymentProofMutation()
+  const confirmPaymentMutation = useConfirmPaymentMutation()
+
+  const isSubmitting =
+    createInvoiceMutation.isPending ||
+    updateInvoiceMutation.isPending ||
+    issueInvoiceMutation.isPending ||
+    voidInvoiceMutation.isPending
 
   // Filter invoices based on search, status, and date range
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       // 0. Shipper restriction: Never expose Draft invoices to Shippers
-      if (isShipper && (inv.status === InvoiceStatus.DRAFT || inv.status === 'Draft')) {
+      if (isShipper && inv.status === InvoiceStatus.DRAFT) {
         return false
       }
 
       // 1. Status Filter
-      if (statusFilter !== 'ALL') {
-        const invStatus = String(inv.status || '').toLowerCase()
-        const targetStatus = String(statusFilter).toLowerCase()
-        if (invStatus !== targetStatus) return false
+      if (statusFilter !== 'ALL' && inv.status !== statusFilter) {
+        return false
       }
 
       // 2. Search Query (matches Invoice ID, Recipient/Shipper Name, Linked Entity/Load Ref)
@@ -191,37 +163,22 @@ function BillingPage() {
   const metrics = useMemo(() => {
     const totalAmount = invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0)
     const paidAmount = invoices
-      .filter((inv) => inv.status === InvoiceStatus.PAID || inv.status === 'Paid')
+      .filter((inv) => inv.status === InvoiceStatus.PAID)
       .reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0)
     const pendingAmount = invoices
-      .filter(
-        (inv) =>
-          inv.status === InvoiceStatus.PAYMENT_PENDING ||
-          inv.status === InvoiceStatus.ISSUED ||
-          inv.status === 'Issued' ||
-          inv.status === 'Payment Pending',
-      )
+      .filter((inv) => inv.status === InvoiceStatus.PAYMENT_PENDING || inv.status === InvoiceStatus.ISSUED)
       .reduce((sum, inv) => sum + Number(inv.totalAmount || inv.amount || 0), 0)
-    const overdueCount = invoices.filter(
-      (inv) =>
-        inv.status === InvoiceStatus.OVERDUE ||
-        inv.status === InvoiceStatus.FAILED ||
-        inv.status === 'Failed' ||
-        inv.status === 'Overdue',
+    const attentionCount = invoices.filter(
+      (inv) => inv.status === InvoiceStatus.FAILED || inv.status === InvoiceStatus.VOID,
     ).length
 
-    return { totalAmount, paidAmount, pendingAmount, overdueCount }
+    return { totalAmount, paidAmount, pendingAmount, attentionCount }
   }, [invoices])
 
-  const handleSelectInvoice = async (invoice) => {
-    try {
-      // Fetch fresh details with full line items if ID available
-      const id = invoice.id || invoice.invoiceId
-      const fullDetails = await fetchInvoiceById(id)
-      setSelectedInvoice(fullDetails || invoice)
-    } catch {
-      setSelectedInvoice(invoice)
-    }
+  const handleSelectInvoice = (invoice) => {
+    const id = invoice.id || invoice.invoiceId
+    setSelectedInvoiceId(id)
+    setSelectedInvoiceFallback(invoice)
     setIsDrawerOpen(true)
   }
 
@@ -240,34 +197,25 @@ function BillingPage() {
 
   // Handle Form Submission (Create or Edit)
   const handleFormSubmit = async (payload, invoiceId) => {
-    setIsSubmitting(true)
     try {
       if (invoiceId) {
-        // Edit existing draft invoice
-        const updated = await updateInvoice(invoiceId, payload)
+        const updated = await updateInvoiceMutation.mutateAsync({ id: invoiceId, payload })
         toast.success(`Invoice ${updated.invoiceNumber || 'Draft'} updated successfully.`)
-        setInvoices((prev) =>
-          prev.map((i) => ((i.id || i.invoiceId) === invoiceId ? { ...i, ...updated } : i)),
-        )
       } else {
-        // Create new invoice
-        const created = await createInvoice(payload)
+        const created = await createInvoiceMutation.mutateAsync(payload)
         const isIssued = payload.issueImmediately
         toast.success(
           isIssued
             ? `Invoice ${created.invoiceNumber} created and issued successfully.`
             : `Draft invoice ${created.invoiceNumber} saved.`,
         )
-        setInvoices((prev) => [created, ...prev])
       }
       setIsFormModalOpen(false)
       setEditingInvoice(null)
     } catch (err) {
       toast.error('Failed to save invoice', {
-        description: err.response?.data?.error?.message || err.message || 'An unexpected error occurred.',
+        description: err.message || 'An unexpected error occurred.',
       })
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -275,23 +223,12 @@ function BillingPage() {
   const handleIssueInvoice = async (invoice) => {
     const id = invoice.id || invoice.invoiceId
     try {
-      setIsSubmitting(true)
-      const issued = await issueInvoice(id)
+      const issued = await issueInvoiceMutation.mutateAsync(id)
       toast.success(`Invoice ${issued.invoiceNumber || invoice.invoiceNumber} has been issued!`, {
         description: 'Totals are locked and ready for payment presentation.',
       })
-      setInvoices((prev) =>
-        prev.map((i) => ((i.id || i.invoiceId) === id ? { ...i, ...issued, status: 'Issued' } : i)),
-      )
-      if (selectedInvoice && (selectedInvoice.id || selectedInvoice.invoiceId) === id) {
-        setSelectedInvoice((prev) => ({ ...prev, ...issued, status: 'Issued' }))
-      }
     } catch (err) {
-      toast.error('Could not issue invoice', {
-        description: err.response?.data?.error?.message || err.message,
-      })
-    } finally {
-      setIsSubmitting(false)
+      toast.error('Could not issue invoice', { description: err.message })
     }
   }
 
@@ -304,27 +241,12 @@ function BillingPage() {
   // Confirm Void
   const handleConfirmVoid = async (id, reason) => {
     try {
-      setIsSubmitting(true)
-      const voided = await voidInvoice(id, reason)
+      const voided = await voidInvoiceMutation.mutateAsync({ id, reason })
       toast.success(`Invoice ${voided.invoiceNumber || 'record'} has been voided.`)
-      setInvoices((prev) =>
-        prev.map((i) =>
-          (i.id || i.invoiceId) === id
-            ? { ...i, ...voided, status: 'Voided', voidReason: reason }
-            : i,
-        ),
-      )
-      if (selectedInvoice && (selectedInvoice.id || selectedInvoice.invoiceId) === id) {
-        setSelectedInvoice((prev) => ({ ...prev, ...voided, status: 'Voided', voidReason: reason }))
-      }
       setIsVoidDialogOpen(false)
       setVoidingInvoice(null)
     } catch (err) {
-      toast.error('Could not void invoice', {
-        description: err.response?.data?.error?.message || err.message,
-      })
-    } finally {
-      setIsSubmitting(false)
+      toast.error('Could not void invoice', { description: err.message })
     }
   }
 
@@ -332,21 +254,13 @@ function BillingPage() {
   const handleUploadPaymentProof = async (invoice, publicId) => {
     const id = invoice.id || invoice.invoiceId
     try {
-      const updated = await uploadPaymentProof(id, publicId)
+      const updated = await submitPaymentProofMutation.mutateAsync({ id, publicId })
       toast.success(`Payment receipt submitted for Invoice ${invoice.invoiceNumber}!`, {
         description: 'The Agency will review it and close the invoice once confirmed.',
       })
-      setInvoices((prev) =>
-        prev.map((i) => ((i.id || i.invoiceId) === id ? { ...i, ...updated } : i)),
-      )
-      if (selectedInvoice && (selectedInvoice.id || selectedInvoice.invoiceId) === id) {
-        setSelectedInvoice((prev) => ({ ...prev, ...updated }))
-      }
       return updated
     } catch (err) {
-      toast.error('Could not submit payment receipt', {
-        description: err.response?.data?.error?.message || err.message,
-      })
+      toast.error('Could not submit payment receipt', { description: err.message })
       throw err
     }
   }
@@ -355,19 +269,11 @@ function BillingPage() {
   const handleConfirmPayment = async (invoice) => {
     const id = invoice.id || invoice.invoiceId
     try {
-      const updated = await confirmPayment(id)
+      const updated = await confirmPaymentMutation.mutateAsync(id)
       toast.success(`Invoice ${invoice.invoiceNumber} settled successfully!`)
-      setInvoices((prev) =>
-        prev.map((i) => ((i.id || i.invoiceId) === id ? { ...i, ...updated } : i)),
-      )
-      if (selectedInvoice && (selectedInvoice.id || selectedInvoice.invoiceId) === id) {
-        setSelectedInvoice((prev) => ({ ...prev, ...updated }))
-      }
       return updated
     } catch (err) {
-      toast.error('Could not confirm payment', {
-        description: err.response?.data?.error?.message || err.message,
-      })
+      toast.error('Could not confirm payment', { description: err.message })
       throw err
     }
   }
@@ -429,12 +335,12 @@ function BillingPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={loadInvoices}
-              disabled={isLoading}
+              onClick={() => refetch()}
+              disabled={isFetching}
               title="Refresh ledger"
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
-              <RefreshCw className={cx('h-3.5 w-3.5', isLoading && 'animate-spin')} />
+              <RefreshCw className={cx('h-3.5 w-3.5', isFetching && 'animate-spin')} />
               <span>Refresh</span>
             </button>
 
@@ -463,6 +369,9 @@ function BillingPage() {
         }
       />
 
+      {/* Admin: read-only cashflow dashboard, no action buttons anywhere on this page */}
+      {isAdmin && <InvoiceCashflowDashboard />}
+
       {/* Summary KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
@@ -482,7 +391,7 @@ function BillingPage() {
             LKR {formatCurrency(metrics.paidAmount)}
           </p>
           <p className="mt-1 text-xs text-slate-400">
-            {invoices.filter((i) => i.status === InvoiceStatus.PAID || i.status === 'Paid').length} invoices cleared
+            {invoices.filter((i) => i.status === InvoiceStatus.PAID).length} invoices cleared
           </p>
         </div>
 
@@ -497,11 +406,7 @@ function BillingPage() {
           <p className="mt-1 text-xs text-slate-400">
             {
               invoices.filter(
-                (i) =>
-                  i.status === InvoiceStatus.PAYMENT_PENDING ||
-                  i.status === InvoiceStatus.ISSUED ||
-                  i.status === 'Issued' ||
-                  i.status === 'Payment Pending',
+                (i) => i.status === InvoiceStatus.PAYMENT_PENDING || i.status === InvoiceStatus.ISSUED,
               ).length
             }{' '}
             awaiting payment
@@ -514,9 +419,9 @@ function BillingPage() {
             <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
           </div>
           <p className="mt-1 font-mono text-lg md:text-xl font-bold text-rose-700">
-            {metrics.overdueCount} Invoices
+            {metrics.attentionCount} Invoices
           </p>
-          <p className="mt-1 text-xs text-slate-400">Overdue or voided records</p>
+          <p className="mt-1 text-xs text-slate-400">Failed or voided records</p>
         </div>
       </div>
 
@@ -537,7 +442,17 @@ function BillingPage() {
 
       {/* Main Ledger Card */}
       <Card className="p-0 overflow-hidden min-h-[420px] flex flex-col justify-between shadow-xs border-slate-200 bg-white">
-        {totalEntries > 0 ? (
+        {isLoading ? (
+          <div className="flex flex-1 items-center justify-center py-16">
+            <RefreshCw className="h-5 w-5 animate-spin text-slate-400" />
+          </div>
+        ) : isError ? (
+          <ErrorState
+            title="Unable to load invoices"
+            description={error?.message || 'Please check your connection and try again.'}
+            onRetry={refetch}
+          />
+        ) : totalEntries > 0 ? (
           <div>
             <InvoiceListTable
               invoices={paginatedInvoices}
@@ -553,53 +468,55 @@ function BillingPage() {
         )}
 
         {/* Table Footer with Pagination */}
-        <div className="border-t border-slate-200 bg-slate-50/50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
-          <div>
-            Showing <span className="font-semibold text-slate-900">{startEntry}</span> to{' '}
-            <span className="font-semibold text-slate-900">{endEntry}</span> of{' '}
-            <span className="font-semibold text-slate-900">{totalEntries}</span> entries
-          </div>
-
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                aria-label="Previous page"
-                className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                ‹
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={cx(
-                    'flex h-7 min-w-7 items-center justify-center rounded px-2 text-xs font-medium transition-colors cursor-pointer',
-                    currentPage === pageNum
-                      ? 'bg-primary text-on-primary font-bold'
-                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                  )}
-                >
-                  {pageNum}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-                aria-label="Next page"
-                className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
-              >
-                ›
-              </button>
+        {!isLoading && !isError && (
+          <div className="border-t border-slate-200 bg-slate-50/50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+            <div>
+              Showing <span className="font-semibold text-slate-900">{startEntry}</span> to{' '}
+              <span className="font-semibold text-slate-900">{endEntry}</span> of{' '}
+              <span className="font-semibold text-slate-900">{totalEntries}</span> entries
             </div>
-          )}
-        </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  aria-label="Previous page"
+                  className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  ‹
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={cx(
+                      'flex h-7 min-w-7 items-center justify-center rounded px-2 text-xs font-medium transition-colors cursor-pointer',
+                      currentPage === pageNum
+                        ? 'bg-primary text-on-primary font-bold'
+                        : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                    )}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  aria-label="Next page"
+                  className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  ›
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Invoice Details Slide-over Drawer */}
@@ -642,7 +559,7 @@ function BillingPage() {
           }}
           onConfirm={handleConfirmVoid}
           invoice={voidingInvoice}
-          isSubmitting={isSubmitting}
+          isSubmitting={voidInvoiceMutation.isPending}
         />
       )}
     </div>

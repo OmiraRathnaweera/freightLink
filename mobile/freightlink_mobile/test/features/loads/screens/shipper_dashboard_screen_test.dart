@@ -5,6 +5,7 @@ import 'package:freightlink_mobile/core/theme/app_theme.dart';
 import 'package:freightlink_mobile/features/auth/models/auth_user.dart';
 import 'package:freightlink_mobile/features/auth/providers/auth_provider.dart';
 import 'package:freightlink_mobile/features/billing/data/billing_repository.dart';
+import 'package:freightlink_mobile/features/billing/models/invoice.dart';
 import 'package:freightlink_mobile/features/loads/data/loads_repository.dart';
 import 'package:freightlink_mobile/features/loads/models/load.dart';
 import 'package:freightlink_mobile/features/loads/models/load_status.dart';
@@ -87,8 +88,8 @@ void main() {
       stubCounts(total: 9, posted: 2, matched: 1, inTransit: 1, delivered: 5);
       when(() => mockBillingRepo.getInvoices()).thenAnswer(
         (_) async => [
-          {'status': 'Issued'},
-          {'status': 'Paid'},
+          _sampleInvoice(status: 'Issued'),
+          _sampleInvoice(status: 'Paid'),
         ],
       );
 
@@ -148,5 +149,17 @@ void main() {
 
       expect(find.text('SHIPMENTS OVERVIEW'), findsOneWidget);
     });
+  });
+}
+
+Invoice _sampleInvoice({required String status}) {
+  return Invoice.fromJson({
+    'invoiceId': 'invoice-${status.toLowerCase()}',
+    'invoiceNumber': 'INV-0001',
+    'status': status,
+    'totalAmount': 1000,
+    'currency': 'LKR',
+    'createdAt': '2026-09-01T00:00:00Z',
+    'updatedAt': '2026-09-01T00:00:00Z',
   });
 }

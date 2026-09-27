@@ -10,6 +10,8 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../../billing/screens/create_invoice_screen.dart';
 import '../data/trips_repository.dart';
 import '../models/trip_event.dart';
 import '../models/trip_models.dart';
@@ -76,6 +78,10 @@ class _AgencyTripDetailScreenState extends State<AgencyTripDetailScreen> {
                 padding: const EdgeInsets.all(AppConstants.spaceLg),
                 children: [
                   _buildOverviewCard(trip),
+                  if (trip.isDelivered && (context.watch<AuthProvider>().user?.isAgencyStaff ?? false)) ...[
+                    const SizedBox(height: AppConstants.spaceLg),
+                    _buildCreateInvoiceAction(context, trip),
+                  ],
                   if (trip.hasRouteCoordinates) ...[
                     const SizedBox(height: AppConstants.spaceLg),
                     _buildRouteMapCard(trip),
@@ -89,6 +95,30 @@ class _AgencyTripDetailScreenState extends State<AgencyTripDetailScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildCreateInvoiceAction(BuildContext context, TripResponse trip) {
+    return SectionCard(
+      child: Row(
+        children: [
+          const Icon(Icons.receipt_long_outlined, color: AppColors.primary),
+          const SizedBox(width: AppConstants.spaceMd),
+          const Expanded(
+            child: Text(
+              'This trip has been delivered. Create an invoice to bill the shipper.',
+              style: TextStyle(fontSize: 13, color: AppColors.ink),
+            ),
+          ),
+          const SizedBox(width: AppConstants.spaceSm),
+          FilledButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => CreateInvoiceScreen(tripId: trip.tripId)),
+            ),
+            child: const Text('Create Invoice'),
+          ),
+        ],
       ),
     );
   }

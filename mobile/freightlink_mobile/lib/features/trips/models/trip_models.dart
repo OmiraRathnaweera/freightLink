@@ -48,6 +48,9 @@ class TripResponse {
     this.pickupWindowStart,
     this.pickupWindowEnd,
     this.referenceCode,
+    this.shipperUserId,
+    this.shipperName,
+    this.agreedPrice,
     this.routedDistanceKm,
     this.proposedEtaMinutes,
     this.events = const [],
@@ -106,6 +109,9 @@ class TripResponse {
       pickupWindowStart: tryParseDate(json['pickupWindowStart']),
       pickupWindowEnd: tryParseDate(json['pickupWindowEnd']),
       referenceCode: json['referenceCode'] as String?,
+      shipperUserId: json['shipperUserId'] as String?,
+      shipperName: json['shipperName'] as String?,
+      agreedPrice: parseDouble(json['agreedPrice']),
       routedDistanceKm: parseDouble(json['routedDistanceKm']),
       proposedEtaMinutes: json['proposedEtaMinutes'] as int?,
       events: eventsList,
@@ -137,6 +143,12 @@ class TripResponse {
   final DateTime? pickupWindowStart;
   final DateTime? pickupWindowEnd;
   final String? referenceCode;
+  final String? shipperUserId;
+  final String? shipperName;
+
+  /// The agreed price from the accepted assignment (the job proposal / AI-matched price the
+  /// Shipper already approved) — the default Create Invoice amount for this trip once Delivered.
+  final double? agreedPrice;
   final double? routedDistanceKm;
   final int? proposedEtaMinutes;
   final List<TripEvent> events;

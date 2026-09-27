@@ -271,6 +271,20 @@ public class TripServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_ExposesShipperAndAgreedPrice_ForCreateInvoiceAutoFill()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+        var (trip, shipperUserId, agencyStaffUserId, _, _) = await SeedTripHierarchyAsync(db);
+
+        var result = await sut.GetByIdAsync(trip.TripId, agencyStaffUserId, UserRole.AgencyStaff);
+
+        Assert.Equal(shipperUserId, result.ShipperUserId);
+        Assert.Equal("Shipper User", result.ShipperName);
+        Assert.Equal(45000m, result.AgreedPrice);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_DeniesOtherShipper_With403()
     {
         using var db = CreateContext();

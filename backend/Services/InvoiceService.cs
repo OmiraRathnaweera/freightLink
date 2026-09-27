@@ -47,7 +47,7 @@ public class InvoiceService : IInvoiceService
     /// <inheritdoc />
     public async Task<InvoiceResponseDto> CreateAsync(Guid currentUserId, UserRole role, CreateInvoiceDto request, CancellationToken cancellationToken = default)
     {
-        if (role != UserRole.AgencyStaff && role != UserRole.Agent)
+        if (role != UserRole.AgencyStaff)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only agents have permission to create invoices.");
         }
@@ -114,8 +114,18 @@ public class InvoiceService : IInvoiceService
                 $"An invoice cannot be created directly into status '{initialStatus}'.");
         }
 
+        // When creating from a trip and the caller didn't supply an explicit amount or line items,
+        // default to the agreed price from the accepted assignment (the job proposal / AI-matched
+        // price the Shipper already approved) — there is no direct-customer/manual-quote path in
+        // this system, so a trip-linked invoice's starting amount is always the already-agreed budget.
+        var amountToUse = request.Amount;
+        if (amountToUse is null && (request.LineItems is null || request.LineItems.Count == 0) && trip is not null)
+        {
+            amountToUse = trip.Assignment.ProposedPrice;
+        }
+
         // Calculate line items and totals
-        var (lineEntities, subtotal, taxTotal, discountTotal, totalAmount) = CalculateLineItemsAndTotals(request.LineItems, request.Amount, request.DiscountTotal);
+        var (lineEntities, subtotal, taxTotal, discountTotal, totalAmount) = CalculateLineItemsAndTotals(request.LineItems, amountToUse, request.DiscountTotal);
 
         var now = DateTimeOffset.UtcNow;
         var invoice = new Invoice
@@ -240,7 +250,7 @@ public class InvoiceService : IInvoiceService
                 (i.Trip != null && i.Trip.Assignment != null && i.Trip.Assignment.Load != null && i.Trip.Assignment.Load.ShipperUserId == currentUserId))
                 && i.Status != InvoiceStatus.Draft);
         }
-        else if (role == UserRole.AgencyStaff || role == UserRole.Agent)
+        else if (role == UserRole.AgencyStaff)
         {
             queryable = queryable.Where(i =>
                 i.RecipientId == currentUserId ||
@@ -457,6 +467,16 @@ public class InvoiceService : IInvoiceService
             {
                 invoice.DiscountTotal = Math.Max(0m, request.DiscountTotal.Value);
                 invoice.Amount = Math.Max(0m, invoice.Subtotal + invoice.TaxTotal - invoice.DiscountTotal);
+            }
+
+            // Keep the single auto-generated line item (the only shape this system's simplified,
+            // trip-linked invoices ever have) in sync with the amount-only update above — otherwise
+            // the line-item breakdown would keep showing the stale pre-edit amount.
+            if (invoice.LineItems.Count == 1)
+            {
+                var onlyLine = invoice.LineItems.Single();
+                onlyLine.UnitPrice = request.Amount.Value;
+                onlyLine.Amount = request.Amount.Value;
             }
         }
         else if (request.DiscountTotal.HasValue)
@@ -886,7 +906,7 @@ public class InvoiceService : IInvoiceService
             return;
         }
 
-        if (role == UserRole.AgencyStaff || role == UserRole.Agent)
+        if (role == UserRole.AgencyStaff)
         {
             return;
         }
@@ -907,7 +927,7 @@ public class InvoiceService : IInvoiceService
 
     private static void EnforceInvoiceModifyAuthorization(Invoice invoice, Guid currentUserId, UserRole role)
     {
-        if (role != UserRole.AgencyStaff && role != UserRole.Agent)
+        if (role != UserRole.AgencyStaff)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only agents have permission to modify invoices.");
         }
@@ -1131,4 +1151,67 @@ public class InvoiceService : IInvoiceService
             UpdatedAt = invoice.UpdatedAt
         }
     };
+
+    /// <inheritdoc />
+    public async Task<InvoiceSummaryDto> GetSummaryAsync(Guid currentUserId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        if (role != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only Admin can view the invoice cashflow summary.");
+        }
+
+        var statusCounts = await _dbContext.Invoices
+            .AsNoTracking()
+            .GroupBy(i => i.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var countByStatus = new InvoiceStatusCountsDto();
+        foreach (var group in statusCounts)
+        {
+            switch (group.Status)
+            {
+                case InvoiceStatus.Draft: countByStatus.Draft = group.Count; break;
+                case InvoiceStatus.Issued: countByStatus.Issued = group.Count; break;
+                case InvoiceStatus.PaymentPending: countByStatus.PaymentPending = group.Count; break;
+                case InvoiceStatus.Paid: countByStatus.Paid = group.Count; break;
+                case InvoiceStatus.Failed: countByStatus.Failed = group.Count; break;
+                case InvoiceStatus.Void: countByStatus.Void = group.Count; break;
+            }
+        }
+
+        var totalInvoiced = await _dbContext.Invoices
+            .AsNoTracking()
+            .Where(i => i.Status != InvoiceStatus.Void)
+            .SumAsync(i => (decimal?)i.Amount, cancellationToken) ?? 0m;
+
+        var totalPaid = await _dbContext.Invoices
+            .AsNoTracking()
+            .Where(i => i.Status == InvoiceStatus.Paid)
+            .SumAsync(i => (decimal?)i.Amount, cancellationToken) ?? 0m;
+
+        var recentActivity = await _dbContext.Invoices
+            .AsNoTracking()
+            .OrderByDescending(i => i.UpdatedAt)
+            .Take(10)
+            .Select(i => new InvoiceRecentActivityDto
+            {
+                InvoiceId = i.InvoiceId,
+                InvoiceNumber = i.InvoiceNumber,
+                Status = i.Status.ToString(),
+                Amount = i.Amount,
+                Currency = i.Currency,
+                UpdatedAt = i.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return new InvoiceSummaryDto
+        {
+            TotalInvoiced = totalInvoiced,
+            TotalPaid = totalPaid,
+            TotalOutstanding = totalInvoiced - totalPaid,
+            CountByStatus = countByStatus,
+            RecentActivity = recentActivity
+        };
+    }
 }

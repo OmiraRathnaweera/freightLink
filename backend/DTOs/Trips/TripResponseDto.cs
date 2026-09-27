@@ -80,6 +80,19 @@ public class TripResponseDto
     /// <summary>Shipper load reference code (e.g. LD-CMB-KDY-01).</summary>
     public string? ReferenceCode { get; set; }
 
+    /// <summary>The owning shipper's user id, denormalized from <c>Trip.Assignment.Load.ShipperUserId</c>.</summary>
+    public Guid? ShipperUserId { get; set; }
+
+    /// <summary>The owning shipper's display name, if resolved.</summary>
+    public string? ShipperName { get; set; }
+
+    /// <summary>
+    /// The agreed price for this job, from the accepted <c>Assignment.ProposedPrice</c> (the job
+    /// proposal / AI-matched price the Shipper already approved). Once the trip is Delivered, this is
+    /// the default amount Agency Staff bills via Create Invoice — see <c>InvoiceService.CreateAsync</c>.
+    /// </summary>
+    public decimal? AgreedPrice { get; set; }
+
     /// <summary>Routed distance in kilometers from assignment.</summary>
     public decimal? RoutedDistanceKm { get; set; }
 

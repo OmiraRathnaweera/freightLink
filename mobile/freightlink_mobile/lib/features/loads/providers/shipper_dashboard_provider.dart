@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../billing/data/billing_repository.dart';
+import '../../billing/models/invoice.dart';
+import '../../billing/models/invoice_status.dart';
 import '../data/loads_repository.dart';
 import '../models/load_status.dart';
 
@@ -51,9 +53,9 @@ class ShipperDashboardProvider extends ChangeNotifier {
       };
 
       final invoices = await _billingRepository.getInvoices().catchError(
-            (_) => <Map<String, dynamic>>[],
+            (_) => <Invoice>[],
           );
-      _pendingInvoices = invoices.where((i) => i['status'] == 'Issued').length;
+      _pendingInvoices = invoices.where((i) => i.status == InvoiceStatus.issued).length;
 
       _state = ShipperDashboardState.loaded;
     } on ApiException catch (e) {

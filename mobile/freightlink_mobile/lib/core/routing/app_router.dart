@@ -24,6 +24,8 @@ import '../../features/agencies/screens/compliance_docs_screen.dart';
 import '../../features/agencies/screens/add_compliance_doc_screen.dart';
 import '../../features/billing/screens/payments_screen.dart';
 import '../../features/billing/screens/raise_dispute_screen.dart';
+import '../../features/billing/screens/invoice_detail_screen.dart';
+import '../../features/billing/screens/create_invoice_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorDashboardKey = GlobalKey<NavigatorState>();
@@ -207,6 +209,20 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                         );
                       }
                       return RaiseDisputeScreen(tripId: tripId);
+                    },
+                  ),
+                  GoRoute(
+                    path: 'create',
+                    builder: (context, state) {
+                      final tripId = state.extra as String?;
+                      return CreateInvoiceScreen(tripId: tripId);
+                    },
+                  ),
+                  GoRoute(
+                    path: ':invoiceId',
+                    builder: (context, state) {
+                      final invoiceId = state.pathParameters['invoiceId']!;
+                      return InvoiceDetailScreen(invoiceId: invoiceId);
                     },
                   ),
                 ],

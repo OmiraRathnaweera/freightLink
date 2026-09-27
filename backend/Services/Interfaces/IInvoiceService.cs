@@ -52,4 +52,10 @@ public interface IInvoiceService
     /// or safely creates a placeholder invoice if none exists.
     /// </summary>
     Task<InvoiceResponseDto> CreateOnTripDeliveredAsync(Guid tripId, Guid? currentUserId = null, UserRole? role = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Admin-only, read-only aggregate cashflow summary: totals, per-status counts, and recent activity,
+    /// computed at the database level across all invoices.
+    /// </summary>
+    Task<InvoiceSummaryDto> GetSummaryAsync(Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
 }

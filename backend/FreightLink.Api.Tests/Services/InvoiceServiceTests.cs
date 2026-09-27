@@ -273,6 +273,27 @@ public class InvoiceServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_TripLinked_NoAmountOrLineItemsGiven_DefaultsToAssignmentAgreedPrice()
+    {
+        using var db = CreateContext();
+        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        // No Amount, no LineItems — only TripId. There is no direct-customer/manual-quote path in
+        // this system, so the invoice must default to the already-agreed job proposal price.
+        var request = new CreateInvoiceDto
+        {
+            TripId = trip.TripId
+        };
+
+        var result = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, request);
+
+        Assert.Equal(45000m, result.TotalAmount);
+        Assert.Equal(shipper.UserId, result.RecipientId);
+        Assert.Single(result.LineItems);
+    }
+
+    [Fact]
     public async Task CreateAsync_NonPositiveAmount_ThrowsBadRequest()
     {
         using var db = CreateContext();

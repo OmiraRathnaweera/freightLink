@@ -20,9 +20,9 @@ namespace FreightLink.Api.Controllers;
 [Authorize]
 public class InvoicesController : ControllerBase
 {
-    private const string AgentRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Agent);
+    private const string AgentRoles = nameof(UserRole.AgencyStaff);
     private const string ShipperRoles = nameof(UserRole.Shipper);
-    private const string DeliveryEventRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Agent);
+    private const string DeliveryEventRoles = nameof(UserRole.AgencyStaff);
 
     private readonly IInvoiceService _invoiceService;
 
@@ -50,6 +50,17 @@ public class InvoicesController : ControllerBase
     public async Task<ActionResult<List<InvoiceRecipientDto>>> GetRecipients(CancellationToken cancellationToken)
     {
         var result = await _invoiceService.GetRecipientsAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only, read-only aggregate cashflow summary: totals, per-status counts, recent activity.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the cashflow summary.</returns>
+    [HttpGet("summary")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<InvoiceSummaryDto>> GetSummary(CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.GetSummaryAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 

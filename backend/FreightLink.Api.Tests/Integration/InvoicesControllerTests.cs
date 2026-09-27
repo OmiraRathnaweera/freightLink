@@ -867,4 +867,103 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.NotNull(fetched);
         Assert.Equal(created.InvoiceId, fetched.InvoiceId);
     }
+
+    // =========================================================================
+    // Cashflow Summary — Admin Only
+    // =========================================================================
+
+    private async Task<InvoiceSummaryDto> GetSummaryAsAdminAsync()
+    {
+        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/invoices/summary");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var summary = await response.Content.ReadFromJsonAsync<InvoiceSummaryDto>(JsonOpts);
+        Assert.NotNull(summary);
+        return summary!;
+    }
+
+    [Fact]
+    public async Task GetSummary_AuthenticatedAdmin_ReturnsWellFormedResponse()
+    {
+        var summary = await GetSummaryAsAdminAsync();
+
+        // This test class shares one database across all [Fact]s, so a fresh factory would be
+        // needed for a true "empty database" assertion — instead we assert the response shape
+        // and non-negative invariants hold, which is what a truly-empty DB would also satisfy.
+        Assert.True(summary.TotalInvoiced >= 0m);
+        Assert.True(summary.TotalPaid >= 0m);
+        Assert.Equal(summary.TotalInvoiced - summary.TotalPaid, summary.TotalOutstanding);
+        Assert.NotNull(summary.RecentActivity);
+    }
+
+    [Fact]
+    public async Task GetSummary_AuthenticatedAdmin_WithMixedStatuses_ReflectsNewInvoicesInAggregates()
+    {
+        var before = await GetSummaryAsAdminAsync();
+
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+
+        // Draft invoice
+        var draftReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                RecipientRole = UserRole.Shipper,
+                Amount = 10000m,
+                Currency = "LKR",
+                IssueImmediately = false
+            })
+        };
+        draftReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var draftRes = await _client.SendAsync(draftReq);
+        Assert.Equal(HttpStatusCode.Created, draftRes.StatusCode);
+
+        // Issued invoice (on a second trip so uniqueness constraints don't collide)
+        var (_, _, staffUser2, trip2) = await SeedTripDataAsync();
+        var agentToken2 = MintToken(staffUser2.UserId, UserRole.AgencyStaff);
+        var issuedReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip2.TripId,
+                Amount = 20000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        issuedReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken2);
+        var issuedRes = await _client.SendAsync(issuedReq);
+        Assert.Equal(HttpStatusCode.Created, issuedRes.StatusCode);
+
+        var after = await GetSummaryAsAdminAsync();
+
+        Assert.Equal(before.TotalInvoiced + 30000m, after.TotalInvoiced);
+        Assert.Equal(before.TotalPaid, after.TotalPaid);
+        Assert.Equal(before.CountByStatus.Draft + 1, after.CountByStatus.Draft);
+        Assert.Equal(before.CountByStatus.Issued + 1, after.CountByStatus.Issued);
+        Assert.True(after.RecentActivity.Count >= 2);
+    }
+
+    [Theory]
+    [InlineData("Shipper")]
+    [InlineData("AgencyStaff")]
+    [InlineData("Driver")]
+    public async Task GetSummary_NonAdminRole_Returns403Forbidden(string roleName)
+    {
+        var role = Enum.Parse<UserRole>(roleName);
+        var token = MintToken(Guid.NewGuid(), role);
+
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/invoices/summary");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

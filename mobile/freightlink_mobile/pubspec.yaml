@@ -45,7 +45,6 @@ dependencies:
   # Current releases support the same win32 binding generation used by
   # flutter_secure_storage_windows; older 8.x releases required win32 5.x.
   file_picker: ^13.1.0
-  webview_flutter: ^4.10.0
   auto_size_text: ^3.0.0
   geolocator: ^14.0.1
 

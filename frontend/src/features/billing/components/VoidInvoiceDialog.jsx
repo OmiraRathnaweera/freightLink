@@ -9,12 +9,17 @@ function VoidInvoiceDialog({ isOpen, onClose, onConfirm, invoice, isSubmitting }
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!voidReason.trim()) {
+    const trimmed = voidReason.trim()
+    if (!trimmed) {
       setError('Please provide a specific reason for voiding this invoice.')
       return
     }
+    if (trimmed.length > 1000) {
+      setError('Reason cannot exceed 1000 characters.')
+      return
+    }
     setError('')
-    onConfirm(invoice.id || invoice.invoiceId, voidReason.trim())
+    onConfirm(invoice.id || invoice.invoiceId, trimmed)
   }
 
   const handleClose = () => {
@@ -70,6 +75,7 @@ function VoidInvoiceDialog({ isOpen, onClose, onConfirm, invoice, isSubmitting }
               id="voidReason"
               name="voidReason"
               rows={3}
+              maxLength={1000}
               value={voidReason}
               onChange={(e) => {
                 setVoidReason(e.target.value)

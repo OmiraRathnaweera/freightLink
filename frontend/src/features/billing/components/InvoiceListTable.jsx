@@ -2,7 +2,7 @@ import { Eye, Edit3, Send, Ban, MoreHorizontal } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import InvoiceStatusBadge from './InvoiceStatusBadge.jsx'
 import { formatCurrency, formatInvoiceDate } from '../lib/formatters.js'
-import { InvoiceStatus } from '../lib/invoiceStatus.js'
+import { InvoiceStatus } from '../../../lib/enums.js'
 import { cx } from '../../../lib/cx.js'
 
 function ActionMenu({
@@ -16,14 +16,12 @@ function ActionMenu({
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef(null)
 
-  const isDraft = invoice.status === InvoiceStatus.DRAFT || invoice.status === 'Draft'
+  const isDraft = invoice.status === InvoiceStatus.DRAFT
   const isVoidable =
     invoice.status === InvoiceStatus.DRAFT ||
     invoice.status === InvoiceStatus.ISSUED ||
     invoice.status === InvoiceStatus.PAYMENT_PENDING ||
-    invoice.status === InvoiceStatus.FAILED ||
-    invoice.status === 'Draft' ||
-    invoice.status === 'Issued'
+    invoice.status === InvoiceStatus.FAILED
 
   useEffect(() => {
     function handleClickOutside(event) {

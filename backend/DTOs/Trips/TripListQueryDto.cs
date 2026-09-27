@@ -36,4 +36,12 @@ public class TripListQueryDto
 
     /// <summary>Optional exact-match driver filter.</summary>
     public Guid? DriverId { get; set; }
+
+    /// <summary>
+    /// When <c>false</c>, returns only trips that don't already have an invoice — used by Agency
+    /// Staff's Create Invoice trip picker, since every invoice must be linked to exactly one trip
+    /// (<c>uq_invoice_trip_id</c>) and a trip can only ever be invoiced once. When <c>true</c>,
+    /// returns only trips that already have one. Omitted/null applies no filter.
+    /// </summary>
+    public bool? HasInvoice { get; set; }
 }

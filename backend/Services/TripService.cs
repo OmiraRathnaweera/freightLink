@@ -104,6 +104,13 @@ public class TripService : ITripService
             tripsQuery = tripsQuery.Where(t => t.Status == query.Status.Value);
         }
 
+        if (query.HasInvoice.HasValue)
+        {
+            tripsQuery = query.HasInvoice.Value
+                ? tripsQuery.Where(t => t.Invoice != null)
+                : tripsQuery.Where(t => t.Invoice == null);
+        }
+
         tripsQuery = query.SortBy?.ToLowerInvariant() switch
         {
             "updatedat" => query.SortDir?.ToLowerInvariant() == "asc"
@@ -143,6 +150,7 @@ public class TripService : ITripService
                 .ThenInclude(a => a.Agency)
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Load)
+                    .ThenInclude(l => l.ShipperUser)
             .Include(t => t.Driver)
                 .ThenInclude(d => d.User)
             .Include(t => t.Vehicle)
@@ -173,6 +181,7 @@ public class TripService : ITripService
                 .ThenInclude(a => a.Agency)
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Load)
+                    .ThenInclude(l => l.ShipperUser)
             .Include(t => t.Driver)
                 .ThenInclude(d => d.User)
             .Include(t => t.Vehicle)
@@ -510,6 +519,9 @@ public class TripService : ITripService
         PickupWindowStart = t.Assignment?.Load?.PickupWindowStart,
         PickupWindowEnd = t.Assignment?.Load?.PickupWindowEnd,
         ReferenceCode = t.Assignment?.Load?.ReferenceCode,
+        ShipperUserId = t.Assignment?.Load?.ShipperUserId,
+        ShipperName = t.Assignment?.Load?.ShipperUser?.FullName,
+        AgreedPrice = t.Assignment?.ProposedPrice,
         RoutedDistanceKm = t.Assignment?.RoutedDistanceKm,
         ProposedEtaMinutes = t.Assignment?.ProposedEtaMinutes,
         Status = t.Status.ToString(),
