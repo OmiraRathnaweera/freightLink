@@ -332,8 +332,13 @@ async def test_short_circuit_agent_3_routing_failure(mock_planner_llm, sample_ca
 
 
 @pytest.mark.anyio
-async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates):
-    """Tests the HTTP POST /workflows/match endpoint contract end-to-end."""
+async def test_post_workflows_run_endpoint(mock_planner_llm, sample_candidates):
+    """Tests the HTTP POST /workflows/run endpoint contract end-to-end.
+
+    Replaces the old /workflows/match endpoint test - that route had no
+    production consumer (the backend only ever calls /workflows/run) and
+    was removed per plans/01-python-service-consolidation.md §3.
+    """
     from freightlink_agent.core.config import get_settings
 
     settings = get_settings()
@@ -388,10 +393,14 @@ async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates
         patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
         patch("freightlink_agent.agents.validation_safety.report", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             res = await client.post(
-                "/workflows/match",
+                "/workflows/run",
                 json=payload,
                 headers={"X-Internal-Api-Key": api_key},
             )
@@ -399,12 +408,6 @@ async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates
     assert res.status_code == 200
     data = res.json()
 
-    # Verify exact consolidated response contract
-    assert "plan" in data and "objective" in data["plan"]
-    assert "steps" in data and len(data["steps"]) == 4
-    assert "candidates" in data and len(data["candidates"]) >= 1
-    assert "toolCalls" in data and len(data["toolCalls"]) >= 2
-    assert "rankedFive" in data and len(data["rankedFive"]) >= 1
-    assert "mostSuitable" in data and data["mostSuitable"] is not None
-    assert data["mostSuitable"]["estimatedPrice"] == 19000.0
-    assert "validation" in data and data["validation"]["recommendation"] == "Approve"
+    assert "workflowRunId" in data
+    assert "objective" in data
+    assert "planJson" in data
