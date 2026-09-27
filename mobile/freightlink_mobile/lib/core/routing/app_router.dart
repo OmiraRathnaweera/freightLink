@@ -27,7 +27,6 @@ final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorDashboardKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorLoadsKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorPaymentsKey = GlobalKey<NavigatorState>();
-final GlobalKey<NavigatorState> _shellNavigatorReportsKey = GlobalKey<NavigatorState>();
 
 // One routing policy for every authenticated mobile role. Screen builders may
 // still select role-specific content for shared tab slots, but they must never
@@ -39,8 +38,8 @@ const _roleHomes = <String, String>{
 };
 
 const _roleAllowedExactPaths = <String, List<String>>{
-  'Shipper': ['/loads', '/payments', '/dashboard', '/reports'],
-  'AgencyStaff': ['/dashboard', '/loads', '/trips', '/payments', '/reports'],
+  'Shipper': ['/loads', '/payments', '/dashboard'],
+  'AgencyStaff': ['/dashboard', '/loads', '/trips', '/payments'],
   'Driver': ['/loads', '/dashboard'],
 };
 
@@ -208,18 +207,6 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                     },
                   ),
                 ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: _shellNavigatorReportsKey,
-            routes: [
-              GoRoute(
-                path: '/reports',
-                builder: (context, state) => const ComingSoonPlaceholder(
-                  title: 'Reports',
-                  icon: Icons.bar_chart_rounded,
-                ),
               ),
             ],
           ),

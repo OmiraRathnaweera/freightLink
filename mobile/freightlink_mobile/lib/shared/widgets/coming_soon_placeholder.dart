@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'app_top_bar.dart';
 import 'empty_state.dart';
 
-/// Placeholder tab content for features not built yet (Dashboard, Payments,
-/// Reports) — the bottom nav is real, these tabs' screens aren't.
+/// Placeholder tab content for features not built yet (Dashboard, Payments)
+/// — the bottom nav is real, these tabs' screens aren't.
 class ComingSoonPlaceholder extends StatelessWidget {
   const ComingSoonPlaceholder({
     super.key,
