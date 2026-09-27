@@ -23,7 +23,9 @@ class AgencyDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => AgencyDashboardProvider(context.read<AgenciesRepository>())..loadStats(),
+      create: (context) =>
+          AgencyDashboardProvider(context.read<AgenciesRepository>())
+            ..loadStats(),
       child: const _AgencyDashboardView(),
     );
   }
@@ -53,7 +55,9 @@ class _AgencyDashboardView extends StatelessWidget {
             return Center(
               child: ErrorState(
                 title: 'Unable to load dashboard',
-                message: provider.errorMessage ?? 'Please check your connection and try again.',
+                message:
+                    provider.errorMessage ??
+                    'Please check your connection and try again.',
                 onRetry: provider.loadStats,
               ),
             );
@@ -71,9 +75,7 @@ class _AgencyDashboardView extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _AgencyHeroBanner(
-                    profile: provider.agencyProfile,
-                  ),
+                  _AgencyHeroBanner(profile: provider.agencyProfile),
                   const SizedBox(height: AppConstants.spaceXl),
                   _buildSectionHeader(
                     title: 'Operational Overview',
@@ -93,7 +95,8 @@ class _AgencyDashboardView extends StatelessWidget {
                     title: 'Fleet Management',
                     subtitle: 'Manage vehicle availability, capacity & specs',
                     icon: Icons.local_shipping_outlined,
-                    badgeText: '${provider.stats?['totalVehicles'] ?? 0} Vehicles',
+                    badgeText:
+                        '${provider.stats?['totalVehicles'] ?? 0} Vehicles',
                     onTap: () => context.go('/dashboard/fleet'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
@@ -107,7 +110,8 @@ class _AgencyDashboardView extends StatelessWidget {
                   const SizedBox(height: AppConstants.spaceSm),
                   DashboardActionTile(
                     title: 'Agency Trips',
-                    subtitle: 'Monitor active shipments, pickup & delivery proof',
+                    subtitle:
+                        'Monitor active shipments, pickup & delivery proof',
                     icon: Icons.route_outlined,
                     badgeText: (provider.stats?['onTripVehicles'] ?? 0) > 0
                         ? '${provider.stats!['onTripVehicles']} In Transit'
@@ -123,6 +127,15 @@ class _AgencyDashboardView extends StatelessWidget {
                     badgeText: 'Finance',
                     onTap: () => context.go('/payments'),
                   ),
+                  const SizedBox(height: AppConstants.spaceSm),
+                  DashboardActionTile(
+                    title: 'Trip Disputes',
+                    subtitle:
+                        'Track claims, review their status & read Admin decisions',
+                    icon: Icons.balance_outlined,
+                    badgeText: 'Claims',
+                    onTap: () => context.push('/payments/disputes'),
+                  ),
                   const SizedBox(height: AppConstants.spaceXl),
                   _buildSectionHeader(
                     title: 'Administration & Compliance',
@@ -133,13 +146,15 @@ class _AgencyDashboardView extends StatelessWidget {
                     title: 'Driver Onboarding',
                     subtitle: 'Manage driver roster, status & credentials',
                     icon: Icons.person_add_outlined,
-                    badgeText: '${provider.stats?['activeDrivers'] ?? 0} Drivers',
+                    badgeText:
+                        '${provider.stats?['activeDrivers'] ?? 0} Drivers',
                     onTap: () => context.go('/dashboard/driver-onboarding'),
                   ),
                   const SizedBox(height: AppConstants.spaceSm),
                   DashboardActionTile(
                     title: 'Compliance Documents',
-                    subtitle: 'Carrier permits, vehicle insurance & KYC records',
+                    subtitle:
+                        'Carrier permits, vehicle insurance & KYC records',
                     icon: Icons.description_outlined,
                     badgeText: (provider.stats?['pendingCompliance'] ?? 0) > 0
                         ? '${provider.stats!['pendingCompliance']} Action Needed'
@@ -193,8 +208,11 @@ class _AgencyHeroBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = context.watch<AuthProvider>().user;
     final agencyName = profile?['name'] as String? ?? 'Agency Fleet Hub';
-    final yardAddress = profile?['yardAddress'] as String? ?? 'Primary Operations Yard';
-    final staffName = user?.fullName.isNotEmpty == true ? user!.fullName : 'Agency Dispatcher';
+    final yardAddress =
+        profile?['yardAddress'] as String? ?? 'Primary Operations Yard';
+    final staffName = user?.fullName.isNotEmpty == true
+        ? user!.fullName
+        : 'Agency Dispatcher';
     final status = profile?['status'] as String? ?? 'Active';
 
     return Container(
@@ -378,18 +396,28 @@ class _KpiGrid extends StatelessWidget {
           iconFg: AppColors.statusInTransitFg,
           value: '$onTripVehicles',
           label: 'On Trip',
-          footer: onTripVehicles > 0 ? '$onTripVehicles active now' : 'No trips in transit',
-          footerColor: onTripVehicles > 0 ? AppColors.statusInTransitFg : AppColors.inkMuted,
+          footer: onTripVehicles > 0
+              ? '$onTripVehicles active now'
+              : 'No trips in transit',
+          footerColor: onTripVehicles > 0
+              ? AppColors.statusInTransitFg
+              : AppColors.inkMuted,
           onTap: () => context.push('/dashboard/trips'),
         ),
         DashboardKpiCard(
           icon: Icons.verified_user_outlined,
-          iconBg: pendingCompliance > 0 ? AppColors.statusErrorBg : AppColors.statusSuccessBg,
-          iconFg: pendingCompliance > 0 ? AppColors.statusErrorFg : AppColors.statusSuccessFg,
+          iconBg: pendingCompliance > 0
+              ? AppColors.statusErrorBg
+              : AppColors.statusSuccessBg,
+          iconFg: pendingCompliance > 0
+              ? AppColors.statusErrorFg
+              : AppColors.statusSuccessFg,
           value: '$pendingCompliance',
           label: 'Pending KYC',
           footer: pendingCompliance > 0 ? 'Action required' : 'All compliant',
-          footerColor: pendingCompliance > 0 ? AppColors.statusErrorFg : AppColors.statusSuccessFg,
+          footerColor: pendingCompliance > 0
+              ? AppColors.statusErrorFg
+              : AppColors.statusSuccessFg,
           onTap: () => context.go('/dashboard/compliance-docs'),
         ),
       ],
@@ -410,7 +438,9 @@ class _FleetUtilizationCard extends StatelessWidget {
     final onTrip = stats['onTripVehicles'] as int? ?? 0;
     final maintenance = stats['maintenanceVehicles'] as int? ?? 0;
 
-    final availabilityRate = total > 0 ? ((available / total) * 100).round() : 0;
+    final availabilityRate = total > 0
+        ? ((available / total) * 100).round()
+        : 0;
 
     return Container(
       decoration: BoxDecoration(
@@ -468,7 +498,9 @@ class _FleetUtilizationCard extends StatelessWidget {
                         if (onTrip > 0)
                           Expanded(
                             flex: onTrip,
-                            child: Container(color: AppColors.statusInTransitFg),
+                            child: Container(
+                              color: AppColors.statusInTransitFg,
+                            ),
                           ),
                         if (maintenance > 0)
                           Expanded(
@@ -509,10 +541,7 @@ class _FleetUtilizationCard extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
         Text(

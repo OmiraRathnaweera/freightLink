@@ -79,9 +79,10 @@ class _PaymentsView extends StatelessWidget {
                 color: AppColors.primary,
                 child: ListView(
                   padding: const EdgeInsets.all(AppConstants.spaceLg),
-                  children: const [
-                    SizedBox(height: 120),
-                    Center(child: Text('No invoices are available yet.')),
+                  children: [
+                    const _DisputesEntryCard(),
+                    const SizedBox(height: 120),
+                    const Center(child: Text('No invoices are available yet.')),
                   ],
                 ),
               );
@@ -91,11 +92,12 @@ class _PaymentsView extends StatelessWidget {
                 color: AppColors.primary,
                 child: ListView.separated(
                   padding: const EdgeInsets.all(AppConstants.spaceLg),
-                  itemCount: provider.items.length,
+                  itemCount: provider.items.length + 1,
                   separatorBuilder: (_, _) =>
                       const SizedBox(height: AppConstants.spaceMd),
                   itemBuilder: (context, index) {
-                    final invoice = provider.items[index];
+                    if (index == 0) return const _DisputesEntryCard();
+                    final invoice = provider.items[index - 1];
                     return _InvoiceCard(
                       invoice: invoice,
                       isShipper: isShipper,
@@ -109,6 +111,57 @@ class _PaymentsView extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Prominent, labeled entry point — kept above invoices so Agency Staff do
+/// not need to discover the dispute list through the app-bar icon alone.
+class _DisputesEntryCard extends StatelessWidget {
+  const _DisputesEntryCard();
+
+  @override
+  Widget build(BuildContext context) => SectionCard(
+    child: Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppColors.statusMatchedBg,
+            borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+          ),
+          child: const Icon(
+            Icons.balance_outlined,
+            color: AppColors.statusMatchedFg,
+          ),
+        ),
+        const SizedBox(width: AppConstants.spaceMd),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Trip Disputes',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
+              ),
+              SizedBox(height: 2),
+              Text(
+                'Track claims and Admin resolutions',
+                style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          onPressed: () => context.push('/payments/disputes'),
+          child: const Text('View'),
+        ),
+      ],
+    ),
+  );
 }
 
 class _InvoiceCard extends StatelessWidget {

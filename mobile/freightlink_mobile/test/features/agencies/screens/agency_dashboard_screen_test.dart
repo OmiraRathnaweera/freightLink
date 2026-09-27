@@ -12,6 +12,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
 
 class MockAgenciesRepository extends Mock implements AgenciesRepository {}
+
 class MockAuthProvider extends Mock implements AuthProvider {}
 
 void main() {
@@ -57,7 +58,9 @@ void main() {
         providers: [
           Provider<AgenciesRepository>.value(value: mockRepo),
           ChangeNotifierProvider<AuthProvider>.value(value: mockAuth),
-          ChangeNotifierProvider<NotificationProvider>(create: (_) => NotificationProvider()),
+          ChangeNotifierProvider<NotificationProvider>(
+            create: (_) => NotificationProvider(),
+          ),
         ],
         child: MaterialApp(
           theme: AppTheme.light,
@@ -68,9 +71,13 @@ void main() {
   }
 
   group('AgencyDashboardScreen', () {
-    testWidgets('renders skeleton during initial loading state', (tester) async {
+    testWidgets('renders skeleton during initial loading state', (
+      tester,
+    ) async {
       final completer = Completer<Map<String, dynamic>>();
-      when(() => mockRepo.getDashboardStats()).thenAnswer((_) => completer.future);
+      when(
+        () => mockRepo.getDashboardStats(),
+      ).thenAnswer((_) => completer.future);
       when(() => mockRepo.getProfile()).thenAnswer((_) async => sampleProfile);
 
       await pumpDashboard(tester);
@@ -85,60 +92,72 @@ void main() {
       expect(find.text('Lanka Express Logistics'), findsOneWidget);
     });
 
-    testWidgets('renders KPIs, fleet utilization, and action tiles when loaded', (tester) async {
-      when(() => mockRepo.getDashboardStats()).thenAnswer((_) async => sampleStats);
-      when(() => mockRepo.getProfile()).thenAnswer((_) async => sampleProfile);
+    testWidgets(
+      'renders KPIs, fleet utilization, and action tiles when loaded',
+      (tester) async {
+        when(
+          () => mockRepo.getDashboardStats(),
+        ).thenAnswer((_) async => sampleStats);
+        when(
+          () => mockRepo.getProfile(),
+        ).thenAnswer((_) async => sampleProfile);
 
-      await pumpDashboard(tester);
-      await tester.pumpAndSettle();
+        await pumpDashboard(tester);
+        await tester.pumpAndSettle();
 
-      // Hero banner
-      expect(find.text('DISPATCH HUB'), findsOneWidget);
-      expect(find.text('ACTIVE'), findsOneWidget);
-      expect(find.text('Lanka Express Logistics'), findsOneWidget);
-      expect(find.text('Peliyagoda Logistics Park, Colombo'), findsOneWidget);
-      expect(find.text('Signed in as Kamal Perera'), findsOneWidget);
+        // Hero banner
+        expect(find.text('DISPATCH HUB'), findsOneWidget);
+        expect(find.text('ACTIVE'), findsOneWidget);
+        expect(find.text('Lanka Express Logistics'), findsOneWidget);
+        expect(find.text('Peliyagoda Logistics Park, Colombo'), findsOneWidget);
+        expect(find.text('Signed in as Kamal Perera'), findsOneWidget);
 
-      // Section headers
-      expect(find.text('OPERATIONAL OVERVIEW'), findsOneWidget);
-      expect(find.text('DISPATCH & OPERATIONS'), findsOneWidget);
-      expect(find.text('ADMINISTRATION & COMPLIANCE'), findsOneWidget);
+        // Section headers
+        expect(find.text('OPERATIONAL OVERVIEW'), findsOneWidget);
+        expect(find.text('DISPATCH & OPERATIONS'), findsOneWidget);
+        expect(find.text('ADMINISTRATION & COMPLIANCE'), findsOneWidget);
 
-      // KPI values
-      expect(find.text('12'), findsOneWidget); // Total vehicles
-      expect(find.text('Total Fleet'), findsOneWidget);
-      expect(find.text('7 available'), findsOneWidget);
+        // KPI values
+        expect(find.text('12'), findsOneWidget); // Total vehicles
+        expect(find.text('Total Fleet'), findsOneWidget);
+        expect(find.text('7 available'), findsOneWidget);
 
-      expect(find.text('8'), findsOneWidget); // Active drivers
-      expect(find.text('Active Drivers'), findsOneWidget);
+        expect(find.text('8'), findsOneWidget); // Active drivers
+        expect(find.text('Active Drivers'), findsOneWidget);
 
-      expect(find.text('3'), findsOneWidget); // On Trip
-      expect(find.text('On Trip'), findsOneWidget);
-      expect(find.text('3 active now'), findsOneWidget);
+        expect(find.text('3'), findsOneWidget); // On Trip
+        expect(find.text('On Trip'), findsOneWidget);
+        expect(find.text('3 active now'), findsOneWidget);
 
-      expect(find.text('1'), findsOneWidget); // Pending KYC
-      expect(find.text('Pending KYC'), findsOneWidget);
-      expect(find.text('Action required'), findsOneWidget);
+        expect(find.text('1'), findsOneWidget); // Pending KYC
+        expect(find.text('Pending KYC'), findsOneWidget);
+        expect(find.text('Action required'), findsOneWidget);
 
-      // Fleet utilization card
-      expect(find.text('FLEET AVAILABILITY'), findsOneWidget);
-      expect(find.text('58% READY'), findsOneWidget); // 7/12 = 58%
-      expect(find.text('Available: 7'), findsOneWidget);
-      expect(find.text('On Trip: 3'), findsOneWidget);
-      expect(find.text('Maint: 2'), findsOneWidget);
+        // Fleet utilization card
+        expect(find.text('FLEET AVAILABILITY'), findsOneWidget);
+        expect(find.text('58% READY'), findsOneWidget); // 7/12 = 58%
+        expect(find.text('Available: 7'), findsOneWidget);
+        expect(find.text('On Trip: 3'), findsOneWidget);
+        expect(find.text('Maint: 2'), findsOneWidget);
 
-      // Action Tiles
-      expect(find.text('Fleet Management'), findsOneWidget);
-      expect(find.text('Job Proposals'), findsOneWidget);
-      expect(find.text('Agency Trips'), findsOneWidget);
-      expect(find.text('Billing & Invoices'), findsOneWidget);
-      expect(find.text('Driver Onboarding'), findsOneWidget);
-      expect(find.text('Compliance Documents'), findsOneWidget);
-      expect(find.text('Agency Profile'), findsOneWidget);
-    });
+        // Action Tiles
+        expect(find.text('Fleet Management'), findsOneWidget);
+        expect(find.text('Job Proposals'), findsOneWidget);
+        expect(find.text('Agency Trips'), findsOneWidget);
+        expect(find.text('Billing & Invoices'), findsOneWidget);
+        expect(find.text('Trip Disputes'), findsOneWidget);
+        expect(find.text('Driver Onboarding'), findsOneWidget);
+        expect(find.text('Compliance Documents'), findsOneWidget);
+        expect(find.text('Agency Profile'), findsOneWidget);
+      },
+    );
 
-    testWidgets('renders ErrorState with retry button when error occurs', (tester) async {
-      when(() => mockRepo.getDashboardStats()).thenThrow(Exception('Network timeout'));
+    testWidgets('renders ErrorState with retry button when error occurs', (
+      tester,
+    ) async {
+      when(
+        () => mockRepo.getDashboardStats(),
+      ).thenThrow(Exception('Network timeout'));
       when(() => mockRepo.getProfile()).thenAnswer((_) async => {});
 
       await pumpDashboard(tester);
@@ -148,7 +167,9 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
 
       // Now mock success for retry
-      when(() => mockRepo.getDashboardStats()).thenAnswer((_) async => sampleStats);
+      when(
+        () => mockRepo.getDashboardStats(),
+      ).thenAnswer((_) async => sampleStats);
       when(() => mockRepo.getProfile()).thenAnswer((_) async => sampleProfile);
 
       await tester.tap(find.text('Retry'));
@@ -157,8 +178,12 @@ void main() {
       expect(find.text('Lanka Express Logistics'), findsOneWidget);
     });
 
-    testWidgets('renders fallback greeting when agency profile is empty', (tester) async {
-      when(() => mockRepo.getDashboardStats()).thenAnswer((_) async => sampleStats);
+    testWidgets('renders fallback greeting when agency profile is empty', (
+      tester,
+    ) async {
+      when(
+        () => mockRepo.getDashboardStats(),
+      ).thenAnswer((_) async => sampleStats);
       when(() => mockRepo.getProfile()).thenAnswer((_) async => {});
 
       await pumpDashboard(tester);

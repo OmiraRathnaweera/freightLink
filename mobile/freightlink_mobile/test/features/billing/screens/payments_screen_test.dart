@@ -56,14 +56,19 @@ void main() {
     when(() => mockAuth.status).thenReturn(AuthStatus.authenticated);
   });
 
-  Future<void> pumpPayments(WidgetTester tester, {AuthUser user = _shipper}) async {
+  Future<void> pumpPayments(
+    WidgetTester tester, {
+    AuthUser user = _shipper,
+  }) async {
     when(() => mockAuth.user).thenReturn(user);
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           Provider<BillingRepository>.value(value: mockBillingRepo),
           ChangeNotifierProvider<AuthProvider>.value(value: mockAuth),
-          ChangeNotifierProvider<NotificationProvider>(create: (_) => NotificationProvider()),
+          ChangeNotifierProvider<NotificationProvider>(
+            create: (_) => NotificationProvider(),
+          ),
         ],
         child: MaterialApp(theme: AppTheme.light, home: const PaymentsScreen()),
       ),
@@ -71,26 +76,40 @@ void main() {
   }
 
   group('PaymentsScreen', () {
-    testWidgets('shows a loading indicator while the query is in flight', (tester) async {
+    testWidgets('shows a loading indicator while the query is in flight', (
+      tester,
+    ) async {
       // A never-completing Future (rather than Future.delayed) keeps the screen in its loading
       // state without leaving a pending Timer behind when the test ends.
-      when(() => mockBillingRepo.getInvoices()).thenAnswer((_) => Completer<List<Invoice>>().future);
+      when(
+        () => mockBillingRepo.getInvoices(),
+      ).thenAnswer((_) => Completer<List<Invoice>>().future);
       await pumpPayments(tester);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
 
-    testWidgets('renders an empty message with no fabricated invoices', (tester) async {
-      when(() => mockBillingRepo.getInvoices()).thenAnswer((_) async => <Invoice>[]);
+    testWidgets('renders an empty message with no fabricated invoices', (
+      tester,
+    ) async {
+      when(
+        () => mockBillingRepo.getInvoices(),
+      ).thenAnswer((_) async => <Invoice>[]);
       await pumpPayments(tester);
       await tester.pumpAndSettle();
 
       expect(find.text('No invoices are available yet.'), findsOneWidget);
+      expect(find.text('Trip Disputes'), findsOneWidget);
+      expect(find.text('View'), findsOneWidget);
       expect(find.textContaining('INV-'), findsNothing);
     });
 
     testWidgets('renders a retry action on failure', (tester) async {
       when(() => mockBillingRepo.getInvoices()).thenThrow(
-        const ApiException(statusCode: 500, code: 'INTERNAL_ERROR', message: 'Network timeout'),
+        const ApiException(
+          statusCode: 500,
+          code: 'INTERNAL_ERROR',
+          message: 'Network timeout',
+        ),
       );
       await pumpPayments(tester);
       await tester.pumpAndSettle();
@@ -99,8 +118,12 @@ void main() {
       expect(find.text('Retry'), findsOneWidget);
     });
 
-    testWidgets('offers "View details" (not "Manage") to a Shipper', (tester) async {
-      when(() => mockBillingRepo.getInvoices()).thenAnswer((_) async => [_invoice()]);
+    testWidgets('offers "View details" (not "Manage") to a Shipper', (
+      tester,
+    ) async {
+      when(
+        () => mockBillingRepo.getInvoices(),
+      ).thenAnswer((_) async => [_invoice()]);
       await pumpPayments(tester, user: _shipper);
       await tester.pumpAndSettle();
 
@@ -108,8 +131,12 @@ void main() {
       expect(find.text('Manage'), findsNothing);
     });
 
-    testWidgets('offers "Manage" (not "View details") to Agency Staff', (tester) async {
-      when(() => mockBillingRepo.getInvoices()).thenAnswer((_) async => [_invoice()]);
+    testWidgets('offers "Manage" (not "View details") to Agency Staff', (
+      tester,
+    ) async {
+      when(
+        () => mockBillingRepo.getInvoices(),
+      ).thenAnswer((_) async => [_invoice()]);
       await pumpPayments(tester, user: _agencyStaff);
       await tester.pumpAndSettle();
 
