@@ -21,6 +21,12 @@ public interface ILoadProposalService
     Task<List<LoadProposalResponseDto>> GetListAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lists every proposal across all of the caller's own loads (Shipper only) — the aggregate feed
+    /// backing the Shipper's "Load Proposals" page, unlike <see cref="GetListAsync"/>'s single-load scope.
+    /// </summary>
+    Task<List<LoadProposalResponseDto>> GetListForShipperAsync(Guid shipperUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Accepts a pending proposal (Shipper only): creates an Assignment for the proposing agency at
     /// the proposed price, advances the load to Matched, and auto-rejects every other pending
     /// proposal on the same load.

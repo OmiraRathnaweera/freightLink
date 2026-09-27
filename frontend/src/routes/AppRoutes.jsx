@@ -12,6 +12,7 @@ import VerifyEmailPage from '../features/auth/pages/VerifyEmailPage.jsx'
 import UnauthorizedPage from '../features/auth/pages/UnauthorizedPage.jsx'
 import LoadsPage from '../features/loads/pages/LoadsPage.jsx'
 import PostLoadPage from '../features/loads/pages/PostLoadPage.jsx'
+import LoadProposalsPage from '../features/loads/pages/LoadProposalsPage.jsx'
 import LoadDetailPage from '../features/loads/pages/LoadDetailPage.jsx'
 import EditLoadPage from '../features/loads/pages/EditLoadPage.jsx'
 import AgenciesPage from '../features/agencies/pages/AgenciesPage.jsx'
@@ -59,6 +60,7 @@ const router = createBrowserRouter(
 
           <Route path="/loads" element={<LoadsPage />} />
           <Route path="/loads/new" element={<PostLoadPage />} />
+          <Route path="/loads/proposals" element={<LoadProposalsPage />} />
           <Route path="/loads/:loadId" element={<LoadDetailPage />} />
           <Route path="/loads/:loadId/edit" element={<EditLoadPage />} />
 

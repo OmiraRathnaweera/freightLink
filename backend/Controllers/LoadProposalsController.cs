@@ -54,6 +54,19 @@ public class LoadProposalsController : ControllerBase
     }
 
     /// <summary>
+    /// Lists every proposal across all of the caller's own loads (Shipper only) — the aggregate feed
+    /// backing the Shipper's "Load Proposals" page. An absolute route override since the class-level
+    /// route requires a {loadId} segment that this endpoint has no single load to scope to.
+    /// </summary>
+    [HttpGet("/api/v1/loads/proposals")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<List<LoadProposalResponseDto>>> GetListForShipper(CancellationToken cancellationToken)
+    {
+        var result = await _loadProposalService.GetListForShipperAsync(GetCurrentUserId(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Accepts a pending proposal (Shipper only): creates the Assignment, advances the load to
     /// Matched, and auto-rejects every other pending proposal on the same load.
     /// </summary>

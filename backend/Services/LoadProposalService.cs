@@ -128,6 +128,20 @@ public class LoadProposalService : ILoadProposalService
     }
 
     /// <inheritdoc />
+    public async Task<List<LoadProposalResponseDto>> GetListForShipperAsync(Guid shipperUserId, CancellationToken cancellationToken = default)
+    {
+        var proposals = await _dbContext.LoadProposals
+            .Include(p => p.Load)
+            .Include(p => p.Agency)
+            .Include(p => p.ProposedByUser)
+            .Where(p => p.Load.ShipperUserId == shipperUserId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        return proposals.Select(MapToDto).ToList();
+    }
+
+    /// <inheritdoc />
     public async Task<LoadProposalResponseDto> AcceptAsync(Guid loadId, Guid proposalId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
         if (currentUserRole != UserRole.Shipper)

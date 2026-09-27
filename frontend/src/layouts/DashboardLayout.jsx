@@ -51,8 +51,16 @@ import { cx } from '../lib/cx.js'
 // bounced from, and there's one place (not two) to update when a role
 // gains access to a route.
 const GET_NAV_ITEMS = (role) => [
-  { to: '/loads', label: 'Loads', icon: Package },
-  { 
+  {
+    to: '/loads',
+    label: 'Loads',
+    icon: Package,
+    children: role === 'Shipper' ? [
+      { to: '/loads', label: 'My Loads', end: true },
+      { to: '/loads/proposals', label: 'Load Proposals' },
+    ] : undefined,
+  },
+  {
     to: '/agencies', 
     label: role === 'AgencyStaff' ? 'My Agency' : 'Agencies', 
     icon: Building2, 

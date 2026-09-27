@@ -27,6 +27,15 @@ export const LoadStatus = Object.freeze({
   CANCELLED: 'Cancelled',
 })
 
+// Lifecycle of a manual price proposal an Agency sends on a Posted load, alongside (not through)
+// the multi-agent matching pipeline.
+export const LoadProposalStatus = Object.freeze({
+  PENDING: 'Pending',
+  ACCEPTED: 'Accepted',
+  REJECTED: 'Rejected',
+  WITHDRAWN: 'Withdrawn',
+})
+
 // Kind of file attached to a load.
 export const FileType = Object.freeze({
   MANIFEST: 'Manifest',
