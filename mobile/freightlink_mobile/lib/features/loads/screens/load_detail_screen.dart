@@ -17,6 +17,7 @@ import '../widgets/load_status_badge.dart';
 import '../widgets/load_timeline.dart';
 import '../widgets/route_map_preview.dart';
 import 'edit_load_screen.dart';
+import 'load_match_screen.dart';
 
 /// **Load Detail** — one screen that adapts to the load's real
 /// [LoadStatus] (composed from shared sections) rather than one bespoke
@@ -280,6 +281,14 @@ class _LoadDetailContent extends StatelessWidget {
               color: AppColors.ink,
             ),
           ),
+        ),
+        const SizedBox(height: AppConstants.spaceLg),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => LoadMatchScreen(loadId: load.loadId)),
+          ),
+          icon: const Icon(Icons.auto_awesome_outlined),
+          label: const Text('View estimate & AI match'),
         ),
       ],
     );

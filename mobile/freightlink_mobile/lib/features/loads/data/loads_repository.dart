@@ -102,6 +102,24 @@ class LoadsRepository {
     return Load.fromJson(json);
   }
 
+  Future<Map<String, dynamic>> estimatePrice(String loadId) async =>
+      await _client.post('/loads/$loadId/estimate') as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> getMatchRecommendation(String loadId) async =>
+      await _client.get('/loads/$loadId/match') as Map<String, dynamic>;
+
+  Future<void> confirmMatch(String loadId, String agencyId) async {
+    await _client.post('/loads/$loadId/match/confirm', body: {'agencyId': agencyId});
+  }
+
+  Future<void> rejectMatch(String loadId, String reason) async {
+    await _client.post('/loads/$loadId/match/reject', body: {'reason': reason});
+  }
+
+  Future<void> reviseMatch(String loadId, String reason) async {
+    await _client.post('/loads/$loadId/match/revise', body: {'reason': reason});
+  }
+
   Future<String> uploadFile(List<int> bytes, String filename) async {
     final response = await _client.postMultipart(
       '/files/single',
