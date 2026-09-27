@@ -9,13 +9,26 @@ export const matchKeys = {
 
 /**
  * GET /api/v1/loads/{loadId}/match
- * Fetches the AI workflow recommendation, alternate candidates, validation checklist, and pipeline steps.
+ * Fetches the AI workflow recommendation, alternate candidates, validation checklist, and pipeline
+ * steps. Purely read-only — never triggers the AI pipeline as a side effect of viewing data. Use
+ * `triggerLoadMatch` to actually start a run.
  * @param {string} loadId
  * @returns {Promise<import('./types').LoadMatchRecommendationDto>}
  */
-export async function getLoadMatch(loadId, rerun = false) {
-  const url = rerun ? `/loads/${loadId}/match?rerun=true` : `/loads/${loadId}/match`
-  return api.get(url)
+export async function getLoadMatch(loadId) {
+  return api.get(`/loads/${loadId}/match`)
+}
+
+/**
+ * POST /api/v1/loads/{loadId}/match/trigger
+ * Explicitly triggers the Agentic AI pipeline for a load — a deliberate command, not a side effect
+ * of viewing data. Creates the next AgentWorkflowRun attempt and returns the resulting
+ * recommendation once the agent service responds.
+ * @param {string} loadId
+ * @returns {Promise<import('./types').LoadMatchRecommendationDto>}
+ */
+export async function triggerLoadMatch(loadId) {
+  return api.post(`/loads/${loadId}/match/trigger`)
 }
 
 /**
@@ -63,6 +76,21 @@ export function useLoadMatchQuery(loadId, options) {
     queryFn: () => getLoadMatch(loadId),
     enabled: Boolean(loadId),
     staleTime: 30_000,
+    ...options,
+  })
+}
+
+/**
+ * Mutation hook for explicitly triggering the AI matching pipeline.
+ * @param {object} [options]
+ */
+export function useTriggerMatchMutation(options) {
+  return useMutation({
+    mutationFn: (loadId) => triggerLoadMatch(loadId),
+    onSuccess: (data, loadId, context) => {
+      queryClient.invalidateQueries({ queryKey: matchKeys.loadMatch(loadId) })
+      options?.onSuccess?.(data, loadId, context)
+    },
     ...options,
   })
 }

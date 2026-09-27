@@ -21,6 +21,7 @@ vi.mock('../../api/agentWorkflowsApi.js', async (importOriginal) => {
   return {
     ...actual,
     useLoadMatchQuery: vi.fn(),
+    useTriggerMatchMutation: vi.fn(),
     useConfirmMatchMutation: vi.fn(),
   }
 })
@@ -81,6 +82,7 @@ afterEach(() => {
   vi.mocked(loadsApi.useLoadsQuery).mockReset()
   vi.mocked(loadsApi.useLoadDetailQuery).mockReset()
   vi.mocked(agentWorkflowsApi.useLoadMatchQuery).mockReset()
+  vi.mocked(agentWorkflowsApi.useTriggerMatchMutation).mockReset()
   vi.mocked(agentWorkflowsApi.useConfirmMatchMutation).mockReset()
   cleanup()
 })
@@ -100,6 +102,11 @@ describe('AgentWorkflowConsolePage', () => {
       isError: false,
       data: mockMatchData,
       refetch: vi.fn(),
+    })
+    agentWorkflowsApi.useTriggerMatchMutation.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
     })
     agentWorkflowsApi.useConfirmMatchMutation.mockReturnValue({
       mutateAsync: vi.fn(),
@@ -138,6 +145,11 @@ describe('AgentWorkflowConsolePage', () => {
       data: mockMatchData,
       refetch: vi.fn(),
     })
+    agentWorkflowsApi.useTriggerMatchMutation.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
     agentWorkflowsApi.useConfirmMatchMutation.mockReturnValue({
       mutateAsync,
       isPending: false,
@@ -160,5 +172,47 @@ describe('AgentWorkflowConsolePage', () => {
     })
 
     expect(await screen.findByText('Proposal Approved')).toBeInTheDocument()
+  })
+
+  it('automatically triggers matching once when a load has no prior run, via an explicit command', async () => {
+    // Regression test: matching used to start as a side effect of the GET the page already makes
+    // on mount. Now it's a separate, explicit POST /match/trigger call the page fires once it sees
+    // workflowStatus "NotStarted" (plans/04-backend-integration.md §1).
+    const mutate = vi.fn()
+
+    loadsApi.useLoadsQuery.mockReturnValue({
+      isLoading: false,
+      data: { items: [mockLoad] },
+    })
+    loadsApi.useLoadDetailQuery.mockReturnValue({
+      isLoading: false,
+      data: mockLoad,
+    })
+    agentWorkflowsApi.useLoadMatchQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...mockMatchData, workflowStatus: 'NotStarted', steps: [] },
+      refetch: vi.fn(),
+    })
+    agentWorkflowsApi.useTriggerMatchMutation.mockReturnValue({
+      mutate,
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+    agentWorkflowsApi.useConfirmMatchMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+
+    renderWithProviders(<AgentWorkflowConsolePage />, {
+      route: '/agent-workflows',
+      initialEntries: ['/agent-workflows?loadId=load-1'],
+      authState: { role: UserRole.SHIPPER, isAuthenticated: true },
+    })
+
+    await waitFor(() => {
+      expect(mutate).toHaveBeenCalledWith('load-1')
+    })
+    expect(mutate).toHaveBeenCalledTimes(1)
   })
 })

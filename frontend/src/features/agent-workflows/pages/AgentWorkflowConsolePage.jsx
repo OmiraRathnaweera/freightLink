@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams, Link } from 'react-router-dom'
 import {
   Sparkles,
@@ -12,8 +12,8 @@ import ErrorState from '../../../components/ErrorState.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
 import { useLoadsQuery, useLoadDetailQuery } from '../../loads/api/loadsApi.js'
 import {
-  getLoadMatch,
   useLoadMatchQuery,
+  useTriggerMatchMutation,
   useConfirmMatchMutation,
   useRejectMatchMutation,
   useReviseMatchMutation,
@@ -48,7 +48,8 @@ export default function AgentWorkflowConsolePage() {
   })
   const matchData = matchQuery.data
 
-  // Confirm/reject/revise match mutations
+  // Trigger/confirm/reject/revise match mutations
+  const triggerMutation = useTriggerMatchMutation()
   const confirmMutation = useConfirmMatchMutation()
   const rejectMutation = useRejectMatchMutation()
   const reviseMutation = useReviseMatchMutation()
@@ -60,6 +61,24 @@ export default function AgentWorkflowConsolePage() {
   const [pendingDecisionType, setPendingDecisionType] = useState(null)
 
   const activeSelectedAgencyId = selectedAgencyId || matchData?.recommendedAgency?.agencyId
+
+  // Matching is a deliberate, explicit action (POST /match/trigger), never a side effect of
+  // viewing this page — but the console still starts matching automatically the first time a
+  // load with no prior run is opened, as two distinct calls (the GET above, then this trigger)
+  // rather than one GET silently mutating state. triggeredLoadIdsRef guards against re-firing on
+  // every refetch/re-render for the same load.
+  const triggeredLoadIdsRef = useRef(new Set())
+  useEffect(() => {
+    if (
+      activeLoadId &&
+      matchData?.workflowStatus === 'NotStarted' &&
+      !triggeredLoadIdsRef.current.has(activeLoadId) &&
+      !triggerMutation.isPending
+    ) {
+      triggeredLoadIdsRef.current.add(activeLoadId)
+      triggerMutation.mutate(activeLoadId)
+    }
+  }, [activeLoadId, matchData?.workflowStatus, triggerMutation])
 
   // Handle switching active load
   const handleSelectLoad = (newLoadId) => {
@@ -88,17 +107,18 @@ export default function AgentWorkflowConsolePage() {
     }
   }
 
-  // Handle retry match
+  // Handle retry match: an explicit command (POST /match/trigger), not a side effect of a GET
   const handleRetryMatch = async () => {
     setActionErrorMessage(null)
     setActionSuccessMessage(null)
     try {
       if (activeLoadId) {
-        await getLoadMatch(activeLoadId, true)
+        await triggerMutation.mutateAsync(activeLoadId)
       }
-      await matchQuery.refetch()
-    } catch {
-      await matchQuery.refetch()
+    } catch (err) {
+      setActionErrorMessage(
+        err?.message || 'Failed to trigger matching. Please try again shortly.'
+      )
     }
   }
 
@@ -114,7 +134,8 @@ export default function AgentWorkflowConsolePage() {
 
     if (decisionType === 'revise' && activeLoadId) {
       try {
-        await getLoadMatch(activeLoadId, true)
+        await triggerMutation.mutateAsync(activeLoadId)
+        return
       } catch {
         // fall through to refetch below regardless
       }
@@ -245,7 +266,7 @@ export default function AgentWorkflowConsolePage() {
             onRejectMatch={() => setPendingDecisionType('reject')}
             onReviseMatch={() => setPendingDecisionType('revise')}
             isApproving={confirmMutation.isPending}
-            isRetrying={matchQuery.isFetching}
+            isRetrying={triggerMutation.isPending}
             isRejecting={rejectMutation.isPending}
             isRevising={reviseMutation.isPending}
           />
