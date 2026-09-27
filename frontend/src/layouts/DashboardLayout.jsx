@@ -189,7 +189,14 @@ function DashboardLayoutContent() {
           )}
         </nav>
         <div className="flex items-center justify-between gap-2 border-t border-primary-container px-4 py-3">
-          <span className="truncate text-body-md text-on-primary/70">{user?.email}</span>
+          <NavLink
+            to="/account"
+            onClick={closeSidebar}
+            className="truncate text-body-md text-on-primary/70 hover:text-on-primary hover:underline"
+            title="My Account"
+          >
+            {user?.email}
+          </NavLink>
           <button
             type="button"
             onClick={() => dispatch(logout())}

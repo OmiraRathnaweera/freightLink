@@ -10,6 +10,7 @@ import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage.jsx'
 import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage.jsx'
 import VerifyEmailPage from '../features/auth/pages/VerifyEmailPage.jsx'
 import UnauthorizedPage from '../features/auth/pages/UnauthorizedPage.jsx'
+import AccountSettingsPage from '../features/auth/pages/AccountSettingsPage.jsx'
 import LoadsPage from '../features/loads/pages/LoadsPage.jsx'
 import PostLoadPage from '../features/loads/pages/PostLoadPage.jsx'
 import LoadProposalsPage from '../features/loads/pages/LoadProposalsPage.jsx'
@@ -57,6 +58,7 @@ const router = createBrowserRouter(
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/account" element={<AccountSettingsPage />} />
 
           <Route path="/loads" element={<LoadsPage />} />
           <Route path="/loads/new" element={<PostLoadPage />} />

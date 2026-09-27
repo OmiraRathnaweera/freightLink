@@ -75,6 +75,27 @@ public interface IAuthService
     Task<CurrentUserResponseDto> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Updates the authenticated caller's own name/email/phone. Changing the email resets email
+    /// verification and sends a fresh verification message, mirroring registration.
+    /// </summary>
+    /// <param name="userId">The id of the authenticated caller, from the access token claims.</param>
+    /// <param name="request">Validated profile-update payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The caller's updated safe profile.</returns>
+    /// <exception cref="Common.Exceptions.ApiException">409 if the new email is already registered to another account.</exception>
+    Task<CurrentUserResponseDto> UpdateProfileAsync(Guid userId, UpdateProfileRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Changes the authenticated caller's own password after re-confirming the current one, then
+    /// revokes every active session (including the caller's own), mirroring <see cref="ResetPasswordAsync"/>.
+    /// </summary>
+    /// <param name="userId">The id of the authenticated caller, from the access token claims.</param>
+    /// <param name="request">Validated change-password payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="Common.Exceptions.ApiException">401 if <see cref="ChangePasswordRequestDto.CurrentPassword"/> doesn't match.</exception>
+    Task ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Creates the default Admin user from <c>ADMIN_USER_EMAIL</c>/<c>ADMIN_USER_PASSWORD</c> if one
     /// doesn't already exist. Called once on every app startup; no-ops safely if those env vars are unset.
     /// </summary>

@@ -392,6 +392,153 @@ public class AuthServiceTests
             sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null));
     }
 
+    // --- Update profile ---
+
+    /// <summary>Updating name/phone without changing the email leaves email verification untouched.</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_UpdatesNameAndPhone_WithoutTouchingEmailVerification_WhenEmailUnchanged()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest("jane@example.com");
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Updated",
+            Email = "jane@example.com",
+            PhoneE164 = "+14155552671"
+        });
+
+        Assert.Equal("Jane Updated", result.FullName);
+        Assert.Equal("+14155552671", result.PhoneE164);
+        Assert.Equal("jane@example.com", result.Email);
+        Assert.True(result.IsEmailVerified);
+    }
+
+    /// <summary>Changing the email resets verification and issues a fresh verification token.</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_ResetsEmailVerification_WhenEmailChanges()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("old@example.com"));
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Shipper",
+            Email = "new@example.com"
+        });
+
+        Assert.Equal("new@example.com", result.Email);
+        Assert.False(result.IsEmailVerified);
+
+        var user = await dbContext.Users.FindAsync(registration.UserId);
+        Assert.NotNull(user!.EmailVerificationTokenHash);
+        Assert.NotNull(user.EmailVerificationTokenExpiresAt);
+    }
+
+    /// <summary>Changing to an email already registered to a different account throws EMAIL_ALREADY_REGISTERED.</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_Throws_WhenNewEmailBelongsToAnotherAccount()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await sut.RegisterShipperAsync(ValidShipperRequest("taken@example.com"));
+        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("mine@example.com"));
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Shipper",
+            Email = "taken@example.com"
+        }));
+        Assert.Equal(ErrorCode.EMAIL_ALREADY_REGISTERED, exception.Code);
+    }
+
+    /// <summary>Re-submitting the same email in a different case is not treated as a change (normalized comparison).</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_DoesNotResetVerification_WhenEmailOnlyDiffersByCase()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("jane@example.com"));
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Shipper",
+            Email = "JANE@EXAMPLE.COM"
+        });
+
+        Assert.True(result.IsEmailVerified);
+    }
+
+    // --- Change password ---
+
+    /// <summary>Changing the password succeeds and the new password works for a subsequent login.</summary>
+    [Fact]
+    public async Task ChangePasswordAsync_Succeeds_AndNewPasswordWorksForLogin()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        await sut.ChangePasswordAsync(registration.UserId, new ChangePasswordRequestDto
+        {
+            CurrentPassword = request.Password,
+            NewPassword = "N3w$trongPass!"
+        });
+
+        var tokens = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = "N3w$trongPass!" }, null);
+        Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
+    }
+
+    /// <summary>An incorrect current password throws INCORRECT_CURRENT_PASSWORD and leaves the password unchanged.</summary>
+    [Fact]
+    public async Task ChangePasswordAsync_Throws_ForIncorrectCurrentPassword()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.ChangePasswordAsync(registration.UserId, new ChangePasswordRequestDto
+        {
+            CurrentPassword = "WrongPassword1!",
+            NewPassword = "N3w$trongPass!"
+        }));
+        Assert.Equal(ErrorCode.INCORRECT_CURRENT_PASSWORD, exception.Code);
+
+        var tokens = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
+        Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
+    }
+
+    /// <summary>A successful password change revokes every active refresh token, including the caller's own.</summary>
+    [Fact]
+    public async Task ChangePasswordAsync_RevokesAllActiveRefreshTokens()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+        var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
+
+        await sut.ChangePasswordAsync(registration.UserId, new ChangePasswordRequestDto
+        {
+            CurrentPassword = request.Password,
+            NewPassword = "N3w$trongPass!"
+        });
+
+        await Assert.ThrowsAsync<ApiException>(() =>
+            sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null));
+    }
+
     // --- Admin seed ---
 
     /// <summary>Seeding creates a Users row with role Admin when none exists yet.</summary>

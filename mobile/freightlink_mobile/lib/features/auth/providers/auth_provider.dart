@@ -98,6 +98,59 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() => _endSession(revokeRemote: true);
 
+  /// Updates the signed-in user's own name/email/phone. On success, refreshes
+  /// [user] in place from the response so every screen reading it updates.
+  Future<bool> updateProfile({
+    required String fullName,
+    required String email,
+    String? phoneE164,
+  }) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final response = await _apiClient.patch('/auth/me', body: {
+        'fullName': fullName,
+        'email': email,
+        if (phoneE164 != null && phoneE164.isNotEmpty) 'phoneE164': phoneE164,
+      }) as Map<String, dynamic>;
+      _user = AuthUser.fromJson(response);
+      return true;
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Changes the signed-in user's password. The backend revokes every active
+  /// session (including this one) on success, so this also ends the local
+  /// session — the caller must sign in again with the new password.
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    _isSubmitting = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _apiClient.post('/auth/change-password', body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      }, retryOnUnauthorized: false);
+      await _endSession();
+      return true;
+    } on ApiException catch (error) {
+      _errorMessage = error.message;
+      return false;
+    } finally {
+      _isSubmitting = false;
+      notifyListeners();
+    }
+  }
+
   Future<AuthUser> _fetchCurrentUser() async =>
       AuthUser.fromJson(await _apiClient.get('/auth/me') as Map<String, dynamic>);
 

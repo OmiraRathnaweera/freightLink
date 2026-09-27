@@ -143,6 +143,30 @@ public class AuthController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Updates the authenticated caller's own name/email/phone.</summary>
+    /// <param name="request">Profile-update payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the updated <see cref="CurrentUserResponseDto"/>.</returns>
+    [HttpPatch("me")]
+    [Authorize]
+    public async Task<ActionResult<CurrentUserResponseDto>> UpdateProfile([FromBody] UpdateProfileRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _authService.UpdateProfileAsync(GetCurrentUserId(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Changes the authenticated caller's own password, then revokes every active session.</summary>
+    /// <param name="request">Change-password payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with a success message.</returns>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<AccountActionResponseDto>> ChangePassword([FromBody] ChangePasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.ChangePasswordAsync(GetCurrentUserId(), request, cancellationToken);
+        return Ok(new AccountActionResponseDto { Message = "Your password has been changed. Please sign in again with your new password." });
+    }
+
     /// <summary>Extracts the authenticated user's id from the <c>NameIdentifier</c> claim on the access token.</summary>
     /// <returns>The caller's user id.</returns>
     /// <exception cref="ApiException">

@@ -152,3 +152,24 @@ export const agencyRegisterSchema = Yup.object({
   yardLat: coordinateField({ label: 'Yard latitude', min: -90, max: 90 }),
   yardLng: coordinateField({ label: 'Yard longitude', min: -180, max: 180 }),
 })
+
+/**
+ * Update-own-profile schema, matching `UpdateProfileRequestDto`
+ * (backend/DTOs/Auth/UpdateProfileRequestDto.cs): required [fullName, email], optional [phoneE164].
+ */
+export const updateProfileSchema = Yup.object({
+  fullName: fullNameSchema,
+  email: emailSchema,
+  phoneE164: phoneE164Schema,
+})
+
+/**
+ * Change-own-password schema, matching `ChangePasswordRequestDto`
+ * (backend/DTOs/Auth/ChangePasswordRequestDto.cs). currentPassword only needs to be present — its
+ * strength was already enforced when it was first set — newPassword reuses the same strength rules
+ * as registration/reset.
+ */
+export const changePasswordSchema = Yup.object({
+  currentPassword: Yup.string().required('Current password is required'),
+  newPassword: passwordSchema,
+})

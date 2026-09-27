@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Sparkles, Truck } from 'lucide-react'
+import { ArrowLeft, Sparkles, Truck } from 'lucide-react'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
@@ -75,16 +75,6 @@ function LoadDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {role === UserRole.AGENCY_STAFF && load.status === 'Posted' && (
-            <Button
-              variant="primary"
-              onClick={() => setIsAcceptOpen(true)}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Accept Shipment
-            </Button>
-          )}
           {role === UserRole.AGENCY_STAFF && load.status === 'Matched' && (
             <Button
               as={Link}

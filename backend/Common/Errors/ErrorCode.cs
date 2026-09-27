@@ -26,6 +26,9 @@ public enum ErrorCode
     /// <summary>Registration was attempted with an email that already has an account.</summary>
     EMAIL_ALREADY_REGISTERED,
 
+    /// <summary>A change-password request's "current password" field didn't match the account's actual password.</summary>
+    INCORRECT_CURRENT_PASSWORD,
+
     /// <summary>Agency registration was attempted with a business registration number already on file.</summary>
     BUSINESS_REG_NO_ALREADY_REGISTERED,
 

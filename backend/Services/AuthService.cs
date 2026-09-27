@@ -405,6 +405,93 @@ public class AuthService : IAuthService
     }
 
     /// <inheritdoc />
+    public async Task<CurrentUserResponseDto> UpdateProfileAsync(Guid userId, UpdateProfileRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users
+            .Include(u => u.AgencyStaff)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.USER_NOT_FOUND, "The current user could not be found.");
+        }
+
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var emailChanged = normalizedEmail != user.Email;
+
+        if (emailChanged && await _dbContext.Users.AnyAsync(u => u.UserId != userId && u.Email == normalizedEmail, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        user.FullName = request.FullName;
+        user.PhoneE164 = request.PhoneE164;
+        user.UpdatedAt = now;
+
+        string? verificationToken = null;
+        if (emailChanged)
+        {
+            user.Email = normalizedEmail;
+            user.EmailVerifiedAt = null;
+            verificationToken = CreateAccountToken();
+            user.EmailVerificationTokenHash = HashAccountToken(verificationToken);
+            user.EmailVerificationTokenExpiresAt = now.AddHours(24);
+        }
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            // Races against the AnyAsync pre-check above: two concurrent requests can both pass
+            // the pre-check and then collide here. Translate the raw unique-violation into the
+            // same ApiException the pre-check would have thrown, instead of an unhandled 500.
+            throw MapUniqueViolationToApiException(pg);
+        }
+
+        if (emailChanged && verificationToken is not null)
+        {
+            await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+        }
+
+        return MapToCurrentUserResponse(user);
+    }
+
+    /// <inheritdoc />
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.USER_NOT_FOUND, "The current user could not be found.");
+        }
+
+        if (!_passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            throw new ApiException(HttpStatusCode.Unauthorized, ErrorCode.INCORRECT_CURRENT_PASSWORD, "The current password you entered is incorrect.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        user.UpdatedAt = now;
+
+        // A password change invalidates every session, including the requester's own — mirrors
+        // ResetPasswordAsync. The caller must sign in again with the new password afterward.
+        var activeRefreshTokens = await _dbContext.RefreshTokens
+            .Where(token => token.UserId == user.UserId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var refreshToken in activeRefreshTokens)
+        {
+            refreshToken.RevokedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
     public async Task SeedAdminIfNotExistsAsync(CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_adminSeedOptions.Email) || string.IsNullOrWhiteSpace(_adminSeedOptions.Password))

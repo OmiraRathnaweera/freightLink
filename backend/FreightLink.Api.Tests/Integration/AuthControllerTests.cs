@@ -116,6 +116,91 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("Shipper", user.Role);
     }
 
+    /// <summary>PATCH /auth/me with a valid Bearer token updates and returns the caller's own profile.</summary>
+    [Fact]
+    public async Task UpdateProfile_UpdatesAndReturnsProfile_WithValidAccessToken()
+    {
+        var (_, _, tokens) = await RegisterAndLoginShipperAsync("update-profile");
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/auth/me")
+        {
+            Content = JsonContent.Create(new UpdateProfileRequestDto
+            {
+                FullName = "Updated Name",
+                Email = $"updated-{Guid.NewGuid():N}@example.com"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var user = await response.Content.ReadFromJsonAsync<CurrentUserResponseDto>();
+        Assert.Equal("Updated Name", user!.FullName);
+        Assert.False(user.IsEmailVerified);
+    }
+
+    /// <summary>PATCH /auth/me without an Authorization header is rejected with 401.</summary>
+    [Fact]
+    public async Task UpdateProfile_Returns401_WithoutAuthorizationHeader()
+    {
+        var response = await _client.PatchAsJsonAsync("/api/v1/auth/me", new UpdateProfileRequestDto
+        {
+            FullName = "Nobody",
+            Email = "nobody@example.com"
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>POST /auth/change-password with the correct current password succeeds, and the new password then logs in.</summary>
+    [Fact]
+    public async Task ChangePassword_Succeeds_AndNewPasswordWorksForLogin()
+    {
+        var (email, password, tokens) = await RegisterAndLoginShipperAsync("change-password");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/change-password")
+        {
+            Content = JsonContent.Create(new ChangePasswordRequestDto
+            {
+                CurrentPassword = password,
+                NewPassword = "N3w$trongPass!"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequestDto
+        {
+            Email = email,
+            Password = "N3w$trongPass!"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+    }
+
+    /// <summary>POST /auth/change-password with the wrong current password returns 401 with INCORRECT_CURRENT_PASSWORD.</summary>
+    [Fact]
+    public async Task ChangePassword_Returns401WithErrorEnvelope_ForIncorrectCurrentPassword()
+    {
+        var (_, _, tokens) = await RegisterAndLoginShipperAsync("change-password-wrong");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/change-password")
+        {
+            Content = JsonContent.Create(new ChangePasswordRequestDto
+            {
+                CurrentPassword = "WrongPassword1!",
+                NewPassword = "N3w$trongPass!"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var raw = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(raw);
+        Assert.Equal("INCORRECT_CURRENT_PASSWORD", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
     /// <summary>
     /// GET /auth/me without an Authorization header is rejected with 401 and the standard error
     /// envelope (JwtBearerEvents.OnChallenge), not ASP.NET's default bare/bodyless 401.
