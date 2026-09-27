@@ -295,9 +295,17 @@ public class LoadService : ILoadService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var pageOfLoadIds = pageOfLoads.Select(l => l.LoadId).ToList();
+        var loadIdsWithTrip = await _dbContext.Assignments
+            .Where(a => pageOfLoadIds.Contains(a.LoadId) && a.Trip != null)
+            .Select(a => a.LoadId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var loadIdsWithTripSet = loadIdsWithTrip.ToHashSet();
+
         return new PagedLoadResponseDto
         {
-            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName))).ToList(),
+            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName), loadIdsWithTripSet.Contains(l.LoadId))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalItems = totalItems,
@@ -569,7 +577,8 @@ public class LoadService : ILoadService
     /// <summary>Maps a <see cref="Load"/> entity to its lightweight list-row representation.</summary>
     /// <param name="load">The load entity.</param>
     /// <param name="shipperName">The resolved display name of the load's owning Shipper.</param>
-    private static LoadListItemDto MapToListItem(Load load, string shipperName) => new()
+    /// <param name="hasTrip">Whether a Trip already exists for one of this load's assignments.</param>
+    private static LoadListItemDto MapToListItem(Load load, string shipperName, bool hasTrip) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -583,6 +592,7 @@ public class LoadService : ILoadService
         PickupWindowEnd = load.PickupWindowEnd,
         EstimatedPrice = load.EstimatedPrice,
         Status = load.Status.ToString(),
+        HasTrip = hasTrip,
         CreatedAt = load.CreatedAt
     };
 }

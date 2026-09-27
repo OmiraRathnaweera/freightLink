@@ -29,6 +29,7 @@ export const loadKeys = {
  * @property {string} pickupWindowEnd
  * @property {number|null} estimatedPrice
  * @property {string} status
+ * @property {boolean} hasTrip - True once a Trip has been dispatched for this load's assignment; status alone stays 'Matched' through dispatch, so this is what gates a one-time "Dispatch" action.
  * @property {string} createdAt
  */
 

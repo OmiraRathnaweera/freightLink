@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "../../../lib/api/api.js";
 import { axiosClient } from "../../../lib/api/axiosClient.js";
 import { queryClient } from "../../../lib/api/queryClient.js";
+import { loadKeys } from "../../loads/api/loadsApi.js";
 
 // Query key factory — mirrors loadKeys.js's hierarchical shape.
 export const tripKeys = {
@@ -203,6 +204,10 @@ export function useCreateTripMutation(options) {
     mutationFn: (data) => createTrip(data),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: tripKeys.lists() });
+      // Dispatching a trip doesn't change the load's status (stays 'Matched'), but it does flip
+      // hasTrip on the load-list row, which is what hides the one-time "Dispatch" action — so the
+      // loads list must be invalidated here too, not just the trips list.
+      queryClient.invalidateQueries({ queryKey: loadKeys.all });
       if (created?.tripId) {
         queryClient.setQueryData(tripKeys.detail(created.tripId), created);
       }
