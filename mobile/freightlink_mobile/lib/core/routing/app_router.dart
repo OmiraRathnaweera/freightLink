@@ -56,6 +56,18 @@ GoRouter createAppRouter(AuthProvider authProvider) {
         return '/loads';
       }
 
+      // Agency profile, fleet, driver-onboarding, and compliance routes are an AgencyStaff
+      // workspace. Do not rely on the child screen builders alone: a Shipper or Driver can type
+      // a nested URL directly, so enforce the role boundary once at the router level.
+      final isAgencyWorkspace = state.matchedLocation == '/dashboard' ||
+          state.matchedLocation.startsWith('/dashboard/profile') ||
+          state.matchedLocation.startsWith('/dashboard/fleet') ||
+          state.matchedLocation.startsWith('/dashboard/driver-onboarding') ||
+          state.matchedLocation.startsWith('/dashboard/compliance-docs');
+      if (status == AuthStatus.authenticated && isAgencyWorkspace && !(authProvider.user?.isAgencyStaff ?? false)) {
+        return '/loads';
+      }
+
       return null;
     },
     routes: [

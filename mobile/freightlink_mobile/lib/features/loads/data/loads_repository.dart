@@ -102,6 +102,22 @@ class LoadsRepository {
     return Load.fromJson(json);
   }
 
+  Future<String> uploadFile(List<int> bytes, String filename) async {
+    final response = await _client.postMultipart(
+      '/files/single',
+      fileBytes: bytes,
+      filename: filename,
+    ) as Map<String, dynamic>;
+    return response['publicId'] as String;
+  }
+
+  Future<void> attachFile(String loadId, String publicId, String fileType) async {
+    await _client.post('/loads/$loadId/files', body: {
+      'publicId': publicId,
+      'fileType': fileType,
+    });
+  }
+
   Future<Load> post(String loadId) => _changeStatus(loadId, LoadStatus.posted);
 
   Future<Load> cancel(String loadId, {required String reason}) =>

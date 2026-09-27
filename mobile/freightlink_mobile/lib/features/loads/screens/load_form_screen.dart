@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
@@ -57,6 +59,7 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
   final _pickupController = TextEditingController();
   final _dropoffController = TextEditingController();
   final _windowController = TextEditingController();
+  String _attachmentType = 'CargoPhoto';
 
   @override
   void initState() {
@@ -155,8 +158,60 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
 
     final success = await form.submit();
     if (success && mounted) {
+      if (form.attachmentWarning != null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(form.attachmentWarning!)));
+      }
       Navigator.of(context).pop(form.result);
     }
+  }
+
+  Future<void> _chooseAttachment(LoadFormProvider form) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(title: Text('Add load attachment')),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take cargo photo'),
+              onTap: () => Navigator.pop(sheetContext, 'camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.folder_open_outlined),
+              title: const Text('Choose document or photo'),
+              onTap: () => Navigator.pop(sheetContext, 'file'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null) return;
+
+    if (choice == 'camera') {
+      final image = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 85);
+      if (image == null) return;
+      form.setAttachment(LoadAttachment(
+        filename: image.name,
+        bytes: await image.readAsBytes(),
+        fileType: 'CargoPhoto',
+      ));
+      return;
+    }
+
+    final selected = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg'],
+      withData: true,
+    );
+    final file = selected?.files.single;
+    if (file?.bytes == null) return;
+    form.setAttachment(LoadAttachment(
+      filename: file!.name,
+      bytes: file.bytes!,
+      fileType: _attachmentType,
+    ));
   }
 
   /// Edit Load's header trash icon — there's no delete endpoint, so this is
@@ -337,6 +392,34 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
                 ],
               ),
             ),
+            if (!isEditing) ...[
+              const SizedBox(height: AppConstants.spaceLg),
+              SectionCard(
+                title: 'Load attachment (optional)',
+                icon: Icons.attach_file_outlined,
+                child: Column(
+                  children: [
+                    DropdownButtonFormField<String>(
+                      value: _attachmentType,
+                      decoration: const InputDecoration(labelText: 'Attachment type'),
+                      items: const [
+                        DropdownMenuItem(value: 'CargoPhoto', child: Text('Cargo photo')),
+                        DropdownMenuItem(value: 'Manifest', child: Text('Manifest')),
+                        DropdownMenuItem(value: 'Invoice', child: Text('Invoice')),
+                        DropdownMenuItem(value: 'Other', child: Text('Other')),
+                      ],
+                      onChanged: (value) => setState(() => _attachmentType = value!),
+                    ),
+                    const SizedBox(height: AppConstants.spaceMd),
+                    OutlinedButton.icon(
+                      onPressed: () => _chooseAttachment(form),
+                      icon: const Icon(Icons.upload_file_outlined),
+                      label: Text(form.attachment?.filename ?? 'Add photo or document'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
