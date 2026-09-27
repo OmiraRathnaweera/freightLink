@@ -335,6 +335,85 @@ public class LoadProposalsControllerTests : IClassFixture<CustomWebApplicationFa
         }
     }
 
+    /// <summary>
+    /// Regression test: an agency that was previously Declined on a load (e.g. an AI-matched
+    /// proposal it turned down) must still be acceptable for a *later*, separate manual proposal on
+    /// that same load. Before the ux_assignment_load_agency index was filtered to live
+    /// (Proposed/Accepted) rows only, this collided on that unique constraint and 500'd instead of
+    /// returning 200 — see AssignmentConfiguration.cs's ux_assignment_load_agency index.
+    /// </summary>
+    [Fact]
+    public async Task Accept_Succeeds_WhenSameAgencyWasPreviouslyDeclinedOnThisLoad()
+    {
+        var db = CreateDbScope(out var scope);
+        using (scope)
+        {
+            var (shipperUserId, agencyId, staffUserId, loadId) = await SeedShipperAgencyAndLoadAsync(db);
+
+            var now = DateTimeOffset.UtcNow;
+            var priorRun = new AgentWorkflowRun
+            {
+                WorkflowRunId = Guid.NewGuid(),
+                LoadId = loadId,
+                TriggeredByUserId = shipperUserId,
+                AttemptNo = 1,
+                Status = WorkflowRunStatus.Failed,
+                StartedAt = now.AddHours(-2),
+                CompletedAt = now.AddHours(-1),
+                CreatedAt = now.AddHours(-2),
+                UpdatedAt = now.AddHours(-1)
+            };
+            db.AgentWorkflowRuns.Add(priorRun);
+
+            var priorAssignmentId = Guid.NewGuid();
+            db.Assignments.Add(new Assignment
+            {
+                AssignmentId = priorAssignmentId,
+                LoadId = loadId,
+                AgencyId = agencyId,
+                WorkflowRunId = priorRun.WorkflowRunId,
+                ProposedPrice = 30000m,
+                Status = AssignmentStatus.Declined,
+                CreatedAt = now.AddHours(-2),
+                UpdatedAt = now.AddHours(-1)
+            });
+            db.AssignmentResponses.Add(new AssignmentResponse
+            {
+                AssignmentId = priorAssignmentId,
+                RespondedByUserId = staffUserId,
+                Response = AssignmentResponseType.Declined,
+                DeclineReason = "Vehicle unavailable at the time.",
+                RespondedAt = now.AddHours(-1)
+            });
+            await db.SaveChangesAsync();
+
+            var staffToken = MintToken(staffUserId, UserRole.AgencyStaff);
+            var shipperToken = MintToken(shipperUserId, UserRole.Shipper);
+
+            using var proposeReq = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{loadId}/proposals", staffToken);
+            proposeReq.Content = JsonContent.Create(new CreateLoadProposalDto { ProposedPrice = 42000m });
+            var proposeRes = await _client.SendAsync(proposeReq);
+            Assert.Equal(HttpStatusCode.Created, proposeRes.StatusCode);
+            var proposal = await proposeRes.Content.ReadFromJsonAsync<LoadProposalResponseDto>();
+
+            using var acceptReq = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{loadId}/proposals/{proposal!.LoadProposalId}/accept", shipperToken);
+            var acceptRes = await _client.SendAsync(acceptReq);
+
+            Assert.Equal(HttpStatusCode.OK, acceptRes.StatusCode);
+            var accepted = await acceptRes.Content.ReadFromJsonAsync<LoadProposalResponseDto>();
+            Assert.Equal("Accepted", accepted!.Status);
+
+            using var freshScope = _factory.Services.CreateScope();
+            var freshDb = freshScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var load = await freshDb.Loads.FirstAsync(l => l.LoadId == loadId);
+            Assert.Equal(LoadStatus.Matched, load.Status);
+
+            var liveAssignment = await freshDb.Assignments
+                .SingleAsync(a => a.LoadId == loadId && a.AgencyId == agencyId && a.Status == AssignmentStatus.Accepted);
+            Assert.Equal(42000m, liveAssignment.ProposedPrice);
+        }
+    }
+
     [Fact]
     public async Task Accept_Returns403_ForNonOwningShipper()
     {

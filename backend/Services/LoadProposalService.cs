@@ -256,8 +256,12 @@ public class LoadProposalService : ILoadProposalService
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg && pg.ConstraintName == "ux_assignment_live_per_load")
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg
+            && (pg.ConstraintName == "ux_assignment_live_per_load" || pg.ConstraintName == "ux_assignment_load_agency"))
         {
+            // Races against EnsureLoadIsBiddableAsync above: a concurrent request (another proposal
+            // accept, or the AI-matching pipeline) could create a live Assignment for this load, or
+            // for this exact (load, agency) pair, between that check and this SaveChanges.
             throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LOAD_NOT_BIDDABLE, "This load was already matched through another path.");
         }
 
