@@ -1,7 +1,11 @@
+import os
+import sys
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 
 from freightlink_agent.graph.pipeline import get_pipeline
 from freightlink_agent.graph.state import WorkflowState
