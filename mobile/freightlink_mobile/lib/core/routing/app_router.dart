@@ -19,6 +19,8 @@ import '../../features/agencies/screens/driver_onboarding_screen.dart';
 import '../../features/agencies/screens/add_driver_screen.dart';
 import '../../features/agencies/screens/compliance_docs_screen.dart';
 import '../../features/agencies/screens/add_compliance_doc_screen.dart';
+import '../../features/billing/screens/payments_screen.dart';
+import '../../features/billing/screens/raise_dispute_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<NavigatorState> _shellNavigatorDashboardKey = GlobalKey<NavigatorState>();
@@ -164,10 +166,21 @@ GoRouter createAppRouter(AuthProvider authProvider) {
             routes: [
               GoRoute(
                 path: '/payments',
-                builder: (context, state) => const ComingSoonPlaceholder(
-                  title: 'Payments',
-                  icon: Icons.payments_outlined,
-                ),
+                builder: (context, state) => const PaymentsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'dispute',
+                    builder: (context, state) {
+                      final tripId = state.extra as String?;
+                      if (tripId == null) {
+                        return const Scaffold(
+                          body: Center(child: Text('No trip was selected for this dispute.')),
+                        );
+                      }
+                      return RaiseDisputeScreen(tripId: tripId);
+                    },
+                  ),
+                ],
               ),
             ],
           ),

@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 using FreightLink.Api.Data;
+using FreightLink.Api.DTOs.Files;
 using FreightLink.Api.DTOs.Invoices;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
@@ -535,11 +536,29 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     // =========================================================================
-    // 5. RBAC Matrix — Pay Invoice (Shipper Allowed on Issued, Agent/Admin Denied 403)
+    // 5. RBAC Matrix — Payment Receipt Upload (Shipper) + Confirm Payment (Agent)
     // =========================================================================
 
+    /// <summary>Uploads a fake file as the given caller via the shared <c>/api/v1/files/single</c> endpoint.</summary>
+    private async Task<FileUploadResultDto> UploadFileAsync(string accessToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/files/single");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        var content = new MultipartFormDataContent();
+        // FileUploadValidator sniffs the leading bytes against the extension's magic number — a
+        // ".pdf" upload must actually start with "%PDF" or it's rejected as BLOCKED_FILE_TYPE.
+        var fileContent = new ByteArrayContent(Encoding.ASCII.GetBytes("%PDF-1.4 fake receipt body"));
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        content.Add(fileContent, "file", "receipt.pdf");
+        request.Content = content;
+
+        var response = await _client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<FileUploadResultDto>())!;
+    }
+
     [Fact]
-    public async Task PayInvoice_AuthenticatedAssignedShipper_IssuedStatus_Returns200Paid()
+    public async Task UploadPaymentProof_AuthenticatedAssignedShipper_IssuedStatus_Returns200PaymentPending()
     {
         var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
         var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
@@ -561,28 +580,26 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         var createRes = await _client.SendAsync(createReq);
         var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
 
-        // Pay invoice as assigned shipper
-        var payReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/pay")
-        {
-            Content = JsonContent.Create(new PayInvoiceDto
-            {
-                PaymentReference = "TXN-INT-PAYHERE-9999",
-                PaymentMethod = "PayHere"
-            })
-        };
-        payReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
-        var payRes = await _client.SendAsync(payReq);
+        var uploaded = await UploadFileAsync(shipperToken);
 
-        Assert.Equal(HttpStatusCode.OK, payRes.StatusCode);
-        var paid = await payRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
-        Assert.NotNull(paid);
-        Assert.Equal(InvoiceStatus.Paid, paid.Status);
-        Assert.NotNull(paid.PaidAt);
-        Assert.Equal("TXN-INT-PAYHERE-9999", paid.PaymentReference);
+        // Submit the receipt as the assigned shipper
+        var proofReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/payment-proof")
+        {
+            Content = JsonContent.Create(new UploadPaymentProofDto { PublicId = uploaded.PublicId })
+        };
+        proofReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var proofRes = await _client.SendAsync(proofReq);
+
+        Assert.Equal(HttpStatusCode.OK, proofRes.StatusCode);
+        var updated = await proofRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(updated);
+        Assert.Equal(InvoiceStatus.PaymentPending, updated.Status);
+        Assert.NotNull(updated.PaymentProofUploadedAt);
+        Assert.Null(updated.PaidAt);
     }
 
     [Fact]
-    public async Task PayInvoice_AuthenticatedAgent_Returns403Forbidden()
+    public async Task UploadPaymentProof_AuthenticatedAgent_Returns403Forbidden()
     {
         var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
         var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
@@ -602,18 +619,20 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         var createRes = await _client.SendAsync(createReq);
         var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
 
-        var payReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/pay")
-        {
-            Content = JsonContent.Create(new PayInvoiceDto())
-        };
-        payReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
-        var payRes = await _client.SendAsync(payReq);
+        var uploaded = await UploadFileAsync(agentToken);
 
-        Assert.Equal(HttpStatusCode.Forbidden, payRes.StatusCode);
+        var proofReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/payment-proof")
+        {
+            Content = JsonContent.Create(new UploadPaymentProofDto { PublicId = uploaded.PublicId })
+        };
+        proofReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var proofRes = await _client.SendAsync(proofReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, proofRes.StatusCode);
     }
 
     [Fact]
-    public async Task PayInvoice_AuthenticatedAdmin_Returns403Forbidden()
+    public async Task UploadPaymentProof_AuthenticatedAdmin_Returns403Forbidden()
     {
         var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
         var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
@@ -634,14 +653,117 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         var createRes = await _client.SendAsync(createReq);
         var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
 
-        var payReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/pay")
-        {
-            Content = JsonContent.Create(new PayInvoiceDto())
-        };
-        payReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
-        var payRes = await _client.SendAsync(payReq);
+        // Admin can't upload via /files/single (Shipper/AgencyStaff/Driver only), so upload as the
+        // shipper and only exercise the admin path against the invoice payment-proof endpoint itself.
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+        var uploaded = await UploadFileAsync(shipperToken);
 
-        Assert.Equal(HttpStatusCode.Forbidden, payRes.StatusCode);
+        var proofReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/payment-proof")
+        {
+            Content = JsonContent.Create(new UploadPaymentProofDto { PublicId = uploaded.PublicId })
+        };
+        proofReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        var proofRes = await _client.SendAsync(proofReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, proofRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmPayment_AuthenticatedAgent_AfterProofSubmitted_Returns200Paid()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 45000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var uploaded = await UploadFileAsync(shipperToken);
+        var proofReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/payment-proof")
+        {
+            Content = JsonContent.Create(new UploadPaymentProofDto { PublicId = uploaded.PublicId })
+        };
+        proofReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        await _client.SendAsync(proofReq);
+
+        var confirmReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/confirm-payment");
+        confirmReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var confirmRes = await _client.SendAsync(confirmReq);
+
+        Assert.Equal(HttpStatusCode.OK, confirmRes.StatusCode);
+        var paid = await confirmRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts);
+        Assert.NotNull(paid);
+        Assert.Equal(InvoiceStatus.Paid, paid.Status);
+        Assert.NotNull(paid.PaidAt);
+    }
+
+    [Fact]
+    public async Task ConfirmPayment_AuthenticatedShipper_Returns403Forbidden()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 45000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var confirmReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/confirm-payment");
+        confirmReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var confirmRes = await _client.SendAsync(confirmReq);
+
+        Assert.Equal(HttpStatusCode.Forbidden, confirmRes.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmPayment_AuthenticatedAgent_WithoutProofSubmitted_Returns400BadRequest()
+    {
+        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
+        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
+
+        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
+        {
+            Content = JsonContent.Create(new CreateInvoiceDto
+            {
+                TripId = trip.TripId,
+                RecipientId = shipper.UserId,
+                Amount = 45000m,
+                Currency = "LKR",
+                IssueImmediately = true
+            })
+        };
+        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var createRes = await _client.SendAsync(createReq);
+        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
+
+        var confirmReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/confirm-payment");
+        confirmReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
+        var confirmRes = await _client.SendAsync(confirmReq);
+
+        Assert.Equal(HttpStatusCode.BadRequest, confirmRes.StatusCode);
     }
 
     // =========================================================================

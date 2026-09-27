@@ -3,6 +3,7 @@ using System;
 using FreightLink.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FreightLink.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260927041044_FixInvoiceManagementSchemaAndRemovePayHere")]
+    partial class FixInvoiceManagementSchemaAndRemovePayHere
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -969,68 +972,6 @@ namespace FreightLink.Api.Migrations
                         .HasDatabaseName("uq_loadfile_uploadedfileid");
 
                     b.ToTable("LoadFiles", (string)null);
-                });
-
-            modelBuilder.Entity("FreightLink.Api.Entities.LoadProposal", b =>
-                {
-                    b.Property<Guid>("LoadProposalId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<Guid>("AgencyId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.Property<Guid>("LoadId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Message")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("ProposedByUserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("ProposedPrice")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
-
-                    b.Property<DateTimeOffset?>("RespondedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResponseReason")
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("now()");
-
-                    b.HasKey("LoadProposalId");
-
-                    b.HasIndex("AgencyId");
-
-                    b.HasIndex("ProposedByUserId");
-
-                    b.HasIndex("LoadId", "AgencyId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_loadproposal_live_per_load_agency")
-                        .HasFilter("\"Status\" = 'Pending'");
-
-                    b.ToTable("LoadProposals", t =>
-                        {
-                            t.HasCheckConstraint("ck_loadproposal_price", "\"ProposedPrice\" > 0");
-                        });
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>
@@ -2107,33 +2048,6 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("UploadedFile");
                 });
 
-            modelBuilder.Entity("FreightLink.Api.Entities.LoadProposal", b =>
-                {
-                    b.HasOne("FreightLink.Api.Entities.Agency", "Agency")
-                        .WithMany()
-                        .HasForeignKey("AgencyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FreightLink.Api.Entities.Load", "Load")
-                        .WithMany("Proposals")
-                        .HasForeignKey("LoadId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("FreightLink.Api.Entities.User", "ProposedByUser")
-                        .WithMany()
-                        .HasForeignKey("ProposedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Agency");
-
-                    b.Navigation("Load");
-
-                    b.Navigation("ProposedByUser");
-                });
-
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>
                 {
                     b.HasOne("FreightLink.Api.Entities.User", "ChangedByUser")
@@ -2409,8 +2323,6 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("Files");
 
                     b.Navigation("Notifications");
-
-                    b.Navigation("Proposals");
 
                     b.Navigation("StatusHistory");
 

@@ -71,6 +71,9 @@ public class InvoiceListItemDto
     /// <summary>Payment reference.</summary>
     public string? PaymentReference { get; set; }
 
+    /// <summary>Whether the Shipper has submitted a payment receipt awaiting Agency review.</summary>
+    public bool HasPaymentProof { get; set; }
+
     /// <summary>Creator Agent name.</summary>
     public string? CreatedByName { get; set; }
 

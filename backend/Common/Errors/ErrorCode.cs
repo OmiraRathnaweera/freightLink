@@ -129,22 +129,17 @@ public enum ErrorCode
     /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
     INVALID_INVOICE_STATUS_TRANSITION,
 
-    /// <summary>
-    /// A status transition targeting <c>Paid</c> or <c>Failed</c> was attempted via the public
-    /// user-facing status endpoint. Those statuses are exclusively managed by the
-    /// signature-verified payment-gateway webhook and may never be set directly by an
-    /// authenticated application user.
-    /// </summary>
-    INVOICE_STATUS_GATEWAY_OWNED,
-
     /// <summary>An invalid invoice amount was supplied.</summary>
     INVALID_INVOICE_AMOUNT,
 
     /// <summary>The invoice is already settled and paid.</summary>
     INVOICE_ALREADY_PAID,
 
-    /// <summary>The payment gateway webhook callback signature check failed.</summary>
-    PAYMENT_SIGNATURE_INVALID,
+    /// <summary>A payment-proof upload referenced an UploadedFile publicId that does not exist, or one the caller did not upload.</summary>
+    INVOICE_PAYMENT_PROOF_FILE_NOT_FOUND,
+
+    /// <summary>An Agency attempted to confirm payment on an invoice with no payment receipt submitted yet.</summary>
+    INVOICE_PAYMENT_PROOF_REQUIRED,
 
     /// <summary>
     /// The supplied <c>DueDate</c> falls before the invoice's issuance date.

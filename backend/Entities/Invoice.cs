@@ -30,6 +30,16 @@ public class Invoice
     public DateTimeOffset? PaidAt { get; set; }
     public string? PaymentReference { get; set; }
 
+    /// <summary>
+    /// The Shipper-uploaded proof-of-payment receipt (image/PDF), referencing an already-uploaded
+    /// <see cref="UploadedFile"/>. Set by <c>InvoiceService.UploadPaymentProofAsync</c>, which also
+    /// advances <see cref="Status"/> to <see cref="InvoiceStatus.PaymentPending"/>. Cleared only by
+    /// re-upload (a later receipt overwrites the reference); never cleared on confirm/void.
+    /// </summary>
+    public Guid? PaymentProofFileId { get; set; }
+    public DateTimeOffset? PaymentProofUploadedAt { get; set; }
+    public Guid? PaymentProofUploadedByUserId { get; set; }
+
     // Audit trail
     public Guid? CreatedByUserId { get; set; }
     public Guid? UpdatedByUserId { get; set; }
@@ -45,7 +55,8 @@ public class Invoice
     public User? CreatedByUser { get; set; }
     public User? UpdatedByUser { get; set; }
     public User? VoidedByUser { get; set; }
+    public UploadedFile? PaymentProofFile { get; set; }
+    public User? PaymentProofUploadedByUser { get; set; }
 
     public ICollection<InvoiceLineItem> LineItems { get; set; } = new List<InvoiceLineItem>();
-    public ICollection<Payment> Payments { get; set; } = new List<Payment>();
 }

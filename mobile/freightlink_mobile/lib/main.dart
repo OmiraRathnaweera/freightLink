@@ -8,6 +8,7 @@ import 'core/routing/app_router.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/loads/data/loads_repository.dart';
 import 'features/agencies/data/agencies_repository.dart';
+import 'features/billing/data/billing_repository.dart';
 import 'features/notifications/providers/notification_provider.dart';
 import 'features/trips/data/trips_repository.dart';
 
@@ -50,6 +51,9 @@ class FreightLinkApp extends StatelessWidget {
         ),
         ProxyProvider<AuthProvider, AgenciesRepository>(
           update: (_, auth, _) => AgenciesRepository(auth.apiClient, auth.user?.agencyId),
+        ),
+        ProxyProvider<AuthProvider, BillingRepository>(
+          update: (_, auth, _) => BillingRepository(auth.apiClient),
         ),
       ],
       child: MaterialApp.router(

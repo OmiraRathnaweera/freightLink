@@ -67,10 +67,6 @@ const router = createBrowserRouter(
           <Route path="/trips" element={<TripsPage />} />
           <Route path="/trips/:tripId" element={<TripDetailPage />} />
           <Route path="/billing" element={<BillingPage />} />
-          <Route path="/invoices/:id/payment-success" element={<PaymentSuccessPage />} />
-          <Route path="/invoices/:id/payment-cancelled" element={<PaymentCancelledPage />} />
-          <Route path="/payment/success" element={<PaymentSuccessPage />} />
-          <Route path="/payment/cancel" element={<PaymentCancelledPage />} />
           <Route path="/agent-workflows" element={<AgentWorkflowConsolePage />} />
 
           <Route path="/pricing-config" element={<Navigate to="/pricing-config/fuel-rates" replace />} />

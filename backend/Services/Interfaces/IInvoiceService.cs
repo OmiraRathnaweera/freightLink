@@ -36,9 +36,16 @@ public interface IInvoiceService
     Task<List<InvoiceRecipientDto>> GetRecipientsAsync(Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Settle and pay an issued invoice (Shipper only). Locks invoice from further edits or voiding.
+    /// Attaches an already-uploaded file as the Shipper's proof-of-payment receipt for an Issued
+    /// (or previously-submitted) invoice, and advances its status to PaymentPending for Agency review.
     /// </summary>
-    Task<InvoiceResponseDto> PayAsync(Guid invoiceId, Guid currentUserId, UserRole role, PayInvoiceDto? request = null, CancellationToken cancellationToken = default);
+    Task<InvoiceResponseDto> UploadPaymentProofAsync(Guid invoiceId, Guid currentUserId, UserRole role, UploadPaymentProofDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Closes out a PaymentPending invoice as Paid (Agency only), after the Agency has reviewed the
+    /// Shipper's submitted payment proof. Fails if no payment proof has been submitted yet.
+    /// </summary>
+    Task<InvoiceResponseDto> ConfirmPaymentAsync(Guid invoiceId, Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Idempotency guard for legacy trip-delivered callbacks. Returns existing invoice if one exists,

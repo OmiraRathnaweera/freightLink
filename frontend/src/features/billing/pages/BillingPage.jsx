@@ -6,7 +6,6 @@ import {
   Download,
   Plus,
   RefreshCw,
-  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import PageHeader from '../../../components/PageHeader.jsx'
@@ -30,18 +29,19 @@ import {
   updateInvoice,
   issueInvoice,
   voidInvoice,
-  payInvoice,
+  uploadPaymentProof,
+  confirmPayment,
 } from '../api/invoiceApi.js'
 
 const PAGE_SIZE = 8
 
 function BillingPage() {
-  const { role, user } = useAppSelector((state) => state.auth)
+  const { role } = useAppSelector((state) => state.auth)
   const isAgent = role === UserRole.AGENCY_STAFF || role === 'Agent' || role === 'AgencyStaff'
   const isAdmin = role === UserRole.ADMIN
   const isShipper = role === UserRole.SHIPPER
   const [invoices, setInvoices] = useState(MOCK_INVOICES)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -60,9 +60,12 @@ function BillingPage() {
 
   const [isExporting, setIsExporting] = useState(false)
 
-  // Load invoices from API (with mock fallback)
-  const loadInvoices = async () => {
-    setIsLoading(true)
+  // Fetches invoices from the API (with mock fallback). Used by the manual Refresh button below,
+  // via an ordinary event handler, so setting isLoading(true) synchronously up front is fine here
+  // (unlike the mount effect, which inlines its own copy of this fetch below rather than calling
+  // this function, so its setState calls stay nested in .then()/.catch()/.finally() callbacks â€”
+  // see react-hooks/set-state-in-effect).
+  const fetchAndSetInvoices = async () => {
     try {
       const response = await fetchInvoices()
       if (response && response.items && response.items.length > 0) {
@@ -79,8 +82,33 @@ function BillingPage() {
     }
   }
 
+  // Manual reload (e.g. the Refresh button) â€” sets the loading flag itself before re-fetching,
+  // since it's called from an event handler, not an effect.
+  const loadInvoices = () => {
+    setIsLoading(true)
+    fetchAndSetInvoices()
+  }
+
   useEffect(() => {
-    loadInvoices()
+    let isMounted = true
+    fetchInvoices()
+      .then((response) => {
+        if (!isMounted) return
+        if (response && response.items && response.items.length > 0) {
+          setInvoices(response.items)
+        } else {
+          setInvoices(MOCK_INVOICES)
+        }
+      })
+      .catch(() => {
+        if (isMounted) setInvoices(MOCK_INVOICES)
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false)
+      })
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   // Filter invoices based on search, status, and date range
@@ -124,7 +152,7 @@ function BillingPage() {
 
       return true
     })
-  }, [invoices, searchQuery, statusFilter, dateRange])
+  }, [invoices, searchQuery, statusFilter, dateRange, isShipper])
 
   // Pagination calculation
   const totalEntries = filteredInvoices.length
@@ -300,38 +328,47 @@ function BillingPage() {
     }
   }
 
-  // Settle / Pay Invoice (Strictly Shipper capability)
-  const handlePayInvoice = async (invoice) => {
+  // Submit Payment Receipt (Strictly Shipper capability)
+  const handleUploadPaymentProof = async (invoice, publicId) => {
     const id = invoice.id || invoice.invoiceId
     try {
-      setIsSubmitting(true)
-      const res = await payInvoice(id, {
-        paymentMethod: 'Card',
-      })
-      const updatedInvoice = {
-        ...invoice,
-        ...(res || {}),
-        status: 'Paid',
-        paidAt: res?.paidAt || new Date().toISOString(),
-        paymentReference: res?.paymentReference || `PAY-${Date.now()}`,
-      }
-      toast.success(`Invoice ${invoice.invoiceNumber} settled successfully!`, {
-        description: `Payment reference: ${updatedInvoice.paymentReference}`,
+      const updated = await uploadPaymentProof(id, publicId)
+      toast.success(`Payment receipt submitted for Invoice ${invoice.invoiceNumber}!`, {
+        description: 'The Agency will review it and close the invoice once confirmed.',
       })
       setInvoices((prev) =>
-        prev.map((i) => ((i.id || i.invoiceId) === id ? updatedInvoice : i)),
+        prev.map((i) => ((i.id || i.invoiceId) === id ? { ...i, ...updated } : i)),
       )
       if (selectedInvoice && (selectedInvoice.id || selectedInvoice.invoiceId) === id) {
-        setSelectedInvoice(updatedInvoice)
+        setSelectedInvoice((prev) => ({ ...prev, ...updated }))
       }
-      return updatedInvoice
+      return updated
     } catch (err) {
-      toast.error('Payment settlement failed', {
+      toast.error('Could not submit payment receipt', {
         description: err.response?.data?.error?.message || err.message,
       })
       throw err
-    } finally {
-      setIsSubmitting(false)
+    }
+  }
+
+  // Confirm Payment & Close Invoice (Strictly Agency capability)
+  const handleConfirmPayment = async (invoice) => {
+    const id = invoice.id || invoice.invoiceId
+    try {
+      const updated = await confirmPayment(id)
+      toast.success(`Invoice ${invoice.invoiceNumber} settled successfully!`)
+      setInvoices((prev) =>
+        prev.map((i) => ((i.id || i.invoiceId) === id ? { ...i, ...updated } : i)),
+      )
+      if (selectedInvoice && (selectedInvoice.id || selectedInvoice.invoiceId) === id) {
+        setSelectedInvoice((prev) => ({ ...prev, ...updated }))
+      }
+      return updated
+    } catch (err) {
+      toast.error('Could not confirm payment', {
+        description: err.response?.data?.error?.message || err.message,
+      })
+      throw err
     }
   }
 
@@ -395,7 +432,7 @@ function BillingPage() {
               onClick={loadInvoices}
               disabled={isLoading}
               title="Refresh ledger"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <RefreshCw className={cx('h-3.5 w-3.5', isLoading && 'animate-spin')} />
               <span>Refresh</span>
@@ -405,7 +442,7 @@ function BillingPage() {
               type="button"
               onClick={handleExportCSV}
               disabled={isExporting || totalEntries === 0}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-700 shadow-xs hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
             >
               <Download className="h-4 w-4 text-slate-500" />
               <span>{isExporting ? 'Exporting…' : 'Export CSV'}</span>
@@ -416,7 +453,7 @@ function BillingPage() {
               <button
                 type="button"
                 onClick={handleOpenCreateModal}
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-on-primary shadow-xs hover:bg-primary/90 transition-colors cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
                 <span>Create Invoice</span>
@@ -428,20 +465,20 @@ function BillingPage() {
 
       {/* Summary KPI Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Total Invoiced</p>
-          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-slate-900 dark:text-white">
+          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-slate-900">
             LKR {formatCurrency(metrics.totalAmount)}
           </p>
           <p className="mt-1 text-xs text-slate-400">{invoices.length} invoices on record</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">Settled (Paid)</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Settled (Paid)</p>
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
           </div>
-          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-emerald-700 dark:text-emerald-400">
+          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-emerald-700">
             LKR {formatCurrency(metrics.paidAmount)}
           </p>
           <p className="mt-1 text-xs text-slate-400">
@@ -449,12 +486,12 @@ function BillingPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">Outstanding</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-amber-700">Outstanding</p>
             <Clock className="h-3.5 w-3.5 text-amber-600" />
           </div>
-          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-amber-800 dark:text-amber-400">
+          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-amber-800">
             LKR {formatCurrency(metrics.pendingAmount)}
           </p>
           <p className="mt-1 text-xs text-slate-400">
@@ -471,12 +508,12 @@ function BillingPage() {
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-wider text-rose-700 dark:text-rose-400">Attention</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-rose-700">Attention</p>
             <AlertCircle className="h-3.5 w-3.5 text-rose-600" />
           </div>
-          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-rose-700 dark:text-rose-400">
+          <p className="mt-1 font-mono text-lg md:text-xl font-bold text-rose-700">
             {metrics.overdueCount} Invoices
           </p>
           <p className="mt-1 text-xs text-slate-400">Overdue or voided records</p>
@@ -499,7 +536,7 @@ function BillingPage() {
       />
 
       {/* Main Ledger Card */}
-      <Card className="p-0 overflow-hidden min-h-[420px] flex flex-col justify-between shadow-xs border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <Card className="p-0 overflow-hidden min-h-[420px] flex flex-col justify-between shadow-xs border-slate-200 bg-white">
         {totalEntries > 0 ? (
           <div>
             <InvoiceListTable
@@ -508,10 +545,7 @@ function BillingPage() {
               onEditInvoice={handleOpenEditModal}
               onIssueInvoice={handleIssueInvoice}
               onVoidInvoice={handleOpenVoidDialog}
-              onPayInvoice={handlePayInvoice}
               isAgent={isAgent}
-              isAdmin={isAdmin}
-              isShipper={isShipper}
             />
           </div>
         ) : (
@@ -519,11 +553,11 @@ function BillingPage() {
         )}
 
         {/* Table Footer with Pagination */}
-        <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600 dark:text-slate-400">
+        <div className="border-t border-slate-200 bg-slate-50/50 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
           <div>
-            Showing <span className="font-semibold text-slate-900 dark:text-white">{startEntry}</span> to{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{endEntry}</span> of{' '}
-            <span className="font-semibold text-slate-900 dark:text-white">{totalEntries}</span> entries
+            Showing <span className="font-semibold text-slate-900">{startEntry}</span> to{' '}
+            <span className="font-semibold text-slate-900">{endEntry}</span> of{' '}
+            <span className="font-semibold text-slate-900">{totalEntries}</span> entries
           </div>
 
           {totalPages > 1 && (
@@ -533,7 +567,7 @@ function BillingPage() {
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
                 aria-label="Previous page"
-                className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
               >
                 ‹
               </button>
@@ -546,8 +580,8 @@ function BillingPage() {
                   className={cx(
                     'flex h-7 min-w-7 items-center justify-center rounded px-2 text-xs font-medium transition-colors cursor-pointer',
                     currentPage === pageNum
-                      ? 'bg-brand-600 text-white font-bold'
-                      : 'border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50',
+                      ? 'bg-primary text-on-primary font-bold'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
                   )}
                 >
                   {pageNum}
@@ -559,7 +593,7 @@ function BillingPage() {
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages}
                 aria-label="Next page"
-                className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
               >
                 ›
               </button>
@@ -576,7 +610,8 @@ function BillingPage() {
         onEdit={handleOpenEditModal}
         onIssue={handleIssueInvoice}
         onVoid={handleOpenVoidDialog}
-        onPay={handlePayInvoice}
+        onUploadPaymentProof={handleUploadPaymentProof}
+        onConfirmPayment={handleConfirmPayment}
         role={role}
         isAgent={isAgent}
         isAdmin={isAdmin}

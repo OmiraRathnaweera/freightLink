@@ -21,12 +21,76 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
   ])
   const [errors, setErrors] = useState({})
 
-  // Fetch recipients and trips when modal opens
+  // Reset/populate the form when the modal opens for a (possibly new) invoice. Adjusted directly
+  // during render rather than in an effect, per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes â€”
+  // `resetKey` tracks the last (isOpen, invoice id) pair the form was populated for, so this only
+  // fires once per actual change, not on every render.
+  const resetKey = isOpen ? (initialInvoice?.id || initialInvoice?.invoiceId || 'new') : null
+  const [populatedForKey, setPopulatedForKey] = useState(resetKey)
+  if (resetKey !== populatedForKey) {
+    setPopulatedForKey(resetKey)
+
+    if (resetKey !== null) {
+      // Also flag the lookups as loading again; the fetch effect below clears it from its
+      // .finally() callback once the request settles.
+      setIsLoadingLookups(true)
+
+      if (initialInvoice) {
+        setRecipientId(initialInvoice.recipientId || '')
+        setTripId(initialInvoice.tripId || initialInvoice.linkedEntityId || '')
+        setCurrency(initialInvoice.currency || 'LKR')
+        setDueDate(initialInvoice.dueDate ? String(initialInvoice.dueDate).slice(0, 10) : '')
+        setNotes(initialInvoice.notes || '')
+        setDiscountTotal(Number(initialInvoice.discountTotal || 0))
+
+        if (initialInvoice.lineItems && initialInvoice.lineItems.length > 0) {
+          setLineItems(
+            initialInvoice.lineItems.map((li) => ({
+              invoiceLineItemId: li.invoiceLineItemId,
+              description: li.description || '',
+              quantity: Number(li.quantity || 1),
+              unitPrice: Number(li.unitPrice || 0),
+              taxRate: Number(li.taxRate || 0),
+            })),
+          )
+        } else if (initialInvoice.amount) {
+          setLineItems([
+            {
+              description: 'Freight Services',
+              quantity: 1,
+              unitPrice: Number(initialInvoice.amount),
+              taxRate: 0,
+            },
+          ])
+        }
+      } else {
+        // Defaults for new invoice
+        setRecipientId('')
+        setTripId('')
+        setCurrency('LKR')
+        // Default due date = 7 days from now
+        const due = new Date()
+        due.setDate(due.getDate() + 7)
+        setDueDate(due.toISOString().slice(0, 10))
+        setNotes('')
+        setDiscountTotal(0)
+        setLineItems([
+          { description: 'Primary Cargo Haulage Service', quantity: 1, unitPrice: 35000, taxRate: 0 },
+        ])
+      }
+
+      setErrors({})
+    }
+  }
+
+  // Fetch recipients and trips when modal opens â€” a genuine external-system side effect, so it
+  // stays in an effect (unlike the form-population logic above). isLoadingLookups is set true
+  // above, during render; this only ever clears it, from the promise's own callback.
   useEffect(() => {
     if (!isOpen) return
 
     let isMounted = true
-    setIsLoadingLookups(true)
 
     Promise.all([fetchRecipients(), fetchTrips()])
       .then(([recipList, tripList]) => {
@@ -38,62 +102,13 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
         if (isMounted) setIsLoadingLookups(false)
       })
 
-    // Populate fields if editing
-    if (initialInvoice) {
-      setRecipientId(initialInvoice.recipientId || '')
-      setTripId(initialInvoice.tripId || initialInvoice.linkedEntityId || '')
-      setCurrency(initialInvoice.currency || 'LKR')
-      setDueDate(initialInvoice.dueDate ? String(initialInvoice.dueDate).slice(0, 10) : '')
-      setNotes(initialInvoice.notes || '')
-      setDiscountTotal(Number(initialInvoice.discountTotal || 0))
-
-      if (initialInvoice.lineItems && initialInvoice.lineItems.length > 0) {
-        setLineItems(
-          initialInvoice.lineItems.map((li) => ({
-            invoiceLineItemId: li.invoiceLineItemId,
-            description: li.description || '',
-            quantity: Number(li.quantity || 1),
-            unitPrice: Number(li.unitPrice || 0),
-            taxRate: Number(li.taxRate || 0),
-          })),
-        )
-      } else if (initialInvoice.amount) {
-        setLineItems([
-          {
-            description: 'Freight Services',
-            quantity: 1,
-            unitPrice: Number(initialInvoice.amount),
-            taxRate: 0,
-          },
-        ])
-      }
-    } else {
-      // Defaults for new invoice
-      setRecipientId('')
-      setTripId('')
-      setCurrency('LKR')
-      // Default due date = 7 days from now
-      const due = new Date()
-      due.setDate(due.getDate() + 7)
-      setDueDate(due.toISOString().slice(0, 10))
-      setNotes('')
-      setDiscountTotal(0)
-      setLineItems([
-        { description: 'Primary Cargo Haulage Service', quantity: 1, unitPrice: 35000, taxRate: 0 },
-      ])
-    }
-
-    setErrors({})
     return () => {
       isMounted = false
     }
-  }, [isOpen, initialInvoice])
+  }, [isOpen])
 
   // Real-time client calculations
   const totals = useMemo(() => {
-    let subtotal = 0
-    let taxTotal = 0
-
     const computedItems = lineItems.map((item) => {
       const q = Math.max(0, Number(item.quantity) || 0)
       const p = Math.max(0, Number(item.unitPrice) || 0)
@@ -103,9 +118,6 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
       const itemTax = itemSubtotal * (t / 100)
       const itemTotal = itemSubtotal + itemTax
 
-      subtotal += itemSubtotal
-      taxTotal += itemTax
-
       return {
         ...item,
         itemSubtotal,
@@ -113,6 +125,9 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
         itemTotal,
       }
     })
+
+    const subtotal = computedItems.reduce((sum, item) => sum + item.itemSubtotal, 0)
+    const taxTotal = computedItems.reduce((sum, item) => sum + item.itemTax, 0)
 
     const disc = Math.max(0, Number(discountTotal) || 0)
     const finalAmount = Math.max(0, subtotal + taxTotal - disc)
@@ -193,19 +208,19 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/40 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div
-        className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800 my-8 max-h-[90vh] flex flex-col"
+        className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-200 my-8 max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
       >
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            <h2 className="text-lg font-bold text-slate-900">
               {isEditing ? `Edit Invoice (${initialInvoice.invoiceNumber || 'Draft'})` : 'Create Manual Invoice'}
             </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Draft bespoke invoices, specify granular line items, and adjust tax rates dynamically.
             </p>
           </div>
@@ -213,7 +228,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-500 dark:hover:bg-slate-800 dark:hover:text-slate-300"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-500"
           >
             <X className="h-5 w-5" />
           </button>
@@ -224,7 +239,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
           {/* Top row: Recipient & Linked Entity (Trip) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="recipient-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="recipient-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                 Recipient
               </label>
               <select
@@ -232,7 +247,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                 value={recipientId}
                 onChange={(e) => setRecipientId(e.target.value)}
                 disabled={isLoadingLookups}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
               >
                 <option value="">-- Unassigned / Direct Billing --</option>
                 {recipients.map((recip) => (
@@ -244,7 +259,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
             </div>
 
             <div>
-              <label htmlFor="trip-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="trip-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                 Linked Trip (Optional)
               </label>
               <select
@@ -252,7 +267,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                 value={tripId}
                 onChange={(e) => setTripId(e.target.value)}
                 disabled={isLoadingLookups}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
               >
                 <option value="">-- No Linked Trip (Standalone) --</option>
                 {trips.map((t) => (
@@ -267,14 +282,14 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
           {/* Currency and Due Date */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label htmlFor="currency-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="currency-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                 Currency
               </label>
               <select
                 id="currency-select"
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
               >
                 <option value="LKR">LKR (Sri Lankan Rupee)</option>
                 <option value="USD">USD (US Dollar)</option>
@@ -283,7 +298,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
             </div>
 
             <div>
-              <label htmlFor="due-date-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="due-date-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                 Due Date
               </label>
               <input
@@ -291,12 +306,12 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
 
             <div>
-              <label htmlFor="discount-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="discount-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
                 Discount ({currency})
               </label>
               <input
@@ -307,7 +322,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                 value={discountTotal}
                 onChange={(e) => setDiscountTotal(e.target.value)}
                 placeholder="0.00"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
               />
             </div>
           </div>
@@ -315,13 +330,13 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
           {/* Line Items Repeater */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
                 Invoice Line Items
               </h3>
               <button
                 type="button"
                 onClick={handleAddLineItem}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50/50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-800 dark:bg-brand-950/40 dark:text-brand-300"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add Item
@@ -329,7 +344,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
             </div>
 
             {errors.lineItems && (
-              <p className="text-xs font-medium text-rose-600 dark:text-rose-400">{errors.lineItems}</p>
+              <p className="text-xs font-medium text-rose-600">{errors.lineItems}</p>
             )}
 
             <div className="space-y-2">
@@ -341,7 +356,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                 return (
                   <div
                     key={index}
-                    className="flex flex-col md:flex-row items-start md:items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/40"
+                    className="flex flex-col md:flex-row items-start md:items-center gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50"
                   >
                     <div className="flex-1 w-full">
                       <input
@@ -349,7 +364,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                         value={item.description}
                         onChange={(e) => handleItemChange(index, 'description', e.target.value)}
                         placeholder="Item Description (e.g. Fuel Surcharge)"
-                        className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-primary focus:ring-1 focus:ring-primary"
                       />
                       {errors[`desc_${index}`] && (
                         <p className="text-[10px] text-rose-500 mt-0.5">{errors[`desc_${index}`]}</p>
@@ -365,7 +380,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                         onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
                         placeholder="Qty"
                         title="Quantity"
-                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-right text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-right text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
                       />
                       {errors[`qty_${index}`] && (
                         <p className="text-[10px] text-rose-500 mt-0.5">{errors[`qty_${index}`]}</p>
@@ -381,7 +396,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                         onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
                         placeholder="Unit Price"
                         title="Unit Price"
-                        className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-right text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                        className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-right text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
                       />
                       {errors[`price_${index}`] && (
                         <p className="text-[10px] text-rose-500 mt-0.5">{errors[`price_${index}`]}</p>
@@ -399,14 +414,14 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
                           onChange={(e) => handleItemChange(index, 'taxRate', e.target.value)}
                           placeholder="Tax %"
                           title="Tax Rate Percentage"
-                          className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-right text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white pr-5"
+                          className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs text-right text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary pr-5"
                         />
                         <span className="absolute right-1.5 top-1.5 text-[10px] text-slate-400">%</span>
                       </div>
                     </div>
 
                     <div className="w-24 text-right">
-                      <span className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                      <span className="text-xs font-semibold text-slate-900">
                         {formatCurrency(itemTotal, currency)}
                       </span>
                     </div>
@@ -428,7 +443,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
 
           {/* Notes */}
           <div>
-            <label htmlFor="notes-textarea" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+            <label htmlFor="notes-textarea" className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
               Invoice Notes & Payment Instructions
             </label>
             <textarea
@@ -437,46 +452,46 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Standard 7-day payment term. Bank transfers to Commercial Bank A/C 10293847."
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
 
           {/* Real-time Calculation Summary Box */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/60">
-            <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              <Calculator className="h-4 w-4 text-brand-600 dark:text-brand-400" />
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-slate-700">
+              <Calculator className="h-4 w-4 text-primary" />
               Calculated Breakdown
             </div>
-            <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-300">
+            <div className="space-y-1.5 text-xs text-slate-600">
               <div className="flex justify-between">
                 <span>Subtotal (Net)</span>
-                <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(totals.subtotal, currency)}</span>
+                <span className="font-medium text-slate-900">{formatCurrency(totals.subtotal, currency)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Tax Total</span>
-                <span className="font-medium text-slate-900 dark:text-white">{formatCurrency(totals.taxTotal, currency)}</span>
+                <span className="font-medium text-slate-900">{formatCurrency(totals.taxTotal, currency)}</span>
               </div>
               {totals.discountTotal > 0 && (
-                <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                <div className="flex justify-between text-emerald-600">
                   <span>Discount Total</span>
                   <span className="font-medium">-{formatCurrency(totals.discountTotal, currency)}</span>
                 </div>
               )}
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between text-sm font-bold text-slate-900 dark:text-white">
+              <div className="pt-2 border-t border-slate-200 flex justify-between text-sm font-bold text-slate-900">
                 <span>Final Total Amount</span>
-                <span className="text-brand-700 dark:text-brand-400">{formatCurrency(totals.finalAmount, currency)}</span>
+                <span className="text-primary font-bold">{formatCurrency(totals.finalAmount, currency)}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0">
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             Cancel
           </button>
@@ -486,7 +501,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
               type="button"
               onClick={() => handleSubmit(false)}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50 shadow-xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-medium text-slate-800 hover:bg-slate-50 shadow-xs"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Save Draft
@@ -496,7 +511,7 @@ function InvoiceFormModal({ isOpen, onClose, onSubmit, initialInvoice = null, is
               type="button"
               onClick={() => handleSubmit(true)}
               disabled={isSubmitting}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-brand-700 focus:ring-2 focus:ring-brand-500 focus:ring-offset-2"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-on-primary shadow-xs hover:bg-primary/90 focus:ring-2 focus:ring-primary focus:ring-offset-2"
             >
               {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {isEditing ? 'Issue & Finalize' : 'Issue Immediately'}

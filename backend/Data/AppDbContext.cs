@@ -35,8 +35,6 @@ public class AppDbContext : DbContext
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
-    public DbSet<Payment> Payments => Set<Payment>();
-    public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
     public DbSet<Dispute> Disputes => Set<Dispute>();
     public DbSet<DisputeResolution> DisputeResolutions => Set<DisputeResolution>();
     public DbSet<Notification> Notifications => Set<Notification>();

@@ -77,6 +77,18 @@ public class InvoiceResponseDto
     /// <summary>Payment transaction or gateway reference.</summary>
     public string? PaymentReference { get; set; }
 
+    /// <summary>URL of the Shipper-uploaded payment receipt, if one has been submitted.</summary>
+    public string? PaymentProofUrl { get; set; }
+
+    /// <summary>Original filename of the uploaded payment receipt, if any.</summary>
+    public string? PaymentProofFileName { get; set; }
+
+    /// <summary>When the payment receipt was uploaded, if any.</summary>
+    public DateTimeOffset? PaymentProofUploadedAt { get; set; }
+
+    /// <summary>Name of the Shipper who uploaded the payment receipt, if any.</summary>
+    public string? PaymentProofUploadedByName { get; set; }
+
     /// <summary>Creator Agent name.</summary>
     public string? CreatedByName => AuditTrail.CreatedByName;
 

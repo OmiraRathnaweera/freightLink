@@ -1,4 +1,4 @@
-import { Eye, Edit3, Send, Ban, MoreHorizontal, CreditCard } from 'lucide-react'
+import { Eye, Edit3, Send, Ban, MoreHorizontal } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import InvoiceStatusBadge from './InvoiceStatusBadge.jsx'
 import { formatCurrency, formatInvoiceDate } from '../lib/formatters.js'
@@ -11,16 +11,12 @@ function ActionMenu({
   onEdit,
   onIssue,
   onVoid,
-  onPay,
   isAgent = true,
-  isAdmin = false,
-  isShipper = false,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef(null)
 
   const isDraft = invoice.status === InvoiceStatus.DRAFT || invoice.status === 'Draft'
-  const isIssued = invoice.status === InvoiceStatus.ISSUED || invoice.status === 'Issued'
   const isVoidable =
     invoice.status === InvoiceStatus.DRAFT ||
     invoice.status === InvoiceStatus.ISSUED ||
@@ -49,7 +45,7 @@ function ActionMenu({
           e.stopPropagation()
           setIsOpen((prev) => !prev)
         }}
-        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
         title="Invoice Actions"
       >
         <MoreHorizontal className="h-4 w-4" />
@@ -57,7 +53,7 @@ function ActionMenu({
 
       {isOpen && (
         <div
-          className="absolute right-0 z-30 mt-1 w-44 origin-top-right rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800 animate-in fade-in duration-100"
+          className="absolute right-0 z-30 mt-1 w-44 origin-top-right rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-slate-200 animate-in fade-in duration-100"
           onClick={(e) => e.stopPropagation()}
         >
           {/* View Details: Allowed for all roles */}
@@ -67,26 +63,11 @@ function ActionMenu({
               setIsOpen(false)
               onView(invoice)
             }}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             <Eye className="h-3.5 w-3.5 text-slate-500" />
             View Details
           </button>
-
-          {/* Pay Invoice: Strictly for Shipper on Issued invoices */}
-          {isShipper && isIssued && onPay && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false)
-                onPay(invoice)
-              }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
-            >
-              <CreditCard className="h-3.5 w-3.5 text-emerald-600" />
-              Pay Invoice
-            </button>
-          )}
 
           {/* Edit Draft: Strictly for Agent role on Draft invoices */}
           {isAgent && isDraft && onEdit && (
@@ -96,7 +77,7 @@ function ActionMenu({
                 setIsOpen(false)
                 onEdit(invoice)
               }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/40"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50"
             >
               <Edit3 className="h-3.5 w-3.5" />
               Edit Draft
@@ -111,7 +92,7 @@ function ActionMenu({
                 setIsOpen(false)
                 onIssue(invoice)
               }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50"
             >
               <Send className="h-3.5 w-3.5" />
               Issue Invoice
@@ -126,7 +107,7 @@ function ActionMenu({
                 setIsOpen(false)
                 onVoid(invoice)
               }}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50"
             >
               <Ban className="h-3.5 w-3.5" />
               Void Invoice
@@ -144,10 +125,7 @@ function InvoiceListTable({
   onEditInvoice,
   onIssueInvoice,
   onVoidInvoice,
-  onPayInvoice,
   isAgent = true,
-  isAdmin = false,
-  isShipper = false,
 }) {
   return (
     <div>
@@ -155,7 +133,7 @@ function InvoiceListTable({
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-body-md border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-slate-800 text-xs uppercase tracking-wider text-slate-500 bg-slate-50/60 dark:bg-slate-800/40">
+            <tr className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500 bg-slate-50/60">
               <th className="py-3 px-4 font-semibold">Invoice #</th>
               <th className="py-3 px-4 font-semibold">Recipient</th>
               <th className="py-3 px-4 font-semibold">Linked Entity</th>
@@ -165,7 +143,7 @@ function InvoiceListTable({
               <th className="py-3 px-4 text-right font-semibold">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60">
+          <tbody className="divide-y divide-slate-100">
             {invoices.map((inv, index) => {
               const recipientDisplay = inv.recipientName || inv.shipperName || 'Direct Customer'
               const linkedDisplay = inv.tripId || inv.linkedEntityId || inv.loadRef || 'Standalone'
@@ -175,17 +153,17 @@ function InvoiceListTable({
                   key={inv.id || inv.invoiceId}
                   onClick={() => onSelectInvoice(inv)}
                   className={cx(
-                    'group transition-colors cursor-pointer hover:bg-slate-50/80 dark:hover:bg-slate-800/50',
-                    index % 2 === 1 ? 'bg-slate-50/20 dark:bg-slate-900/40' : 'bg-white dark:bg-slate-900',
+                    'group transition-colors cursor-pointer hover:bg-slate-50/80',
+                    index % 2 === 1 ? 'bg-slate-50/20' : 'bg-white',
                   )}
                 >
                   {/* Invoice # */}
-                  <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-white group-hover:text-brand-600 dark:group-hover:text-brand-400">
+                  <td className="py-3.5 px-4 font-bold text-slate-900 group-hover:text-primary">
                     {inv.invoiceNumber}
                   </td>
 
                   {/* Recipient */}
-                  <td className="py-3.5 px-4 font-medium text-slate-700 dark:text-slate-200 max-w-[200px] truncate" title={recipientDisplay}>
+                  <td className="py-3.5 px-4 font-medium text-slate-700 max-w-[200px] truncate" title={recipientDisplay}>
                     <div className="flex flex-col">
                       <span>{recipientDisplay}</span>
                       {inv.recipientRole && (
@@ -195,9 +173,9 @@ function InvoiceListTable({
                   </td>
 
                   {/* Linked Entity */}
-                  <td className="py-3.5 px-4 font-mono text-xs text-slate-600 dark:text-slate-400">
+                  <td className="py-3.5 px-4 font-mono text-xs text-slate-600">
                     {linkedDisplay !== 'Standalone' ? (
-                      <span className="inline-block rounded border border-slate-200 bg-slate-100/70 px-2 py-0.5 font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      <span className="inline-block rounded border border-slate-200 bg-slate-100/70 px-2 py-0.5 font-medium text-slate-700">
                         {typeof linkedDisplay === 'string' && linkedDisplay.length > 12 ? linkedDisplay.slice(0, 8) : linkedDisplay}
                       </span>
                     ) : (
@@ -211,12 +189,12 @@ function InvoiceListTable({
                   </td>
 
                   {/* Issue Date */}
-                  <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-mono text-xs whitespace-nowrap">
+                  <td className="py-3.5 px-4 text-slate-600 font-mono text-xs whitespace-nowrap">
                     {formatInvoiceDate(inv.issuedAt || inv.issueDate || inv.createdAt)}
                   </td>
 
                   {/* Total */}
-                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900 dark:text-white text-right">
+                  <td className="py-3.5 px-4 font-mono font-bold text-slate-900 text-right">
                     {formatCurrency(inv.totalAmount || inv.amount, inv.currency || 'LKR')}
                   </td>
 
@@ -228,10 +206,7 @@ function InvoiceListTable({
                       onEdit={onEditInvoice}
                       onIssue={onIssueInvoice}
                       onVoid={onVoidInvoice}
-                      onPay={onPayInvoice}
                       isAgent={isAgent}
-                      isAdmin={isAdmin}
-                      isShipper={isShipper}
                     />
                   </td>
                 </tr>
@@ -242,26 +217,26 @@ function InvoiceListTable({
       </div>
 
       {/* Mobile Card Layout */}
-      <div className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+      <div className="md:hidden divide-y divide-slate-100">
         {invoices.map((inv) => (
           <div
             key={inv.id || inv.invoiceId}
             onClick={() => onSelectInvoice(inv)}
-            className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 cursor-pointer space-y-2.5"
+            className="p-4 hover:bg-slate-50 cursor-pointer space-y-2.5"
           >
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-900 dark:text-white">{inv.invoiceNumber}</span>
+              <span className="font-bold text-slate-900">{inv.invoiceNumber}</span>
               <InvoiceStatusBadge status={inv.status} />
             </div>
 
-            <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+            <div className="flex items-center justify-between text-xs text-slate-600">
               <span>{inv.recipientName || inv.shipperName || 'Direct Customer'}</span>
-              <span className="font-bold text-slate-900 dark:text-white font-mono">
+              <span className="font-bold text-slate-900 font-mono">
                 {formatCurrency(inv.totalAmount || inv.amount, inv.currency || 'LKR')}
               </span>
             </div>
 
-            <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400">
+            <div className="flex items-center justify-between pt-1 border-t border-slate-100 text-[11px] text-slate-400">
               <span>{formatInvoiceDate(inv.issuedAt || inv.issueDate || inv.createdAt)}</span>
               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 <ActionMenu
@@ -270,10 +245,7 @@ function InvoiceListTable({
                   onEdit={onEditInvoice}
                   onIssue={onIssueInvoice}
                   onVoid={onVoidInvoice}
-                  onPay={onPayInvoice}
                   isAgent={isAgent}
-                  isAdmin={isAdmin}
-                  isShipper={isShipper}
                 />
               </div>
             </div>
