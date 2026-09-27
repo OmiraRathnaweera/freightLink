@@ -77,10 +77,20 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
                 enabled: !_submitting,
                 minLines: 5,
                 maxLines: 8,
+                maxLength: 2000,
                 decoration: const InputDecoration(labelText: 'What happened?', alignLabelWithHint: true),
-                validator: (value) => value == null || value.trim().length < 10
-                    ? 'Describe the issue in at least 10 characters.'
-                    : null,
+                // Mirrors CreateDisputeDto: [Required][StringLength(2000, MinimumLength = 10)]
+                // (backend/DTOs/Disputes/CreateDisputeDto.cs).
+                validator: (value) {
+                  final trimmed = value?.trim() ?? '';
+                  if (trimmed.length < 10) {
+                    return 'Describe the issue in at least 10 characters.';
+                  }
+                  if (trimmed.length > 2000) {
+                    return 'Must be 2000 characters or fewer.';
+                  }
+                  return null;
+                },
               ),
               const Spacer(),
               FilledButton(

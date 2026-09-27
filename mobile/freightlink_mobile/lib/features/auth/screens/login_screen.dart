@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
@@ -21,6 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _hasAttemptedSubmit = false;
+  Map<String, String> _fieldErrors = {};
 
   @override
   void dispose() {
@@ -29,7 +32,29 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  String? _errorFor(String field) => _hasAttemptedSubmit ? _fieldErrors[field] : null;
+
+  Map<String, String> _validate() {
+    final errors = <String, String>{};
+    final emailError = AppValidators.email(_emailController.text);
+    if (emailError != null) errors['email'] = emailError;
+    final passwordError = AppValidators.password(_passwordController.text);
+    if (passwordError != null) errors['password'] = passwordError;
+    return errors;
+  }
+
+  void _revalidateIfDirty() {
+    if (!_hasAttemptedSubmit) return;
+    setState(() => _fieldErrors = _validate());
+  }
+
   Future<void> _submit() async {
+    setState(() {
+      _hasAttemptedSubmit = true;
+      _fieldErrors = _validate();
+    });
+    if (_fieldErrors.isNotEmpty) return;
+
     await context.read<AuthProvider>().login(
           email: _emailController.text.trim(),
           password: _passwordController.text,
@@ -82,6 +107,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icons.mail_outline_rounded,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
+                      errorText: _errorFor('email'),
+                      onChanged: (_) => _revalidateIfDirty(),
                     ),
                     const SizedBox(height: AppConstants.spaceLg),
                     AppTextField(
@@ -91,6 +118,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
+                      errorText: _errorFor('password'),
+                      onChanged: (_) => _revalidateIfDirty(),
                       suffixIcon: IconButton(
                         icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 20),
                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),

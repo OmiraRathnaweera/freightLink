@@ -76,28 +76,52 @@ class _LoadMatchScreenState extends State<LoadMatchScreen> {
     }
   }
 
+  // Mirrors MatchDecisionRequestDto: [Required][StringLength(1000, MinimumLength = 5)]
+  // (backend/DTOs/Loads/MatchDecisionRequestDto.cs).
+  static const _reasonMinLength = 5;
+  static const _reasonMaxLength = 1000;
+
   Future<String?> _askReason(String title) async {
     final controller = TextEditingController();
+    String? errorText;
     return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          minLines: 3,
-          maxLines: 5,
-          decoration: const InputDecoration(hintText: 'Explain your decision (at least 5 characters)'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.length >= 5) Navigator.pop(context, value);
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            minLines: 3,
+            maxLines: 5,
+            maxLength: _reasonMaxLength,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: 'Explain your decision (at least $_reasonMinLength characters)',
+              errorText: errorText,
+            ),
+            onChanged: (_) {
+              if (errorText != null) setDialogState(() => errorText = null);
             },
-            child: const Text('Submit'),
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.length < _reasonMinLength) {
+                  setDialogState(() => errorText = 'Enter at least $_reasonMinLength characters.');
+                  return;
+                }
+                if (value.length > _reasonMaxLength) {
+                  setDialogState(() => errorText = 'Must be $_reasonMaxLength characters or fewer.');
+                  return;
+                }
+                Navigator.pop(dialogContext, value);
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        ),
       ),
     );
   }

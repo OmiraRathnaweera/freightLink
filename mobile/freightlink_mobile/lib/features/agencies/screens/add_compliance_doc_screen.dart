@@ -8,6 +8,8 @@ import 'package:intl/intl.dart';
 import '../providers/compliance_docs_provider.dart';
 import '../data/agencies_repository.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_validators.dart';
 import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
@@ -32,13 +34,41 @@ class _AddComplianceDocForm extends StatefulWidget {
 }
 
 class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
-  final _formKey = GlobalKey<FormState>();
   final _docNumberController = TextEditingController();
   final _issuedOnController = TextEditingController();
 
   String _selectedDocType = 'BusinessRegistration';
   String? _selectedFileName;
   List<int>? _selectedFileBytes;
+
+  bool _hasAttemptedSubmit = false;
+  Map<String, String> _fieldErrors = {};
+
+  String? _errorFor(String field) => _hasAttemptedSubmit ? _fieldErrors[field] : null;
+
+  /// Mirrors `ComplianceDocCreateDto`'s DataAnnotations — see
+  /// `backend/DTOs/Agency/ComplianceDocCreateDto.cs`.
+  Map<String, String> _validate() {
+    final errors = <String, String>{};
+
+    final docNumberError = AppValidators.length(_docNumberController.text, 'Document number', max: 100);
+    if (docNumberError != null) errors['docNumber'] = docNumberError;
+
+    if (_issuedOnController.text.trim().isEmpty) {
+      errors['issuedOn'] = 'Issued/effective date is required.';
+    }
+
+    if (_selectedFileName == null || _selectedFileBytes == null) {
+      errors['file'] = 'Select a file to upload.';
+    }
+
+    return errors;
+  }
+
+  void _revalidateIfDirty() {
+    if (!_hasAttemptedSubmit) return;
+    setState(() => _fieldErrors = _validate());
+  }
 
   @override
   void dispose() {
@@ -59,6 +89,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
         _selectedFileName = file.name;
       });
       _selectedFileBytes = await file.readAsBytes();
+      _revalidateIfDirty();
     }
   }
 
@@ -75,6 +106,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
       _selectedFileName = photo.name;
       _selectedFileBytes = bytes;
     });
+    _revalidateIfDirty();
   }
 
   Future<void> _chooseDocumentSource() async {
@@ -117,22 +149,16 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
       setState(() {
         _issuedOnController.text = DateFormat('yyyy-MM-dd').format(picked);
       });
+      _revalidateIfDirty();
     }
   }
 
   Future<void> _submit(ComplianceDocsProvider provider) async {
-    if (_docNumberController.text.trim().isEmpty || _issuedOnController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Document number and issue date are required.')),
-      );
-      return;
-    }
-    if (_selectedFileName == null || _selectedFileBytes == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a file to upload.')),
-      );
-      return;
-    }
+    setState(() {
+      _hasAttemptedSubmit = true;
+      _fieldErrors = _validate();
+    });
+    if (_fieldErrors.isNotEmpty) return;
 
     final success = await provider.uploadDoc(
       _selectedDocType,
@@ -171,11 +197,9 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppConstants.spaceXl),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
                 DropdownButtonFormField<String>(
                   value: _selectedDocType,
                   decoration: InputDecoration(
@@ -205,6 +229,9 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                   label: 'Document Number',
                   controller: _docNumberController,
                   prefixIcon: Icons.numbers_outlined,
+                  maxLength: 100,
+                  errorText: _errorFor('docNumber'),
+                  onChanged: (_) => _revalidateIfDirty(),
                 ),
                 const SizedBox(height: AppConstants.spaceLg),
                 InkWell(
@@ -214,6 +241,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                       label: 'Issued / Effective Date',
                       controller: _issuedOnController,
                       prefixIcon: Icons.calendar_today_outlined,
+                      hintText: 'Tap to select a date',
+                      errorText: _errorFor('issuedOn'),
                     ),
                   ),
                 ),
@@ -226,6 +255,13 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
+                if (_errorFor('file') != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _errorFor('file')!,
+                    style: const TextStyle(fontSize: 12, color: AppColors.statusErrorFg),
+                  ),
+                ],
                 const SizedBox(height: AppConstants.spaceXxl),
                 if (provider.isUploading)
                   const Center(child: CircularProgressIndicator())
@@ -236,7 +272,6 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                   ),
               ],
             ),
-          ),
         ),
       ),
     );

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/app_validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/app_top_bar.dart';
 import '../../../shared/widgets/primary_button.dart';
@@ -31,7 +32,9 @@ class _AgencyProfileBody extends StatefulWidget {
 
 class _AgencyProfileBodyState extends State<_AgencyProfileBody> {
   bool _isEditing = false;
-  
+  bool _hasAttemptedSubmit = false;
+  Map<String, String> _fieldErrors = {};
+
   final _nameController = TextEditingController();
   final _businessRegNoController = TextEditingController();
   final _yardAddressController = TextEditingController();
@@ -44,6 +47,30 @@ class _AgencyProfileBodyState extends State<_AgencyProfileBody> {
     super.dispose();
   }
 
+  String? _errorFor(String field) => _hasAttemptedSubmit ? _fieldErrors[field] : null;
+
+  /// Mirrors `AgencyUpdateDto`'s DataAnnotations — see
+  /// `backend/DTOs/Agency/AgencyUpdateDto.cs`. Note `BusinessRegNo` is
+  /// intentionally absent: that DTO has no such property (it's immutable
+  /// after agency creation), so it's never sent in the update payload below —
+  /// the field stays visible but read-only.
+  Map<String, String> _validate() {
+    final errors = <String, String>{};
+
+    final nameError = AppValidators.length(_nameController.text, 'Agency name', min: 1, max: 100);
+    if (nameError != null) errors['name'] = nameError;
+
+    final yardError = AppValidators.length(_yardAddressController.text, 'Yard address', min: 1, max: 255);
+    if (yardError != null) errors['yardAddress'] = yardError;
+
+    return errors;
+  }
+
+  void _revalidateIfDirty() {
+    if (!_hasAttemptedSubmit) return;
+    setState(() => _fieldErrors = _validate());
+  }
+
   void _populateFields(Map<String, dynamic> data) {
     _nameController.text = data['name'] ?? '';
     _businessRegNoController.text = data['businessRegNo'] ?? '';
@@ -51,17 +78,24 @@ class _AgencyProfileBodyState extends State<_AgencyProfileBody> {
   }
 
   Future<void> _saveProfile(AgencyProfileProvider provider) async {
+    setState(() {
+      _hasAttemptedSubmit = true;
+      _fieldErrors = _validate();
+    });
+    if (_fieldErrors.isNotEmpty) return;
+
     final success = await provider.updateProfile({
       'name': _nameController.text.trim(),
-      'businessRegNo': _businessRegNoController.text.trim(),
       'yardAddress': _yardAddressController.text.trim(),
     });
-    
+
     if (!mounted) return;
-    
+
     if (success) {
       setState(() {
         _isEditing = false;
+        _hasAttemptedSubmit = false;
+        _fieldErrors = {};
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Profile updated successfully!')),
@@ -129,12 +163,17 @@ class _AgencyProfileBodyState extends State<_AgencyProfileBody> {
                 controller: _nameController,
                 readOnly: !_isEditing,
                 prefixIcon: Icons.business_outlined,
+                maxLength: 100,
+                errorText: _errorFor('name'),
+                onChanged: (_) => _revalidateIfDirty(),
               ),
               const SizedBox(height: AppConstants.spaceLg),
               AppTextField(
-                label: 'Business Registration No.',
+                // Immutable after agency creation — always read-only, regardless
+                // of _isEditing, and never sent in the update payload.
+                label: 'Business Registration No. (cannot be changed)',
                 controller: _businessRegNoController,
-                readOnly: !_isEditing,
+                readOnly: true,
                 prefixIcon: Icons.assignment_outlined,
               ),
               const SizedBox(height: AppConstants.spaceLg),
@@ -144,6 +183,9 @@ class _AgencyProfileBodyState extends State<_AgencyProfileBody> {
                 readOnly: !_isEditing,
                 prefixIcon: Icons.location_on_outlined,
                 maxLines: 2,
+                maxLength: 255,
+                errorText: _errorFor('yardAddress'),
+                onChanged: (_) => _revalidateIfDirty(),
               ),
               const SizedBox(height: AppConstants.spaceXxl),
               if (_isEditing)

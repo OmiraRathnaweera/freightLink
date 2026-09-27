@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/app_validators.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../providers/auth_provider.dart';
@@ -31,6 +32,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _jobTitleController = TextEditingController();
   PickedLocation? _yardLocation;
 
+  bool _hasAttemptedSubmit = false;
+  Map<String, String> _fieldErrors = {};
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -44,15 +48,63 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    final auth = context.read<AuthProvider>();
-    final yard = _yardLocation;
-    if (yard == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select your agency yard location.')),
-      );
-      return;
+  String? _errorFor(String field) => _hasAttemptedSubmit ? _fieldErrors[field] : null;
+
+  /// Mirrors every DataAnnotation on `RegisterAgencyRequestDto` — see
+  /// `backend/DTOs/Auth/RegisterAgencyRequestDto.cs`.
+  Map<String, String> _validate() {
+    final errors = <String, String>{};
+
+    final fullNameError = AppValidators.length(_fullNameController.text, 'Full name', min: 2, max: 200);
+    if (fullNameError != null) errors['fullName'] = fullNameError;
+
+    final emailError = AppValidators.email(_emailController.text);
+    if (emailError != null) errors['email'] = emailError;
+
+    final passwordError = AppValidators.strongPassword(_passwordController.text);
+    if (passwordError != null) errors['password'] = passwordError;
+
+    final phoneError = AppValidators.optionalPhone(_phoneController.text);
+    if (phoneError != null) errors['phoneE164'] = phoneError;
+
+    final agencyNameError = AppValidators.length(_agencyNameController.text, 'Agency name', min: 2, max: 200);
+    if (agencyNameError != null) errors['agencyName'] = agencyNameError;
+
+    final businessRegNoError = AppValidators.length(_businessRegNoController.text, 'Business registration no.', max: 100);
+    if (businessRegNoError != null) errors['businessRegNo'] = businessRegNoError;
+
+    final jobTitleError = AppValidators.length(
+      _jobTitleController.text,
+      'Job title',
+      max: 150,
+      isRequired: false,
+    );
+    if (jobTitleError != null) errors['jobTitle'] = jobTitleError;
+
+    if (_yardLocation == null) {
+      errors['yardAddress'] = 'Select your agency yard location.';
+    } else {
+      final yardError = AppValidators.length(_yardLocation!.address, 'Yard address', min: 5, max: 500);
+      if (yardError != null) errors['yardAddress'] = yardError;
     }
+
+    return errors;
+  }
+
+  void _revalidateIfDirty() {
+    if (!_hasAttemptedSubmit) return;
+    setState(() => _fieldErrors = _validate());
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _hasAttemptedSubmit = true;
+      _fieldErrors = _validate();
+    });
+    if (_fieldErrors.isNotEmpty) return;
+
+    final auth = context.read<AuthProvider>();
+    final yard = _yardLocation!;
 
     final registered = await auth.registerAgency(
       email: _emailController.text.trim(),
@@ -88,6 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _yardLocation = picked;
       _yardAddressController.text = picked.address;
     });
+    _revalidateIfDirty();
   }
 
   @override
@@ -123,6 +176,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       hintText: 'John Doe',
                       prefixIcon: Icons.person_outline,
                       textInputAction: TextInputAction.next,
+                      maxLength: 200,
+                      errorText: _errorFor('fullName'),
+                      onChanged: (_) => _revalidateIfDirty(),
                     ),
                     const SizedBox(height: AppConstants.spaceLg),
                     AppTextField(
@@ -132,6 +188,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.mail_outline_rounded,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
+                      maxLength: 256,
+                      errorText: _errorFor('email'),
+                      onChanged: (_) => _revalidateIfDirty(),
                     ),
                     const SizedBox(height: AppConstants.spaceLg),
                     AppTextField(
@@ -141,6 +200,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       prefixIcon: Icons.lock_outline_rounded,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.next,
+                      errorText: _errorFor('password'),
+                      onChanged: (_) => _revalidateIfDirty(),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
@@ -153,14 +214,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'At least 8 characters, with an uppercase letter, a lowercase letter, a digit, and a special character.',
+                      style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                    ),
                     const SizedBox(height: AppConstants.spaceLg),
                     AppTextField(
-                      label: 'Phone (E.164)',
+                      label: 'Phone (E.164) — optional',
                       controller: _phoneController,
                       hintText: '+14155552671',
                       prefixIcon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
+                      errorText: _errorFor('phoneE164'),
+                      onChanged: (_) => _revalidateIfDirty(),
                     ),
                     const SizedBox(height: AppConstants.spaceLg),
 
@@ -172,6 +240,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'Fast Freight Co.',
                         prefixIcon: Icons.business_outlined,
                         textInputAction: TextInputAction.next,
+                        maxLength: 200,
+                        errorText: _errorFor('agencyName'),
+                        onChanged: (_) => _revalidateIfDirty(),
                       ),
                       const SizedBox(height: AppConstants.spaceLg),
                       AppTextField(
@@ -180,14 +251,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         hintText: 'REG-12345',
                         prefixIcon: Icons.numbers_outlined,
                         textInputAction: TextInputAction.next,
+                        maxLength: 100,
+                        errorText: _errorFor('businessRegNo'),
+                        onChanged: (_) => _revalidateIfDirty(),
                       ),
                       const SizedBox(height: AppConstants.spaceLg),
                       AppTextField(
-                        label: 'Job Title',
+                        label: 'Job Title — optional',
                         controller: _jobTitleController,
                         hintText: 'Fleet Manager',
                         prefixIcon: Icons.work_outline,
                         textInputAction: TextInputAction.next,
+                        maxLength: 150,
+                        errorText: _errorFor('jobTitle'),
+                        onChanged: (_) => _revalidateIfDirty(),
                       ),
                       const SizedBox(height: AppConstants.spaceLg),
                       AppTextField(
@@ -198,6 +275,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         readOnly: true,
                         onTap: _pickYard,
                         textInputAction: TextInputAction.done,
+                        errorText: _errorFor('yardAddress'),
                       ),
                     ],
 
