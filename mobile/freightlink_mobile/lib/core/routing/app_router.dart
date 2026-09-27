@@ -9,6 +9,7 @@ import '../../features/loads/screens/my_loads_screen.dart';
 import '../../features/trips/screens/driver_assigned_trip_screen.dart';
 import '../../features/trips/screens/job_proposals_screen.dart';
 import '../../features/trips/screens/agency_trips_screen.dart';
+import '../../features/trips/screens/agency_trip_detail_screen.dart';
 import '../../shared/widgets/app_shell.dart';
 import '../../shared/widgets/app_top_bar.dart';
 import '../../shared/widgets/coming_soon_placeholder.dart';
@@ -51,6 +52,7 @@ const _roleAllowedNestedPrefixes = <String, List<String>>{
     '/dashboard/driver-onboarding',
     '/dashboard/compliance-docs',
     '/payments/',
+    '/trips/',
   ],
   'Driver': [],
 };
@@ -215,6 +217,15 @@ GoRouter createAppRouter(AuthProvider authProvider) {
       GoRoute(
         path: '/trips',
         builder: (context, state) => const AgencyTripsScreen(),
+        routes: [
+          GoRoute(
+            path: ':tripId',
+            builder: (context, state) {
+              final tripId = state.pathParameters['tripId']!;
+              return AgencyTripDetailScreen(tripId: tripId);
+            },
+          ),
+        ],
       ),
     ],
   );
