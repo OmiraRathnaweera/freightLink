@@ -144,6 +144,15 @@ export async function updateDriverStatus({ agencyId, driverId, status }) {
   return api.patch(`/agencies/${agencyId}/drivers/${driverId}/status`, { status })
 }
 
+/**
+ * PUT /agencies/{id}/drivers/{driverId}
+ * Updates a driver's editable details (fullName, licenceNo, licenceExpiry). Email/status are
+ * out of scope here — email is immutable after creation and status has its own endpoint above.
+ */
+export async function updateDriver({ agencyId, driverId, driver }) {
+  return api.put(`/agencies/${agencyId}/drivers/${driverId}`, driver)
+}
+
 export function useDriversQuery(agencyId, options) {
   return useQuery({
     queryKey: ['agencies', agencyId, 'drivers'],
@@ -168,6 +177,18 @@ export function useUpdateDriverStatusMutation({ onSuccess, ...options } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateDriverStatus,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useUpdateDriverMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateDriver,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
       if (onSuccess) onSuccess(data, variables, context)

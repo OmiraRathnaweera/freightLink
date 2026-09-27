@@ -4,6 +4,7 @@ import {
   Filter,
   IdCard,
   Loader2,
+  Pencil,
   Plus,
   Search,
   UserX,
@@ -20,6 +21,7 @@ import { useCurrentUserQuery } from '../../auth/api/authApi.js'
 import { useDriversQuery, useUpdateDriverStatusMutation } from '../api/agencyApi.js'
 import { getAgencyErrorMessage } from '../lib/errorMessages.js'
 import AddDriverDrawer from '../components/AddDriverDrawer.jsx'
+import EditDriverDrawer from '../components/EditDriverDrawer.jsx'
 
 function getStatusTone(status) {
   switch (status) {
@@ -55,6 +57,7 @@ export default function FleetDriversPage() {
   const [pendingDriverId, setPendingDriverId] = useState(null)
 
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false)
+  const [editingDriver, setEditingDriver] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
 
@@ -80,8 +83,8 @@ export default function FleetDriversPage() {
     })
   }, [drivers, searchQuery, statusFilter])
 
-  async function handleToggleStatus(driver) {
-    const nextStatus = driver.status === 'Inactive' ? 'Active' : 'Inactive'
+  async function handleChangeStatus(driver, nextStatus) {
+    if (nextStatus === driver.status) return
     setPendingDriverId(driver.driverId)
     try {
       await updateStatusMutation.mutateAsync({ agencyId, driverId: driver.driverId, status: nextStatus })
@@ -254,23 +257,33 @@ export default function FleetDriversPage() {
                         <StatusBadge tone={getStatusTone(driver.status)}>{driver.status}</StatusBadge>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          disabled={isOnTrip || isPending}
-                          title={isOnTrip ? 'Cannot change status while the driver is on a trip' : undefined}
-                          onClick={() => handleToggleStatus(driver)}
-                          className="inline-flex items-center gap-1.5 text-xs"
-                        >
-                          {isPending ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          ) : driver.status === 'Inactive' ? (
-                            <UserCheck className="h-3.5 w-3.5" />
-                          ) : (
-                            <UserX className="h-3.5 w-3.5" />
-                          )}
-                          {driver.status === 'Inactive' ? 'Reinstate' : 'Remove'}
-                        </Button>
+                        <div className="inline-flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setEditingDriver(driver)}
+                            className="inline-flex items-center gap-1.5 text-xs"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Update
+                          </Button>
+                          <div className="relative inline-flex items-center">
+                            <select
+                              value={driver.status}
+                              disabled={isOnTrip || isPending}
+                              title={isOnTrip ? 'Cannot change status while the driver is on a trip' : undefined}
+                              onChange={(e) => handleChangeStatus(driver, e.target.value)}
+                              className="rounded-md border border-slate-300 bg-white py-1.5 pl-2.5 pr-7 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <option value="Active">Active</option>
+                              <option value="Inactive">Inactive</option>
+                              {isOnTrip && <option value="OnTrip">On Trip</option>}
+                            </select>
+                            {isPending && (
+                              <Loader2 className="pointer-events-none absolute right-1.5 h-3.5 w-3.5 animate-spin text-slate-500" />
+                            )}
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -286,6 +299,13 @@ export default function FleetDriversPage() {
         agencyId={agencyId}
         isOpen={isAddDrawerOpen}
         onClose={() => setIsAddDrawerOpen(false)}
+      />
+
+      {/* Slide-over Drawer for editing an existing driver */}
+      <EditDriverDrawer
+        agencyId={agencyId}
+        driver={editingDriver}
+        onClose={() => setEditingDriver(null)}
       />
     </div>
   )

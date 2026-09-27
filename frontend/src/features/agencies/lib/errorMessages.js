@@ -7,6 +7,9 @@ const AGENCY_ERROR_MESSAGES = {
   FORBIDDEN: 'You are not authorized to perform this fleet management action.',
   EMAIL_ALREADY_REGISTERED: 'An account with this email already exists.',
   DRIVER_LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',
+  // Thrown by the update-driver endpoint specifically (as opposed to DRIVER_LICENCE_ALREADY_REGISTERED,
+  // thrown on create) — same meaning, different code, so both must be mapped.
+  LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',
   DRIVER_NOT_FOUND: 'Driver could not be found in your fleet.',
   INVALID_DRIVER_STATUS_TRANSITION: 'Driver status can only be set to Active or Inactive — OnTrip is managed automatically during trips.',
 }

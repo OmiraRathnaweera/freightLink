@@ -43,6 +43,30 @@ export const addDriverSchema = Yup.object({
 })
 
 /**
+ * Validation schema for updating an existing driver's editable details.
+ *
+ * Mirrors the backend's DriverUpdateDto: only fullName, licenceNo, and licenceExpiry are editable
+ * (email is immutable after creation, status has its own dedicated endpoint/schema).
+ */
+export const updateDriverSchema = Yup.object({
+  fullName: Yup.string()
+    .trim()
+    .min(2, 'Full name must be at least 2 characters')
+    .max(200, 'Full name must be 200 characters or fewer')
+    .required('Full name is required'),
+
+  licenceNo: Yup.string()
+    .trim()
+    .min(2, 'Licence number must be at least 2 characters')
+    .max(100, 'Licence number must be 100 characters or fewer')
+    .required('Licence number is required'),
+
+  licenceExpiry: Yup.date()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .required('Licence expiry date is required'),
+})
+
+/**
  * Validation schema for registering a new fleet vehicle in an agency.
  *
  * Rules:
