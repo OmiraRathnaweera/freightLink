@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
     public DbSet<UploadedFile> UploadedFiles => Set<UploadedFile>();
 
     public DbSet<Assignment> Assignments => Set<Assignment>();
+    public DbSet<LoadProposal> LoadProposals => Set<LoadProposal>();
     public DbSet<AssignmentResponse> AssignmentResponses => Set<AssignmentResponse>();
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<TripEvent> TripEvents => Set<TripEvent>();

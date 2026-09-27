@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Building2, PackageOpen, ShoppingBag, Truck } from 'lucide-react'
+import { PackageOpen, ShoppingBag, Truck } from 'lucide-react'
 import PageHeader from '../../../components/PageHeader.jsx'
 import Button from '../../../components/Button.jsx'
 import Card from '../../../components/Card.jsx'
@@ -16,6 +16,7 @@ import LoadFilterBar from '../components/LoadFilterBar.jsx'
 import LoadsTable from '../components/LoadsTable.jsx'
 import Pagination from '../components/Pagination.jsx'
 import AcceptShipmentDialog from '../components/AcceptShipmentDialog.jsx'
+import SendProposalDialog from '../components/SendProposalDialog.jsx'
 import { cx } from '../../../lib/cx.js'
 
 const DEFAULT_PAGE_SIZE = 20
@@ -26,6 +27,7 @@ function LoadsPage() {
   const isAgencyStaff = role === UserRole.AGENCY_STAFF
 
   const [selectedAcceptLoad, setSelectedAcceptLoad] = useState(null)
+  const [selectedProposalLoad, setSelectedProposalLoad] = useState(null)
 
   const activeTab = searchParams.get('tab') ?? (isAgencyStaff ? 'marketplace' : 'all')
 
@@ -166,6 +168,7 @@ function LoadsPage() {
               showShipperColumn={role === UserRole.ADMIN || isAgencyStaff}
               role={role}
               onAcceptLoad={isMarketplaceMode ? (load) => setSelectedAcceptLoad(load) : undefined}
+              onSendProposal={isMarketplaceMode ? (load) => setSelectedProposalLoad(load) : undefined}
               onDispatchLoad={isAgencyStaff && activeTab === 'assigned' ? (load) => load : undefined}
             />
             <Pagination
@@ -218,6 +221,15 @@ function LoadsPage() {
             loadsQuery.refetch()
             handleTabChange('assigned')
           }}
+        />
+      )}
+
+      {/* Send Proposal Modal for Agency */}
+      {selectedProposalLoad && (
+        <SendProposalDialog
+          load={selectedProposalLoad}
+          onClose={() => setSelectedProposalLoad(null)}
+          onSent={() => loadsQuery.refetch()}
         />
       )}
     </div>

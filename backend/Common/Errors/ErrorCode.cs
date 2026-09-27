@@ -344,5 +344,30 @@ public enum ErrorCode
     WORKFLOW_RUN_ALREADY_APPROVED,
 
     /// <summary>Registration was attempted with a driving licence number already on file.</summary>
-    DRIVER_LICENCE_ALREADY_REGISTERED
+    DRIVER_LICENCE_ALREADY_REGISTERED,
+
+    /// <summary>
+    /// A driver roster status change attempted to set/clear OnTrip directly, which is
+    /// trip-execution-owned, rather than the only staff-controllable transition (Active/Inactive).
+    /// </summary>
+    INVALID_DRIVER_STATUS_TRANSITION,
+
+    /// <summary>The requested load proposal could not be found.</summary>
+    LOAD_PROPOSAL_NOT_FOUND,
+
+    /// <summary>
+    /// An agency attempted to submit a second live (Pending) proposal on a load it already has one
+    /// on. Mirrors <c>ux_loadproposal_live_per_load_agency</c>.
+    /// </summary>
+    LOAD_PROPOSAL_ALREADY_EXISTS,
+
+    /// <summary>
+    /// A proposal was submitted, accepted, or rejected on a load that isn't <c>Posted</c>, or that
+    /// already has a live (Proposed/Accepted) <c>Assignment</c> — direct AI-matching and manual
+    /// agency proposals both compete for the same single live-assignment slot per load.
+    /// </summary>
+    LOAD_NOT_BIDDABLE,
+
+    /// <summary>A load-proposal mutation was attempted that violates allowed lifecycle rules (e.g. responding to a non-Pending proposal).</summary>
+    INVALID_LOAD_PROPOSAL_STATUS_TRANSITION
 }
