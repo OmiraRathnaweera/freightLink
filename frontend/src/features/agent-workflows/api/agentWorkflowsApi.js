@@ -31,6 +31,28 @@ export async function confirmLoadMatch(loadId, agencyId) {
 }
 
 /**
+ * POST /api/v1/loads/{loadId}/match/reject
+ * Rejects the load's current AI match recommendation, recording the shipper's reason.
+ * @param {string} loadId
+ * @param {string} reason
+ * @returns {Promise<any>}
+ */
+export async function rejectLoadMatch(loadId, reason) {
+  return api.post(`/loads/${loadId}/match/reject`, { reason })
+}
+
+/**
+ * POST /api/v1/loads/{loadId}/match/revise
+ * Requests a revised AI match recommendation for the load, recording the shipper's reason.
+ * @param {string} loadId
+ * @param {string} reason
+ * @returns {Promise<any>}
+ */
+export async function reviseLoadMatch(loadId, reason) {
+  return api.post(`/loads/${loadId}/match/revise`, { reason })
+}
+
+/**
  * Query hook for fetching AI match recommendation and pipeline telemetry.
  * @param {string} loadId
  * @param {object} [options]
@@ -55,6 +77,36 @@ export function useConfirmMatchMutation(options) {
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: matchKeys.loadMatch(variables.loadId) })
       queryClient.invalidateQueries({ queryKey: ['loads'] })
+      options?.onSuccess?.(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+/**
+ * Mutation hook for rejecting a carrier match recommendation.
+ * @param {object} [options]
+ */
+export function useRejectMatchMutation(options) {
+  return useMutation({
+    mutationFn: ({ loadId, reason }) => rejectLoadMatch(loadId, reason),
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: matchKeys.loadMatch(variables.loadId) })
+      options?.onSuccess?.(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+/**
+ * Mutation hook for requesting a revised carrier match recommendation.
+ * @param {object} [options]
+ */
+export function useReviseMatchMutation(options) {
+  return useMutation({
+    mutationFn: ({ loadId, reason }) => reviseLoadMatch(loadId, reason),
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: matchKeys.loadMatch(variables.loadId) })
       options?.onSuccess?.(data, variables, context)
     },
     ...options,

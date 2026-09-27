@@ -144,20 +144,71 @@ public class LoadsController : ControllerBase
     /// <summary>
     /// Confirms a matched agency proposal for a load (concurrency-safe, ADR-013 / ADR-016).
     /// Creates an Assignment in Proposed status, records ApprovalDecision, sends agency proposal email,
-    /// and completes the workflow run. Accessible by Shippers (who own the load) and Admins.
+    /// and completes the workflow run. Only the owning Shipper may take this decision.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="request">The agency chosen by the shipper.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the created <see cref="AssignmentResponseDto"/>.</returns>
     [HttpPost("{loadId:guid}/match/confirm")]
-    [Authorize(Roles = ShipperOrAdminRoles)]
+    [Authorize(Roles = ShipperRole)]
     public async Task<ActionResult<AssignmentResponseDto>> ConfirmMatch(
         Guid loadId,
         [FromBody] ConfirmMatchDto request,
         CancellationToken cancellationToken)
     {
         var result = await _assignmentService.ConfirmMatchAsync(
+            loadId,
+            request,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Rejects the load's current match recommendation. Records a Reject approval decision
+    /// with the shipper's reason and aborts the workflow run. Only the owning Shipper may take this decision.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="request">The shipper's reason for rejecting the recommendation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="MatchDecisionResponseDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/reject")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<MatchDecisionResponseDto>> RejectMatch(
+        Guid loadId,
+        [FromBody] MatchDecisionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.RejectMatchAsync(
+            loadId,
+            request,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Requests a revised match recommendation for the load. Records a Revise approval decision
+    /// with the shipper's reason and aborts the workflow run so a fresh recommendation can be fetched.
+    /// Only the owning Shipper may take this decision.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="request">The shipper's reason for requesting a revised recommendation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="MatchDecisionResponseDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/revise")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<MatchDecisionResponseDto>> ReviseMatch(
+        Guid loadId,
+        [FromBody] MatchDecisionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.ReviseMatchAsync(
             loadId,
             request,
             GetCurrentUserId(),

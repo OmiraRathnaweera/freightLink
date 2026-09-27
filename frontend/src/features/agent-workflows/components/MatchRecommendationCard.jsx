@@ -5,6 +5,7 @@ import {
   Clock,
   Navigation,
   Check,
+  X,
   RotateCcw,
   CheckCircle2,
   Building2,
@@ -33,8 +34,12 @@ export default function MatchRecommendationCard({
   existingAssignment,
   onApproveMatch,
   onRetryMatch,
+  onRejectMatch,
+  onReviseMatch,
   isApproving,
   isRetrying,
+  isRejecting,
+  isRevising,
 }) {
   if (!recommendedAgency) {
     return (
@@ -282,35 +287,63 @@ export default function MatchRecommendationCard({
 
           <div className="flex items-center gap-3">
             {!isMatched ? (
-              <button
-                id="approve-match-btn"
-                data-testid="approve-match-btn"
-                type="button"
-                onClick={() =>
-                  onApproveMatch({
-                    loadId,
-                    agencyId: selectedAgencyId || recommendedAgency.agencyId,
-                  })
-                }
-                disabled={isApproving}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isApproving ? (
-                  <>
-                    <RotateCcw className="h-4 w-4 animate-spin" />
-                    <span>Confirming Match...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-5 w-5 stroke-[2.5]" />
-                    <span>
-                      {selectedCandidate
-                        ? `Approve ${selectedCandidate.name} & Dispatch`
-                        : 'Approve Match & Dispatch'}
-                    </span>
-                  </>
+              <>
+                {onReviseMatch && (
+                  <button
+                    id="revise-match-btn"
+                    data-testid="revise-match-btn"
+                    type="button"
+                    onClick={() => onReviseMatch({ loadId })}
+                    disabled={isApproving || isRevising || isRejecting}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-status-amber-text px-4 py-2.5 text-sm font-bold text-status-amber-text transition-all hover:bg-status-amber-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Request Revision</span>
+                  </button>
                 )}
-              </button>
+                {onRejectMatch && (
+                  <button
+                    id="reject-match-btn"
+                    data-testid="reject-match-btn"
+                    type="button"
+                    onClick={() => onRejectMatch({ loadId })}
+                    disabled={isApproving || isRevising || isRejecting}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-status-red-text px-4 py-2.5 text-sm font-bold text-status-red-text transition-all hover:bg-status-red-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <X className="h-4 w-4" />
+                    <span>Reject Match</span>
+                  </button>
+                )}
+                <button
+                  id="approve-match-btn"
+                  data-testid="approve-match-btn"
+                  type="button"
+                  onClick={() =>
+                    onApproveMatch({
+                      loadId,
+                      agencyId: selectedAgencyId || recommendedAgency.agencyId,
+                    })
+                  }
+                  disabled={isApproving}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isApproving ? (
+                    <>
+                      <RotateCcw className="h-4 w-4 animate-spin" />
+                      <span>Confirming Match...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5 stroke-[2.5]" />
+                      <span>
+                        {selectedCandidate
+                          ? `Approve ${selectedCandidate.name} & Dispatch`
+                          : 'Approve Match & Dispatch'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </>
             ) : (
               <span className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />

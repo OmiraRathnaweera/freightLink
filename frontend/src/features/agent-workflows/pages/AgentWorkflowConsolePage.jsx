@@ -15,9 +15,12 @@ import {
   getLoadMatch,
   useLoadMatchQuery,
   useConfirmMatchMutation,
+  useRejectMatchMutation,
+  useReviseMatchMutation,
 } from '../api/agentWorkflowsApi.js'
 import WorkflowStepper from '../components/WorkflowStepper.jsx'
 import MatchRecommendationCard from '../components/MatchRecommendationCard.jsx'
+import MatchDecisionDialog from '../components/MatchDecisionDialog.jsx'
 import ValidationChecklist from '../components/ValidationChecklist.jsx'
 import AlternateCandidatesList from '../components/AlternateCandidatesList.jsx'
 import LoadSelectorBar from '../components/LoadSelectorBar.jsx'
@@ -45,13 +48,16 @@ export default function AgentWorkflowConsolePage() {
   })
   const matchData = matchQuery.data
 
-  // Confirm match mutation
+  // Confirm/reject/revise match mutations
   const confirmMutation = useConfirmMatchMutation()
+  const rejectMutation = useRejectMatchMutation()
+  const reviseMutation = useReviseMatchMutation()
 
   // Track candidate selection override
   const [selectedAgencyId, setSelectedAgencyId] = useState(null)
   const [actionSuccessMessage, setActionSuccessMessage] = useState(null)
   const [actionErrorMessage, setActionErrorMessage] = useState(null)
+  const [pendingDecisionType, setPendingDecisionType] = useState(null)
 
   const activeSelectedAgencyId = selectedAgencyId || matchData?.recommendedAgency?.agencyId
 
@@ -94,6 +100,26 @@ export default function AgentWorkflowConsolePage() {
     } catch {
       await matchQuery.refetch()
     }
+  }
+
+  // Handle a Reject/Revise decision submitted through MatchDecisionDialog
+  const handleMatchDecided = async (decisionType) => {
+    setPendingDecisionType(null)
+    setActionErrorMessage(null)
+    setActionSuccessMessage(
+      decisionType === 'reject'
+        ? 'Match recommendation rejected.'
+        : 'Revision requested — fetching a new recommendation.'
+    )
+
+    if (decisionType === 'revise' && activeLoadId) {
+      try {
+        await getLoadMatch(activeLoadId, true)
+      } catch {
+        // fall through to refetch below regardless
+      }
+    }
+    await matchQuery.refetch()
   }
 
   return (
@@ -216,9 +242,22 @@ export default function AgentWorkflowConsolePage() {
             existingAssignment={matchData.existingAssignment}
             onApproveMatch={handleApproveMatch}
             onRetryMatch={handleRetryMatch}
+            onRejectMatch={() => setPendingDecisionType('reject')}
+            onReviseMatch={() => setPendingDecisionType('revise')}
             isApproving={confirmMutation.isPending}
             isRetrying={matchQuery.isFetching}
+            isRejecting={rejectMutation.isPending}
+            isRevising={reviseMutation.isPending}
           />
+
+          {pendingDecisionType && (
+            <MatchDecisionDialog
+              loadId={activeLoadId}
+              decisionType={pendingDecisionType}
+              onClose={() => setPendingDecisionType(null)}
+              onDecided={() => handleMatchDecided(pendingDecisionType)}
+            />
+          )}
 
           {/* 3. Side-by-Side: Agent 4 Safety Gate & Alternate Candidates */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

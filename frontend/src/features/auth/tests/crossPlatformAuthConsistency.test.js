@@ -122,7 +122,7 @@ describe('Cross-Platform Auth & Session Consistency (Y3S01-103)', () => {
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/agencies')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/trips')).toBe(true)
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/billing')).toBe(true)
-      expect(isRouteAllowedForRole(UserRole.ADMIN, '/agent-workflows')).toBe(true)
+      expect(isRouteAllowedForRole(UserRole.ADMIN, '/agent-workflows')).toBe(false)
       expect(isRouteAllowedForRole(UserRole.ADMIN, '/pricing-config')).toBe(true)
     })
   })

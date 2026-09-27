@@ -734,7 +734,7 @@ public class AssignmentService : IAssignmentService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
-        if (currentUserRole != UserRole.Admin && load.ShipperUserId != currentUserId)
+        if (currentUserRole != UserRole.Shipper || load.ShipperUserId != currentUserId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "You do not own this load.");
         }
@@ -1036,6 +1036,108 @@ public class AssignmentService : IAssignmentService
         return MapToDetail(assignment);
     }
 
+    /// <inheritdoc />
+    public Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> RejectMatchAsync(
+        Guid loadId,
+        FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+        => RecordMatchDecisionAsync(loadId, request, ApprovalDecisionType.Reject, currentUserId, currentUserRole, cancellationToken);
+
+    /// <inheritdoc />
+    public Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> ReviseMatchAsync(
+        Guid loadId,
+        FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+        => RecordMatchDecisionAsync(loadId, request, ApprovalDecisionType.Revise, currentUserId, currentUserRole, cancellationToken);
+
+    /// <summary>
+    /// Records a Shipper Reject/Revise decision on the load's latest workflow run, aborting the run
+    /// so a fresh recommendation must be fetched (via <see cref="GetMatchRecommendationAsync"/> with
+    /// <c>rerun: true</c>) before another decision can be made.
+    /// </summary>
+    private async Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> RecordMatchDecisionAsync(
+        Guid loadId,
+        FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request,
+        ApprovalDecisionType decisionType,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Reason))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Reason is required.");
+        }
+
+        var load = await _dbContext.Loads.FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+        if (load == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
+        }
+
+        if (currentUserRole != UserRole.Shipper || load.ShipperUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "You do not own this load.");
+        }
+
+        var run = await _dbContext.AgentWorkflowRuns
+            .Include(r => r.ApprovalDecisions)
+            .OrderByDescending(r => r.AttemptNo)
+            .ThenByDescending(r => r.CreatedAt)
+            .FirstOrDefaultAsync(r => r.LoadId == loadId, cancellationToken);
+
+        if (run == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.WORKFLOW_RUN_NOT_FOUND, "No match recommendation exists yet for this load.");
+        }
+
+        if (run.Status != WorkflowRunStatus.AwaitingApproval)
+        {
+            throw new ApiException(
+                HttpStatusCode.Conflict,
+                ErrorCode.WORKFLOW_RUN_ALREADY_APPROVED,
+                $"This workflow run cannot be updated because it is in '{run.Status}' status (expected AwaitingApproval).");
+        }
+
+        if (run.ApprovalDecisions.Any(d => d.Decision == ApprovalDecisionType.Approve))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.WORKFLOW_RUN_ALREADY_APPROVED, "This workflow run has already been approved.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var seqNo = await _dbContext.ApprovalDecisions.CountAsync(d => d.WorkflowRunId == run.WorkflowRunId, cancellationToken) + 1;
+        _dbContext.ApprovalDecisions.Add(new ApprovalDecision
+        {
+            ApprovalDecisionId = Guid.NewGuid(),
+            WorkflowRunId = run.WorkflowRunId,
+            DecidedByUserId = currentUserId,
+            SequenceNo = Math.Max(1, seqNo),
+            Decision = decisionType,
+            Reason = request.Reason.Trim(),
+            DecidedAt = now
+        });
+
+        run.Status = WorkflowRunStatus.Aborted;
+        run.CompletedAt = now;
+        run.UpdatedAt = now;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        var message = decisionType == ApprovalDecisionType.Reject
+            ? "Match recommendation rejected. Request a new recommendation when you're ready."
+            : "Revision requested. Fetching a new recommendation for this load.";
+
+        return new FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto
+        {
+            WorkflowRunId = run.WorkflowRunId,
+            Decision = decisionType.ToString(),
+            WorkflowStatus = run.Status.ToString(),
+            Message = message
+        };
+    }
+
     private static VehicleClass ResolveVehicleClassFromLoad(decimal weightKg, decimal? volumeM3)
     {
         var vol = volumeM3 ?? 1.0m;
@@ -1273,7 +1375,7 @@ public class AssignmentService : IAssignmentService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
-        if (currentUserRole != UserRole.Admin && load.ShipperUserId != currentUserId)
+        if (currentUserRole != UserRole.Shipper || load.ShipperUserId != currentUserId)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "You do not have permission to view match recommendations for this load.");
         }

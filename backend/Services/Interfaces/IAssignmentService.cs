@@ -53,4 +53,16 @@ public interface IAssignmentService
     /// Fetches the AI workflow match recommendation, candidates, validation, and steps for a load.
     /// </summary>
     Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, bool rerun = false, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Rejects the load's current match recommendation. Records a Reject <c>ApprovalDecision</c> with the
+    /// Shipper's reason and aborts the workflow run; a new recommendation must be requested afterwards.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> RejectMatchAsync(Guid loadId, FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Requests a revised match recommendation for the load. Records a Revise <c>ApprovalDecision</c> with the
+    /// Shipper's reason and aborts the workflow run so a fresh recommendation can be fetched.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> ReviseMatchAsync(Guid loadId, FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

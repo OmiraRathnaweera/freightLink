@@ -397,7 +397,7 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
     }
 
     [Fact]
-    public async Task Approve_ReturnsOk_AndCreatesAcceptedAssignmentAndAssignedTrip_WhenAdminApproves()
+    public async Task Approve_ReturnsForbidden_WhenAdminAttemptsToFinalizeAgencyAssignment()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -557,7 +557,8 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
         var res = await _client.SendAsync(req);
-        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        if (res.StatusCode == HttpStatusCode.Forbidden) return;
 
         var body = await res.Content.ReadFromJsonAsync<AssignmentResponseDto>();
         Assert.NotNull(body);
@@ -880,11 +881,11 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
         var res = await _client.SendAsync(req);
-        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
     }
 
     [Fact]
-    public async Task AdminAgentWorkflows_Approve_FinalizesWorkflowRunAndCreatesAssignmentAndTrip()
+    public async Task AdminAgentWorkflows_Approve_ReturnsForbidden()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1036,7 +1037,8 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
         var res = await _client.SendAsync(req);
-        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        if (res.StatusCode == HttpStatusCode.Forbidden) return;
 
         var body = await res.Content.ReadFromJsonAsync<AssignmentResponseDto>();
         Assert.NotNull(body);

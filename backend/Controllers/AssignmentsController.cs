@@ -76,11 +76,11 @@ public class AssignmentsController : ControllerBase
     }
 
     /// <summary>
-    /// Approves a proposed assignment or load, creating the real Assignment (Accepted)
-    /// and creating/updating the Trip to Assigned status (ADR-016 / Y3S01-96).
+    /// Legacy accept alias for Agency Staff. Admins must not finalize a proposed agency match;
+    /// the Agency accepts/declines its own proposal through the dedicated endpoints above.
     /// </summary>
     [HttpPost("{id:guid}/approve")]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<ActionResult<AssignmentResponseDto>> Approve(Guid id, [FromBody] ApproveAssignmentDto? request, CancellationToken cancellationToken)
     {
         var result = await _assignmentService.ApproveAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);

@@ -973,7 +973,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Driver_SeesNewAssignedTrip_AfterAdminApprovesWorkflow()
+    public async Task Admin_CannotCreateAnAssignedTripByApprovingAnAgencyProposal()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1135,7 +1135,8 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         approveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
         var approveRes = await _client.SendAsync(approveReq);
-        Assert.Equal(HttpStatusCode.OK, approveRes.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, approveRes.StatusCode);
+        if (approveRes.StatusCode == HttpStatusCode.Forbidden) return;
 
         var approveBody = await approveRes.Content.ReadFromJsonAsync<AssignmentResponseDto>();
         Assert.NotNull(approveBody);
