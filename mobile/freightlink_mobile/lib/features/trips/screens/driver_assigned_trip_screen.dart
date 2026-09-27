@@ -16,6 +16,7 @@ import '../../notifications/providers/notification_provider.dart';
 import '../data/trips_repository.dart';
 import '../models/trip_models.dart';
 import 'proof_of_delivery_screen.dart';
+import 'trip_route_map_screen.dart';
 
 /// Screen displayed to authenticated users with the Driver role.
 /// Shows the driver's currently assigned active trip (Assigned, PickedUp, InTransit),
@@ -649,63 +650,23 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'PICKUP LOCATION',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.inkMuted,
-                        letterSpacing: 0.5,
-                      ),
+                    _buildRouteStop(
+                      label: 'PICKUP LOCATION',
+                      address: trip.pickupAddress ?? 'Origin Address',
+                      windowText: trip.pickupWindowStart != null
+                          ? 'Window: ${DateFormat('MMM d, h:mm a').format(trip.pickupWindowStart!)}'
+                          : null,
+                      onTap: trip.hasRouteCoordinates ? () => _openRouteMap(trip, focus: 'pickup') : null,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      trip.pickupAddress ?? 'Origin Address',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    if (trip.pickupWindowStart != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Window: ${DateFormat('MMM d, h:mm a').format(trip.pickupWindowStart!)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.inkMuted,
-                        ),
-                      ),
-                    ],
                     const SizedBox(height: 20),
-                    const Text(
-                      'DROPOFF LOCATION',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.inkMuted,
-                        letterSpacing: 0.5,
-                      ),
+                    _buildRouteStop(
+                      label: 'DROPOFF LOCATION',
+                      address: trip.dropoffAddress ?? 'Destination Address',
+                      windowText: trip.pickupWindowEnd != null
+                          ? 'Target: ${DateFormat('MMM d, h:mm a').format(trip.pickupWindowEnd!)}'
+                          : null,
+                      onTap: trip.hasRouteCoordinates ? () => _openRouteMap(trip, focus: 'dropoff') : null,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      trip.dropoffAddress ?? 'Destination Address',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.ink,
-                      ),
-                    ),
-                    if (trip.pickupWindowEnd != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Target: ${DateFormat('MMM d, h:mm a').format(trip.pickupWindowEnd!)}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.inkMuted,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -713,6 +674,78 @@ class _DriverAssignedTripScreenState extends State<DriverAssignedTripScreen>
           ),
         ],
       ),
+    );
+  }
+
+  void _openRouteMap(TripResponse trip, {required String focus}) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => TripRouteMapScreen(
+          pickupLat: trip.pickupLat!,
+          pickupLng: trip.pickupLng!,
+          pickupAddress: trip.pickupAddress ?? 'Pickup location',
+          dropoffLat: trip.dropoffLat!,
+          dropoffLng: trip.dropoffLng!,
+          dropoffAddress: trip.dropoffAddress ?? 'Dropoff location',
+          focus: focus,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRouteStop({
+    required String label,
+    required String address,
+    String? windowText,
+    VoidCallback? onTap,
+  }) {
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: AppColors.inkMuted,
+                letterSpacing: 0.5,
+              ),
+            ),
+            if (onTap != null) ...[
+              const SizedBox(width: 6),
+              const Icon(Icons.map_outlined, size: 13, color: AppColors.primary),
+            ],
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text(
+          address,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.ink,
+          ),
+        ),
+        if (windowText != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            windowText,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.inkMuted,
+            ),
+          ),
+        ],
+      ],
+    );
+
+    if (onTap == null) return content;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppConstants.radiusSm),
+      child: Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: content),
     );
   }
 

@@ -47,6 +47,7 @@ dependencies:
   file_picker: ^13.1.0
   webview_flutter: ^4.10.0
   auto_size_text: ^3.0.0
+  geolocator: ^14.0.1
 
 dev_dependencies:
   flutter_test:
