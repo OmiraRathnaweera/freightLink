@@ -74,6 +74,8 @@ export default function WorkflowStepper({ steps = [], workflowStatus = 'PendingR
               ? 'Matching Not Started Yet'
               : workflowStatus === 'Failed'
               ? 'Matching Failed'
+              : workflowStatus === 'Aborted'
+              ? 'Recommendation Rejected'
               : 'Matching In Progress'}
           </span>
         </div>

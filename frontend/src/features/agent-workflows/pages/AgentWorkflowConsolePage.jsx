@@ -271,6 +271,7 @@ export default function AgentWorkflowConsolePage() {
           <MatchRecommendationCard
             loadId={activeLoadId}
             loadStatus={matchData.loadStatus}
+            workflowStatus={matchData.workflowStatus}
             recommendedAgency={matchData.recommendedAgency}
             selectedAgencyId={activeSelectedAgencyId}
             alternateCandidates={matchData.alternateCandidates}

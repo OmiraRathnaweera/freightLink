@@ -120,4 +120,72 @@ describe('MatchRecommendationCard', () => {
     expect(screen.getByText(/Match Approved & Dispatched/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Approve Match & Dispatch/i })).not.toBeInTheDocument()
   })
+
+  it('shows only a single Request Revision action once the recommendation has been rejected (Aborted)', () => {
+    render(
+      <MatchRecommendationCard
+        loadId="load-1"
+        loadStatus="Posted"
+        workflowStatus="Aborted"
+        recommendedAgency={mockRecommendedAgency}
+        selectedAgencyId="agency-111"
+        onApproveMatch={vi.fn()}
+        onRetryMatch={vi.fn()}
+        onRejectMatch={vi.fn()}
+        onReviseMatch={vi.fn()}
+        isApproving={false}
+        isRetrying={false}
+      />
+    )
+
+    expect(screen.getByText('Recommendation Rejected')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Request Revision/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Approve Match & Dispatch/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Reject Match/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Retry Match$/i })).not.toBeInTheDocument()
+  })
+
+  it('calls onRetryMatch (a fresh trigger, not the decision endpoints) when Request Revision is clicked after rejection', async () => {
+    const user = userEvent.setup()
+    const handleRetry = vi.fn()
+
+    render(
+      <MatchRecommendationCard
+        loadId="load-1"
+        loadStatus="Posted"
+        workflowStatus="Aborted"
+        recommendedAgency={mockRecommendedAgency}
+        selectedAgencyId="agency-111"
+        onApproveMatch={vi.fn()}
+        onRetryMatch={handleRetry}
+        onRejectMatch={vi.fn()}
+        onReviseMatch={vi.fn()}
+        isApproving={false}
+        isRetrying={false}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /Request Revision/i }))
+    expect(handleRetry).toHaveBeenCalled()
+  })
+
+  it('shows the single Request Revision action when no automatic match was found (Failed)', () => {
+    render(
+      <MatchRecommendationCard
+        loadId="load-1"
+        loadStatus="Posted"
+        workflowStatus="Failed"
+        recommendedAgency={mockRecommendedAgency}
+        selectedAgencyId="agency-111"
+        onApproveMatch={vi.fn()}
+        onRetryMatch={vi.fn()}
+        isApproving={false}
+        isRetrying={false}
+      />
+    )
+
+    expect(screen.getByText('No Automatic Match Found')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Request Revision/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Retry Match$/i })).not.toBeInTheDocument()
+  })
 })
