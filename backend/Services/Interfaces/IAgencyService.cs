@@ -24,6 +24,12 @@ public interface IAgencyService
     Task<PagedAgencyResponseDto> GetListAsync(Guid currentUserId, UserRole currentUserRole, AgencyListQueryDto query, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Computes system-wide agency/driver/vehicle counts, unaffected by any list search/status
+    /// filter or page — backs the Admin dashboard's summary cards (issue #45).
+    /// </summary>
+    Task<AgencyPlatformSummaryDto> GetPlatformSummaryAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves a list of agencies that have compliance documents expiring within the specified number of days.
     /// </summary>
     Task<IEnumerable<AgencyExpiringComplianceDto>> GetAgenciesWithExpiringComplianceAsync(int days, CancellationToken cancellationToken = default);

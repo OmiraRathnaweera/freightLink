@@ -61,6 +61,18 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// System-wide agency/driver/vehicle counts for the Admin dashboard's summary cards -
+    /// unaffected by any search/status filter or page on the list above (issue #45).
+    /// </summary>
+    [HttpGet("summary")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<AgencyPlatformSummaryDto>> GetPlatformSummary(CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetPlatformSummaryAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Retrieves a list of agencies with compliance documents expiring soon.
     /// </summary>
     [HttpGet("expiring-compliance")]

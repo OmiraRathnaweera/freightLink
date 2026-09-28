@@ -161,6 +161,28 @@ public class AgencyService : IAgencyService
     }
 
     /// <inheritdoc />
+    public async Task<AgencyPlatformSummaryDto> GetPlatformSummaryAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can view platform-wide agency summary.");
+        }
+
+        // Direct COUNT queries against the whole table - never paged through and summed
+        // client-side, and never derived from a search/status-filtered listing - so these numbers
+        // stay accurate no matter how many agencies exist or what the admin's list view is
+        // currently filtered to (issue #45).
+        return new AgencyPlatformSummaryDto
+        {
+            TotalAgencies = await _dbContext.Agencies.CountAsync(cancellationToken),
+            ActiveAgencies = await _dbContext.Agencies.CountAsync(a => a.Status == AgencyStatus.Active, cancellationToken),
+            TotalDrivers = await _dbContext.Drivers.CountAsync(cancellationToken),
+            ActiveDrivers = await _dbContext.Drivers.CountAsync(d => d.Status == DriverStatus.Active, cancellationToken),
+            TotalVehicles = await _dbContext.Vehicles.CountAsync(cancellationToken)
+        };
+    }
+
+    /// <inheritdoc />
     public async Task<IEnumerable<AgencyExpiringComplianceDto>> GetAgenciesWithExpiringComplianceAsync(int days, CancellationToken cancellationToken = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);

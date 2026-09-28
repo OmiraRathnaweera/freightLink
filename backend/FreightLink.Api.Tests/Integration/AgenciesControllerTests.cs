@@ -102,7 +102,155 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
     {
         var tokens = await RegisterAndLoginAgencyAsync("list-fail", "FAIL");
         using var request = AuthedRequest(HttpMethod.Get, "/api/v1/agencies", tokens.AccessToken);
-        
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    /// <summary>
+    /// Directly inserts <paramref name="count"/> minimal agencies (bypassing the real registration
+    /// flow, which would be far slower for a "many agencies" pagination test), each with
+    /// <paramref name="marker"/> embedded in its Name so a test can isolate exactly its own seeded
+    /// rows via <c>?search=</c>, immune to any other agencies other tests in this shared-per-class
+    /// InMemory DB (<c>IClassFixture</c>) may have created. CreatedAt descends by one second per
+    /// agency in seed order, so seed order is deterministic default (createdAt desc) sort order.
+    /// </summary>
+    private async Task<List<Guid>> SeedManyAgenciesAsync(string marker, int count, AgencyStatus status = AgencyStatus.Active)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var now = DateTimeOffset.UtcNow;
+        var ids = new List<Guid>();
+        for (var i = 0; i < count; i++)
+        {
+            var agencyId = Guid.NewGuid();
+            ids.Add(agencyId);
+            db.Agencies.Add(new Agency
+            {
+                AgencyId = agencyId,
+                Name = $"{marker} Agency {i:D3}",
+                BusinessRegNo = $"BR-{marker}-{i:D3}",
+                YardAddress = $"{i} Test Yard Road",
+                YardLat = 6.9m,
+                YardLng = 79.8m,
+                Status = status,
+                CreatedAt = now.AddSeconds(-i),
+                UpdatedAt = now.AddSeconds(-i)
+            });
+        }
+        await db.SaveChangesAsync();
+        return ids;
+    }
+
+    [Fact]
+    public async Task GetAllAgencies_PagesAndSearchTogether_FindEveryMatchAcrossAllPages()
+    {
+        // Regression test for issue #45: the admin console previously only ever showed page 1 and
+        // searched/filtered only those already-fetched rows, so a match that only existed beyond
+        // page 1 looked like it didn't exist. This seeds 25 agencies sharing one unique marker and
+        // asserts paging through the *search-filtered* result set (not the whole table) surfaces
+        // every one of them exactly once, including the ones on page 2 and 3.
+        var marker = $"Zephyr{Guid.NewGuid():N}"[..14];
+        var seededIds = await SeedManyAgenciesAsync(marker, 25);
+
+        var foundIds = new HashSet<Guid>();
+        int? totalItems = null;
+        int? totalPages = null;
+
+        for (var page = 1; page <= 3; page++)
+        {
+            using var request = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies?search={marker}&page={page}&pageSize=10", MintAdminToken());
+            var response = await _client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+            var body = await response.Content.ReadFromJsonAsync<PagedAgencyResponseDto>(JsonOpts);
+            Assert.NotNull(body);
+            Assert.Equal(page, body!.Page);
+            Assert.All(body.Items, item => Assert.Contains(marker, item.Name));
+
+            totalItems = body.TotalItems;
+            totalPages = body.TotalPages;
+            foreach (var item in body.Items) foundIds.Add(item.AgencyId);
+        }
+
+        Assert.Equal(25, totalItems);
+        Assert.Equal(3, totalPages);
+        Assert.Equal(seededIds.Count, foundIds.Count);
+        Assert.True(seededIds.All(id => foundIds.Contains(id)), "Every seeded agency should have been found across the paged, search-filtered results.");
+    }
+
+    [Fact]
+    public async Task GetAllAgencies_StatusFilter_FindsMatchesBeyondFirstPage()
+    {
+        // Same scenario as above, but for the status filter specifically: 15 Suspended agencies
+        // sharing a unique marker, pageSize 10 so the filtered result set spans 2 pages.
+        var marker = $"Halcyon{Guid.NewGuid():N}"[..14];
+        var seededIds = await SeedManyAgenciesAsync(marker, 15, AgencyStatus.Suspended);
+
+        using var page1Req = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies?search={marker}&status=Suspended&page=1&pageSize=10", MintAdminToken());
+        var page1Res = await _client.SendAsync(page1Req);
+        var page1 = await page1Res.Content.ReadFromJsonAsync<PagedAgencyResponseDto>(JsonOpts);
+        Assert.NotNull(page1);
+        Assert.Equal(10, page1!.Items.Count);
+        Assert.Equal(15, page1.TotalItems);
+        Assert.Equal(2, page1.TotalPages);
+
+        using var page2Req = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies?search={marker}&status=Suspended&page=2&pageSize=10", MintAdminToken());
+        var page2Res = await _client.SendAsync(page2Req);
+        var page2 = await page2Res.Content.ReadFromJsonAsync<PagedAgencyResponseDto>(JsonOpts);
+        Assert.NotNull(page2);
+        Assert.Equal(5, page2!.Items.Count);
+
+        var combinedIds = page1.Items.Select(i => i.AgencyId).Concat(page2.Items.Select(i => i.AgencyId)).ToHashSet();
+        Assert.Equal(15, combinedIds.Count);
+        Assert.True(seededIds.All(id => combinedIds.Contains(id)));
+        Assert.All(page1.Items.Concat(page2.Items), item => Assert.Equal("Suspended", item.Status.ToString()));
+    }
+
+    [Fact]
+    public async Task GetPlatformSummary_Returns200_WithSystemWideCounts_UnaffectedByListFilters()
+    {
+        // Regression test for issue #45: the summary cards must reflect true platform-wide totals,
+        // not just whatever happens to be on the admin's current (filtered/paged) list view. Since
+        // this InMemory DB is shared across every test in this class (IClassFixture), we assert the
+        // *delta* this seed produces rather than an absolute count, so the test is immune to
+        // whatever other tests have already added.
+        using var beforeReq = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/summary", MintAdminToken());
+        var beforeRes = await _client.SendAsync(beforeReq);
+        Assert.Equal(HttpStatusCode.OK, beforeRes.StatusCode);
+        var before = await beforeRes.Content.ReadFromJsonAsync<AgencyPlatformSummaryDto>(JsonOpts);
+        Assert.NotNull(before);
+
+        var marker = $"Summary{Guid.NewGuid():N}"[..14];
+        await SeedManyAgenciesAsync(marker, 7, AgencyStatus.Active);
+        await SeedManyAgenciesAsync(marker, 3, AgencyStatus.Suspended);
+
+        using var afterReq = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/summary", MintAdminToken());
+        var afterRes = await _client.SendAsync(afterReq);
+        var after = await afterRes.Content.ReadFromJsonAsync<AgencyPlatformSummaryDto>(JsonOpts);
+        Assert.NotNull(after);
+
+        Assert.Equal(before!.TotalAgencies + 10, after!.TotalAgencies);
+        Assert.Equal(before.ActiveAgencies + 7, after.ActiveAgencies);
+
+        // A search/status-scoped list call for just this seed must NOT change what the summary
+        // reports - the summary endpoint takes no filters at all and must stay platform-wide.
+        using var scopedListReq = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies?search={marker}&status=Active&pageSize=1", MintAdminToken());
+        await _client.SendAsync(scopedListReq);
+
+        using var afterListReq = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/summary", MintAdminToken());
+        var afterListRes = await _client.SendAsync(afterListReq);
+        var afterList = await afterListRes.Content.ReadFromJsonAsync<AgencyPlatformSummaryDto>(JsonOpts);
+        Assert.Equal(after.TotalAgencies, afterList!.TotalAgencies);
+    }
+
+    [Fact]
+    public async Task GetPlatformSummary_Returns403_ForAgencyStaff()
+    {
+        var tokens = await RegisterAndLoginAgencyAsync("summary-fail", "SUMFAIL");
+        using var request = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/summary", tokens.AccessToken);
+
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

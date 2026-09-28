@@ -62,6 +62,24 @@ export function useAgenciesQuery(queryParams, options) {
   })
 }
 
+/**
+ * GET /agencies/summary
+ * Admin-only: system-wide agency/driver/vehicle counts, unaffected by any search/status filter or
+ * page on the agencies list — backs the "Registered Agencies & Fleet" dashboard's summary cards
+ * (issue #45). Never derive these totals from a paged useAgenciesQuery response.
+ */
+export async function getAgenciesSummary() {
+  return api.get('/agencies/summary')
+}
+
+export function useAgenciesSummaryQuery(options) {
+  return useQuery({
+    queryKey: [...agencyKeys.all, 'summary'],
+    queryFn: getAgenciesSummary,
+    ...options,
+  })
+}
+
 export function useVerifyAgencyMutation(options) {
   return useMutation({
     mutationFn: verifyAgency,
