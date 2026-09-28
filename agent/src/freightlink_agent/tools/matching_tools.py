@@ -98,11 +98,16 @@ def build_matching_tools(
     vehicle_class_by_candidate: dict[str, VehicleClass],
     ledger: dict[str, dict[str, Any]],
     tool_calls_audit: list[dict[str, Any]],
+    attempt_counters: dict[str, int],
 ) -> list[Any]:
     """Builds the two tools for one Agent 3 run, closing over that run's own candidates,
-    coordinates, and ledger so concurrent runs never share mutable state."""
+    coordinates, and ledger so concurrent runs never share mutable state.
 
-    attempt_counters: dict[str, int] = {}
+    attempt_counters is owned by the caller (agents/matching_pricing.py), not created here:
+    if the LLM tool-calling path turns out to be unusable, the caller's deterministic
+    fallback records ToolCall rows against this same AgentStep too, and must continue this
+    same per-tool-name counter rather than restart at 1 - the backend's uq_toolcall_attempt
+    constraint is unique on (AgentStepId, ToolName, AttemptNo)."""
 
     @tool
     async def get_route_and_eta_for_candidate(candidate_agency_id: str, leg: Literal["positioning", "cargo"]) -> str:

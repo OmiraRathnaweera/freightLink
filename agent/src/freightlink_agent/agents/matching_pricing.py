@@ -232,6 +232,7 @@ async def _deterministic_fallback_selection(
     weight_kg: float,
     volume_m3: float,
     tool_calls: list[dict[str, Any]],
+    attempt_counters: dict[str, int],
 ) -> dict[str, Any]:
     """Today's original, fully procedural selection algorithm (no LLM): routes every
     shortlisted candidate, picks the fastest positioning ETA, routes the cargo leg, and
@@ -239,10 +240,22 @@ async def _deterministic_fallback_selection(
     outage degrades to this already-tested behavior instead of failing the run outright.
     Raises _SelectionFailed (a real "hold for review" failure) if routing/pricing
     themselves are broken - that must stop the pipeline either way.
+
+    attempt_counters is the SAME per-tool-name counter dict the (possibly already-run)
+    LLM tool-calling path used via build_matching_tools - continuing it here, rather than
+    restarting each tool's attempt numbering at 1, is required: both paths record ToolCall
+    rows against the very same AgentStep, and the backend's uq_toolcall_attempt constraint
+    is unique on (AgentStepId, ToolName, AttemptNo). Restarting at 1 collides with attempt
+    numbers the LLM path already persisted whenever it made real tool calls before its
+    final decision turned out to be unusable - every single one of this fallback's own
+    tool calls would then fail to persist (silently, since record_tool_call failures are
+    non-fatal), losing the audit trail for the run that actually mattered.
     """
     routed_candidates: list[tuple[CandidateAgency, RouteAndEtaResponse]] = []
 
-    for idx, candidate in enumerate(shortlist_to_eval, start=1):
+    for candidate in shortlist_to_eval:
+        attempt_counters["get_route_and_eta"] = attempt_counters.get("get_route_and_eta", 0) + 1
+        attempt_no = attempt_counters["get_route_and_eta"]
         req = RouteAndEtaRequest(
             origin_lat=candidate.yard_lat,
             origin_lng=candidate.yard_lng,
@@ -265,7 +278,7 @@ async def _deterministic_fallback_selection(
         tool_calls.append({
             "toolCallId": str(uuid4()),
             "toolName": "get_route_and_eta",
-            "attemptNo": idx,
+            "attemptNo": attempt_no,
             "requestJson": req_json,
             "responseJson": res_json,
             "success": route_res.success,
@@ -279,7 +292,7 @@ async def _deterministic_fallback_selection(
                 workflow_run_id,
                 CreateToolCallRequest(
                     tool_name="get_route_and_eta",
-                    attempt_no=idx,
+                    attempt_no=attempt_no,
                     request_json=req_json,
                     response_json=res_json,
                     success=route_res.success,
@@ -329,6 +342,9 @@ async def _deterministic_fallback_selection(
     )
     cargo_route, cargo_telemetry = await get_route_and_eta(cargo_req)
 
+    attempt_counters["get_route_and_eta"] = attempt_counters.get("get_route_and_eta", 0) + 1
+    cargo_attempt_no = attempt_counters["get_route_and_eta"]
+
     cargo_req_json = json.dumps(cargo_telemetry.get("request"), default=str)
     cargo_err_msg = cargo_route.error_message
     if not cargo_route.success:
@@ -343,7 +359,7 @@ async def _deterministic_fallback_selection(
     tool_calls.append({
         "toolCallId": str(uuid4()),
         "toolName": "get_route_and_eta",
-        "attemptNo": len(shortlist_to_eval) + 1,
+        "attemptNo": cargo_attempt_no,
         "requestJson": cargo_req_json,
         "responseJson": cargo_res_json,
         "success": cargo_route.success,
@@ -357,7 +373,7 @@ async def _deterministic_fallback_selection(
             workflow_run_id,
             CreateToolCallRequest(
                 tool_name="get_route_and_eta",
-                attempt_no=len(shortlist_to_eval) + 1,
+                attempt_no=cargo_attempt_no,
                 request_json=cargo_req_json,
                 response_json=cargo_res_json,
                 success=cargo_route.success,
@@ -385,6 +401,9 @@ async def _deterministic_fallback_selection(
     )
     pricing_res, pricing_telemetry = await get_price_estimate(pricing_req)
 
+    attempt_counters["estimate_price"] = attempt_counters.get("estimate_price", 0) + 1
+    pricing_attempt_no = attempt_counters["estimate_price"]
+
     pricing_req_json = json.dumps(pricing_req.model_dump(by_alias=True), default=str)
     pricing_err_msg = pricing_telemetry.get("error")
     if not pricing_res:
@@ -399,7 +418,7 @@ async def _deterministic_fallback_selection(
     tool_calls.append({
         "toolCallId": str(uuid4()),
         "toolName": "estimate_price",
-        "attemptNo": 1,
+        "attemptNo": pricing_attempt_no,
         "requestJson": pricing_req_json,
         "responseJson": pricing_res_json,
         "success": pricing_res is not None,
@@ -413,7 +432,7 @@ async def _deterministic_fallback_selection(
             workflow_run_id,
             CreateToolCallRequest(
                 tool_name="estimate_price",
-                attempt_no=1,
+                attempt_no=pricing_attempt_no,
                 request_json=pricing_req_json,
                 response_json=pricing_res_json,
                 success=pricing_res is not None,
@@ -522,6 +541,11 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     }
 
     ledger: dict[str, dict[str, Any]] = {}
+    # Shared across the LLM tool-calling path (below) AND _deterministic_fallback_selection
+    # if it runs afterward - both record ToolCall rows against the same AgentStep, and the
+    # backend's uq_toolcall_attempt constraint is unique on (AgentStepId, ToolName,
+    # AttemptNo), so attempt numbering must continue rather than restart at 1.
+    attempt_counters: dict[str, int] = {}
     tools = build_matching_tools(
         candidates_by_id=candidates_by_id,
         pickup=(pickup_lat, pickup_lng),
@@ -531,6 +555,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         vehicle_class_by_candidate=vehicle_class_by_candidate,
         ledger=ledger,
         tool_calls_audit=tool_calls,
+        attempt_counters=attempt_counters,
     )
 
     llm_context = {
@@ -584,6 +609,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
                 weight_kg=weight_kg,
                 volume_m3=volume_m3,
                 tool_calls=tool_calls,
+                attempt_counters=attempt_counters,
             )
         except _SelectionFailed as failure:
             logger.error(failure.message)

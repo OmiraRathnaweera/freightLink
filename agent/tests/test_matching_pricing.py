@@ -518,3 +518,122 @@ async def test_tool_failure_routing_safe_hold_for_review():
     assert steps[-1]["status"] == "Failed"
     assert "hold for review" in steps[-1]["errorMessage"].lower()
 
+
+@pytest.mark.anyio
+async def test_deterministic_fallback_continues_attempt_numbering_after_partial_llm_tool_calls():
+    """Regression test for a production bug: a real LLM often makes several genuine
+    positioning tool calls (consuming get_route_and_eta attempt numbers 1, 2, 3...) before
+    its final decision turns out to cite an invalid/failed id, triggering the deterministic
+    fallback. The fallback's own tool calls, against that SAME AgentStep, must continue that
+    numbering rather than restart at 1 - the backend's uq_toolcall_attempt constraint is
+    unique on (AgentStepId, ToolName, AttemptNo), so restarting causes every one of the
+    fallback's calls to collide and fail to persist (observed in production as repeated
+    409 TOOL_CALL_DUPLICATE_ATTEMPT responses and a lost audit trail)."""
+    load_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    shipper_id = uuid.uuid4()
+
+    agency_1 = CandidateAgency(
+        agency_id=uuid.uuid4(),
+        name="Peliyagoda Logistics",
+        yard_lat=6.9667,
+        yard_lng=79.8917,
+        yard_address="123 Negombo Rd, Peliyagoda",
+        available_vehicle_classes=["MediumLorry"],
+    )
+    agency_2 = CandidateAgency(
+        agency_id=uuid.uuid4(),
+        name="Southern Freight Express",
+        yard_lat=6.0535,
+        yard_lng=80.2210,
+        yard_address="45 Port Rd, Galle",
+        available_vehicle_classes=["MediumLorry"],
+    )
+
+    state = WorkflowState(
+        load_id=load_id,
+        triggered_by_user_id=shipper_id,
+        attempt_no=1,
+        workflow_run_id=run_id,
+        load_context={
+            "pickupLat": 6.9271,
+            "pickupLng": 79.8612,
+            "dropoffLat": 7.2906,
+            "dropoffLng": 80.6337,
+            "weightKg": 2500,
+            "volumeM3": 8.0,
+        },
+        candidate_shortlist=[agency_1, agency_2],
+    )
+
+    mock_pricing_response = EstimatePricingResponse(
+        load_id=load_id,
+        estimated_price=18500.0,
+        distance_km=115.0,
+        vehicle_class="MediumLorry",
+        rate_per_km=120.0,
+        rate_per_kg=1.5,
+        base_fare=1500.0,
+    )
+
+    # Simulates a real, imperfect LLM: it genuinely checks BOTH candidates' positioning ETA
+    # (two real get_route_and_eta tool calls, consuming attempt numbers 1 and 2) but its
+    # final decision cites a pricing tool_call_id that was never actually returned -
+    # forcing a fallback to the deterministic algorithm.
+    fake_llm = MagicMock()
+
+    async def _fake_run_tool_calling_selection(system_prompt, context, tools, max_iterations=6, max_tool_calls=8):
+        tools_by_name = {t.name: t for t in tools}
+        for candidate in (agency_1, agency_2):
+            await tools_by_name["get_route_and_eta_for_candidate"].ainvoke(
+                {"candidate_agency_id": str(candidate.agency_id), "leg": "positioning"}
+            )
+        return ToolCallingSelectionOutput(
+            selected_candidate_agency_id=str(agency_1.agency_id),
+            selected_positioning_tool_call_id="hallucinated-id",
+            selected_cargo_tool_call_id="hallucinated-id",
+            selected_pricing_tool_call_id="hallucinated-id",
+            headline="Bad decision",
+            detailed_reasoning="Cites ids that were never actually returned by any tool.",
+        )
+
+    fake_llm.run_tool_calling_selection = AsyncMock(side_effect=_fake_run_tool_calling_selection)
+
+    recorded_calls: list = []
+
+    async def _record_tool_call_side_effect(workflow_run_id, request):
+        recorded_calls.append(request)
+
+    with (
+        patch("freightlink_agent.agents.matching_pricing.get_llm", return_value=fake_llm),
+        patch(
+            "freightlink_agent.tools.matching_tools.record_tool_call",
+            new=AsyncMock(side_effect=_record_tool_call_side_effect),
+        ),
+        patch(
+            "freightlink_agent.agents.matching_pricing.get_price_estimate",
+            new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200})),
+        ),
+        patch(
+            "freightlink_agent.agents.matching_pricing.record_tool_call",
+            new=AsyncMock(side_effect=_record_tool_call_side_effect),
+        ),
+        patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
+    ):
+        result = await matching_pricing.run(state)
+
+    assert result.get("failed") is not True
+    assert result["proposed_price"] == 18500.0
+
+    # Every recorded ToolCall for a given tool name must have a unique attempt number - no
+    # (tool_name, attempt_no) pair repeats, which is exactly what uq_toolcall_attempt enforces.
+    seen: set[tuple[str, int]] = set()
+    for call in recorded_calls:
+        key = (call.tool_name, call.attempt_no)
+        assert key not in seen, f"duplicate (tool_name, attempt_no) recorded: {key}"
+        seen.add(key)
+
+    # The LLM path's 2 positioning calls plus the fallback's own calls must all have landed.
+    get_route_calls = [c for c in recorded_calls if c.tool_name == "get_route_and_eta"]
+    assert len(get_route_calls) >= 4  # 2 from the LLM path + at least 2 from the fallback
+
