@@ -1840,6 +1840,150 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
     }
 
     [Fact]
+    public async Task Decline_ThirdConsecutiveAttempt_MarksWorkflowRunFailed_NoFourthAutomaticAttempt()
+    {
+        // ADR-018 retry cascade: attempts 1-2 leave the load Posted for another match attempt;
+        // attempt 3 (the cap) must record a safe, terminal failure - never a silent infinite loop,
+        // never a 4th automatic attempt (plans/06-testing-and-verification-plan.md §4).
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var shipperUserId = Guid.NewGuid();
+        db.Users.Add(new User
+        {
+            UserId = shipperUserId,
+            FullName = "Cascade Shipper",
+            Email = $"cascade-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var loadId = Guid.NewGuid();
+        db.Loads.Add(new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-CAS-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Cascade Cargo",
+            WeightKg = 2000,
+            VolumeM3 = 8,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            Status = LoadStatus.Posted,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        var workflowRunIds = new Guid[3];
+        var assignmentIds = new Guid[3];
+
+        for (var i = 0; i < 3; i++)
+        {
+            var attemptNo = i + 1;
+            var agencyId = Guid.NewGuid();
+            var staffUserId = Guid.NewGuid();
+            workflowRunIds[i] = Guid.NewGuid();
+            assignmentIds[i] = Guid.NewGuid();
+
+            db.Agencies.Add(new Agency
+            {
+                AgencyId = agencyId,
+                Name = $"Cascade Agency Attempt {attemptNo}",
+                BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+                YardAddress = "Cascade Yard",
+                YardLat = 6.9m,
+                YardLng = 79.8m,
+                Status = AgencyStatus.Active,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+
+            var staffUser = new User
+            {
+                UserId = staffUserId,
+                FullName = $"Cascade Staff {attemptNo}",
+                Email = $"cascade-staff-{Guid.NewGuid():N}@example.com",
+                PasswordHash = "hash",
+                Role = UserRole.AgencyStaff,
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            db.Users.Add(staffUser);
+            db.AgencyStaff.Add(new AgencyStaff
+            {
+                AgencyId = agencyId,
+                UserId = staffUserId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+
+            db.AgentWorkflowRuns.Add(new AgentWorkflowRun
+            {
+                WorkflowRunId = workflowRunIds[i],
+                LoadId = loadId,
+                TriggeredByUserId = shipperUserId,
+                AttemptNo = attemptNo,
+                Objective = $"Match load, attempt {attemptNo}",
+                Status = WorkflowRunStatus.AwaitingApproval,
+                StartedAt = DateTimeOffset.UtcNow,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+
+            db.Assignments.Add(new Assignment
+            {
+                AssignmentId = assignmentIds[i],
+                LoadId = loadId,
+                AgencyId = agencyId,
+                WorkflowRunId = workflowRunIds[i],
+                ProposedPrice = 40000m,
+                Status = AssignmentStatus.Proposed,
+                CreatedAt = DateTimeOffset.UtcNow,
+                UpdatedAt = DateTimeOffset.UtcNow
+            });
+
+            await db.SaveChangesAsync();
+
+            var token = MintToken(staffUserId, UserRole.AgencyStaff);
+            var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{assignmentIds[i]}/decline")
+            {
+                Content = JsonContent.Create(new DeclineAssignmentDto { Reason = $"Declining attempt {attemptNo}" })
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var res = await _client.SendAsync(req);
+            Assert.Equal(HttpStatusCode.OK, res.StatusCode);
+        }
+
+        using var checkScope = _factory.Services.CreateScope();
+        var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var firstRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunIds[0]);
+        var secondRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunIds[1]);
+        var thirdRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunIds[2]);
+
+        // Attempts 1 and 2 are below the cap - no terminal failure recorded for them.
+        Assert.NotEqual(WorkflowRunStatus.Failed, firstRun.Status);
+        Assert.NotEqual(WorkflowRunStatus.Failed, secondRun.Status);
+
+        // Attempt 3 (the cap) must be a real, recorded, terminal failure.
+        Assert.Equal(WorkflowRunStatus.Failed, thirdRun.Status);
+        Assert.NotNull(thirdRun.CompletedAt);
+
+        var allAssignments = await checkDb.Assignments.Where(a => a.LoadId == loadId).ToListAsync();
+        Assert.Equal(3, allAssignments.Count);
+        Assert.All(allAssignments, a => Assert.Equal(AssignmentStatus.Declined, a.Status));
+    }
+
+    [Fact]
     public async Task Decline_ReturnsConflict_WhenAssignmentAlreadyDeclined()
     {
         using var scope = _factory.Services.CreateScope();
