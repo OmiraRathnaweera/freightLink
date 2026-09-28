@@ -2,6 +2,8 @@ using System.Net;
 using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
+using FreightLink.Api.Common.Options;
+using FreightLink.Api.Common.Security;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Assignments;
 using FreightLink.Api.DTOs.Internal;
@@ -10,6 +12,7 @@ using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FreightLink.Api.Services;
 
@@ -24,6 +27,7 @@ public class AssignmentService : IAssignmentService
     private readonly IRouteService? _routeService;
     private readonly IConfiguration? _configuration;
     private readonly ILogger<AssignmentService>? _logger;
+    private readonly EmailOptions? _emailOptions;
 
     public AssignmentService(
         AppDbContext dbContext,
@@ -31,7 +35,8 @@ public class AssignmentService : IAssignmentService
         IPricingEstimatorService pricingEstimatorService,
         IRouteService? routeService = null,
         IConfiguration? configuration = null,
-        ILogger<AssignmentService>? logger = null)
+        ILogger<AssignmentService>? logger = null,
+        IOptions<EmailOptions>? emailOptions = null)
     {
         _dbContext = dbContext;
         _emailService = emailService;
@@ -39,6 +44,7 @@ public class AssignmentService : IAssignmentService
         _routeService = routeService;
         _configuration = configuration;
         _logger = logger;
+        _emailOptions = emailOptions?.Value;
     }
 
     /// <inheritdoc />
@@ -992,25 +998,46 @@ public class AssignmentService : IAssignmentService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         // 6. Trigger personalized agency email (reuse IEmailService) — only after this point, never before
-        var agencyEmail = agency.Staff.Select(s => s.User.Email).FirstOrDefault(e => !string.IsNullOrEmpty(e))
+        var agencyStaffForEmail = agency.Staff.FirstOrDefault(s => !string.IsNullOrEmpty(s.User.Email));
+        var agencyEmail = agencyStaffForEmail?.User.Email
             ?? $"dispatch@{agency.Name.ToLower().Replace(" ", "")}.com";
+
+        // Mint email Accept/Decline action-link tokens, best-effort: a failure here must never
+        // block match confirmation, only degrade the email to the plain "log in" variant.
+        string? acceptUrl = null;
+        string? declineUrl = null;
+        if (agencyStaffForEmail != null && !string.IsNullOrWhiteSpace(_emailOptions?.FrontendBaseUrl))
+        {
+            try
+            {
+                var (acceptRaw, declineRaw) = await IssueAssignmentActionTokensAsync(assignment.AssignmentId, agencyStaffForEmail.UserId, cancellationToken);
+                var frontendBaseUrl = _emailOptions.FrontendBaseUrl.TrimEnd('/');
+                acceptUrl = $"{frontendBaseUrl}/agency/job-proposals/respond?token={Uri.EscapeDataString(acceptRaw)}";
+                declineUrl = $"{frontendBaseUrl}/agency/job-proposals/respond?token={Uri.EscapeDataString(declineRaw)}";
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Failed to issue assignment action email tokens for assignment {AssignmentId}", assignment.AssignmentId);
+            }
+        }
+
+        var (proposalSubject, proposalHtmlBody, proposalTextBody) = EmailTemplates.BuildJobProposal(
+            agency.Name,
+            load.ReferenceCode,
+            load.CargoDescription,
+            load.WeightKg,
+            load.PickupAddress,
+            load.DropoffAddress,
+            proposedPrice,
+            acceptUrl,
+            declineUrl);
 
         var emailMessage = new EmailMessage
         {
             To = agencyEmail,
-            Subject = $"FreightLink — New Job Proposal for Load #{load.ReferenceCode}",
-            HtmlBody = $@"
-                <p>Dear {agency.Name},</p>
-                <p>A new freight load proposal has been matched and assigned to your agency on FreightLink.</p>
-                <ul>
-                    <li><strong>Load Reference:</strong> {load.ReferenceCode}</li>
-                    <li><strong>Cargo:</strong> {load.CargoDescription} ({load.WeightKg:N0} kg)</li>
-                    <li><strong>Pickup Location:</strong> {load.PickupAddress}</li>
-                    <li><strong>Dropoff Location:</strong> {load.DropoffAddress}</li>
-                    <li><strong>Proposed Price:</strong> LKR {proposedPrice:N2}</li>
-                </ul>
-                <p>Please log in to your FreightLink Agency portal to accept or decline this proposal.</p>",
-            TextBody = $"Dear {agency.Name},\n\nA new freight load proposal has been assigned to your agency.\nLoad Reference: {load.ReferenceCode}\nProposed Price: LKR {proposedPrice:N2}\nPlease log in to review and accept or decline.",
+            Subject = proposalSubject,
+            HtmlBody = proposalHtmlBody,
+            TextBody = proposalTextBody,
             TemplateKey = NotificationCategory.NewMatchFound,
             Metadata = new Dictionary<string, string>
             {
@@ -1271,6 +1298,55 @@ public class AssignmentService : IAssignmentService
         }
 
         return (vehicleId, driverId);
+    }
+
+    /// <summary>
+    /// Mints a fresh Accept+Decline email action-token pair for a just-created Proposed
+    /// assignment, invalidating any still-active tokens previously issued for it (a resend
+    /// replaces, never stacks). Returns the two raw tokens - only their hashes are persisted.
+    /// </summary>
+    private async Task<(string AcceptToken, string DeclineToken)> IssueAssignmentActionTokensAsync(
+        Guid assignmentId, Guid actingUserId, CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        var activeTokens = await _dbContext.AssignmentActionTokens
+            .Where(t => t.AssignmentId == assignmentId && t.ConsumedAt == null && t.ExpiresAt > now)
+            .ToListAsync(cancellationToken);
+        foreach (var existing in activeTokens)
+        {
+            existing.ConsumedAt = now;
+            existing.ConsumedReason = "Superseded by a newly issued action link.";
+        }
+
+        var acceptRaw = AccountTokens.CreateToken();
+        var declineRaw = AccountTokens.CreateToken();
+        var expiresAt = now.AddDays(7);
+
+        _dbContext.AssignmentActionTokens.AddRange(
+            new AssignmentActionToken
+            {
+                AssignmentActionTokenId = Guid.NewGuid(),
+                AssignmentId = assignmentId,
+                Action = AssignmentActionType.Accept,
+                TokenHash = AccountTokens.HashToken(acceptRaw),
+                ActingUserId = actingUserId,
+                ExpiresAt = expiresAt,
+                CreatedAt = now
+            },
+            new AssignmentActionToken
+            {
+                AssignmentActionTokenId = Guid.NewGuid(),
+                AssignmentId = assignmentId,
+                Action = AssignmentActionType.Decline,
+                TokenHash = AccountTokens.HashToken(declineRaw),
+                ActingUserId = actingUserId,
+                ExpiresAt = expiresAt,
+                CreatedAt = now
+            });
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return (acceptRaw, declineRaw);
     }
 
     private async Task EnforceOwnershipAsync(Assignment assignment, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)

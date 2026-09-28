@@ -141,6 +141,64 @@ public static class EmailTemplates
         return (subject, Wrap(subject, bodyHtml), bodyText);
     }
 
+    /// <summary>Builds the agency-facing job-proposal message. When <paramref name="acceptUrl"/>
+    /// and <paramref name="declineUrl"/> are both supplied, the email carries direct Accept/
+    /// Decline action buttons (single-use, 7-day links - see AssignmentActionTokenService);
+    /// otherwise it falls back to the original "log in to your portal" copy.</summary>
+    public static (string Subject, string HtmlBody, string TextBody) BuildJobProposal(
+        string agencyName,
+        string loadReference,
+        string cargoDescription,
+        decimal weightKg,
+        string pickupAddress,
+        string dropoffAddress,
+        decimal proposedPrice,
+        string? acceptUrl,
+        string? declineUrl)
+    {
+        var subject = $"FreightLink — New Job Proposal for Load #{loadReference}";
+        var hasActionLinks = !string.IsNullOrWhiteSpace(acceptUrl) && !string.IsNullOrWhiteSpace(declineUrl);
+
+        var actionHtml = hasActionLinks
+            ? $"""
+                <p style="margin: 24px 0;">
+                  <a href="{Encode(acceptUrl!)}" style="display:inline-block;padding:10px 20px;margin-right:12px;background:#0b8a3e;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;">Accept proposal</a>
+                  <a href="{Encode(declineUrl!)}" style="display:inline-block;padding:10px 20px;background:#b3261e;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;">Decline proposal</a>
+                </p>
+                <p style="font-size:12px;color:#6b6b6b;">These links expire in 7 days and work without logging in first. You can also respond from the FreightLink Agency Portal.</p>
+                """
+            : "<p>Please log in to your FreightLink Agency portal to accept or decline this proposal.</p>";
+
+        var bodyHtml = $"""
+            <p>Dear {Encode(agencyName)},</p>
+            <p>A new freight load proposal has been matched and assigned to your agency on FreightLink.</p>
+            <ul>
+                <li><strong>Load Reference:</strong> {Encode(loadReference)}</li>
+                <li><strong>Cargo:</strong> {Encode(cargoDescription)} ({weightKg:N0} kg)</li>
+                <li><strong>Pickup Location:</strong> {Encode(pickupAddress)}</li>
+                <li><strong>Dropoff Location:</strong> {Encode(dropoffAddress)}</li>
+                <li><strong>Proposed Price:</strong> LKR {proposedPrice:N2}</li>
+            </ul>
+            {actionHtml}
+            """;
+
+        var actionText = hasActionLinks
+            ? $"Accept: {acceptUrl}\nDecline: {declineUrl}\n\n(Links expire in 7 days and work without logging in first; you can also respond from the FreightLink Agency Portal.)"
+            : "Please log in to your FreightLink Agency portal to accept or decline this proposal.";
+
+        var bodyText =
+            $"Dear {agencyName},\n\n" +
+            "A new freight load proposal has been assigned to your agency.\n" +
+            $"Load Reference: {loadReference}\n" +
+            $"Cargo: {cargoDescription} ({weightKg:N0} kg)\n" +
+            $"Pickup Location: {pickupAddress}\n" +
+            $"Dropoff Location: {dropoffAddress}\n" +
+            $"Proposed Price: LKR {proposedPrice:N2}\n\n" +
+            actionText;
+
+        return (subject, Wrap(subject, bodyHtml), bodyText);
+    }
+
     /// <summary>Wraps a template's inner HTML in a small, shared, professional-looking shell.</summary>
     private static string Wrap(string title, string innerHtml) => $"""
         <!DOCTYPE html>

@@ -311,6 +311,12 @@ public enum ErrorCode
     /// <summary>The assignment exists but does not belong to the caller's agency.</summary>
     ASSIGNMENT_NOT_OWNED,
 
+    /// <summary>An assignment Accept/Decline email action token is unknown, expired, or already consumed.</summary>
+    INVALID_OR_EXPIRED_ASSIGNMENT_TOKEN,
+
+    /// <summary>The assignment an action token points to was already accepted/declined another way (e.g. via the app) since the email was sent.</summary>
+    ASSIGNMENT_NO_LONGER_ACTIONABLE,
+
     /// <summary>A trip has already been created for this assignment.</summary>
     TRIP_ALREADY_EXISTS,
 

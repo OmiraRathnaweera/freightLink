@@ -32,6 +32,7 @@ import MyDisputesPage from '../features/disputes/pages/MyDisputesPage.jsx'
 import RaiseDisputePage from '../features/disputes/pages/RaiseDisputePage.jsx'
 import ClaimantDisputeDetailPage from '../features/disputes/pages/ClaimantDisputeDetailPage.jsx'
 import AdminAnalyticsPage from '../features/analytics/pages/AdminAnalyticsPage.jsx'
+import AssignmentActionPage from '../features/assignmentActions/pages/AssignmentActionPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
@@ -47,6 +48,12 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <>
       <Route path="/" element={<LandingPage />} />
+
+      {/* Outside both PublicRoute and ProtectedRoute, like the landing page: an email
+          Accept/Decline action link must work regardless of whatever session (or none)
+          happens to be active in the clicking browser, so it must never be bounced by
+          PublicRoute's "already logged in -> redirect" behavior. */}
+      <Route path="/agency/job-proposals/respond" element={<AssignmentActionPage />} />
 
       {/* --- Public-only routes: bounced to role home if already signed in --- */}
       <Route element={<PublicRoute />}>

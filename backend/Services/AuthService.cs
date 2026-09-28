@@ -1,11 +1,11 @@
 ﻿using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Common.Options;
+using FreightLink.Api.Common.Security;
 using FreightLink.Api.Common.Validation;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Auth;
@@ -69,7 +69,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var verificationToken = CreateAccountToken();
+        var verificationToken = AccountTokens.CreateToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -79,7 +79,7 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
-            EmailVerificationTokenHash = HashAccountToken(verificationToken),
+            EmailVerificationTokenHash = AccountTokens.HashToken(verificationToken),
             EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
@@ -136,7 +136,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
-        var verificationToken = CreateAccountToken();
+        var verificationToken = AccountTokens.CreateToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -146,7 +146,7 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
-            EmailVerificationTokenHash = HashAccountToken(verificationToken),
+            EmailVerificationTokenHash = AccountTokens.HashToken(verificationToken),
             EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
@@ -228,8 +228,8 @@ public class AuthService : IAuthService
             return;
         }
 
-        var rawToken = CreateAccountToken();
-        user.PasswordResetTokenHash = HashAccountToken(rawToken);
+        var rawToken = AccountTokens.CreateToken();
+        user.PasswordResetTokenHash = AccountTokens.HashToken(rawToken);
         user.PasswordResetTokenExpiresAt = DateTimeOffset.UtcNow.AddHours(1);
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -241,7 +241,7 @@ public class AuthService : IAuthService
     public async Task ResetPasswordAsync(ResetPasswordRequestDto request, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
-        var tokenHash = HashAccountToken(request.Token);
+        var tokenHash = AccountTokens.HashToken(request.Token);
         var user = await _dbContext.Users.FirstOrDefaultAsync(
             u => u.PasswordResetTokenHash == tokenHash
                  && u.PasswordResetTokenExpiresAt != null
@@ -275,7 +275,7 @@ public class AuthService : IAuthService
     public async Task VerifyEmailAsync(VerifyEmailRequestDto request, CancellationToken cancellationToken = default)
     {
         var now = DateTimeOffset.UtcNow;
-        var tokenHash = HashAccountToken(request.Token);
+        var tokenHash = AccountTokens.HashToken(request.Token);
         var user = await _dbContext.Users.FirstOrDefaultAsync(
             u => u.EmailVerificationTokenHash == tokenHash
                  && u.EmailVerificationTokenExpiresAt != null
@@ -306,8 +306,8 @@ public class AuthService : IAuthService
             return;
         }
 
-        var rawToken = CreateAccountToken();
-        user.EmailVerificationTokenHash = HashAccountToken(rawToken);
+        var rawToken = AccountTokens.CreateToken();
+        user.EmailVerificationTokenHash = AccountTokens.HashToken(rawToken);
         user.EmailVerificationTokenExpiresAt = DateTimeOffset.UtcNow.AddHours(24);
         user.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -434,8 +434,8 @@ public class AuthService : IAuthService
         {
             user.Email = normalizedEmail;
             user.EmailVerifiedAt = null;
-            verificationToken = CreateAccountToken();
-            user.EmailVerificationTokenHash = HashAccountToken(verificationToken);
+            verificationToken = AccountTokens.CreateToken();
+            user.EmailVerificationTokenHash = AccountTokens.HashToken(verificationToken);
             user.EmailVerificationTokenExpiresAt = now.AddHours(24);
         }
 
@@ -558,16 +558,6 @@ public class AuthService : IAuthService
             RefreshToken = refreshToken
         };
     }
-
-    /// <summary>Creates a URL-safe, high-entropy one-time account-action token.</summary>
-    private static string CreateAccountToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-        .TrimEnd('=')
-        .Replace('+', '-')
-        .Replace('/', '_');
-
-    /// <summary>Stores only a deterministic SHA-256 hash of one-time tokens, never the raw value.</summary>
-    private static string HashAccountToken(string rawToken) => Convert.ToBase64String(
-        SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
 
     private async Task TrySendEmailVerificationAsync(User user, string rawToken, CancellationToken cancellationToken)
     {

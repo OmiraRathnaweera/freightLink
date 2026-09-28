@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<LoadProposal> LoadProposals => Set<LoadProposal>();
     public DbSet<AssignmentResponse> AssignmentResponses => Set<AssignmentResponse>();
+    public DbSet<AssignmentActionToken> AssignmentActionTokens => Set<AssignmentActionToken>();
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<TripEvent> TripEvents => Set<TripEvent>();
     public DbSet<TripEvidence> TripEvidences => Set<TripEvidence>();
