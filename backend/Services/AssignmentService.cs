@@ -542,7 +542,11 @@ public class AssignmentService : IAssignmentService
                 }
             }
 
-        if (assignment.Load != null)
+        // By the time an Agency accepts a Proposed assignment, the Shipper's own
+        // ConfirmMatchAsync has almost always already moved the Load to Matched - recording
+        // ANOTHER Matched -> Matched "transition" here would violate ck_lsh_transition
+        // ("FromStatus IS DISTINCT FROM ToStatus"), since it isn't a real transition at all.
+        if (assignment.Load != null && assignment.Load.Status != LoadStatus.Matched)
         {
             var prevLoadStatus = assignment.Load.Status;
             assignment.Load.Status = LoadStatus.Matched;
@@ -715,16 +719,22 @@ public class AssignmentService : IAssignmentService
             run.Load.Status = LoadStatus.Matched;
             run.Load.UpdatedAt = now;
 
-            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            // Same guard as ApproveAsync: a Matched -> Matched "transition" violates
+            // ck_lsh_transition ("FromStatus IS DISTINCT FROM ToStatus") and isn't a real
+            // transition anyway.
+            if (prevLoadStatus != LoadStatus.Matched)
             {
-                LoadStatusHistoryId = Guid.NewGuid(),
-                LoadId = run.LoadId,
-                FromStatus = prevLoadStatus,
-                ToStatus = LoadStatus.Matched,
-                ChangedByUserId = currentUserId,
-                Reason = "Load matched and assignment approved by admin.",
-                ChangedAt = now
-            });
+                _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+                {
+                    LoadStatusHistoryId = Guid.NewGuid(),
+                    LoadId = run.LoadId,
+                    FromStatus = prevLoadStatus,
+                    ToStatus = LoadStatus.Matched,
+                    ChangedByUserId = currentUserId,
+                    Reason = "Load matched and assignment approved by admin.",
+                    ChangedAt = now
+                });
+            }
         }
 
         run.Status = WorkflowRunStatus.Completed;

@@ -97,7 +97,12 @@ public class AssignmentActionsControllerTests : IClassFixture<CustomWebApplicati
             DropoffAddress = "Site B",
             DropoffLat = 7.1m,
             DropoffLng = 80.1m,
-            Status = LoadStatus.Posted,
+            // Matched, not Posted: by the time a Proposed assignment's proposal email exists
+            // at all, ConfirmMatchAsync has always already moved the Load to Matched - a
+            // Posted seed here would mask the real Matched -> Matched double-transition bug
+            // ApproveAsync had (ck_lsh_transition), since accepting would then be a genuine
+            // Posted -> Matched transition instead of the no-op the real flow always hits.
+            Status = LoadStatus.Matched,
             CreatedAt = now,
             UpdatedAt = now
         });
@@ -217,6 +222,15 @@ public class AssignmentActionsControllerTests : IClassFixture<CustomWebApplicati
         var tokens = await checkDb.AssignmentActionTokens.Where(t => t.AssignmentId == scenario.AssignmentId).ToListAsync();
         Assert.Equal(2, tokens.Count);
         Assert.All(tokens, t => Assert.NotNull(t.ConsumedAt));
+
+        // Regression check: the Load was already Matched before this accept (the real
+        // production sequence - ConfirmMatchAsync always sets it before the proposal email
+        // exists at all). ApproveAsync must not attempt a Matched -> Matched "transition" -
+        // no LoadStatusHistory row should be written for a no-op status change. The InMemory
+        // test provider doesn't enforce ck_lsh_transition itself (only real Postgres does), so
+        // this asserts the C# guard directly rather than relying on the DB to reject it.
+        var historyCount = await checkDb.LoadStatusHistories.CountAsync(h => h.LoadId == assignment.LoadId);
+        Assert.Equal(0, historyCount);
     }
 
     [Fact]

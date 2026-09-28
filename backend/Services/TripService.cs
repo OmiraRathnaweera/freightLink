@@ -937,7 +937,7 @@ public class TripService : ITripService
             trip.Assignment.Status = AssignmentStatus.Cancelled;
             trip.Assignment.UpdatedAt = now;
 
-            if (trip.Assignment.Load != null)
+            if (trip.Assignment.Load != null && trip.Assignment.Load.Status != LoadStatus.Cancelled)
             {
                 var prevLoadStatus = trip.Assignment.Load.Status;
                 trip.Assignment.Load.Status = LoadStatus.Cancelled;
@@ -1011,7 +1011,7 @@ public class TripService : ITripService
         var load = assignment?.Load;
 
         // Requirement 4: When an agency deletes a shipment load it has received, the load's status must revert to "Posted," allowing another agency to accept it.
-        if (load != null)
+        if (load != null && load.Status != LoadStatus.Posted)
         {
             var prevLoadStatus = load.Status;
             load.Status = LoadStatus.Posted;
