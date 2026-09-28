@@ -136,6 +136,7 @@ public class AgentWorkflowService : IAgentWorkflowService
         {
             using var plan = JsonDocument.Parse(request.OutputJson ?? "{}");
             run.Objective = plan.RootElement.TryGetProperty("objective", out var objectiveProperty) ? objectiveProperty.GetString() ?? string.Empty : string.Empty;
+            run.ShipperMessage = plan.RootElement.TryGetProperty("shipper_message", out var shipperMessageProperty) ? shipperMessageProperty.GetString() : null;
             run.PlanJson = request.OutputJson;
         }
         else if (status == AgentStepStatus.Succeeded && agentRole == AgentRole.DomainAnalysis && !string.IsNullOrWhiteSpace(request.OutputJson))

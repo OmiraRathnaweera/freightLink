@@ -1616,6 +1616,10 @@ public class AssignmentService : IAssignmentService
             {
                 result.Objective = run.Objective;
             }
+            if (!string.IsNullOrWhiteSpace(run.ShipperMessage))
+            {
+                result.ShipperMessage = run.ShipperMessage;
+            }
 
             // Map workflow steps
             foreach (var step in run.Steps.OrderBy(s => s.StepNo))

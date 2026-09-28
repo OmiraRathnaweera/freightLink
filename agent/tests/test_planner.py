@@ -143,3 +143,39 @@ async def test_run_succeeds_and_reports_step():
     assert result["objective"] == "Find and assign a suitable carrier."
     mock_report.assert_awaited_once()
     assert result["steps"][-1]["status"] == "Succeeded"
+
+
+@pytest.mark.anyio
+async def test_shipper_message_is_requested_and_persisted_in_step_output():
+    """The Planner's structured output must carry a human-friendly shipper_message
+    alongside the internal objective, and it must reach the reported step's
+    outputJson so the backend can extract it onto AgentWorkflowRun.ShipperMessage."""
+    state = _state()
+    run_id = uuid.uuid4()
+
+    mock_llm = MagicMock()
+    mock_llm.plan = AsyncMock(
+        return_value={
+            "objective": "Find and assign a suitable carrier.",
+            "shipper_message": (
+                "This load is 500kg and 3.2 m3, so a MediumLorry is a good fit. "
+                "I'm now finding the most suitable agency for you."
+            ),
+            "steps": ["Evaluate candidate agencies"],
+        }
+    )
+
+    with (
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=run_id)),
+        ),
+        patch("freightlink_agent.agents.planner.get_llm", return_value=mock_llm),
+        patch("freightlink_agent.agents.planner.report", new=AsyncMock()) as mock_report,
+    ):
+        result = await planner.run(state)
+
+    assert result.get("failed") is not True
+    assert result["plan"]["shipper_message"].startswith("This load is 500kg")
+    _, report_kwargs = mock_report.call_args
+    assert report_kwargs["output_data"]["shipper_message"] == result["plan"]["shipper_message"]

@@ -9,6 +9,7 @@ public class AgentWorkflowRun
     public Guid TriggeredByUserId { get; set; }
     public int AttemptNo { get; set; }
     public string Objective { get; set; } = string.Empty;
+    public string? ShipperMessage { get; set; }
     public string? PlanJson { get; set; }
     public WorkflowRunStatus Status { get; set; }
     public DateTimeOffset StartedAt { get; set; }

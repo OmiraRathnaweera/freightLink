@@ -42,6 +42,7 @@ PipelineStage = Literal[
 
 class PlanOutput(BaseModel):
     objective: str
+    shipper_message: str
     steps: list[PipelineStage]
 
 
@@ -107,6 +108,10 @@ class AgentLLM:
             self._record_meta("deterministic_fallback", None, used_fallback=True)
             return {
                 "objective": "Evaluate candidate agencies, select optimal carrier via routing, validate safety compliance, and confirm dispatch.",
+                "shipper_message": (
+                    "I'm reviewing your load's weight and volume to pick a suitable vehicle class, "
+                    "then finding the most suitable agency for you."
+                ),
                 "steps": [
                     "Evaluate candidate agencies",
                     "Select agency via routing",

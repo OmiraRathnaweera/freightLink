@@ -34,7 +34,7 @@ def _mock_chat_model(result):
 
 @pytest.mark.anyio
 async def test_openai_success_records_provenance():
-    plan_result = PlanOutput(objective="Test objective", steps=["Evaluate candidate agencies"])
+    plan_result = PlanOutput(objective="Test objective", shipper_message="Hi shipper", steps=["Evaluate candidate agencies"])
 
     with patch("freightlink_agent.core.llm.get_settings", return_value=_settings()):
         llm = AgentLLM()
@@ -79,7 +79,7 @@ async def test_openai_call_cap_enforced_falls_back_without_calling_openai_again(
     """Cost guard (plans/03-openai-migration.md §5): once the per-process cap is hit, no
     further OpenAI calls are attempted - subsequent calls go straight to the deterministic
     fallback, not to any other LLM provider (there isn't one)."""
-    plan_result = PlanOutput(objective="First call objective", steps=["Notify agency"])
+    plan_result = PlanOutput(objective="First call objective", shipper_message="Hi shipper", steps=["Notify agency"])
 
     with patch("freightlink_agent.core.llm.get_settings", return_value=_settings(openai_max_calls_per_process=1)):
         llm = AgentLLM()

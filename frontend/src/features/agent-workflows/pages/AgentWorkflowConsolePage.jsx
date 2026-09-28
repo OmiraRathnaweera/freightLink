@@ -246,6 +246,20 @@ export default function AgentWorkflowConsolePage() {
       {/* Main Content: Workflow Pipeline, Recommendation, and Validation */}
       {matchData && (
         <div className="space-y-6">
+          {/* 0. Agent 1's conversational message to the shipper */}
+          {matchData.shipperMessage && (
+            <div
+              data-testid="shipper-message-banner"
+              className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4 text-on-surface shadow-sm"
+            >
+              <Sparkles className="h-5 w-5 shrink-0 mt-0.5 text-primary" />
+              <div className="flex-1">
+                <p className="text-xs font-bold text-primary">Agent 1</p>
+                <p className="text-sm text-on-surface-variant">{matchData.shipperMessage}</p>
+              </div>
+            </div>
+          )}
+
           {/* 1. 4-Agent LangGraph Stepper */}
           <WorkflowStepper
             steps={matchData.steps}

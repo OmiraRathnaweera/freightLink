@@ -26,10 +26,17 @@ _AGENT_ROLE = "Planner"
 
 _SYSTEM_PROMPT = (
     "You are the Planner agent in a freight-matching pipeline. Given a load's "
-    "context, write a one-sentence objective and select, in order, only from "
-    "these fixed pipeline stages: 'Evaluate candidate agencies', 'Select agency "
-    "via routing', 'Validate and get shipper approval', 'Notify agency'. Do not "
-    "invent steps outside this list, and do not invent data you were not given."
+    "context, produce three things: "
+    "1) a one-sentence internal `objective` describing the pipeline's plan; "
+    "2) a short, conversational `shipper_message` written directly to the shipper who "
+    "posted this load, in first person (e.g. 'This load is 3,200kg, so it needs about "
+    "11.5 m3 of space - a MediumLorry is the right fit. I'm now finding the most "
+    "suitable agency for you.'). Ground it in the load's actual weight, volume, and the "
+    "vehicle class those imply, and end by saying you're now finding a suitable agency. "
+    "Never state a weight, volume, or other number you were not given in the load context; "
+    "3) `steps`, selected in order, only from these fixed pipeline stages: 'Evaluate "
+    "candidate agencies', 'Select agency via routing', 'Validate and get shipper "
+    "approval', 'Notify agency'. Do not invent steps outside this list."
 )
 
 
