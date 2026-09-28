@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency } from '../../loads/lib/format.js'
 import Button from '../../../components/Button.jsx'
+import FormattedAiText from './FormattedAiText.jsx'
 
 const VEHICLE_CLASS_LABELS = {
   SmallVan: 'Small Van (Up to 1,500 kg)',
@@ -236,9 +237,10 @@ export default function MatchRecommendationCard({
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />
               <span>Multi-Agent Selection Rationale (Agent 3 & 4)</span>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-slate-800 italic">
-              "{recommendedAgency.selectionJustification}"
-            </p>
+            <FormattedAiText
+              text={recommendedAgency.selectionJustification}
+              className="mt-2 text-sm leading-relaxed text-slate-800 italic"
+            />
           </div>
         )}
 

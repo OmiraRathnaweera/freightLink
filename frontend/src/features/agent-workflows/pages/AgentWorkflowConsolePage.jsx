@@ -24,6 +24,7 @@ import MatchDecisionDialog from '../components/MatchDecisionDialog.jsx'
 import ValidationChecklist from '../components/ValidationChecklist.jsx'
 import AlternateCandidatesList from '../components/AlternateCandidatesList.jsx'
 import LoadSelectorBar from '../components/LoadSelectorBar.jsx'
+import FormattedAiText from '../components/FormattedAiText.jsx'
 
 export default function AgentWorkflowConsolePage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -255,7 +256,7 @@ export default function AgentWorkflowConsolePage() {
               <Sparkles className="h-5 w-5 shrink-0 mt-0.5 text-primary" />
               <div className="flex-1">
                 <p className="text-xs font-bold text-primary">Agent 1</p>
-                <p className="text-sm text-on-surface-variant">{matchData.shipperMessage}</p>
+                <FormattedAiText text={matchData.shipperMessage} className="text-sm text-on-surface-variant" />
               </div>
             </div>
           )}
