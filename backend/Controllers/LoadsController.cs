@@ -160,6 +160,30 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
+    /// Fetches every agent workflow run attempt ever made for a load - not just the latest
+    /// (unlike <see cref="GetMatchRecommendation"/>) - each with its own 4 agent steps and
+    /// every tool call made during them, for the AI Workflow Console's call history view.
+    /// Purely read-only. Only the owning Shipper may view it.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="LoadMatchHistoryDto"/>.</returns>
+    [HttpGet("{loadId:guid}/match/history")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<LoadMatchHistoryDto>> GetMatchHistory(
+        Guid loadId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _assignmentService.GetMatchHistoryAsync(
+            loadId,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Explicitly triggers the Agentic AI pipeline for a load — a deliberate command, not a side
     /// effect of viewing data (plans/04-backend-integration.md §1). Creates the next
     /// AgentWorkflowRun attempt and returns the resulting recommendation once the agent service

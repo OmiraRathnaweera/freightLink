@@ -5,6 +5,7 @@ import { queryClient } from '../../../lib/api/queryClient.js'
 export const matchKeys = {
   all: ['match'],
   loadMatch: (loadId) => [...matchKeys.all, loadId],
+  loadMatchHistory: (loadId) => [...matchKeys.all, loadId, 'history'],
 }
 
 /**
@@ -17,6 +18,18 @@ export const matchKeys = {
  */
 export async function getLoadMatch(loadId) {
   return api.get(`/loads/${loadId}/match`)
+}
+
+/**
+ * GET /api/v1/loads/{loadId}/match/history
+ * Fetches every agent workflow run attempt ever made for this load (not just the latest),
+ * each with its own 4 agent steps and every tool call made during them - the full agent
+ * call history, for the AI Workflow Console's history view. Purely read-only.
+ * @param {string} loadId
+ * @returns {Promise<import('./types').LoadMatchHistoryDto>}
+ */
+export async function getLoadMatchHistory(loadId) {
+  return api.get(`/loads/${loadId}/match/history`)
 }
 
 /**
@@ -75,6 +88,23 @@ export function useLoadMatchQuery(loadId, options) {
     queryKey: matchKeys.loadMatch(loadId),
     queryFn: () => getLoadMatch(loadId),
     enabled: Boolean(loadId),
+    staleTime: 30_000,
+    ...options,
+  })
+}
+
+/**
+ * Query hook for fetching the full agent call history (every attempt, every tool call) for a load.
+ * Disabled until explicitly enabled by the caller (the history view is opened on demand, not
+ * fetched eagerly alongside the main console).
+ * @param {string} loadId
+ * @param {object} [options]
+ */
+export function useLoadMatchHistoryQuery(loadId, options) {
+  return useQuery({
+    queryKey: matchKeys.loadMatchHistory(loadId),
+    queryFn: () => getLoadMatchHistory(loadId),
+    enabled: Boolean(loadId) && (options?.enabled ?? true),
     staleTime: 30_000,
     ...options,
   })

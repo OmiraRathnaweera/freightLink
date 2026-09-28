@@ -57,6 +57,14 @@ public interface IAssignmentService
     Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Fetches every AgentWorkflowRun attempt ever made for a load (not just the latest), each
+    /// with its own 4 agent steps and every tool call made during them - the full agent call
+    /// history, for the AI Workflow Console's history view. Purely read-only, same ownership
+    /// rule as <see cref="GetMatchRecommendationAsync"/>.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchHistoryDto> GetMatchHistoryAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Explicitly triggers the Python Agentic AI pipeline for a load (a deliberate command, not a
     /// side effect of viewing data - plans/04-backend-integration.md §1). Creates the next
     /// AgentWorkflowRun attempt, calls the agent service, and returns the resulting recommendation

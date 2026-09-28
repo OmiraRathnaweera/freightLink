@@ -25,6 +25,7 @@ import ValidationChecklist from '../components/ValidationChecklist.jsx'
 import AlternateCandidatesList from '../components/AlternateCandidatesList.jsx'
 import LoadSelectorBar from '../components/LoadSelectorBar.jsx'
 import FormattedAiText from '../components/FormattedAiText.jsx'
+import AgentCallHistory from '../components/AgentCallHistory.jsx'
 
 export default function AgentWorkflowConsolePage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -309,6 +310,9 @@ export default function AgentWorkflowConsolePage() {
               isMatched={matchData.loadStatus === 'Matched' || Boolean(matchData.existingAssignment)}
             />
           </div>
+
+          {/* 4. Full Agent Call History (every attempt, every tool call) */}
+          <AgentCallHistory loadId={activeLoadId} />
         </div>
       )}
     </div>
