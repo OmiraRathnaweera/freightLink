@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import FleetVehiclesPage from '../../pages/FleetVehiclesPage.jsx'
 import { UserRole } from '../../../../lib/enums.js'
@@ -8,6 +8,8 @@ import * as agencyApi from '../../api/agencyApi.js'
 import * as authApi from '../../../auth/api/authApi.js'
 
 const mockMutateAsync = vi.fn()
+const mockUpdateVehicle = vi.fn()
+const mockUpdateVehicleStatus = vi.fn()
 
 vi.mock('../../api/agencyApi.js', async (importOriginal) => {
   const actual = await importOriginal()
@@ -16,6 +18,14 @@ vi.mock('../../api/agencyApi.js', async (importOriginal) => {
     useVehiclesQuery: vi.fn(),
     useAddVehicleMutation: vi.fn(() => ({
       mutateAsync: mockMutateAsync,
+      isPending: false,
+    })),
+    useUpdateVehicleMutation: vi.fn(() => ({
+      mutateAsync: mockUpdateVehicle,
+      isPending: false,
+    })),
+    useUpdateVehicleStatusMutation: vi.fn(() => ({
+      mutateAsync: mockUpdateVehicleStatus,
       isPending: false,
     })),
   }
@@ -52,7 +62,7 @@ const MOCK_VEHICLES = [
     vehicleType: 'FlatBed',
     capacityKg: 20000,
     volumeM3: 40.0,
-    status: 'InUse',
+    status: 'OnTrip',
     createdAt: '2026-09-05T10:00:00Z',
   },
   {
@@ -66,10 +76,10 @@ const MOCK_VEHICLES = [
   },
 ]
 
-function renderPage() {
+function renderPage(role = UserRole.AGENCY_STAFF) {
   return renderWithProviders(<FleetVehiclesPage />, {
     route: '/agencies/vehicles',
-    authState: { role: UserRole.AGENCY_STAFF, isAuthenticated: true },
+    authState: { role, isAuthenticated: true },
   })
 }
 
@@ -98,7 +108,7 @@ describe('FleetVehiclesPage', () => {
     expect(screen.getByText('Total Fleet')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument() // 3 total vehicles
     expect(screen.getAllByText('Available').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getByText('In Use / Transit')).toBeInTheDocument()
+    expect(screen.getAllByText('On Trip').length).toBeGreaterThanOrEqual(1)
 
     // Vehicles table entries
     expect(screen.getByText('WP-CAD-1020')).toBeInTheDocument()
@@ -409,5 +419,110 @@ describe('FleetVehiclesPage', () => {
     expect(
       await screen.findByText(/invalid vehicle type\. please select a supported vehicle type/i),
     ).toBeInTheDocument()
+  })
+
+  it('edits a vehicle using prefilled values and the update API', async () => {
+    const user = userEvent.setup()
+    mockUpdateVehicle.mockResolvedValueOnce({ ...MOCK_VEHICLES[0], registrationNo: 'WP-CAD-2020' })
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useVehiclesQuery.mockReturnValue({ data: MOCK_VEHICLES, isLoading: false })
+
+    renderPage()
+    const row = screen.getByText('WP-CAD-1020').closest('tr')
+    await user.click(within(row).getByRole('button', { name: /edit/i }))
+
+    expect(screen.getByRole('heading', { name: 'Edit Fleet Vehicle' })).toBeInTheDocument()
+    const registration = screen.getByDisplayValue('WP-CAD-1020')
+    await user.clear(registration)
+    await user.type(registration, 'wp-cad-2020')
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    await waitFor(() => expect(mockUpdateVehicle).toHaveBeenCalledWith({
+      agencyId: 'agency-101',
+      vehicleId: 'veh-1',
+      vehicle: {
+        registrationNo: 'WP-CAD-2020',
+        vehicleType: 'Lorry',
+        capacityKg: 5000,
+        volumeM3: 18,
+      },
+    }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows a registration conflict on the edit field', async () => {
+    const user = userEvent.setup()
+    const conflict = new Error('A vehicle with this registration number already exists.')
+    conflict.code = 'VEHICLE_REGISTRATION_ALREADY_EXISTS'
+    mockUpdateVehicle.mockRejectedValueOnce(conflict)
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useVehiclesQuery.mockReturnValue({ data: MOCK_VEHICLES, isLoading: false })
+
+    renderPage()
+    await user.click(within(screen.getByText('WP-CAD-1020').closest('tr')).getByRole('button', { name: /edit/i }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(await screen.findByText('This registration number is already in your fleet.')).toBeInTheDocument()
+  })
+
+  it('changes availability and confirms retirement before submitting', async () => {
+    const user = userEvent.setup()
+    mockUpdateVehicleStatus.mockResolvedValue({})
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useVehiclesQuery.mockReturnValue({ data: MOCK_VEHICLES, isLoading: false })
+
+    renderPage()
+    const row = screen.getByText('WP-CAD-1020').closest('tr')
+    const select = within(row).getByRole('combobox', { name: 'Change status for WP-CAD-1020' })
+    await user.selectOptions(select, 'Maintenance')
+    await waitFor(() => expect(mockUpdateVehicleStatus).toHaveBeenCalledWith({
+      agencyId: 'agency-101', vehicleId: 'veh-1', status: 'Maintenance',
+    }))
+
+    await user.selectOptions(select, 'Retired')
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument()
+    expect(mockUpdateVehicleStatus).toHaveBeenCalledTimes(1)
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+
+    await user.selectOptions(select, 'Retired')
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Retire vehicle' }))
+    await waitFor(() => expect(mockUpdateVehicleStatus).toHaveBeenCalledWith({
+      agencyId: 'agency-101', vehicleId: 'veh-1', status: 'Retired',
+    }))
+  })
+
+  it('uses backend statuses in filters and locks OnTrip or Retired row actions', async () => {
+    const user = userEvent.setup()
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useVehiclesQuery.mockReturnValue({
+      data: [...MOCK_VEHICLES, { ...MOCK_VEHICLES[0], vehicleId: 'veh-4', registrationNo: 'WP-CAD-4040', status: 'Retired' }],
+      isLoading: false,
+    })
+
+    renderPage()
+    const onTripRow = screen.getByText('WP-LH-5544').closest('tr')
+    expect(within(onTripRow).getByRole('button', { name: /edit/i })).toBeDisabled()
+    expect(within(onTripRow).getByRole('combobox', { name: /change status/i })).toBeDisabled()
+    const retiredRow = screen.getByText('WP-CAD-4040').closest('tr')
+    expect(within(retiredRow).getByRole('button', { name: /edit/i })).toBeDisabled()
+    expect(within(retiredRow).getByRole('combobox', { name: /change status/i })).toBeDisabled()
+
+    const statusFilter = screen.getAllByRole('combobox')[1]
+    await user.selectOptions(statusFilter, 'Retired')
+    expect(screen.getByText('WP-CAD-4040')).toBeInTheDocument()
+    expect(screen.queryByText('WP-CAD-1020')).not.toBeInTheDocument()
+    await user.selectOptions(statusFilter, 'OnTrip')
+    expect(screen.getByText('WP-LH-5544')).toBeInTheDocument()
+    expect(screen.queryByText('WP-CAD-4040')).not.toBeInTheDocument()
+  })
+
+  it('does not expose vehicle mutations to Admin web users', () => {
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useVehiclesQuery.mockReturnValue({ data: MOCK_VEHICLES, isLoading: false })
+    renderPage(UserRole.ADMIN)
+    expect(screen.queryByRole('button', { name: /add new vehicle/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: /change status/i })).not.toBeInTheDocument()
   })
 })

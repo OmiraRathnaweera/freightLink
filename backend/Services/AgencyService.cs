@@ -474,7 +474,7 @@ public class AgencyService : IAgencyService
             VehicleId = Guid.NewGuid(),
             AgencyId = agencyId,
             RegistrationNo = request.RegistrationNo,
-            VehicleType = request.VehicleType,
+            VehicleType = request.VehicleType!.Value,
             CapacityKg = request.CapacityKg,
             VolumeM3 = request.VolumeM3,
             Status = VehicleStatus.Available,
@@ -494,7 +494,90 @@ public class AgencyService : IAgencyService
             CapacityKg = vehicle.CapacityKg,
             VolumeM3 = vehicle.VolumeM3,
             Status = vehicle.Status.ToString(),
-            CreatedAt = vehicle.CreatedAt
+            IsAvailable = true,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<VehicleResponseDto> UpdateVehicleAsync(
+        Guid agencyId,
+        Guid vehicleId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        VehicleUpdateDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.AgencyStaff)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only agency staff may edit fleet vehicles.");
+        }
+
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+        if (agency is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
+        }
+        AgencyStatusGuard.EnsureActive(agency.Status);
+
+        var vehicle = await _dbContext.Vehicles.FirstOrDefaultAsync(
+            v => v.VehicleId == vehicleId && v.AgencyId == agencyId,
+            cancellationToken);
+        if (vehicle is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.VEHICLE_NOT_FOUND, "Vehicle not found in this agency fleet.");
+        }
+        if (vehicle.Status is VehicleStatus.OnTrip or VehicleStatus.Retired)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.VEHICLE_CANNOT_BE_MODIFIED,
+                "Vehicles on a trip or retired cannot have their fleet details changed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.RegistrationNo))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Registration number is required.");
+        }
+        var registrationNo = request.RegistrationNo.Trim().ToUpperInvariant();
+        if (await _dbContext.Vehicles.AnyAsync(
+            v => v.AgencyId == agencyId && v.VehicleId != vehicleId && v.RegistrationNo == registrationNo,
+            cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.VEHICLE_REGISTRATION_ALREADY_EXISTS,
+                "A vehicle with this registration number already exists in your fleet.");
+        }
+
+        vehicle.RegistrationNo = registrationNo;
+        vehicle.VehicleType = request.VehicleType!.Value;
+        vehicle.CapacityKg = request.CapacityKg;
+        vehicle.VolumeM3 = request.VolumeM3;
+        vehicle.UpdatedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_vehicle_agency_regno" })
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.VEHICLE_REGISTRATION_ALREADY_EXISTS,
+                "A vehicle with this registration number already exists in your fleet.");
+        }
+
+        return new VehicleResponseDto
+        {
+            VehicleId = vehicle.VehicleId,
+            AgencyId = vehicle.AgencyId,
+            RegistrationNo = vehicle.RegistrationNo,
+            VehicleType = vehicle.VehicleType.ToString(),
+            CapacityKg = vehicle.CapacityKg,
+            VolumeM3 = vehicle.VolumeM3,
+            Status = vehicle.Status.ToString(),
+            IsAvailable = vehicle.Status == VehicleStatus.Available,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
         };
     }
 
@@ -526,14 +609,15 @@ public class AgencyService : IAgencyService
 
         // Trip assignment/execution is the sole authority for OnTrip. Retired vehicles are
         // deliberately terminal so matching cannot accidentally revive a decommissioned vehicle.
-        if (request.Status == VehicleStatus.OnTrip || vehicle.Status == VehicleStatus.OnTrip ||
-            (vehicle.Status == VehicleStatus.Retired && request.Status != VehicleStatus.Retired))
+        var targetStatus = request.Status!.Value;
+        if (targetStatus == VehicleStatus.OnTrip || vehicle.Status == VehicleStatus.OnTrip ||
+            (vehicle.Status == VehicleStatus.Retired && targetStatus != VehicleStatus.Retired))
         {
             throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_VEHICLE_STATUS_TRANSITION,
                 "Vehicle availability can only move between Available, Maintenance, and Retired. OnTrip is managed by trip execution and Retired is terminal.");
         }
 
-        vehicle.Status = request.Status;
+        vehicle.Status = targetStatus;
         vehicle.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
 

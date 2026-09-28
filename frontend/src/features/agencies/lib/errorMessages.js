@@ -12,6 +12,10 @@ const AGENCY_ERROR_MESSAGES = {
   LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',
   DRIVER_NOT_FOUND: 'Driver could not be found in your fleet.',
   INVALID_DRIVER_STATUS_TRANSITION: 'Driver status can only be set to Active or Inactive — OnTrip is managed automatically during trips.',
+  VEHICLE_NOT_FOUND: 'Vehicle could not be found in your fleet.',
+  VEHICLE_REGISTRATION_ALREADY_EXISTS: 'A vehicle with this registration number already exists in your fleet.',
+  VEHICLE_CANNOT_BE_MODIFIED: 'Vehicles on a trip or retired cannot be edited.',
+  INVALID_VEHICLE_STATUS_TRANSITION: 'This vehicle status change is not allowed. OnTrip is managed during trips and Retired is final.',
 }
 
 /**

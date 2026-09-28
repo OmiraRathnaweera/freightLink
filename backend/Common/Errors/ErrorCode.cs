@@ -317,6 +317,12 @@ public enum ErrorCode
     /// <summary>The requested vehicle could not be found.</summary>
     VEHICLE_NOT_FOUND,
 
+    /// <summary>A registration number already belongs to another vehicle in the agency's fleet.</summary>
+    VEHICLE_REGISTRATION_ALREADY_EXISTS,
+
+    /// <summary>An OnTrip or Retired vehicle's fleet details cannot be edited.</summary>
+    VEHICLE_CANNOT_BE_MODIFIED,
+
     /// <summary>The vehicle does not belong to the executing agency.</summary>
     VEHICLE_NOT_OWNED,
 

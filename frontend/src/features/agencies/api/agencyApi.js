@@ -127,6 +127,16 @@ export async function addVehicle({ agencyId, vehicle }) {
   return api.post(`/agencies/${agencyId}/vehicles`, vehicle)
 }
 
+/** Updates editable fleet details without changing vehicle availability. */
+export async function updateVehicle({ agencyId, vehicleId, vehicle }) {
+  return api.put(`/agencies/${agencyId}/vehicles/${vehicleId}`, vehicle)
+}
+
+/** Agency Staff availability changes; OnTrip is controlled by trip execution. */
+export async function updateVehicleStatus({ agencyId, vehicleId, status }) {
+  return api.patch(`/agencies/${agencyId}/vehicles/${vehicleId}/status`, { status })
+}
+
 export async function getDrivers(agencyId) {
   return api.get(`/agencies/${agencyId}/drivers`)
 }
@@ -288,6 +298,30 @@ export function useAddVehicleMutation({ onSuccess, ...options } = {}) {
       if (onSuccess) onSuccess(data, variables, context)
     },
     ...options
+  })
+}
+
+export function useUpdateVehicleMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateVehicle,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'vehicles'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useUpdateVehicleStatusMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateVehicleStatus,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'vehicles'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
   })
 }
 

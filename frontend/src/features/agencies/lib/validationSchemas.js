@@ -132,3 +132,24 @@ export const addVehicleSchema = Yup.object({
     .positive('Volume must be greater than 0')
     .max(1000, 'Volume cannot exceed 1,000 m³'),
 })
+
+/**
+ * Existing fleets may contain registration values accepted by the backend
+ * before the current web registration pattern was introduced. An unchanged
+ * plate must not prevent an Agency Staff member from correcting other fields.
+ */
+export function updateVehicleSchema(originalRegistrationNo) {
+  return addVehicleSchema.shape({
+    registrationNo: Yup.string()
+      .trim()
+      .required('Registration number is required')
+      .max(50, 'Registration number must be 50 characters or fewer')
+      .test(
+        'registration-format',
+        'Enter a valid Sri Lankan vehicle registration number (e.g. WP CAB-1234, WP-CAD-1020, or CAB-5678)',
+        (value) =>
+          value?.toUpperCase() === originalRegistrationNo?.trim().toUpperCase() ||
+          SRI_LANKAN_VEHICLE_REG_REGEX.test(value ?? ''),
+      ),
+  })
+}

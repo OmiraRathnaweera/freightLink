@@ -73,6 +73,9 @@ public interface IAgencyService
 
     Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default);
 
+    /// <summary>Agency Staff edits a vehicle's fleet details while it is Available or in Maintenance.</summary>
+    Task<VehicleResponseDto> UpdateVehicleAsync(Guid agencyId, Guid vehicleId, Guid currentUserId, UserRole currentUserRole, VehicleUpdateDto request, CancellationToken cancellationToken = default);
+
     /// <summary>Agency Staff updates a vehicle's manually managed availability state.</summary>
     Task<VehicleResponseDto> UpdateVehicleStatusAsync(Guid agencyId, Guid vehicleId, Guid currentUserId, UserRole currentUserRole, UpdateVehicleStatusDto request, CancellationToken cancellationToken = default);
 

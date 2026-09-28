@@ -183,6 +183,20 @@ public class AgenciesController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>Edits a vehicle's registration, type, and capacity without changing its status.</summary>
+    [HttpPut("{id:guid}/vehicles/{vehicleId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<VehicleResponseDto>> UpdateVehicle(
+        Guid id,
+        Guid vehicleId,
+        [FromBody] VehicleUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateVehicleAsync(
+            id, vehicleId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>Updates a vehicle's availability for matching. OnTrip is system-managed by trip execution.</summary>
     [HttpPatch("{id:guid}/vehicles/{vehicleId:guid}/status")]
     [Authorize(Roles = nameof(UserRole.AgencyStaff))]

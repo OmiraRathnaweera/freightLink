@@ -1,13 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.DTOs.Agency;
 
-public class VehicleCreateDto
+/// <summary>Editable fleet details. Availability is changed through the dedicated status endpoint.</summary>
+public class VehicleUpdateDto
 {
     [Required]
-    [StringLength(50)]
+    [StringLength(50, MinimumLength = 1)]
     public string RegistrationNo { get; set; } = string.Empty;
 
     [Required]

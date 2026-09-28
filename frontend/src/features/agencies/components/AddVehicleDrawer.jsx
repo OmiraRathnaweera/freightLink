@@ -4,8 +4,8 @@ import { toast } from 'sonner'
 import Button from '../../../components/Button.jsx'
 import { FormikNumberField, FormikTextField } from '../../../components/form/index.js'
 import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
-import { useAddVehicleMutation } from '../api/agencyApi.js'
-import { addVehicleSchema } from '../lib/validationSchemas.js'
+import { useAddVehicleMutation, useUpdateVehicleMutation } from '../api/agencyApi.js'
+import { addVehicleSchema, updateVehicleSchema } from '../lib/validationSchemas.js'
 import { getAgencyErrorMessage, mapValidationDetailsToFormik } from '../lib/errorMessages.js'
 import { VEHICLE_TYPE_CONFIG, VEHICLE_TYPES } from '../lib/vehicleClasses.js'
 
@@ -17,19 +17,32 @@ const INITIAL_VALUES = {
 }
 
 /**
- * Slide-over right drawer for adding a new vehicle to an agency's fleet.
+ * Slide-over right drawer for adding or editing a vehicle in an agency's fleet.
  * Validates with Formik + Yup and maps backend error details directly onto fields.
  *
  * @param {string} agencyId
  * @param {boolean} isOpen
+ * @param {object|null} vehicle Existing vehicle to edit, or null when adding.
  * @param {() => void} onClose
  */
-function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
+function AddVehicleDrawer({ agencyId, isOpen, vehicle = null, onClose }) {
   const addVehicleMutation = useAddVehicleMutation()
+  const updateVehicleMutation = useUpdateVehicleMutation()
+  const isEditing = Boolean(vehicle)
+  const isPending = addVehicleMutation.isPending || updateVehicleMutation.isPending
 
   useEscapeKey(isOpen, onClose)
 
   if (!isOpen) return null
+
+  const initialValues = isEditing
+    ? {
+        vehicleType: vehicle.vehicleType ?? 'Lorry',
+        registrationNo: vehicle.registrationNo ?? '',
+        capacityKg: vehicle.capacityKg ?? '',
+        volumeM3: vehicle.volumeM3 ?? '',
+      }
+    : INITIAL_VALUES
 
   async function handleSubmit(values, { setErrors, setStatus, setSubmitting, resetForm }) {
     setStatus(null)
@@ -42,17 +55,22 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
         volumeM3: Number(values.volumeM3),
       }
 
-      await addVehicleMutation.mutateAsync({
-        agencyId,
-        vehicle: payload,
-      })
+      if (isEditing) {
+        await updateVehicleMutation.mutateAsync({ agencyId, vehicleId: vehicle.vehicleId, vehicle: payload })
+      } else {
+        await addVehicleMutation.mutateAsync({ agencyId, vehicle: payload })
+      }
 
-      toast.success(`Vehicle ${payload.registrationNo} registered successfully!`)
+      toast.success(isEditing
+        ? `Vehicle ${payload.registrationNo} updated.`
+        : `Vehicle ${payload.registrationNo} registered successfully!`)
       resetForm()
       onClose()
     } catch (error) {
       if (error?.code === 'VALIDATION_ERROR' && error?.details) {
         setErrors(mapValidationDetailsToFormik(error.details))
+      } else if (error?.code === 'VEHICLE_REGISTRATION_ALREADY_EXISTS') {
+        setErrors({ registrationNo: 'This registration number is already in your fleet.' })
       }
       const message = getAgencyErrorMessage(error)
       setStatus(message)
@@ -75,7 +93,7 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-labelledby="add-vehicle-title"
+        aria-labelledby={isEditing ? 'edit-vehicle-title' : 'add-vehicle-title'}
         className="relative z-50 flex h-full w-full max-w-md flex-col border-l border-slate-border bg-surface-container-lowest shadow-2xl"
       >
         {/* Header */}
@@ -85,10 +103,12 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
               <Truck className="h-5 w-5" />
             </div>
             <div>
-              <h2 id="add-vehicle-title" className="text-body-lg font-bold text-primary">
-                Add Fleet Vehicle
+              <h2 id={isEditing ? 'edit-vehicle-title' : 'add-vehicle-title'} className="text-body-lg font-bold text-primary">
+                {isEditing ? 'Edit Fleet Vehicle' : 'Add Fleet Vehicle'}
               </h2>
-              <p className="text-body-xs text-on-surface-variant">Register a new truck or lorry</p>
+              <p className="text-body-xs text-on-surface-variant">
+                {isEditing ? `Update ${vehicle.registrationNo}'s details` : 'Register a new truck or lorry'}
+              </p>
             </div>
           </div>
           <button
@@ -103,9 +123,10 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
 
         {/* Content */}
         <Formik
-          initialValues={INITIAL_VALUES}
-          validationSchema={addVehicleSchema}
+          initialValues={initialValues}
+          validationSchema={isEditing ? updateVehicleSchema(vehicle.registrationNo) : addVehicleSchema}
           onSubmit={handleSubmit}
+          enableReinitialize
         >
           {({ values, errors, touched, status, isSubmitting, setFieldValue }) => {
             const activeTypeConfig =
@@ -205,19 +226,21 @@ function AddVehicleDrawer({ agencyId, isOpen, onClose }) {
                     type="button"
                     variant="secondary"
                     onClick={onClose}
-                    disabled={isSubmitting || addVehicleMutation.isPending}
+                    disabled={isSubmitting || isPending}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    disabled={isSubmitting || addVehicleMutation.isPending}
+                    disabled={isSubmitting || isPending}
                     className="inline-flex items-center gap-1.5"
                   >
-                    {(isSubmitting || addVehicleMutation.isPending) && (
+                    {(isSubmitting || isPending) && (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     )}
-                    {isSubmitting || addVehicleMutation.isPending ? 'Registering...' : 'Add to Fleet'}
+                    {isSubmitting || isPending
+                      ? (isEditing ? 'Saving...' : 'Registering...')
+                      : (isEditing ? 'Save Changes' : 'Add to Fleet')}
                   </Button>
                 </div>
               </div>

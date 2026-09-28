@@ -1,21 +1,29 @@
 import { useMemo, useState } from 'react'
 import {
+  Ban,
   CheckCircle,
   Filter,
+  Loader2,
+  Pencil,
   Plus,
   Search,
   Truck,
   Wrench,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import Button from '../../../components/Button.jsx'
 import Card from '../../../components/Card.jsx'
 import EmptyState from '../../../components/EmptyState.jsx'
 import Input from '../../../components/Input.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
+import { useAppSelector } from '../../../hooks/useAppSelector.js'
+import { useEscapeKey } from '../../../hooks/useEscapeKey.js'
+import { UserRole } from '../../../lib/enums.js'
 import { useCurrentUserQuery } from '../../auth/api/authApi.js'
-import { useVehiclesQuery } from '../api/agencyApi.js'
+import { useUpdateVehicleStatusMutation, useVehiclesQuery } from '../api/agencyApi.js'
 import AddVehicleDrawer from '../components/AddVehicleDrawer.jsx'
+import { getAgencyErrorMessage } from '../lib/errorMessages.js'
 
 function getVehicleTypeBadge(type) {
   switch (type) {
@@ -41,6 +49,8 @@ function getVehicleTypeBadge(type) {
 }
 
 export default function FleetVehiclesPage() {
+  const role = useAppSelector((state) => state.auth.role)
+  const isAgencyStaff = role === UserRole.AGENCY_STAFF
   const { data: user, isLoading: userLoading } = useCurrentUserQuery()
   const agencyId = user?.agencyId
 
@@ -49,17 +59,24 @@ export default function FleetVehiclesPage() {
   })
 
   const [isAddDrawerOpen, setIsAddDrawerOpen] = useState(false)
+  const [editingVehicle, setEditingVehicle] = useState(null)
+  const [retiringVehicle, setRetiringVehicle] = useState(null)
+  const [pendingVehicleId, setPendingVehicleId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const updateStatusMutation = useUpdateVehicleStatusMutation()
+  useEscapeKey(Boolean(retiringVehicle) && pendingVehicleId !== retiringVehicle?.vehicleId,
+    () => setRetiringVehicle(null))
 
   // Metrics
   const stats = useMemo(() => {
     const total = vehicles.length
     const available = vehicles.filter((v) => v.status === 'Available').length
-    const inUse = vehicles.filter((v) => v.status === 'InUse').length
+    const onTrip = vehicles.filter((v) => v.status === 'OnTrip').length
     const maintenance = vehicles.filter((v) => v.status === 'Maintenance').length
-    return { total, available, inUse, maintenance }
+    const retired = vehicles.filter((v) => v.status === 'Retired').length
+    return { total, available, onTrip, maintenance, retired }
   }, [vehicles])
 
   // Filtered list
@@ -76,6 +93,28 @@ export default function FleetVehiclesPage() {
       return matchesSearch && matchesType && matchesStatus
     })
   }, [vehicles, searchQuery, typeFilter, statusFilter])
+
+  async function applyStatusChange(vehicle, status) {
+    setPendingVehicleId(vehicle.vehicleId)
+    try {
+      await updateStatusMutation.mutateAsync({ agencyId, vehicleId: vehicle.vehicleId, status })
+      toast.success(`Vehicle ${vehicle.registrationNo} is now ${status.toLowerCase()}.`)
+      setRetiringVehicle(null)
+    } catch (error) {
+      toast.error(getAgencyErrorMessage(error))
+    } finally {
+      setPendingVehicleId(null)
+    }
+  }
+
+  function requestStatusChange(vehicle, status) {
+    if (status === vehicle.status) return
+    if (status === 'Retired') {
+      setRetiringVehicle(vehicle)
+      return
+    }
+    void applyStatusChange(vehicle, status)
+  }
 
   if (userLoading) {
     return <div className="p-8 text-center text-slate-500">Loading agency profile…</div>
@@ -94,19 +133,21 @@ export default function FleetVehiclesPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <PageHeader
           title="Fleet Vehicles"
-          subtitle="Manage your transportation fleet, monitor vehicle status, and register new carriers."
+          description="Manage your transportation fleet, monitor vehicle status, and register new vehicles."
         />
-        <Button
-          onClick={() => setIsAddDrawerOpen(true)}
-          className="inline-flex items-center gap-2 self-start text-body-sm font-semibold sm:self-auto"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add New Vehicle</span>
-        </Button>
+        {isAgencyStaff && (
+          <Button
+            onClick={() => setIsAddDrawerOpen(true)}
+            className="inline-flex items-center gap-2 self-start text-body-sm font-semibold sm:self-auto"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add New Vehicle</span>
+          </Button>
+        )}
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -134,8 +175,8 @@ export default function FleetVehiclesPage() {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-body-xs font-medium text-on-surface-variant">In Use / Transit</p>
-              <p className="mt-1 text-headline-sm font-bold text-status-blue-text">{stats.inUse}</p>
+              <p className="text-body-xs font-medium text-on-surface-variant">On Trip</p>
+              <p className="mt-1 text-headline-sm font-bold text-status-blue-text">{stats.onTrip}</p>
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-blue-bg text-status-blue-text">
               <Truck className="h-5 w-5" />
@@ -151,6 +192,18 @@ export default function FleetVehiclesPage() {
             </div>
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-amber-bg text-status-amber-text">
               <Wrench className="h-5 w-5" />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-body-xs font-medium text-on-surface-variant">Retired</p>
+              <p className="mt-1 text-headline-sm font-bold text-status-red-text">{stats.retired}</p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-red-bg text-status-red-text">
+              <Ban className="h-5 w-5" />
             </div>
           </div>
         </Card>
@@ -195,9 +248,9 @@ export default function FleetVehiclesPage() {
             >
               <option value="ALL">All Statuses</option>
               <option value="Available">Available</option>
-              <option value="InUse">In Use</option>
+              <option value="OnTrip">On Trip</option>
               <option value="Maintenance">Maintenance</option>
-              <option value="Inactive">Inactive</option>
+              <option value="Retired">Retired</option>
             </select>
           </div>
         </div>
@@ -217,7 +270,7 @@ export default function FleetVehiclesPage() {
                   : 'Try clearing your search query or adjusting your filters.'
               }
               action={
-                vehicles.length === 0 ? (
+                vehicles.length === 0 && isAgencyStaff ? (
                   <Button onClick={() => setIsAddDrawerOpen(true)}>
                     <Plus className="mr-1.5 h-4 w-4" />
                     <span>Register First Vehicle</span>
@@ -237,11 +290,14 @@ export default function FleetVehiclesPage() {
                   <th className="px-6 py-3.5">Cargo Volume</th>
                   <th className="px-6 py-3.5">Status</th>
                   <th className="px-6 py-3.5">Added Date</th>
+                  {isAgencyStaff && <th className="px-6 py-3.5 text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredVehicles.map((vehicle) => {
                   const typeBadge = getVehicleTypeBadge(vehicle.vehicleType)
+                  const isLocked = vehicle.status === 'OnTrip' || vehicle.status === 'Retired'
+                  const isPending = pendingVehicleId === vehicle.vehicleId
                   return (
                     <tr key={vehicle.vehicleId} className="transition-colors hover:bg-slate-50/50">
                       <td className="px-6 py-4 font-mono font-bold text-slate-900">
@@ -264,14 +320,14 @@ export default function FleetVehiclesPage() {
                           tone={
                             vehicle.status === 'Available'
                               ? 'green'
-                              : vehicle.status === 'InUse'
+                              : vehicle.status === 'OnTrip'
                                 ? 'blue'
                                 : vehicle.status === 'Maintenance'
                                   ? 'amber'
                                   : 'red'
                           }
                         >
-                          {vehicle.status}
+                          {vehicle.status === 'OnTrip' ? 'On Trip' : vehicle.status}
                         </StatusBadge>
                       </td>
                       <td className="px-6 py-4 text-slate-500">
@@ -279,6 +335,36 @@ export default function FleetVehiclesPage() {
                           ? new Date(vehicle.createdAt).toLocaleDateString()
                           : '—'}
                       </td>
+                      {isAgencyStaff && (
+                        <td className="px-6 py-4 text-right">
+                          <div className="inline-flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => setEditingVehicle(vehicle)}
+                              disabled={isLocked || isPending}
+                              title={isLocked ? 'Vehicles on a trip or retired cannot be edited' : undefined}
+                              className="inline-flex items-center gap-1.5 text-xs"
+                            >
+                              <Pencil className="h-3.5 w-3.5" /> Edit
+                            </Button>
+                            <select
+                              value={vehicle.status}
+                              aria-label={`Change status for ${vehicle.registrationNo}`}
+                              disabled={isLocked || isPending}
+                              title={isLocked ? 'OnTrip is system-managed and Retired is final' : undefined}
+                              onChange={(event) => requestStatusChange(vehicle, event.target.value)}
+                              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <option value="Available">Available</option>
+                              <option value="Maintenance">Maintenance</option>
+                              <option value="Retired">Retired</option>
+                              {vehicle.status === 'OnTrip' && <option value="OnTrip">On Trip</option>}
+                            </select>
+                            {isPending && <Loader2 aria-label="Updating vehicle" className="h-4 w-4 animate-spin text-primary" />}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -291,9 +377,29 @@ export default function FleetVehiclesPage() {
       {/* Slide-over Drawer for adding new vehicle */}
       <AddVehicleDrawer
         agencyId={agencyId}
-        isOpen={isAddDrawerOpen}
-        onClose={() => setIsAddDrawerOpen(false)}
+        isOpen={isAddDrawerOpen || Boolean(editingVehicle)}
+        vehicle={editingVehicle}
+        onClose={() => {
+          setIsAddDrawerOpen(false)
+          setEditingVehicle(null)
+        }}
       />
+      {retiringVehicle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-primary/40 p-4">
+          <div role="alertdialog" aria-modal="true" aria-labelledby="retire-vehicle-title" className="w-full max-w-md rounded-lg bg-white p-6 shadow-2xl">
+            <h2 id="retire-vehicle-title" className="text-lg font-bold text-on-surface">Retire vehicle?</h2>
+            <p className="mt-2 text-sm text-on-surface-variant">
+              {retiringVehicle.registrationNo} will be removed from matching. Retirement is final.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <Button type="button" variant="secondary" autoFocus onClick={() => setRetiringVehicle(null)} disabled={pendingVehicleId === retiringVehicle.vehicleId}>Cancel</Button>
+              <Button type="button" onClick={() => void applyStatusChange(retiringVehicle, 'Retired')} disabled={pendingVehicleId === retiringVehicle.vehicleId}>
+                {pendingVehicleId === retiringVehicle.vehicleId ? 'Retiring...' : 'Retire vehicle'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

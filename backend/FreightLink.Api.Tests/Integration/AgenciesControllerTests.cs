@@ -6,9 +6,13 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.DTOs.Auth;
+using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -16,6 +20,7 @@ namespace FreightLink.Api.Tests.Integration;
 
 public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
+    private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -26,6 +31,7 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
 
     public AgenciesControllerTests(CustomWebApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -195,6 +201,220 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
         var created = await addRes.Content.ReadFromJsonAsync<DriverResponseDto>(JsonOpts);
 
         return (agency.AccessToken, agencyId, created!.DriverId);
+    }
+
+    private async Task<(string AgencyStaffToken, Guid AgencyId, Guid VehicleId)> SeedActiveAgencyWithVehicleAsync(string prefix)
+    {
+        var tokens = await RegisterAndLoginAgencyAsync(prefix, prefix.ToUpperInvariant());
+        using var fleetRequest = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/my/fleet", tokens.AccessToken);
+        var fleetResponse = await _client.SendAsync(fleetRequest);
+        fleetResponse.EnsureSuccessStatusCode();
+        var fleet = await fleetResponse.Content.ReadFromJsonAsync<AgencyFleetResponseDto>(JsonOpts);
+        var agencyId = fleet!.AgencyId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var agency = await db.Agencies.SingleAsync(a => a.AgencyId == agencyId);
+            agency.Status = AgencyStatus.Active;
+            await db.SaveChangesAsync();
+        }
+
+        using var addRequest = AuthedRequest(HttpMethod.Post, $"/api/v1/agencies/{agencyId}/vehicles", tokens.AccessToken);
+        addRequest.Content = JsonContent.Create(new VehicleCreateDto
+        {
+            RegistrationNo = $"WP-CAB-{Guid.NewGuid():N}"[..15],
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000m,
+            VolumeM3 = 18m
+        });
+        var addResponse = await _client.SendAsync(addRequest);
+        addResponse.EnsureSuccessStatusCode();
+        var created = await addResponse.Content.ReadFromJsonAsync<VehicleResponseDto>(JsonOpts);
+        return (tokens.AccessToken, agencyId, created!.VehicleId);
+    }
+
+    [Fact]
+    public async Task UpdateVehicle_UpdatesOwnedVehicleDetails_WithoutChangingStatus()
+    {
+        var (token, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("edit-vehicle");
+        using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", token);
+        request.Content = JsonContent.Create(new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-2468",
+            VehicleType = VehicleType.Container,
+            CapacityKg = 24000m,
+            VolumeM3 = 60m
+        });
+
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var updated = await response.Content.ReadFromJsonAsync<VehicleResponseDto>(JsonOpts);
+        Assert.NotNull(updated);
+        Assert.Equal("WP-CAB-2468", updated.RegistrationNo);
+        Assert.Equal("Container", updated.VehicleType);
+        Assert.Equal(24000m, updated.CapacityKg);
+        Assert.Equal(60m, updated.VolumeM3);
+        Assert.Equal("Available", updated.Status);
+
+        using var listRequest = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies/{agencyId}/vehicles", token);
+        var listResponse = await _client.SendAsync(listRequest);
+        listResponse.EnsureSuccessStatusCode();
+        var vehicles = await listResponse.Content.ReadFromJsonAsync<List<VehicleResponseDto>>(JsonOpts);
+        Assert.Contains(vehicles!, v => v.VehicleId == vehicleId && v.RegistrationNo == "WP-CAB-2468");
+    }
+
+    [Fact]
+    public async Task UpdateVehicle_ReturnsConflict_ForDuplicateAgencyRegistration()
+    {
+        var (token, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("duplicate-vehicle");
+        using var addRequest = AuthedRequest(HttpMethod.Post, $"/api/v1/agencies/{agencyId}/vehicles", token);
+        addRequest.Content = JsonContent.Create(new VehicleCreateDto
+        {
+            RegistrationNo = "WP-CAB-3579",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 4000m,
+            VolumeM3 = 16m
+        });
+        (await _client.SendAsync(addRequest)).EnsureSuccessStatusCode();
+
+        using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", token);
+        request.Content = JsonContent.Create(new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-3579",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000m,
+            VolumeM3 = 18m
+        });
+        Assert.Equal(HttpStatusCode.Conflict, (await _client.SendAsync(request)).StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateVehicle_ReturnsForbidden_ForAnotherAgencyAndAdmin()
+    {
+        var (_, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("owned-vehicle");
+        var otherAgency = await RegisterAndLoginAgencyAsync("other-vehicle", "OTHER-VEHICLE");
+        var body = new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-4680",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000m,
+            VolumeM3 = 18m
+        };
+
+        using var otherRequest = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", otherAgency.AccessToken);
+        otherRequest.Content = JsonContent.Create(body);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(otherRequest)).StatusCode);
+
+        using var adminRequest = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", MintAdminToken());
+        adminRequest.Content = JsonContent.Create(body);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(adminRequest)).StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateVehicle_ReturnsValidationError_ForZeroCapacity()
+    {
+        var (token, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("invalid-vehicle");
+        using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", token);
+        request.Content = JsonContent.Create(new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-5791",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 0,
+            VolumeM3 = 18m
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, (await _client.SendAsync(request)).StatusCode);
+    }
+
+    [Fact]
+    public async Task VehicleMutations_ReturnValidationErrors_WhenTypeOrStatusIsMissing()
+    {
+        var (token, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("missing-vehicle-fields");
+
+        using var editRequest = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", token);
+        editRequest.Content = JsonContent.Create(new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-5791",
+            CapacityKg = 5000m,
+            VolumeM3 = 18m
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, (await _client.SendAsync(editRequest)).StatusCode);
+
+        using var statusRequest = AuthedRequest(HttpMethod.Patch, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}/status", token);
+        statusRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto());
+        Assert.Equal(HttpStatusCode.BadRequest, (await _client.SendAsync(statusRequest)).StatusCode);
+    }
+
+    [Fact]
+    public async Task VehicleStatus_TransitionsAvailableMaintenanceAndRetired_ButCannotRestoreRetired()
+    {
+        var (token, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("status-vehicle");
+        var path = $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}/status";
+
+        using var maintenanceRequest = AuthedRequest(HttpMethod.Patch, path, token);
+        maintenanceRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.Maintenance });
+        var maintenance = await _client.SendAsync(maintenanceRequest);
+        Assert.Equal(HttpStatusCode.OK, maintenance.StatusCode);
+
+        using var availableRequest = AuthedRequest(HttpMethod.Patch, path, token);
+        availableRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.Available });
+        var available = await _client.SendAsync(availableRequest);
+        Assert.Equal(HttpStatusCode.OK, available.StatusCode);
+
+        using var retireRequest = AuthedRequest(HttpMethod.Patch, path, token);
+        retireRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.Retired });
+        var retired = await _client.SendAsync(retireRequest);
+        Assert.Equal(HttpStatusCode.OK, retired.StatusCode);
+
+        using var restoreRequest = AuthedRequest(HttpMethod.Patch, path, token);
+        restoreRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.Available });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _client.SendAsync(restoreRequest)).StatusCode);
+
+        using var editRequest = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", token);
+        editRequest.Content = JsonContent.Create(new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-6802",
+            VehicleType = VehicleType.Container,
+            CapacityKg = 24000m,
+            VolumeM3 = 60m
+        });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _client.SendAsync(editRequest)).StatusCode);
+    }
+
+    [Fact]
+    public async Task VehicleStatus_RejectsDirectOnTrip_AndOtherAgency()
+    {
+        var (token, agencyId, vehicleId) = await SeedActiveAgencyWithVehicleAsync("ontrip-vehicle");
+        var path = $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}/status";
+        using var onTripRequest = AuthedRequest(HttpMethod.Patch, path, token);
+        onTripRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.OnTrip });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _client.SendAsync(onTripRequest)).StatusCode);
+
+        var otherAgency = await RegisterAndLoginAgencyAsync("unowned-vehicle", "UNOWNED-VEHICLE");
+        using var otherRequest = AuthedRequest(HttpMethod.Patch, path, otherAgency.AccessToken);
+        otherRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.Maintenance });
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(otherRequest)).StatusCode);
+
+        using var adminRequest = AuthedRequest(HttpMethod.Patch, path, MintAdminToken());
+        adminRequest.Content = JsonContent.Create(new UpdateVehicleStatusDto { Status = VehicleStatus.Maintenance });
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(adminRequest)).StatusCode);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var vehicle = await db.Vehicles.SingleAsync(v => v.VehicleId == vehicleId);
+            vehicle.Status = VehicleStatus.OnTrip;
+            await db.SaveChangesAsync();
+        }
+        using var editRequest = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/vehicles/{vehicleId}", token);
+        editRequest.Content = JsonContent.Create(new VehicleUpdateDto
+        {
+            RegistrationNo = "WP-CAB-7913",
+            VehicleType = VehicleType.Lorry,
+            CapacityKg = 5000m,
+            VolumeM3 = 18m
+        });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _client.SendAsync(editRequest)).StatusCode);
     }
 
     [Fact]

@@ -8,6 +8,7 @@ namespace FreightLink.Api.DTOs.Agency;
 public class UpdateVehicleStatusDto
 {
     [Required]
+    [EnumDataType(typeof(VehicleStatus))]
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public VehicleStatus Status { get; set; }
+    public VehicleStatus? Status { get; set; }
 }
