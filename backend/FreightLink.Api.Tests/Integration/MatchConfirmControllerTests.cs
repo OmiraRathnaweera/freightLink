@@ -393,6 +393,107 @@ public class MatchConfirmControllerTests
     }
 
     [Fact]
+    public async Task ConfirmMatch_Candidate2_UsesThatCandidatesOwnPositioningEta_NotCandidate1Stale()
+    {
+        // Regression test: overriding to a different candidate must use THAT candidate's own
+        // positioning ETA (from Agent 3's rankedCandidates comparison), never agency #1's
+        // leftover ETA copied onto a completely different agency's Assignment row.
+        using var factory = new CustomWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var tokens = await RegisterAndLoginShipperAsync(client, "shipper-cand2-eta");
+        var load = await SeedLoadAsync(client, tokens);
+        var agency1Id = await SeedAgencyAsync(factory, "Carrier One Eta");
+        var agency2Id = await SeedAgencyAsync(factory, "Carrier Two Eta");
+
+        var workflowRunId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var dbLoad = await db.Loads.FirstAsync(l => l.LoadId == load.LoadId);
+            dbLoad.EstimatedPrice = 18500m;
+
+            var run = new AgentWorkflowRun
+            {
+                WorkflowRunId = workflowRunId,
+                LoadId = load.LoadId,
+                TriggeredByUserId = load.ShipperUserId,
+                AttemptNo = 1,
+                Objective = "Find best carrier and price load",
+                Status = WorkflowRunStatus.AwaitingApproval,
+                StartedAt = now.AddMinutes(-5),
+                CreatedAt = now.AddMinutes(-5),
+                UpdatedAt = now.AddMinutes(-1)
+            };
+            db.AgentWorkflowRuns.Add(run);
+
+            db.MatchCandidates.Add(new MatchCandidate
+            {
+                MatchCandidateId = Guid.NewGuid(),
+                WorkflowRunId = workflowRunId,
+                AgencyId = agency1Id,
+                Rank = 1,
+                EligibilityScore = 0.95m,
+                Eligible = true,
+                EvaluatedAt = now.AddMinutes(-4)
+            });
+            db.MatchCandidates.Add(new MatchCandidate
+            {
+                MatchCandidateId = Guid.NewGuid(),
+                WorkflowRunId = workflowRunId,
+                AgencyId = agency2Id,
+                Rank = 2,
+                EligibilityScore = 0.85m,
+                Eligible = true,
+                EvaluatedAt = now.AddMinutes(-4)
+            });
+
+            var step3 = new AgentStep
+            {
+                AgentStepId = Guid.NewGuid(),
+                WorkflowRunId = workflowRunId,
+                StepNo = 3,
+                AgentRole = AgentRole.MatchingPricing,
+                Status = AgentStepStatus.Succeeded,
+                OutputJson = JsonSerializer.Serialize(new
+                {
+                    selectedAgencyId = agency1Id.ToString(),
+                    suggestedVehicleClass = "MiniTruck",
+                    etaMinutes = 12, // agency #1's own positioning ETA - must NOT end up on agency #2's Assignment
+                    cargoDistanceKm = 120.0,
+                    proposedPrice = 18500.0,
+                    rankedCandidates = new[]
+                    {
+                        new { agencyId = agency1Id.ToString(), etaMinutes = 12, distanceKm = 8.0 },
+                        new { agencyId = agency2Id.ToString(), etaMinutes = 47, distanceKm = 61.0 },
+                    }
+                }),
+                StartedAt = now.AddMinutes(-3),
+                CompletedAt = now.AddMinutes(-2)
+            };
+            db.AgentSteps.Add(step3);
+
+            await db.SaveChangesAsync();
+        }
+
+        using var confirmRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/match/confirm");
+        confirmRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        confirmRequest.Content = JsonContent.Create(new ConfirmMatchDto { AgencyId = agency2Id });
+
+        var response = await client.SendAsync(confirmRequest);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var assignment = await response.Content.ReadFromJsonAsync<AssignmentResponseDto>();
+        Assert.NotNull(assignment);
+        Assert.Equal(agency2Id, assignment!.AgencyId);
+        // Agency #2's own ETA (47), never agency #1's (12).
+        Assert.Equal(47, assignment.ProposedEtaMinutes);
+    }
+
+    [Fact]
     public async Task ConfirmMatch_ByAdmin_Returns200Ok_AndCompletesWorkflowRun()
     {
         using var factory = new CustomWebApplicationFactory();

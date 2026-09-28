@@ -867,6 +867,7 @@ public class AssignmentService : IAssignmentService
         VehicleClass suggestedVehicleClass = ResolveVehicleClassFromLoad(load.WeightKg, load.VolumeM3);
         decimal? step3ProposedPrice = null;
         Guid? step3WinnerAgencyId = null;
+        var rankedPositioning = new List<(Guid AgencyId, int? EtaMinutes)>();
 
         if (!string.IsNullOrEmpty(step3?.OutputJson))
         {
@@ -884,6 +885,20 @@ public class AssignmentService : IAssignmentService
                     step3ProposedPrice = prVal;
                 if (root.TryGetProperty("suggestedVehicleClass", out var vcProp) && Enum.TryParse<VehicleClass>(vcProp.GetString(), out var vcVal))
                     suggestedVehicleClass = vcVal;
+                // Every candidate's OWN positioning ETA (yard -> pickup), not just the #1
+                // winner's - needed below so a shipper who overrides to a different agency
+                // gets THAT agency's real ETA on the Assignment, not the winner's leftover one.
+                if (root.TryGetProperty("rankedCandidates", out var rankedEl) && rankedEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var rc in rankedEl.EnumerateArray())
+                    {
+                        if (rc.TryGetProperty("agencyId", out var ridProp) && Guid.TryParse(ridProp.GetString(), out var rid))
+                        {
+                            int? rEta = rc.TryGetProperty("etaMinutes", out var reProp) && reProp.TryGetInt32(out var reVal) ? reVal : null;
+                            rankedPositioning.Add((rid, rEta));
+                        }
+                    }
+                }
             }
             catch
             {
@@ -928,18 +943,31 @@ public class AssignmentService : IAssignmentService
         }
         else
         {
-            // 3. If agencyId is a different one of the 5: re-call POST /internal/pricing/estimate with that candidate's
-            // already-known distanceKm (from the original run's data — no new ORS call needed)
+            // 3. If agencyId is a different one of the 5: this is the shipper actively
+            // overriding Agent 3's own #1 pick, so re-derive this candidate's own details
+            // rather than reusing agency #1's - never present a different agency's stale
+            // positioning ETA or fleet-derived vehicle class as if they were this one's.
+            // The cargo-leg distance itself is reused as-is: it's pickup -> dropoff, which
+            // is identical regardless of which agency is chosen (ADR-015 addendum).
+            suggestedVehicleClass = ResolveVehicleClassFromLoad(load.WeightKg, load.VolumeM3);
+            etaMinutes = rankedPositioning.FirstOrDefault(p => p.AgencyId == chosenAgencyId).EtaMinutes;
+
             decimal distance = cargoDistanceKm.HasValue && cargoDistanceKm.Value > 0 ? cargoDistanceKm.Value : 100m;
 
-            var estimateResult = await _pricingEstimatorService.EstimateAsync(new EstimatePricingRequestDto
+            try
             {
-                LoadId = load.LoadId,
-                SuggestedVehicleClass = suggestedVehicleClass,
-                DistanceKm = distance
-            }, cancellationToken);
-
-            proposedPrice = estimateResult.EstimatedPrice;
+                var estimateResult = await _pricingEstimatorService.EstimateAsync(new EstimatePricingRequestDto
+                {
+                    LoadId = load.LoadId,
+                    SuggestedVehicleClass = suggestedVehicleClass,
+                    DistanceKm = distance
+                }, cancellationToken);
+                proposedPrice = estimateResult.EstimatedPrice;
+            }
+            catch
+            {
+                proposedPrice = 25000m;
+            }
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -2055,6 +2083,126 @@ public class AssignmentService : IAssignmentService
         // result.Validation stays null and result.Steps stays empty - WorkflowStatus is already
         // "NotStarted" from the DTO's construction above, an honest signal to the Shipper (and the
         // WorkflowStepper UI) that no agent has actually validated this preview yet.
+
+        return result;
+    }
+
+    /// <inheritdoc />
+    public async Task<FreightLink.Api.DTOs.Loads.LoadMatchHistoryDto> GetMatchHistoryAsync(
+        Guid loadId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        CancellationToken cancellationToken = default)
+    {
+        var load = await _dbContext.Loads.FirstOrDefaultAsync(l => l.LoadId == loadId, cancellationToken);
+        if (load == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
+        }
+
+        if (currentUserRole != UserRole.Shipper || load.ShipperUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "You do not have permission to view match history for this load.");
+        }
+
+        var runs = await _dbContext.AgentWorkflowRuns
+            .Include(r => r.Steps)
+            .Include(r => r.ApprovalDecisions)
+            .Where(r => r.LoadId == loadId)
+            .OrderByDescending(r => r.AttemptNo)
+            .ToListAsync(cancellationToken);
+
+        var stepIds = runs.SelectMany(r => r.Steps).Select(s => s.AgentStepId).ToList();
+        var toolCallsByStep = (await _dbContext.ToolCalls
+                .Where(tc => stepIds.Contains(tc.AgentStepId))
+                .OrderBy(tc => tc.CalledAt)
+                .ToListAsync(cancellationToken))
+            .GroupBy(tc => tc.AgentStepId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var selectedAgencyIds = new HashSet<Guid>();
+        var perRunSelection = new Dictionary<Guid, (Guid? AgencyId, decimal? Price)>();
+        foreach (var run in runs)
+        {
+            var step3 = run.Steps.FirstOrDefault(s => s.StepNo == 3 || s.AgentRole == AgentRole.MatchingPricing);
+            Guid? agencyId = null;
+            decimal? price = null;
+            if (!string.IsNullOrEmpty(step3?.OutputJson))
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(step3.OutputJson);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("selectedAgencyId", out var selProp) && Guid.TryParse(selProp.GetString(), out var selVal))
+                        agencyId = selVal;
+                    if (root.TryGetProperty("proposedPrice", out var prProp) && prProp.TryGetDecimal(out var prVal))
+                        price = prVal;
+                }
+                catch
+                {
+                    // Leave agencyId/price null for this attempt
+                }
+            }
+            perRunSelection[run.WorkflowRunId] = (agencyId, price);
+            if (agencyId.HasValue)
+            {
+                selectedAgencyIds.Add(agencyId.Value);
+            }
+        }
+
+        var agencyNamesById = selectedAgencyIds.Count == 0
+            ? new Dictionary<Guid, string>()
+            : await _dbContext.Agencies
+                .Where(a => selectedAgencyIds.Contains(a.AgencyId))
+                .ToDictionaryAsync(a => a.AgencyId, a => a.Name, cancellationToken);
+
+        var result = new FreightLink.Api.DTOs.Loads.LoadMatchHistoryDto
+        {
+            LoadId = load.LoadId,
+            ReferenceCode = load.ReferenceCode,
+        };
+
+        foreach (var run in runs)
+        {
+            var (selectedAgencyId, proposedPrice) = perRunSelection[run.WorkflowRunId];
+            var lastDecision = run.ApprovalDecisions.OrderByDescending(d => d.SequenceNo).FirstOrDefault();
+
+            result.Attempts.Add(new FreightLink.Api.DTOs.Loads.AgentWorkflowRunHistoryItemDto
+            {
+                WorkflowRunId = run.WorkflowRunId,
+                AttemptNo = run.AttemptNo,
+                Status = run.Status.ToString(),
+                StartedAt = run.StartedAt,
+                CompletedAt = run.CompletedAt,
+                Objective = run.Objective,
+                ShipperMessage = run.ShipperMessage,
+                SelectedAgencyId = selectedAgencyId,
+                SelectedAgencyName = selectedAgencyId.HasValue && agencyNamesById.TryGetValue(selectedAgencyId.Value, out var name) ? name : null,
+                ProposedPrice = proposedPrice,
+                Decision = lastDecision?.Decision.ToString(),
+                DecisionReason = lastDecision?.Reason,
+                Steps = run.Steps.OrderBy(s => s.StepNo).Select(s => new FreightLink.Api.DTOs.Loads.WorkflowStepHistoryDto
+                {
+                    StepNo = s.StepNo,
+                    AgentRole = s.AgentRole.ToString(),
+                    Status = s.Status.ToString(),
+                    ErrorMessage = s.ErrorMessage,
+                    DurationMs = s.DurationMs,
+                    ToolCalls = (toolCallsByStep.TryGetValue(s.AgentStepId, out var tcs) ? tcs : new List<ToolCall>())
+                        .Select(tc => new FreightLink.Api.DTOs.Loads.ToolCallHistoryDto
+                        {
+                            ToolName = tc.ToolName.ToString(),
+                            AttemptNo = tc.AttemptNo,
+                            Success = tc.Success,
+                            DurationMs = tc.DurationMs,
+                            HttpStatusCode = tc.HttpStatusCode,
+                            ErrorMessage = tc.ErrorMessage,
+                            CalledAt = tc.CalledAt,
+                        })
+                        .ToList(),
+                }).ToList(),
+            });
+        }
 
         return result;
     }
