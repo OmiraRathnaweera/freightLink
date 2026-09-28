@@ -5,7 +5,7 @@ Tools: get_route_and_eta, get_price_estimate.
 
 Selects the best agency using real routing data, prices the job using the cargo leg
 distance, generates a natural-language recommendation justification for the Shipper via
-Gemini/Ollama, records ToolCall audit records, and reports step 3 back to the backend.
+OpenAI, records ToolCall audit records, and reports step 3 back to the backend.
 """
 
 import json
@@ -447,7 +447,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
 
     assigned_driver = winner.active_drivers[0] if winner.active_drivers else None
 
-    # Step 4: LLM justification call (Gemini Flash / Ollama)
+    # Step 4: LLM justification call (OpenAI)
     llm_context = {
         "load": {
             "weightKg": weight_kg,

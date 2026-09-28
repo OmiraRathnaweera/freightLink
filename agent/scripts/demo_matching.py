@@ -1,4 +1,4 @@
-"""FreightLink — Agent 3 (Matching & Pricing) Standalone Demo & Model Benchmark Runner.
+"""FreightLink — Agent 3 (Matching & Pricing) Standalone Demo Runner.
 
 Component C — Matching & Trip Execution
 
@@ -7,28 +7,15 @@ Interactive demonstration of Agent 3:
 2. Runs OpenRouteService routing for candidate positioning ETA & distance.
 3. Captures and evaluates the TOP 3 CANDIDATE CARRIERS (Spotlight #1 Winner, Alternate #2, Alternate #3).
 4. Routes cargo leg and calls pricing estimation (POST /internal/pricing/estimate, ADR-015).
-5. Generates shipper recommendation justification using Gemini LLM.
-6. Benchmarks and checks the best TOP 3 LLM MODELS (gemini-3.8-flash, gemini-3.7-flash, Local Fallback).
-7. Persists ToolCall audits and reports AgentStep 3.
+5. Generates shipper recommendation justification using OpenAI (gpt-4o-mini by default).
+6. Persists ToolCall audits and reports AgentStep 3.
 """
 
 import asyncio
-from datetime import datetime, timezone
-import json
 from pathlib import Path
 import sys
-import time
 from unittest.mock import AsyncMock, patch
 import uuid
-import warnings
-import logging
-
-try:
-    from google.genai.models import AsyncModels, Models
-    AsyncModels._logged_afc_warning = True
-    Models._logged_afc_warning = True
-except Exception:
-    pass
 
 from dotenv import load_dotenv
 
@@ -49,7 +36,6 @@ if sys.platform == "win32":
         pass
 
 import httpx
-from pydantic import BaseModel
 
 from freightlink_agent.agents import matching_pricing
 from freightlink_agent.core.config import get_settings
@@ -294,7 +280,7 @@ async def run_scenario(scenario: dict):
     for i, c in enumerate(candidates, 1):
         print(f"     {i}. {c.name:<32} Yard: {c.yard_address[:32]:<32} Classes: {', '.join(c.available_vehicle_classes)}")
     print(f"  * Backend Service: {'ONLINE (' + settings.backend_base_url + ')' if backend_up else 'STANDALONE MODE (simulated)'}")
-    print(f"  * LLM Provider:    {settings.llm_provider.upper()} ({settings.gemini_model if settings.llm_provider == 'gemini' else settings.ollama_model})")
+    print(f"  * LLM Provider:    OPENAI ({settings.openai_model})")
     print()
 
     # If backend is offline, patch the network calls so the demo runs standalone seamlessly
@@ -403,226 +389,15 @@ async def run_scenario(scenario: dict):
     print(f"{GREEN}[OK] Audit Confirmed: Top 3 captured, ToolCalls logged, and AgentStep #3 generated.{RESET}\n")
 
 
-async def benchmark_top_3_llm_models():
-    """Benchmarks and checks the Top 3 LLM models for justification generation quality and latency."""
-    print(f"\n{CYAN}{BOLD}" + "=" * 78)
-    print("           BENCHMARKING & TESTING TOP 3 LLM GENERATIVE MODELS")
-    print("=" * 78 + f"{RESET}\n")
-
-    settings = get_settings()
-
-    models_to_test = [
-        {
-            "name": "gemini-3.5-flash",
-            "provider": "Google Gemini",
-            "description": "High-Availability Stable Production Flash Model",
-        },
-        {
-            "name": "gemini-3.8-flash",
-            "provider": "Google Gemini",
-            "description": "Next-Gen Experimental Reasoning Flash Model",
-        },
-        {
-            "name": "Local Fallback Engine",
-            "provider": "FreightLink Core",
-            "description": "Deterministic Rule-Based Zero-Latency Compliance Engine",
-        },
-    ]
-
-    sample_context = {
-        "selectedAgency": {
-            "name": "Samagi Express Logistics",
-            "etaMinutes": 11,
-            "positioningDistanceKm": 7.9,
-            "suggestedVehicleClass": "MediumLorry",
-        },
-        "cargoDescription": "Industrial generator and spare parts (3,200 kg)",
-        "pickupAddress": "Colombo Port Container Terminal",
-        "dropoffAddress": "Kandy Industrial Zone, Pallekele",
-        "cargoTransitKm": 132.5,
-        "estimatedPrice": 22669.50,
-        "otherCandidatesEvaluated": [
-            {"name": "Lanka Freight & Cargo Hub", "etaMinutes": 16, "positioningDistanceKm": 12.4},
-            {"name": "Wayamba Regional Transporters", "etaMinutes": 88, "positioningDistanceKm": 91.5},
-        ],
-    }
-
-    system_prompt = (
-        "You are FreightLink Agent 3 (Matching & Pricing). Write a concise headline (under 80 chars) "
-        "and a detailed 2-sentence rationale explaining why the recommended carrier was selected over "
-        "alternate candidates."
-    )
-
-    results = []
-
-    gemini_client = None
-    if settings.gemini_api_key:
-        try:
-            from google import genai
-            gemini_client = genai.Client(api_key=settings.gemini_api_key)
-        except Exception:
-            pass
-
-    for item in models_to_test:
-        model_name = item["name"]
-        print(f"{CYAN}Testing Model: {BOLD}{model_name}{RESET} ({item['provider']})...")
-
-        start = time.perf_counter()
-
-        if model_name == "Local Fallback Engine":
-            # Instant deterministic rule-based output
-            agency = sample_context["selectedAgency"]
-            headline = f"Recommended: {agency['name']} (Shortest 11-min Positioning ETA)"
-            reasoning = (
-                f"{agency['name']} was selected as the #1 carrier because its Peliyagoda depot provides the "
-                f"fastest arrival time ({agency['etaMinutes']} min) with full {agency['suggestedVehicleClass']} compliance, "
-                f"saving transit time over Lanka Freight (+5 min) and Wayamba (+77 min)."
-            )
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            results.append({
-                "model": model_name,
-                "provider": item["provider"],
-                "status": "SUCCESS",
-                "latency_ms": elapsed_ms,
-                "headline": headline,
-                "reasoning": reasoning,
-            })
-            print(f"  -> {GREEN}SUCCESS{RESET} in {elapsed_ms} ms\n")
-            continue
-
-        # Test Gemini models
-        try:
-            if not gemini_client:
-                raise RuntimeError("Gemini client not initialized or missing API key")
-
-            prompt = (
-                f"{system_prompt}\n\n"
-                f"Context: {json.dumps(sample_context, default=str)}\n\n"
-                "Return a JSON object with keys 'headline' and 'detailed_reasoning'."
-            )
-
-            response = await asyncio.wait_for(
-                gemini_client.aio.models.generate_content(
-                    model=model_name,
-                    contents=prompt,
-                ),
-                timeout=20.0,
-            )
-
-            raw_text = (response.text or "").strip()
-            if not raw_text and response.candidates and response.candidates[0].content and response.candidates[0].content.parts:
-                part_texts = [p.text for p in response.candidates[0].content.parts if getattr(p, "text", None)]
-                raw_text = " ".join(part_texts).strip()
-
-            if not raw_text:
-                finish_reason = response.candidates[0].finish_reason if response.candidates else "NO_CANDIDATES"
-                raise ValueError(f"Model returned empty content (finish_reason: {finish_reason})")
-
-            headline = f"Optimal Carrier Selected: {sample_context['selectedAgency']['name']}"
-            reasoning = raw_text
-
-            # Try parsing JSON if model returned structured json
-            try:
-                clean_json = raw_text
-                if clean_json.startswith("```json"):
-                    clean_json = clean_json[7:]
-                if clean_json.endswith("```"):
-                    clean_json = clean_json[:-3]
-                parsed = json.loads(clean_json.strip())
-                if isinstance(parsed, dict):
-                    headline = parsed.get("headline", headline)
-                    reasoning = parsed.get("detailed_reasoning", reasoning)
-            except Exception:
-                pass
-
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            results.append({
-                "model": model_name,
-                "provider": item["provider"],
-                "status": "SUCCESS",
-                "latency_ms": elapsed_ms,
-                "headline": headline,
-                "reasoning": reasoning,
-            })
-            print(f"  -> {GREEN}SUCCESS{RESET} in {elapsed_ms} ms\n")
-
-        except Exception as exc:
-            elapsed_ms = int((time.perf_counter() - start) * 1000)
-            err_msg = str(exc)
-            if "503" in err_msg or "UNAVAILABLE" in err_msg:
-                status_label = "HIGH DEMAND / FALLBACK"
-            elif "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                status_label = "RATE LIMITED / FALLBACK"
-            elif "504" in err_msg or "DEADLINE" in err_msg or "Timeout" in err_msg or "timed out" in err_msg:
-                status_label = "TIMEOUT / FALLBACK"
-            elif "404" in err_msg:
-                status_label = "DEPRECATED / 404"
-            else:
-                status_label = "FALLBACK TRIGGERED"
-
-            fallback_headline = f"Recommended: {sample_context['selectedAgency']['name']} (Fastest Proximity)"
-            fallback_reasoning = (
-                f"{sample_context['selectedAgency']['name']} offers optimal 11-min positioning "
-                f"and verified vehicle capacity for this industrial machinery shipment."
-            )
-
-            results.append({
-                "model": model_name,
-                "provider": item["provider"],
-                "status": status_label,
-                "latency_ms": elapsed_ms,
-                "headline": fallback_headline,
-                "reasoning": fallback_reasoning,
-                "note": err_msg[:75] + "...",
-            })
-            print(f"  -> {YELLOW}{status_label}{RESET} ({elapsed_ms} ms)\n")
-
-    # =========================================================================
-    # SUMMARY BENCHMARK TABLE
-    # =========================================================================
-    print(f"{GREEN}{BOLD}" + "=" * 78)
-    print("                    TOP 3 LLM MODELS BENCHMARK RESULTS")
-    print("=" * 78 + f"{RESET}")
-    print(f"{BOLD}{'Model':<24} {'Provider':<18} {'Status':<22} {'Latency':<10}{RESET}")
-    print("-" * 78)
-
-    for r in results:
-        status_color = GREEN if r["status"] == "SUCCESS" else YELLOW
-        print(
-            f"{BOLD}{r['model']:<24}{RESET} "
-            f"{r['provider']:<18} "
-            f"{status_color}{r['status']:<22}{RESET} "
-            f"{r['latency_ms']} ms"
-        )
-        headline_str = str(r.get("headline", ""))
-        reasoning_str = str(r.get("reasoning", ""))
-        print(f"  {DIM}Headline:  \"{headline_str[:65]}\"{RESET}")
-        print(f"  {DIM}Reasoning: \"{reasoning_str[:65]}\"{RESET}")
-        print()
-
-    # Determine recommended best model
-    best_candidate = results[0]
-    print(f"{GREEN}{BOLD}* BEST RECOMMENDED MODEL: {best_candidate['model']}{RESET}")
-    print(f"  - Configured in: {BOLD}agent/.env{RESET} (`GEMINI_MODEL={best_candidate['model']}`)")
-    print(f"  - Zero Downtime: Automatically switches to Local Fallback if Google Cloud experiences transient 503/429 spikes.")
-    print("=" * 78 + "\n")
-
-
 async def main():
     print_banner()
     scenarios = get_sample_scenarios()
 
     # Check CLI arguments first
-    if "--test-models" in sys.argv or "--models" in sys.argv or "-m" in sys.argv:
-        await benchmark_top_3_llm_models()
-        return
-
     if "--all" in sys.argv or "-a" in sys.argv:
         for s in scenarios:
             await run_scenario(s)
             print("-" * 78 + "\n")
-        print(f"{CYAN}Running Top 3 LLM Models Benchmark...{RESET}")
-        await benchmark_top_3_llm_models()
         return
 
     if "--scenario" in sys.argv:
@@ -644,11 +419,10 @@ async def main():
     for idx, s in enumerate(scenarios, 1):
         print(f"  [{idx}] {s['title']}")
     print(f"  [4] Run All 3 Scenarios Sequentially (Verify Top 3 Candidates Across Sri Lanka)")
-    print(f"  [5] Benchmark & Compare Top 3 LLM Models (gemini-3.8-flash vs gemini-3.7-flash vs Fallback)")
     print("  [q] Quit")
 
     try:
-        choice = input(f"\nEnter choice (1-5) [default: 1]: ").strip()
+        choice = input(f"\nEnter choice (1-4) [default: 1]: ").strip()
     except EOFError:
         choice = "1"
 
@@ -664,8 +438,6 @@ async def main():
         for s in scenarios:
             await run_scenario(s)
             print("-" * 78 + "\n")
-    elif choice == "5":
-        await benchmark_top_3_llm_models()
     else:
         await run_scenario(scenarios[0])
 

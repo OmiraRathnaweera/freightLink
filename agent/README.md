@@ -50,7 +50,7 @@ Agent 3 acts as the **tool-use agent** responsible for selecting the optimal car
      $$\text{Estimated Price} = \text{BaseFare} + (\text{CargoDistanceKm} \times \text{RatePerKm}) + (\text{WeightKg} \times \text{RatePerKg})$$
 
 4. **Natural-Language Shipper Justification (LLM)**
-   - Prompts Google Gemini (with automatic Ollama and deterministic rule fallbacks) using structured output (`SelectionJustificationOutput`).
+   - Prompts OpenAI (`gpt-4o-mini` by default, with a deterministic rule-based fallback if the call fails) using structured output (`SelectionJustificationOutput`). No Gemini, no Ollama - OpenAI is the only LLM provider.
    - Produces a transparent, human-readable justification grounded strictly in the routing and pricing data (e.g., *"Recommended: Peliyagoda Logistics Express — nearest available carrier with suitable MediumLorry capacity (ETA 11 min to pickup, 7.86 km positioning)..."*).
 
 5. **Auditing & Telemetry Persistence**
@@ -62,7 +62,7 @@ Agent 3 acts as the **tool-use agent** responsible for selecting the optimal car
 ## 3. Key Architectural Decision Records (ADRs) Followed
 
 - **ADR-007 (LangGraph Orchestration):** Sequential execution model passing a strongly-typed `WorkflowState`.
-- **ADR-008 (LLM Provider & Fallback):** Google Gemini primary (`gemini-2.5-flash` / `gemini-3.6-flash`), with Ollama (`llama3.2`) and deterministic rule fallbacks to prevent pipeline failure.
+- **ADR-008 (LLM Provider & Fallback):** OpenAI only (`gpt-4o-mini` by default) - no Gemini, no Ollama. Each agent falls back to its own deterministic, template-based copy if the OpenAI call fails.
 - **ADR-009 (Strict Service Boundary):** Python has **zero direct database access** (no ORM, no connection strings). All reads/writes traverse the internal REST API guarded by `X-Internal-Api-Key`.
 - **ADR-012 (OpenRouteService Integration):** Real-world road routing and ETA calculation with graceful fallback simulation.
 - **ADR-015 (Pricing Formula & Cargo Leg):** Pricing exclusively applies to the cargo transit movement.
@@ -83,11 +83,9 @@ cp .env.example .env
 | `AGENT_API_BASE_URL` | Base URL of this Python service | `http://localhost:8001` |
 | `AGENT_SERVICE_PORT` | Port for FastAPI / Uvicorn server | `8001` |
 | `LOG_LEVEL` | Logging verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) | `INFO` |
-| `LLM_PROVIDER` | Primary LLM provider (`gemini` or `ollama`) | `gemini` |
-| `GEMINI_API_KEY` | Google AI Studio Gemini API key | `AQ.Ab8...` |
-| `GEMINI_MODEL` | Gemini model identifier | `gemini-2.5-flash` |
-| `OLLAMA_MODEL` | Local Ollama model for offline fallback | `llama3.2` |
-| `OLLAMA_BASE_URL` | Ollama service URL | `http://localhost:11434` |
+| `OPENAI_API_KEY` | OpenAI API key (the only LLM provider - no Gemini, no Ollama) | `sk-...` |
+| `OPENAI_MODEL` | OpenAI model identifier | `gpt-4o-mini` |
+| `OPENAI_MAX_CALLS_PER_PROCESS` | Hard per-process cap on OpenAI calls (cost guard) | `200` |
 | `OPENROUTESERVICE_API_KEY` | OpenRouteService API key for road routing | `your-ors-api-key` |
 | `OPENROUTESERVICE_BASE_URL` | OpenRouteService endpoint | `https://api.openrouteservice.org` |
 | `SHARED_SECRET` | Secret token expected in `X-Internal-Api-Key` header | Matches backend `agent-service-api-key` |
@@ -155,7 +153,7 @@ An interactive demo CLI runner is provided in [`scripts/demo_matching.py`](file:
   4. *FMCG Distribution:* Peliyagoda Warehouse $\rightarrow$ Jaffna Town
 - Live ORS road routing and ETA calculations.
 - Automatic vehicle class resolution and ADR-015 pricing breakdown.
-- Live Gemini natural-language recommendation justification.
+- Live OpenAI natural-language recommendation justification.
 - Audit trail simulation (`ToolCall` and `AgentStep` records).
 
 ### Execution:

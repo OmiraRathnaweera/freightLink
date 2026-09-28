@@ -11,8 +11,9 @@ Architectural Guardrails (Non-Negotiable):
    - LLM Reasoning: Explaining the validation results in plain language for the Shipper and writing
      the personalized job proposal email copy for the agency.
 3. LLM Provider:
-   - Use gemini-2.5-flash via Google GenAI / LangChain as the default (do not use gemini-2.5-pro due to free-tier rate limits).
-   - Support local Ollama via configuration (LLM_PROVIDER=gemini or LLM_PROVIDER=ollama).
+   - Use OpenAI (gpt-4o-mini by default) via LangChain as the only LLM provider (ADR-008 addendum #2).
+   - No Gemini, no Ollama, no other fallback provider - if OpenAI fails, fall back to a
+     deterministic, template-based copy (see core/llm.py's _fallback_validation_copy).
    - The agent MUST execute a real LLM call (university rubric requirement).
 4. Approval Gate & Authority:
    - Every single run—including every automatic retry—must unconditionally pause for human approval (AwaitingApproval).
@@ -228,7 +229,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
     """Executes Agent 4 — Validation & Safety.
 
     - Performs deterministic sanity checks, validation rules, and price-deviation arithmetic.
-    - Executes real LLM reasoning call (gemini-2.5-flash default, Ollama fallback) for Shipper
+    - Executes real LLM reasoning call (OpenAI only, deterministic template fallback) for Shipper
       validation summary and personalized Job Proposal email copy (ADR-017: No Bidding).
     - Incrementally persists step report via POST /internal/agent-workflow-runs/{id}/steps (Channel 1).
     - Unconditionally pauses for human approval by the Shipper (status: AwaitingApproval).
@@ -266,7 +267,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "checks": checks,
     }
 
-    # 3. LLM Reasoning Call (OpenAI default, Gemini/Ollama fallback per config)
+    # 3. LLM Reasoning Call (OpenAI only, deterministic template fallback on failure)
     llm = get_llm()
     llm_provenance: dict[str, Any] | None = None
     try:
