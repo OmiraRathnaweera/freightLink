@@ -92,6 +92,16 @@ export default function AgentWorkflowConsolePage() {
   // live console or the full history list.
   const isFinalized = matchData?.loadStatus === 'Matched' || Boolean(matchData?.existingAssignment)
 
+  // GetMatchRecommendationAsync fills in a live, real-data "preview" recommendation (real
+  // agencies/routing/pricing) even before Agent 3 has actually run, so the Shipper isn't staring
+  // at a blank screen while the pipeline is in flight - but it's honest about that via
+  // workflowStatus, which stays NotStarted/Pending/Running until a real AgentWorkflowRun has
+  // actually produced it. Excluding just those three (rather than allowlisting the "done" values)
+  // means any other real status the backend reports is trusted as backed by an actual Agent 3
+  // decision - only the known in-flight/not-yet-started states must render as "still evaluating"
+  // instead of as an approvable suggestion.
+  const hasRealRecommendation = !['NotStarted', 'Pending', 'Running'].includes(matchData?.workflowStatus)
+
   // Handle switching active load
   const handleSelectLoad = (newLoadId) => {
     setActionSuccessMessage(null)
@@ -297,9 +307,9 @@ export default function AgentWorkflowConsolePage() {
             loadId={activeLoadId}
             loadStatus={matchData.loadStatus}
             workflowStatus={matchData.workflowStatus}
-            recommendedAgency={matchData.recommendedAgency}
+            recommendedAgency={hasRealRecommendation ? matchData.recommendedAgency : null}
             selectedAgencyId={activeSelectedAgencyId}
-            alternateCandidates={matchData.alternateCandidates}
+            alternateCandidates={hasRealRecommendation ? matchData.alternateCandidates : []}
             onResetSelectedAgency={() => setSelectedAgencyId(null)}
             existingAssignment={matchData.existingAssignment}
             onApproveMatch={handleApproveMatch}
@@ -328,7 +338,7 @@ export default function AgentWorkflowConsolePage() {
 
             {/* Alternate Candidates List */}
             <AlternateCandidatesList
-              candidates={matchData.alternateCandidates}
+              candidates={hasRealRecommendation ? matchData.alternateCandidates : []}
               selectedAgencyId={activeSelectedAgencyId}
               onSelectAgency={(agencyId) => setSelectedAgencyId(agencyId)}
               isMatched={matchData.loadStatus === 'Matched' || Boolean(matchData.existingAssignment)}

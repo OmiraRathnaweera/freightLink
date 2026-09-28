@@ -228,6 +228,40 @@ describe('AgentWorkflowConsolePage', () => {
     expect(mutate).toHaveBeenCalledTimes(1)
   })
 
+  it('does not show an approvable recommendation card while matching has not actually run yet', () => {
+    // Regression: GetMatchRecommendationAsync fills recommendedAgency with a live-computed
+    // "preview" (real agencies/routing/pricing) even before Agent 3 has run, purely so the
+    // Shipper isn't staring at a blank screen while the pipeline is in flight - but that preview
+    // must never render as an approvable Agent 3 decision while workflowStatus still says
+    // NotStarted (plans/04-backend-integration.md §5's "never fabricate" rule, applied here to
+    // what the console displays, not just what the backend persists).
+    loadsApi.useLoadsQuery.mockReturnValue({ isLoading: false, data: { items: [mockLoad] } })
+    loadsApi.useLoadDetailQuery.mockReturnValue({ isLoading: false, data: mockLoad })
+    agentWorkflowsApi.useLoadMatchQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: { ...mockMatchData, workflowStatus: 'NotStarted', steps: [] },
+      refetch: vi.fn(),
+    })
+    agentWorkflowsApi.useTriggerMatchMutation.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+    agentWorkflowsApi.useConfirmMatchMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+
+    renderWithProviders(<AgentWorkflowConsolePage />, {
+      route: '/agent-workflows',
+      initialEntries: ['/agent-workflows?loadId=load-1'],
+      authState: { role: UserRole.SHIPPER, isAuthenticated: true },
+    })
+
+    expect(screen.getByText('Evaluating Optimal Carrier Matches')).toBeInTheDocument()
+    expect(screen.queryByText('Rapid Haul Logistics')).not.toBeInTheDocument()
+    expect(screen.queryByText('Wayamba Transporters')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Approve Match & Dispatch/i })).not.toBeInTheDocument()
+  })
+
   it('shows only the agent call history, not the live decision UI, once the load is already Matched', () => {
     loadsApi.useLoadsQuery.mockReturnValue({
       isLoading: false,
