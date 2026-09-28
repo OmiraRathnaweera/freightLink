@@ -1,8 +1,10 @@
+import re
 import uuid
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from freightlink_agent.agents import matching_pricing
+from freightlink_agent.core.llm import ToolCallingSelectionOutput
 from freightlink_agent.graph.state import WorkflowState
 from freightlink_agent.schemas.matching import (
     CandidateAgency,
@@ -10,6 +12,52 @@ from freightlink_agent.schemas.matching import (
     RouteAndEtaRequest,
 )
 from freightlink_agent.tools.routing import calculate_haversine_distance_km, get_route_and_eta
+
+
+def _extract_tool_call_id(tool_output: str) -> str:
+    match = re.search(r"tool_call_id='?([0-9a-fA-F-]+)'?", tool_output)
+    assert match, f"no tool_call_id found in tool output: {tool_output}"
+    return match.group(1)
+
+
+def _make_fake_tool_calling_llm(winner_agency_id: uuid.UUID, *, headline: str, detailed_reasoning: str):
+    """Builds a fake AgentLLM whose run_tool_calling_selection genuinely drives the real
+    tool objects it's handed (populating the real ledger via real tool calls), then cites
+    the real tool_call_ids it got back - exactly what a real tool-calling LLM would do."""
+
+    fake_llm = MagicMock()
+
+    async def _fake_run_tool_calling_selection(system_prompt, context, tools, max_iterations=6, max_tool_calls=8):
+        tools_by_name = {t.name: t for t in tools}
+        winner_id = str(winner_agency_id)
+
+        positioning_output = await tools_by_name["get_route_and_eta_for_candidate"].ainvoke(
+            {"candidate_agency_id": winner_id, "leg": "positioning"}
+        )
+        positioning_id = _extract_tool_call_id(positioning_output)
+
+        cargo_output = await tools_by_name["get_route_and_eta_for_candidate"].ainvoke(
+            {"candidate_agency_id": winner_id, "leg": "cargo"}
+        )
+        cargo_id = _extract_tool_call_id(cargo_output)
+
+        pricing_output = await tools_by_name["estimate_price_for_load"].ainvoke(
+            {"candidate_agency_id": winner_id, "cargo_route_tool_call_id": cargo_id}
+        )
+        pricing_id = _extract_tool_call_id(pricing_output)
+
+        return ToolCallingSelectionOutput(
+            selected_candidate_agency_id=winner_id,
+            selected_positioning_tool_call_id=positioning_id,
+            selected_cargo_tool_call_id=cargo_id,
+            selected_pricing_tool_call_id=pricing_id,
+            headline=headline,
+            detailed_reasoning=detailed_reasoning,
+        )
+
+    fake_llm.run_tool_calling_selection = AsyncMock(side_effect=_fake_run_tool_calling_selection)
+    fake_llm.last_call_meta = {"provider": "openai", "model": "gpt-4o-mini", "usedFallback": False}
+    return fake_llm
 
 
 def test_calculate_haversine_distance():
@@ -124,9 +172,16 @@ async def test_matching_pricing_agent_success():
         base_fare=1500.0,
     )
 
+    fake_llm = _make_fake_tool_calling_llm(
+        agency_1.agency_id,
+        headline="Recommended: Peliyagoda Logistics",
+        detailed_reasoning="Fastest positioning ETA with verified MediumLorry capacity.",
+    )
+
     with (
+        patch("freightlink_agent.agents.matching_pricing.get_llm", return_value=fake_llm),
         patch(
-            "freightlink_agent.agents.matching_pricing.get_price_estimate",
+            "freightlink_agent.tools.matching_tools.get_price_estimate",
             new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200})),
         ),
         patch(
@@ -134,7 +189,7 @@ async def test_matching_pricing_agent_success():
             new=AsyncMock(return_value=uuid.uuid4()),
         ),
         patch(
-            "freightlink_agent.agents.matching_pricing.record_tool_call",
+            "freightlink_agent.tools.matching_tools.record_tool_call",
             new=AsyncMock(),
         ),
     ):
@@ -144,10 +199,151 @@ async def test_matching_pricing_agent_success():
     assert result["selected_agency_id"] == agency_1.agency_id
     assert result["selected_agency_name"] == "Peliyagoda Logistics"
     assert result["suggested_vehicle_class"] == "MediumLorry"
+    # The real, tool-returned price - not anything the fake LLM's text could have said
     assert result["proposed_price"] == 18500.0
     assert result["eta_minutes"] is not None
     assert result["cargo_distance_km"] is not None
     assert "Peliyagoda Logistics" in result["selection_justification"]
+    assert result["steps"][-1]["outputJson"]["llmProvenance"]["provider"] == "openai"
+
+
+@pytest.mark.anyio
+async def test_llm_restated_wrong_price_is_ignored_real_price_persists():
+    """Regression proof of the deterministic-vs-LLM boundary: even if the model's own
+    narrative text restates a wrong number, the persisted proposed_price must come from
+    the real tool result the model cited - never from its own words."""
+    load_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    shipper_id = uuid.uuid4()
+
+    agency = CandidateAgency(
+        agency_id=uuid.uuid4(),
+        name="Peliyagoda Logistics",
+        yard_lat=6.9667,
+        yard_lng=79.8917,
+        yard_address="123 Negombo Rd, Peliyagoda",
+        available_vehicle_classes=["MediumLorry"],
+    )
+
+    state = WorkflowState(
+        load_id=load_id,
+        triggered_by_user_id=shipper_id,
+        attempt_no=1,
+        workflow_run_id=run_id,
+        load_context={
+            "pickupLat": 6.9271,
+            "pickupLng": 79.8612,
+            "dropoffLat": 7.2906,
+            "dropoffLng": 80.6337,
+            "weightKg": 2500,
+            "volumeM3": 8.0,
+        },
+        candidate_shortlist=[agency],
+    )
+
+    mock_pricing_response = EstimatePricingResponse(
+        load_id=load_id,
+        estimated_price=18500.0,
+        distance_km=115.0,
+        vehicle_class="MediumLorry",
+        rate_per_km=120.0,
+        rate_per_kg=1.5,
+        base_fare=1500.0,
+    )
+
+    fake_llm = _make_fake_tool_calling_llm(
+        agency.agency_id,
+        headline="Recommended carrier at a bargain LKR 1.00",
+        detailed_reasoning="This deliberately wrong price of LKR 1.00 must never be trusted.",
+    )
+
+    with (
+        patch("freightlink_agent.agents.matching_pricing.get_llm", return_value=fake_llm),
+        patch(
+            "freightlink_agent.tools.matching_tools.get_price_estimate",
+            new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200})),
+        ),
+        patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
+        patch("freightlink_agent.tools.matching_tools.record_tool_call", new=AsyncMock()),
+    ):
+        result = await matching_pricing.run(state)
+
+    assert result.get("failed") is not True
+    # The LLM's own restated "LKR 1.00" never reaches the persisted price
+    assert result["proposed_price"] == 18500.0
+    assert "LKR 1.00" in result["selection_justification"]  # the wrong text is still just prose
+
+
+@pytest.mark.anyio
+async def test_invalid_tool_call_citation_falls_back_to_deterministic_selection():
+    """If the model's final decision cites a tool_call_id that isn't in the ledger (or
+    points at nothing real), that must be treated exactly like a total LLM failure - the
+    run still succeeds, via the deterministic fallback algorithm, never a fabricated result."""
+    load_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    shipper_id = uuid.uuid4()
+
+    agency = CandidateAgency(
+        agency_id=uuid.uuid4(),
+        name="Peliyagoda Logistics",
+        yard_lat=6.9667,
+        yard_lng=79.8917,
+        yard_address="123 Negombo Rd, Peliyagoda",
+        available_vehicle_classes=["MediumLorry"],
+    )
+
+    state = WorkflowState(
+        load_id=load_id,
+        triggered_by_user_id=shipper_id,
+        attempt_no=1,
+        workflow_run_id=run_id,
+        load_context={
+            "pickupLat": 6.9271,
+            "pickupLng": 79.8612,
+            "dropoffLat": 7.2906,
+            "dropoffLng": 80.6337,
+            "weightKg": 2500,
+            "volumeM3": 8.0,
+        },
+        candidate_shortlist=[agency],
+    )
+
+    mock_pricing_response = EstimatePricingResponse(
+        load_id=load_id,
+        estimated_price=18500.0,
+        distance_km=115.0,
+        vehicle_class="MediumLorry",
+        rate_per_km=120.0,
+        rate_per_kg=1.5,
+        base_fare=1500.0,
+    )
+
+    fake_llm = MagicMock()
+    fake_llm.run_tool_calling_selection = AsyncMock(
+        return_value=ToolCallingSelectionOutput(
+            selected_candidate_agency_id=str(agency.agency_id),
+            selected_positioning_tool_call_id="not-a-real-tool-call-id",
+            selected_cargo_tool_call_id="also-not-real",
+            selected_pricing_tool_call_id="still-not-real",
+            headline="Hallucinated citation",
+            detailed_reasoning="These tool_call_ids were never actually returned by any tool.",
+        )
+    )
+
+    with (
+        patch("freightlink_agent.agents.matching_pricing.get_llm", return_value=fake_llm),
+        patch(
+            "freightlink_agent.agents.matching_pricing.get_price_estimate",
+            new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200})),
+        ),
+        patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
+    ):
+        result = await matching_pricing.run(state)
+
+    assert result.get("failed") is not True
+    assert result["proposed_price"] == 18500.0
+    assert result["steps"][-1]["outputJson"]["llmProvenance"]["provider"] == "deterministic_fallback"
 
 
 @pytest.mark.anyio

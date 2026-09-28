@@ -3,9 +3,18 @@
 Owner: Ratnaweera (Component C).
 Tools: get_route_and_eta, get_price_estimate.
 
-Selects the best agency using real routing data, prices the job using the cargo leg
-distance, generates a natural-language recommendation justification for the Shipper via
-OpenAI, records ToolCall audit records, and reports step 3 back to the backend.
+The LLM itself decides which candidate agency to route, when to price it, and which one
+to select - it is genuinely the tool-usage agent, not a narrator called after a Python
+loop already picked the winner (see tools/matching_tools.py and
+AgentLLM.run_tool_calling_selection). The actual distance/ETA/price numbers that get
+persisted always come from the tool results themselves (looked up from a ledger by the
+tool_call_id the model cites), never from the model restating a number in its own words.
+
+If OpenAI is unreachable, the per-process call cap is hit, or the model's final decision
+cites an id that isn't in the ledger (or points at a failed result), this falls back to
+_deterministic_fallback_selection - today's original procedural algorithm (route every
+candidate, pick the fastest ETA, price the cargo leg) - so a total LLM outage degrades to
+already-tested behavior rather than crashing or fabricating a result.
 """
 
 import json
@@ -14,7 +23,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from freightlink_agent.core.backend_client import BackendClientError, record_tool_call
-from freightlink_agent.core.llm import get_llm
+from freightlink_agent.core.llm import ToolCallingSelectionOutput, get_llm
 from freightlink_agent.graph.state import WorkflowState
 from freightlink_agent.graph.step_reporter import now, report
 from freightlink_agent.schemas.enums import VehicleClass
@@ -26,6 +35,7 @@ from freightlink_agent.schemas.matching import (
     RouteAndEtaRequest,
     RouteAndEtaResponse,
 )
+from freightlink_agent.tools.matching_tools import build_matching_tools
 from freightlink_agent.tools.pricing import get_price_estimate
 from freightlink_agent.tools.routing import get_route_and_eta
 
@@ -34,19 +44,49 @@ logger = logging.getLogger(__name__)
 _STEP_NO = 3
 _AGENT_ROLE = "MatchingPricing"
 
-_SYSTEM_PROMPT = (
-    "You are the Matching & Pricing AI Agent in the FreightLink logistics platform. "
-    "Given the load specifications, candidate comparison metrics, positioning route, pricing breakdown, "
-    "and the selected carrier's real database fleet vehicle and licensed driver, "
-    "provide a professional, natural-language recommendation for the Shipper. "
+# Bounds on Agent 3's tool-calling loop (AgentLLM.run_tool_calling_selection): enough turns
+# to check several candidates' positioning ETA, route one cargo leg, and price a winner,
+# without letting a confused model loop unboundedly or blow the OpenAI cost cap.
+MAX_TOOL_ITERATIONS = 6
+MAX_TOOL_CALLS = 8
+
+_TOOL_SELECTION_SYSTEM_PROMPT = (
+    "You are the Matching & Pricing AI Agent in the FreightLink logistics platform. You "
+    "have two tools: get_route_and_eta_for_candidate and estimate_price_for_load. Use them "
+    "yourself to decide which candidate agency is the best fit for this load - do not "
+    "guess or skip straight to a decision without calling tools."
+    "\n\n"
+    "Suggested process: for each candidate agency given to you, call "
+    "get_route_and_eta_for_candidate(leg='positioning') to see how quickly it can reach "
+    "pickup. For the candidate(s) you are seriously considering, call "
+    "get_route_and_eta_for_candidate(leg='cargo') once (the cargo leg is the same distance "
+    "for every candidate, but you must still name the candidate you are evaluating), then "
+    "call estimate_price_for_load citing that cargo tool_call_id to get a real price. "
+    "Prefer agencies with a fast positioning ETA, a suitable vehicle class, and fleet/"
+    "driver readiness."
+    "\n\n"
     "CRITICAL GROUNDING RULES: "
-    "1. Never invent mock carriers, mock vehicles, or mock drivers. Use ONLY the real carrier, assigned fleet vehicle "
-    "(with actual registration plate), and assigned licensed driver provided in the context. "
-    "2. Explicitly cite the carrier name, yard location, assigned vehicle registration plate, and licensed driver name. "
-    "3. State why this agency was selected (fastest ETA to pickup, distance, fleet readiness). "
-    "4. Explain the price estimate (LKR) with distance and cargo weight factors clearly and transparently. "
-    "5. Keep the tone concise, authoritative, and professional for enterprise freight logistics."
+    "1. Never invent a distance, ETA, or price - every number must come from a tool "
+    "result, and you must cite its exact tool_call_id in your final decision. "
+    "2. Never invent mock carriers, vehicles, or drivers - reference only the real "
+    "candidates, fleet vehicles, and drivers given to you in the candidates list. "
+    "3. In headline/detailed_reasoning, explain why you picked this agency: positioning "
+    "ETA, distance, price, and fleet/driver readiness. "
+    "4. Keep the tone concise, authoritative, and professional for enterprise freight "
+    "logistics."
 )
+
+
+class _SelectionFailed(Exception):
+    """Raised by _deterministic_fallback_selection when the underlying routing/pricing
+    tools themselves are broken - a real pipeline failure, not something to fall back
+    further from. ranked_five carries whatever partial comparison data exists so far, for
+    the same visibility the original inline failure paths used to return."""
+
+    def __init__(self, message: str, ranked_five: list[dict[str, Any]] | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.ranked_five = ranked_five
 
 
 def _determine_vehicle_class(
@@ -79,6 +119,331 @@ def _determine_vehicle_class(
 
     # Fallback to the first available class
     return available_classes[0]
+
+
+def _build_ranked_five(
+    candidates_by_id: dict[str, CandidateAgency],
+    ledger: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Builds the candidate comparison list from whichever positioning-leg tool results
+    actually landed in the ledger - only candidates the LLM (or the deterministic fallback)
+    actually routed appear here."""
+    best_by_candidate: dict[str, RouteAndEtaResponse] = {}
+    for entry in ledger.values():
+        if entry.get("type") == "route" and entry.get("leg") == "positioning" and entry["result"].success:
+            best_by_candidate[entry["candidateAgencyId"]] = entry["result"]
+
+    pairs = [(candidates_by_id[cid], route) for cid, route in best_by_candidate.items() if cid in candidates_by_id]
+    pairs.sort(key=lambda pair: (pair[1].eta_minutes or 999999, pair[1].distance_km or 999999))
+    return [
+        {
+            "agencyId": str(cand.agency_id),
+            "etaMinutes": route.eta_minutes or 0,
+            "distanceKm": route.distance_km or 0.0,
+            "isSimulatedRoute": route.is_simulated,
+        }
+        for cand, route in pairs[:5]
+    ]
+
+
+def _extract_selection_from_ledger(
+    decision: ToolCallingSelectionOutput,
+    candidates_by_id: dict[str, CandidateAgency],
+    ledger: dict[str, dict[str, Any]],
+    vehicle_class_by_candidate: dict[str, VehicleClass],
+) -> dict[str, Any]:
+    """Validates the LLM's cited tool_call_ids against the real ledger and pulls every
+    numeric field from there - never from the decision's own text. Raises ValueError if any
+    citation is missing, malformed, or points at a failed result; the caller treats that
+    exactly like a total LLM failure and falls back to the deterministic algorithm."""
+    winner = candidates_by_id.get(decision.selected_candidate_agency_id)
+    if winner is None:
+        raise ValueError(f"decision cites unknown candidate_agency_id '{decision.selected_candidate_agency_id}'")
+
+    positioning_entry = ledger.get(decision.selected_positioning_tool_call_id)
+    if (
+        positioning_entry is None
+        or positioning_entry.get("type") != "route"
+        or positioning_entry.get("leg") != "positioning"
+        or positioning_entry.get("candidateAgencyId") != decision.selected_candidate_agency_id
+        or not positioning_entry["result"].success
+    ):
+        raise ValueError("decision cites an invalid or failed positioning tool_call_id")
+
+    cargo_entry = ledger.get(decision.selected_cargo_tool_call_id)
+    if (
+        cargo_entry is None
+        or cargo_entry.get("type") != "route"
+        or cargo_entry.get("leg") != "cargo"
+        or not cargo_entry["result"].success
+    ):
+        raise ValueError("decision cites an invalid or failed cargo tool_call_id")
+
+    pricing_entry = ledger.get(decision.selected_pricing_tool_call_id)
+    if pricing_entry is None or pricing_entry.get("type") != "pricing" or pricing_entry["result"] is None:
+        raise ValueError("decision cites an invalid or failed pricing tool_call_id")
+
+    justification = f"{decision.headline}\n\n{decision.detailed_reasoning}".strip()
+
+    return {
+        "winner": winner,
+        "winner_route": positioning_entry["result"],
+        "cargo_route": cargo_entry["result"],
+        "pricing_res": pricing_entry["result"],
+        "suggested_vehicle_class": vehicle_class_by_candidate.get(decision.selected_candidate_agency_id, "MediumLorry"),
+        "justification": justification,
+        "ranked_five": _build_ranked_five(candidates_by_id, ledger),
+    }
+
+
+def _build_deterministic_justification(
+    *,
+    winner: CandidateAgency,
+    winner_route: RouteAndEtaResponse,
+    cargo_distance_km: float,
+    pricing_res: EstimatePricingResponse,
+    suggested_vehicle_class: str,
+    assigned_vehicle: dict[str, Any] | None,
+    assigned_driver: dict[str, Any] | None,
+) -> str:
+    veh_reg = (
+        (assigned_vehicle.get("registrationNo") or assigned_vehicle.get("registration_no"))
+        if assigned_vehicle
+        else "Verified Fleet Vehicle"
+    )
+    dr_name = assigned_driver.get("name") if assigned_driver else "Licensed Carrier Driver"
+    return (
+        f"Recommended Carrier: {winner.name} (Yard: {winner.yard_address or 'Hub'}). "
+        f"Assigned Vehicle: {veh_reg} ({suggested_vehicle_class}) with Driver: {dr_name}. "
+        f"Nearest available carrier with ETA {winner_route.eta_minutes} min to pickup ({winner_route.distance_km} km positioning). "
+        f"Cargo transit distance: {cargo_distance_km} km. Estimated price: LKR {pricing_res.estimated_price:,.2f}."
+    )
+
+
+async def _deterministic_fallback_selection(
+    *,
+    shortlist_to_eval: list[CandidateAgency],
+    load_id: UUID,
+    pickup_lat: float,
+    pickup_lng: float,
+    dropoff_lat: float,
+    dropoff_lng: float,
+    workflow_run_id: UUID,
+    weight_kg: float,
+    volume_m3: float,
+    tool_calls: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Today's original, fully procedural selection algorithm (no LLM): routes every
+    shortlisted candidate, picks the fastest positioning ETA, routes the cargo leg, and
+    prices it. Used whenever the genuine LLM tool-calling path is unusable, so a total LLM
+    outage degrades to this already-tested behavior instead of failing the run outright.
+    Raises _SelectionFailed (a real "hold for review" failure) if routing/pricing
+    themselves are broken - that must stop the pipeline either way.
+    """
+    routed_candidates: list[tuple[CandidateAgency, RouteAndEtaResponse]] = []
+
+    for idx, candidate in enumerate(shortlist_to_eval, start=1):
+        req = RouteAndEtaRequest(
+            origin_lat=candidate.yard_lat,
+            origin_lng=candidate.yard_lng,
+            destination_lat=pickup_lat,
+            destination_lng=pickup_lng,
+        )
+        route_res, telemetry = await get_route_and_eta(req)
+
+        req_json = json.dumps(telemetry.get("request"), default=str)
+        err_msg = route_res.error_message
+        if not route_res.success:
+            if not err_msg:
+                err_msg = "hold for review: routing lookup failed after retry"
+            elif "hold for review" not in err_msg.lower():
+                err_msg = f"hold for review: {err_msg}"
+            res_json = json.dumps({"status": "hold for review", "error": err_msg}, default=str)
+        else:
+            res_json = json.dumps(route_res.model_dump(by_alias=True), default=str)
+
+        tool_calls.append({
+            "toolCallId": str(uuid4()),
+            "toolName": "get_route_and_eta",
+            "attemptNo": idx,
+            "requestJson": req_json,
+            "responseJson": res_json,
+            "success": route_res.success,
+            "httpStatusCode": telemetry.get("httpStatusCode"),
+            "durationMs": telemetry.get("durationMs"),
+            "errorMessage": err_msg if not route_res.success else None,
+            "calledAt": now().isoformat(),
+        })
+        try:
+            await record_tool_call(
+                workflow_run_id,
+                CreateToolCallRequest(
+                    tool_name="get_route_and_eta",
+                    attempt_no=idx,
+                    request_json=req_json,
+                    response_json=res_json,
+                    success=route_res.success,
+                    http_status_code=telemetry.get("httpStatusCode"),
+                    duration_ms=telemetry.get("durationMs"),
+                    error_message=err_msg if not route_res.success else None,
+                    called_at=now(),
+                ),
+            )
+        except BackendClientError:
+            pass
+
+        if route_res.success and route_res.eta_minutes is not None:
+            routed_candidates.append((candidate, route_res))
+        else:
+            logger.warning("Routing failed for candidate %s: %s", candidate.name, route_res.error_message)
+
+    if not routed_candidates:
+        raise _SelectionFailed("hold for review: all candidate agency routing lookups failed after retry")
+
+    sorted_routed = sorted(
+        routed_candidates,
+        key=lambda pair: (pair[1].eta_minutes or 999999, pair[1].distance_km or 999999),
+    )
+    ranked_five = [
+        {
+            "agencyId": str(cand.agency_id),
+            "etaMinutes": r.eta_minutes or 0,
+            "distanceKm": r.distance_km or 0.0,
+            "isSimulatedRoute": r.is_simulated,
+        }
+        for cand, r in sorted_routed[:5]
+    ]
+
+    winner, winner_route = sorted_routed[0]
+    suggested_vehicle_class = _determine_vehicle_class(
+        weight_kg=weight_kg,
+        volume_m3=volume_m3,
+        available_classes=winner.available_vehicle_classes,
+    )
+
+    cargo_req = RouteAndEtaRequest(
+        origin_lat=pickup_lat,
+        origin_lng=pickup_lng,
+        destination_lat=dropoff_lat,
+        destination_lng=dropoff_lng,
+    )
+    cargo_route, cargo_telemetry = await get_route_and_eta(cargo_req)
+
+    cargo_req_json = json.dumps(cargo_telemetry.get("request"), default=str)
+    cargo_err_msg = cargo_route.error_message
+    if not cargo_route.success:
+        if not cargo_err_msg:
+            cargo_err_msg = "hold for review: cargo routing lookup failed after retry"
+        elif "hold for review" not in cargo_err_msg.lower():
+            cargo_err_msg = f"hold for review: {cargo_err_msg}"
+        cargo_res_json = json.dumps({"status": "hold for review", "error": cargo_err_msg}, default=str)
+    else:
+        cargo_res_json = json.dumps(cargo_route.model_dump(by_alias=True), default=str)
+
+    tool_calls.append({
+        "toolCallId": str(uuid4()),
+        "toolName": "get_route_and_eta",
+        "attemptNo": len(shortlist_to_eval) + 1,
+        "requestJson": cargo_req_json,
+        "responseJson": cargo_res_json,
+        "success": cargo_route.success,
+        "httpStatusCode": cargo_telemetry.get("httpStatusCode"),
+        "durationMs": cargo_telemetry.get("durationMs"),
+        "errorMessage": cargo_err_msg if not cargo_route.success else None,
+        "calledAt": now().isoformat(),
+    })
+    try:
+        await record_tool_call(
+            workflow_run_id,
+            CreateToolCallRequest(
+                tool_name="get_route_and_eta",
+                attempt_no=len(shortlist_to_eval) + 1,
+                request_json=cargo_req_json,
+                response_json=cargo_res_json,
+                success=cargo_route.success,
+                http_status_code=cargo_telemetry.get("httpStatusCode"),
+                duration_ms=cargo_telemetry.get("durationMs"),
+                error_message=cargo_err_msg if not cargo_route.success else None,
+                called_at=now(),
+            ),
+        )
+    except BackendClientError:
+        pass
+
+    if not cargo_route.success or cargo_route.distance_km is None or cargo_route.distance_km <= 0:
+        raise _SelectionFailed(
+            f"hold for review: cargo leg routing lookup failed: {cargo_err_msg}",
+            ranked_five=ranked_five,
+        )
+
+    cargo_distance_km = cargo_route.distance_km
+
+    pricing_req = EstimatePricingRequest(
+        load_id=load_id,
+        suggested_vehicle_class=suggested_vehicle_class,
+        distance_km=cargo_distance_km,
+    )
+    pricing_res, pricing_telemetry = await get_price_estimate(pricing_req)
+
+    pricing_req_json = json.dumps(pricing_req.model_dump(by_alias=True), default=str)
+    pricing_err_msg = pricing_telemetry.get("error")
+    if not pricing_res:
+        if not pricing_err_msg:
+            pricing_err_msg = "hold for review: pricing estimation failed after retry"
+        elif "hold for review" not in pricing_err_msg.lower():
+            pricing_err_msg = f"hold for review: {pricing_err_msg}"
+        pricing_res_json = json.dumps({"status": "hold for review", "error": pricing_err_msg}, default=str)
+    else:
+        pricing_res_json = json.dumps(pricing_res.model_dump(by_alias=True), default=str)
+
+    tool_calls.append({
+        "toolCallId": str(uuid4()),
+        "toolName": "estimate_price",
+        "attemptNo": 1,
+        "requestJson": pricing_req_json,
+        "responseJson": pricing_res_json,
+        "success": pricing_res is not None,
+        "httpStatusCode": pricing_telemetry.get("httpStatusCode"),
+        "durationMs": pricing_telemetry.get("durationMs"),
+        "errorMessage": pricing_err_msg if not pricing_res else None,
+        "calledAt": now().isoformat(),
+    })
+    try:
+        await record_tool_call(
+            workflow_run_id,
+            CreateToolCallRequest(
+                tool_name="estimate_price",
+                attempt_no=1,
+                request_json=pricing_req_json,
+                response_json=pricing_res_json,
+                success=pricing_res is not None,
+                http_status_code=pricing_telemetry.get("httpStatusCode"),
+                duration_ms=pricing_telemetry.get("durationMs"),
+                error_message=pricing_err_msg if not pricing_res else None,
+                called_at=now(),
+            ),
+        )
+    except BackendClientError:
+        pass
+
+    # Pricing is a hard business number, never an LLM/local guess (deterministic-vs-LLM
+    # boundary, see plans/00-master-plan.md §6.5): if the backend estimator fails, fail
+    # this run cleanly rather than fabricate a price.
+    if not pricing_res:
+        raise _SelectionFailed(
+            f"hold for review: pricing estimation failed: {pricing_err_msg}",
+            ranked_five=ranked_five,
+        )
+
+    return {
+        "winner": winner,
+        "winner_route": winner_route,
+        "cargo_route": cargo_route,
+        "pricing_res": pricing_res,
+        "suggested_vehicle_class": suggested_vehicle_class,
+        "justification": None,
+        "ranked_five": ranked_five,
+    }
 
 
 async def run(state: WorkflowState) -> dict[str, Any]:
@@ -145,293 +510,123 @@ async def run(state: WorkflowState) -> dict[str, Any]:
             logger.exception("Failed to report step failure")
         return {"failed": True, "failure_reason": msg, "tool_calls": tool_calls, "steps": steps}
 
-    # Step 1: Route positioning leg (Yard -> Pickup) for up to top 5 candidates
+    # Up to the top 5 candidates from Agent 2's shortlist are evaluated (capped to preserve
+    # API quotas and the OpenAI tool-call budget).
     shortlist_to_eval = candidates[:5]
-    routed_candidates: list[tuple[CandidateAgency, RouteAndEtaResponse]] = []
-
-    for idx, candidate in enumerate(shortlist_to_eval, start=1):
-        req = RouteAndEtaRequest(
-            origin_lat=candidate.yard_lat,
-            origin_lng=candidate.yard_lng,
-            destination_lat=pickup_lat,
-            destination_lng=pickup_lng,
-        )
-        route_res, telemetry = await get_route_and_eta(req)
-
-        # In-memory ToolCall audit record
-        req_json = json.dumps(telemetry.get("request"), default=str)
-        err_msg = route_res.error_message
-        if not route_res.success:
-            if not err_msg:
-                err_msg = "hold for review: routing lookup failed after retry"
-            elif "hold for review" not in err_msg.lower():
-                err_msg = f"hold for review: {err_msg}"
-            res_json = json.dumps({"status": "hold for review", "error": err_msg}, default=str)
-        else:
-            res_json = json.dumps(route_res.model_dump(by_alias=True), default=str)
-
-        tool_call_dict = {
-            "toolCallId": str(uuid4()),
-            "toolName": "get_route_and_eta",
-            "attemptNo": idx,
-            "requestJson": req_json,
-            "responseJson": res_json,
-            "success": route_res.success,
-            "httpStatusCode": telemetry.get("httpStatusCode"),
-            "durationMs": telemetry.get("durationMs"),
-            "errorMessage": err_msg if not route_res.success else None,
-            "calledAt": now().isoformat(),
-        }
-        tool_calls.append(tool_call_dict)
-
-        # Attempt reporting to backend if online
-        try:
-            tool_call_req = CreateToolCallRequest(
-                tool_name="get_route_and_eta",
-                attempt_no=idx,
-                request_json=req_json,
-                response_json=res_json,
-                success=route_res.success,
-                http_status_code=telemetry.get("httpStatusCode"),
-                duration_ms=telemetry.get("durationMs"),
-                error_message=err_msg if not route_res.success else None,
-                called_at=now(),
-            )
-            await record_tool_call(workflow_run_id, tool_call_req)
-        except BackendClientError:
-            pass
-
-        if route_res.success and route_res.eta_minutes is not None:
-            routed_candidates.append((candidate, route_res))
-        else:
-            logger.warning("Routing failed for candidate %s: %s", candidate.name, route_res.error_message)
-
-    if not routed_candidates:
-        msg = "hold for review: all candidate agency routing lookups failed after retry"
-        logger.error(msg)
-        steps.append({
-            "stepNo": _STEP_NO,
-            "agentRole": _AGENT_ROLE,
-            "status": "Failed",
-            "inputJson": input_data,
-            "outputJson": {"status": "hold for review", "reason": msg},
-            "errorMessage": msg,
-            "startedAt": started.isoformat(),
-            "completedAt": now().isoformat(),
-        })
-        try:
-            await report(
-                workflow_run_id=workflow_run_id,
-                step_no=_STEP_NO,
-                agent_role=_AGENT_ROLE,
-                status="Failed",
-                started_at=started,
-                input_data=input_data,
-                error_message=msg,
-            )
-        except BackendClientError:
-            pass
-        return {"failed": True, "failure_reason": msg, "tool_calls": tool_calls, "steps": steps}
-
-    # Step 2: Rank routed candidates by ETA & distance (top 5)
-    sorted_routed = sorted(
-        routed_candidates,
-        key=lambda pair: (pair[1].eta_minutes or 999999, pair[1].distance_km or 999999),
-    )
-    ranked_five = [
-        {
-            "agencyId": str(cand.agency_id),
-            "etaMinutes": r.eta_minutes or 0,
-            "distanceKm": r.distance_km or 0.0,
-            "isSimulatedRoute": r.is_simulated,
-        }
-        for cand, r in sorted_routed[:5]
-    ]
-
-    winner, winner_route = sorted_routed[0]
-    suggested_vehicle_class = _determine_vehicle_class(
-        weight_kg=weight_kg,
-        volume_m3=volume_m3,
-        available_classes=winner.available_vehicle_classes,
-    )
-
-    # Step 3: Route cargo leg (Pickup -> Dropoff) & calculate pricing
-    # Critical (ADR-015 addendum): Pricing uses the cargo leg distance, not the yard->pickup positioning leg!
-    cargo_req = RouteAndEtaRequest(
-        origin_lat=pickup_lat,
-        origin_lng=pickup_lng,
-        destination_lat=dropoff_lat,
-        destination_lng=dropoff_lng,
-    )
-    cargo_route, cargo_telemetry = await get_route_and_eta(cargo_req)
-
-    cargo_req_json = json.dumps(cargo_telemetry.get("request"), default=str)
-    cargo_err_msg = cargo_route.error_message
-    if not cargo_route.success:
-        if not cargo_err_msg:
-            cargo_err_msg = "hold for review: cargo routing lookup failed after retry"
-        elif "hold for review" not in cargo_err_msg.lower():
-            cargo_err_msg = f"hold for review: {cargo_err_msg}"
-        cargo_res_json = json.dumps({"status": "hold for review", "error": cargo_err_msg}, default=str)
-    else:
-        cargo_res_json = json.dumps(cargo_route.model_dump(by_alias=True), default=str)
-
-    cargo_tool_call_dict = {
-        "toolCallId": str(uuid4()),
-        "toolName": "get_route_and_eta",
-        "attemptNo": len(shortlist_to_eval) + 1,
-        "requestJson": cargo_req_json,
-        "responseJson": cargo_res_json,
-        "success": cargo_route.success,
-        "httpStatusCode": cargo_telemetry.get("httpStatusCode"),
-        "durationMs": cargo_telemetry.get("durationMs"),
-        "errorMessage": cargo_err_msg if not cargo_route.success else None,
-        "calledAt": now().isoformat(),
+    candidates_by_id = {str(c.agency_id): c for c in shortlist_to_eval}
+    # Vehicle class is a pure capacity lookup with no judgment call (ADR-019) - given to the
+    # LLM as a fact per candidate, never left for it to "decide" or exposed as a tool.
+    vehicle_class_by_candidate: dict[str, VehicleClass] = {
+        cid: _determine_vehicle_class(weight_kg, volume_m3, c.available_vehicle_classes)
+        for cid, c in candidates_by_id.items()
     }
-    tool_calls.append(cargo_tool_call_dict)
 
-    try:
-        await record_tool_call(
-            workflow_run_id,
-            CreateToolCallRequest(
-                tool_name="get_route_and_eta",
-                attempt_no=len(shortlist_to_eval) + 1,
-                request_json=cargo_req_json,
-                response_json=cargo_res_json,
-                success=cargo_route.success,
-                http_status_code=cargo_telemetry.get("httpStatusCode"),
-                duration_ms=cargo_telemetry.get("durationMs"),
-                error_message=cargo_err_msg if not cargo_route.success else None,
-                called_at=now(),
-            ),
-        )
-    except BackendClientError:
-        pass
-
-    if not cargo_route.success or cargo_route.distance_km is None or cargo_route.distance_km <= 0:
-        msg = f"hold for review: cargo leg routing lookup failed: {cargo_err_msg}"
-        logger.error(msg)
-        steps.append({
-            "stepNo": _STEP_NO,
-            "agentRole": _AGENT_ROLE,
-            "status": "Failed",
-            "inputJson": input_data,
-            "outputJson": {"status": "hold for review", "reason": msg},
-            "errorMessage": msg,
-            "startedAt": started.isoformat(),
-            "completedAt": now().isoformat(),
-        })
-        try:
-            await report(
-                workflow_run_id=workflow_run_id,
-                step_no=_STEP_NO,
-                agent_role=_AGENT_ROLE,
-                status="Failed",
-                started_at=started,
-                input_data=input_data,
-                error_message=msg,
-            )
-        except BackendClientError:
-            pass
-        return {
-            "failed": True,
-            "failure_reason": msg,
-            "tool_calls": tool_calls,
-            "ranked_five": ranked_five,
-            "steps": steps,
-        }
-
-    cargo_distance_km = cargo_route.distance_km
-
-    # Call backend pricing estimator endpoint (POST /internal/pricing/estimate)
-    pricing_req = EstimatePricingRequest(
+    ledger: dict[str, dict[str, Any]] = {}
+    tools = build_matching_tools(
+        candidates_by_id=candidates_by_id,
+        pickup=(pickup_lat, pickup_lng),
+        dropoff=(dropoff_lat, dropoff_lng),
         load_id=state.load_id,
-        suggested_vehicle_class=suggested_vehicle_class,
-        distance_km=cargo_distance_km,
+        workflow_run_id=workflow_run_id,
+        vehicle_class_by_candidate=vehicle_class_by_candidate,
+        ledger=ledger,
+        tool_calls_audit=tool_calls,
     )
-    pricing_res, pricing_telemetry = await get_price_estimate(pricing_req)
 
-    pricing_req_json = json.dumps(pricing_req.model_dump(by_alias=True), default=str)
-    pricing_err_msg = pricing_telemetry.get("error")
-    if not pricing_res:
-        if not pricing_err_msg:
-            pricing_err_msg = "hold for review: pricing estimation failed after retry"
-        elif "hold for review" not in pricing_err_msg.lower():
-            pricing_err_msg = f"hold for review: {pricing_err_msg}"
-        pricing_res_json = json.dumps({"status": "hold for review", "error": pricing_err_msg}, default=str)
-    else:
-        pricing_res_json = json.dumps(pricing_res.model_dump(by_alias=True), default=str)
-
-    pricing_tool_call_dict = {
-        "toolCallId": str(uuid4()),
-        "toolName": "estimate_price",
-        "attemptNo": 1,
-        "requestJson": pricing_req_json,
-        "responseJson": pricing_res_json,
-        "success": pricing_res is not None,
-        "httpStatusCode": pricing_telemetry.get("httpStatusCode"),
-        "durationMs": pricing_telemetry.get("durationMs"),
-        "errorMessage": pricing_err_msg if not pricing_res else None,
-        "calledAt": now().isoformat(),
+    llm_context = {
+        "load": {
+            "weightKg": weight_kg,
+            "volumeM3": volume_m3,
+            "cargoDescription": cargo_desc,
+        },
+        "candidates": [
+            {
+                "agencyId": cid,
+                "name": c.name,
+                "yardAddress": c.yard_address,
+                "suggestedVehicleClass": vehicle_class_by_candidate[cid],
+                "availableVehicles": c.available_vehicles,
+                "activeDrivers": c.active_drivers,
+            }
+            for cid, c in candidates_by_id.items()
+        ],
     }
-    tool_calls.append(pricing_tool_call_dict)
 
+    selection: dict[str, Any] | None = None
+    llm_provenance: dict[str, Any] | None = None
     try:
-        await record_tool_call(
-            workflow_run_id,
-            CreateToolCallRequest(
-                tool_name="estimate_price",
-                attempt_no=1,
-                request_json=pricing_req_json,
-                response_json=pricing_res_json,
-                success=pricing_res is not None,
-                http_status_code=pricing_telemetry.get("httpStatusCode"),
-                duration_ms=pricing_telemetry.get("durationMs"),
-                error_message=pricing_err_msg if not pricing_res else None,
-                called_at=now(),
-            ),
+        llm = get_llm()
+        decision = await llm.run_tool_calling_selection(
+            system_prompt=_TOOL_SELECTION_SYSTEM_PROMPT,
+            context=llm_context,
+            tools=tools,
+            max_iterations=MAX_TOOL_ITERATIONS,
+            max_tool_calls=MAX_TOOL_CALLS,
         )
-    except BackendClientError:
-        pass
+        selection = _extract_selection_from_ledger(decision, candidates_by_id, ledger, vehicle_class_by_candidate)
+        llm_provenance = getattr(llm, "last_call_meta", None)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "LLM tool-calling selection unusable (%s); falling back to deterministic selection", exc
+        )
+        selection = None
 
-    # Pricing is a hard business number, never an LLM/local guess (deterministic-vs-LLM
-    # boundary, see plans/00-master-plan.md §6.5): if the backend estimator fails, fail
-    # this run cleanly rather than fabricate a price. The previous fallback here also
-    # referenced VehicleClass.MiniTruck as if VehicleClass were an enum with attributes -
-    # it's a Literal type alias, so that comparison always raised AttributeError before
-    # it could even construct its (separately shape-mismatched) fallback response.
-    if not pricing_res:
-        msg = f"hold for review: pricing estimation failed: {pricing_err_msg}"
-        logger.error(msg)
-        steps.append({
-            "stepNo": _STEP_NO,
-            "agentRole": _AGENT_ROLE,
-            "status": "Failed",
-            "inputJson": input_data,
-            "outputJson": {"status": "hold for review", "reason": msg},
-            "errorMessage": msg,
-            "startedAt": started.isoformat(),
-            "completedAt": now().isoformat(),
-        })
+    if selection is None:
         try:
-            await report(
+            selection = await _deterministic_fallback_selection(
+                shortlist_to_eval=shortlist_to_eval,
+                load_id=state.load_id,
+                pickup_lat=pickup_lat,
+                pickup_lng=pickup_lng,
+                dropoff_lat=dropoff_lat,
+                dropoff_lng=dropoff_lng,
                 workflow_run_id=workflow_run_id,
-                step_no=_STEP_NO,
-                agent_role=_AGENT_ROLE,
-                status="Failed",
-                started_at=started,
-                input_data=input_data,
-                error_message=msg,
+                weight_kg=weight_kg,
+                volume_m3=volume_m3,
+                tool_calls=tool_calls,
             )
-        except BackendClientError:
-            pass
-        return {
-            "failed": True,
-            "failure_reason": msg,
-            "tool_calls": tool_calls,
-            "ranked_five": ranked_five,
-            "steps": steps,
-        }
+        except _SelectionFailed as failure:
+            logger.error(failure.message)
+            steps.append({
+                "stepNo": _STEP_NO,
+                "agentRole": _AGENT_ROLE,
+                "status": "Failed",
+                "inputJson": input_data,
+                "outputJson": {"status": "hold for review", "reason": failure.message},
+                "errorMessage": failure.message,
+                "startedAt": started.isoformat(),
+                "completedAt": now().isoformat(),
+            })
+            try:
+                await report(
+                    workflow_run_id=workflow_run_id,
+                    step_no=_STEP_NO,
+                    agent_role=_AGENT_ROLE,
+                    status="Failed",
+                    started_at=started,
+                    input_data=input_data,
+                    error_message=failure.message,
+                )
+            except BackendClientError:
+                pass
+            failure_result: dict[str, Any] = {
+                "failed": True,
+                "failure_reason": failure.message,
+                "tool_calls": tool_calls,
+                "steps": steps,
+            }
+            if failure.ranked_five is not None:
+                failure_result["ranked_five"] = failure.ranked_five
+            return failure_result
+        llm_provenance = {"provider": "deterministic_fallback", "model": None, "usedFallback": True}
+
+    winner: CandidateAgency = selection["winner"]
+    winner_route: RouteAndEtaResponse = selection["winner_route"]
+    cargo_route: RouteAndEtaResponse = selection["cargo_route"]
+    cargo_distance_km = cargo_route.distance_km
+    pricing_res: EstimatePricingResponse = selection["pricing_res"]
+    suggested_vehicle_class = selection["suggested_vehicle_class"]
+    ranked_five = selection["ranked_five"]
 
     # Resolve real assigned fleet vehicle and licensed driver from database entities
     assigned_vehicle = None
@@ -447,65 +642,15 @@ async def run(state: WorkflowState) -> dict[str, Any]:
 
     assigned_driver = winner.active_drivers[0] if winner.active_drivers else None
 
-    # Step 4: LLM justification call (OpenAI)
-    llm_context = {
-        "load": {
-            "weightKg": weight_kg,
-            "volumeM3": volume_m3,
-            "cargoDescription": cargo_desc,
-            "cargoDistanceKm": cargo_distance_km,
-        },
-        "selectedAgency": {
-            "agencyId": str(winner.agency_id),
-            "name": winner.name,
-            "yardAddress": winner.yard_address,
-            "etaMinutes": winner_route.eta_minutes,
-            "positioningDistanceKm": winner_route.distance_km,
-            "suggestedVehicleClass": suggested_vehicle_class,
-            "assignedVehicle": assigned_vehicle,
-            "assignedDriver": assigned_driver,
-            "availableVehicles": winner.available_vehicles,
-            "activeDrivers": winner.active_drivers,
-        },
-        "pricing": pricing_res.model_dump(by_alias=True),
-        "otherCandidatesEvaluated": [
-            {
-                "name": cand.name,
-                "etaMinutes": r.eta_minutes,
-                "positioningDistanceKm": r.distance_km,
-                "availableVehiclesCount": len(cand.available_vehicles),
-                "activeDriversCount": len(cand.active_drivers),
-            }
-            for cand, r in routed_candidates
-            if cand.agency_id != winner.agency_id
-        ],
-    }
-
-    llm_provenance: dict[str, Any] | None = None
-    try:
-        llm = get_llm()
-        llm_out = await llm.justify_selection(
-            system_prompt=_SYSTEM_PROMPT,
-            context=llm_context,
-        )
-        headline = llm_out.get("headline", "")
-        detailed = llm_out.get("detailed_reasoning", "")
-        justification = f"{headline}\n\n{detailed}".strip()
-        llm_provenance = getattr(llm, "last_call_meta", None)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("LLM selection justification failed (%s); using deterministic explanation", exc)
-        veh_reg = (
-            assigned_vehicle.get("registrationNo") or assigned_vehicle.get("registration_no")
-            if assigned_vehicle
-            else "Verified Fleet Vehicle"
-        )
-        dr_name = assigned_driver.get("name") if assigned_driver else "Licensed Carrier Driver"
-        justification = (
-            f"Recommended Carrier: {winner.name} (Yard: {winner.yard_address or 'Hub'}). "
-            f"Assigned Vehicle: {veh_reg} ({suggested_vehicle_class}) with Driver: {dr_name}. "
-            f"Nearest available carrier with ETA {winner_route.eta_minutes} min to pickup ({winner_route.distance_km} km positioning). "
-            f"Cargo transit distance: {cargo_distance_km} km. Estimated price: LKR {pricing_res.estimated_price:,.2f}."
-        )
+    justification = selection.get("justification") or _build_deterministic_justification(
+        winner=winner,
+        winner_route=winner_route,
+        cargo_distance_km=cargo_distance_km,
+        pricing_res=pricing_res,
+        suggested_vehicle_class=suggested_vehicle_class,
+        assigned_vehicle=assigned_vehicle,
+        assigned_driver=assigned_driver,
+    )
 
     output_data = {
         "selectedAgencyId": str(winner.agency_id),
@@ -539,7 +684,7 @@ async def run(state: WorkflowState) -> dict[str, Any]:
         "driverName": assigned_driver.get("name") if assigned_driver else None,
     }
 
-    # Step 5: Report step 3 outcome to backend
+    # Report step 3 outcome to backend
     steps.append({
         "stepNo": _STEP_NO,
         "agentRole": _AGENT_ROLE,

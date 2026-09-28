@@ -29,33 +29,21 @@ flowchart LR
 **Owner:** Ratnaweera O.V. (`OmiraRathnaweera`)  
 **Implementation:** [`src/freightlink_agent/agents/matching_pricing.py`](file:///D:/Y3S1/SEF%20Project/freightLink/agent/src/freightlink_agent/agents/matching_pricing.py)
 
-Agent 3 acts as the **tool-use agent** responsible for selecting the optimal carrier and determining the commercial price for the freight assignment.
+Agent 3 is a **genuine tool-use agent**: OpenAI itself decides which candidate to route, when to price it, and which agency to select - Python never pre-computes the winner and hands it to the LLM to narrate after the fact.
 
 ### Core Workflow & Logic
 
-1. **Candidate Positioning Routing (Yard $\rightarrow$ Pickup)**
-   - For up to the top 3 candidate agencies from Agent 2's shortlist (capped to preserve API quotas and reduce latency), Agent 3 calls the `get_route_and_eta` tool.
-   - **Origin:** Agency yard coordinates (ADR-002 single-yard rule).
-   - **Destination:** Load pickup coordinates.
-   - Computes realistic road distance (km) and estimated positioning time (minutes).
+1. **LLM-driven tool calling** (`src/freightlink_agent/tools/matching_tools.py`, `AgentLLM.run_tool_calling_selection`)
+   - The model is given the load's weight/volume/cargo description and, for each of up to 5 candidate agencies from Agent 2's shortlist, its name, yard, deterministically-resolved vehicle class (ADR-019 - a pure capacity lookup, never left to the model), fleet vehicles, and drivers.
+   - It has two tools: `get_route_and_eta_for_candidate(candidate_agency_id, leg)` (positioning leg yard→pickup, or the shared cargo leg pickup→dropoff) and `estimate_price_for_load(candidate_agency_id, cargo_route_tool_call_id)` (ADR-015: base fare + cargo distance × rate/km + weight × rate/kg, via `POST /internal/pricing/estimate`). It decides itself how many candidates to check and in what order, bounded by a per-run tool-call and iteration budget so it can't loop unboundedly or blow the OpenAI cost cap.
+   - **Grounding rule:** every tool result comes back as a short summary plus a `tool_call_id` - never a bare number the model could restate wrong. Its final decision must cite the exact `tool_call_id`s it relied on; Python looks the real distance/ETA/price up from an in-memory ledger by that id and never trusts a number the model typed itself. A decision citing an unknown or failed id is treated as invalid and discarded.
 
-2. **Deterministic Winner Selection & Vehicle Class Resolution**
-   - Candidate with the lowest positioning ETA is selected as the winner.
-   - Deterministically matches the load requirements (weight and volume) against the agency's fleet capability to assign the most cost-effective vehicle class (`MiniTruck`, `MediumLorry`, or `ContainerTruck`, ADR-019).
+2. **Deterministic fallback**
+   - If OpenAI is unreachable, the per-process call cap is hit, or the model's citations don't check out, Agent 3 falls back to a fully procedural algorithm: route every shortlisted candidate, pick the fastest positioning ETA, route the cargo leg, and price it - the same tested behavior this agent used before it gained real tool-calling. A total LLM outage therefore degrades gracefully rather than crashing or fabricating a result (`llmProvenance.provider` records which path actually ran).
 
-3. **Cargo Leg Routing & Pricing (Pickup $\rightarrow$ Dropoff)**
-   - Invokes `get_route_and_eta` for the actual cargo leg.
-   - Calls the ASP.NET Core backend endpoint (`POST /internal/pricing/estimate`).
-   - **Critical Rule (ADR-015 Addendum):** Pricing is strictly calculated on the **cargo transit leg**, never the positioning leg:
-     $$\text{Estimated Price} = \text{BaseFare} + (\text{CargoDistanceKm} \times \text{RatePerKm}) + (\text{WeightKg} \times \text{RatePerKg})$$
-
-4. **Natural-Language Shipper Justification (LLM)**
-   - Prompts OpenAI (`gpt-4o-mini` by default, with a deterministic rule-based fallback if the call fails) using structured output (`SelectionJustificationOutput`). No Gemini, no Ollama - OpenAI is the only LLM provider.
-   - Produces a transparent, human-readable justification grounded strictly in the routing and pricing data (e.g., *"Recommended: Peliyagoda Logistics Express — nearest available carrier with suitable MediumLorry capacity (ETA 11 min to pickup, 7.86 km positioning)..."*).
-
-5. **Auditing & Telemetry Persistence**
-   - Records each routing call and pricing attempt as a `ToolCall` audit row via backend endpoint `POST /internal/agent-workflow-runs/{workflowRunId}/tool-calls`.
-   - Durably reports step completion as `AgentStep` #3 (`MatchingPricing`, `Succeeded` / `Failed`).
+3. **Auditing & Telemetry Persistence**
+   - Every tool invocation - whichever path ran it - is recorded as a `ToolCall` audit row via backend endpoint `POST /internal/agent-workflow-runs/{workflowRunId}/tool-calls`.
+   - Durably reports step completion as `AgentStep` #3 (`MatchingPricing`, `Succeeded` / `Failed`), including the winning candidate's `selectionJustification` - the model's own headline/reasoning when the tool-calling path succeeded, or a deterministic template otherwise.
 
 ---
 

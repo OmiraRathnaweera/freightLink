@@ -31,12 +31,10 @@ def mock_planner_llm():
             ],
         }
     )
-    mock_llm.justify_selection = AsyncMock(
-        return_value={
-            "headline": "Optimal match: Peliyagoda Logistics",
-            "detailed_reasoning": "Fastest positioning ETA with verified MediumLorry capacity.",
-        }
-    )
+    # Deliberately no run_tool_calling_selection mock: calling it on this plain MagicMock
+    # raises (not awaitable), which agents.matching_pricing.run() catches and falls back to
+    # its own deterministic selection algorithm - proven separately, with a real tool-
+    # calling mock, in tests/test_matching_pricing.py.
     return mock_llm
 
 

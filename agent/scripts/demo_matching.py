@@ -304,8 +304,15 @@ async def run_scenario(scenario: dict):
             return resp, {"httpStatusCode": 200, "durationMs": 35}
 
         with (
+            # Deterministic-fallback path's own imports (used if the LLM tool-calling path
+            # is unusable, e.g. no OPENAI_API_KEY configured):
             patch("freightlink_agent.agents.matching_pricing.get_price_estimate", side_effect=mock_pricing),
             patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
+            # The genuine tool-calling path's own tool wrappers call these same names from
+            # tools/matching_tools.py instead - patch both so standalone mode works whichever
+            # path actually runs:
+            patch("freightlink_agent.tools.matching_tools.get_price_estimate", side_effect=mock_pricing),
+            patch("freightlink_agent.tools.matching_tools.record_tool_call", new=AsyncMock()),
             patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock(return_value=uuid.uuid4())),
         ):
             print(f"{CYAN}Executing Agent 3 Multi-Criteria Carrier Ranking & Pricing...{RESET}")

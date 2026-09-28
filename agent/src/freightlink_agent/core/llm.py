@@ -4,8 +4,8 @@ ADR-008 addendum #2: OpenAI (gpt-4o-mini by default) is the only LLM provider th
 service calls - no Gemini, no Ollama, no other fallback provider. Always uses structured
 output (a typed Pydantic schema), never free-form text parsing. If OpenAI is unreachable
 or the per-process call cap is hit, each caller falls back to its own deterministic,
-template-based copy (see plan()/justify_selection()/generate_validation_summary_and_proposal()
-below) rather than trying a second LLM provider.
+template-based copy (see plan()/run_tool_calling_selection()/
+generate_validation_summary_and_proposal() below) rather than trying a second LLM provider.
 
 Every call records which provider and model actually responded, and whether the
 deterministic fallback was used, on `self.last_call_meta` - callers read this immediately
@@ -46,7 +46,15 @@ class PlanOutput(BaseModel):
     steps: list[PipelineStage]
 
 
-class SelectionJustificationOutput(BaseModel):
+class ToolCallingSelectionOutput(BaseModel):
+    """Agent 3's final tool-calling decision. Every distance/ETA/price cited must trace
+    back to a tool_call_id the model actually received from a tool result - the model
+    never restates a number itself; only headline/detailed_reasoning are its own words."""
+
+    selected_candidate_agency_id: str
+    selected_positioning_tool_call_id: str
+    selected_cargo_tool_call_id: str
+    selected_pricing_tool_call_id: str
     headline: str
     detailed_reasoning: str
 
@@ -120,35 +128,94 @@ class AgentLLM:
                 ],
             }
 
-    async def justify_selection(self, system_prompt: str, context: dict[str, Any]) -> dict:
-        messages = [
-            ("system", system_prompt),
-            ("human", json.dumps(context, default=str)),
-        ]
-        try:
-            result: SelectionJustificationOutput = await self._invoke_structured(
-                SelectionJustificationOutput, messages, "justify_selection"
+    async def run_tool_calling_selection(
+        self,
+        system_prompt: str,
+        context: dict[str, Any],
+        tools: list[Any],
+        max_iterations: int = 6,
+        max_tool_calls: int = 8,
+    ) -> ToolCallingSelectionOutput:
+        """Agent 3's genuine tool-use loop: the LLM itself decides when and which of
+        `tools` to call (and on which candidate) before producing a final structured
+        decision. Every turn - each tool-calling turn plus the final decision call -
+        counts against OPENAI_MAX_CALLS_PER_PROCESS and records last_call_meta, exactly
+        like plan()/generate_validation_summary_and_proposal() do for their single call.
+
+        Raises if the cap is already hit, if OpenAI is unreachable, or if a turn fails;
+        the caller (agents/matching_pricing.py) catches this and falls back to its own
+        deterministic selection algorithm - a total LLM outage must degrade to that
+        tested behavior, never crash and never fabricate a result.
+        """
+        from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+
+        if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+            raise RuntimeError(
+                f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                f"reached; refusing further calls for run_tool_calling_selection"
             )
-            return result.model_dump()
-        except Exception:
-            logger.warning("OpenAI call failed for justify_selection, using deterministic explanation", exc_info=True)
-            self._record_meta("deterministic_fallback", None, used_fallback=True)
-            selected_agency = context.get("selectedAgency") if isinstance(context.get("selectedAgency"), dict) else {}
-            agency_name = selected_agency.get("name") or context.get("agency_name") or context.get("agencyName") or "Recommended Carrier"
-            yard_address = selected_agency.get("yardAddress") or "Verified Yard"
-            assigned_vehicle = selected_agency.get("assignedVehicle") or {}
-            assigned_driver = selected_agency.get("assignedDriver") or {}
-            reg_no = assigned_vehicle.get("registrationNo") or assigned_vehicle.get("registration_no") or "Assigned Fleet Vehicle"
-            driver_name = assigned_driver.get("name") or "Assigned Licensed Driver"
-            eta = selected_agency.get("etaMinutes") or context.get("eta_minutes") or context.get("etaMinutes") or "optimal"
-            dist = selected_agency.get("positioningDistanceKm") or "direct"
-            return {
-                "headline": f"Recommended Carrier: {agency_name} (Yard: {yard_address})",
-                "detailed_reasoning": (
-                    f"Selected {agency_name} based on real database fleet availability: assigned vehicle {reg_no} and driver {driver_name}. "
-                    f"This carrier provides the fastest positioning ETA ({eta} mins, {dist} km) to pickup, full payload capability, and verified safety compliance."
-                ),
-            }
+
+        tools_by_name = {t.name: t for t in tools}
+        model_with_tools = self._openai().bind_tools(tools)
+
+        messages: list[Any] = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=json.dumps(context, default=str)),
+        ]
+        total_tool_calls_made = 0
+
+        for _ in range(max_iterations):
+            if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+                raise RuntimeError(
+                    f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                    f"reached mid tool-calling loop for run_tool_calling_selection"
+                )
+            self._openai_call_count += 1
+            ai_message = await model_with_tools.ainvoke(messages)
+            self._record_meta("openai", self._settings.openai_model, used_fallback=False)
+            messages.append(ai_message)
+
+            requested_tool_calls = getattr(ai_message, "tool_calls", None) or []
+            if not requested_tool_calls:
+                break
+
+            for tool_call in requested_tool_calls:
+                if total_tool_calls_made >= max_tool_calls:
+                    messages.append(ToolMessage(
+                        content=(
+                            "Tool-call budget exhausted. Make your final decision now, citing "
+                            "only tool_call_ids you already have."
+                        ),
+                        tool_call_id=tool_call["id"],
+                    ))
+                    continue
+                total_tool_calls_made += 1
+                selected_tool = tools_by_name.get(tool_call["name"])
+                if selected_tool is None:
+                    messages.append(ToolMessage(content=f"Unknown tool '{tool_call['name']}'.", tool_call_id=tool_call["id"]))
+                    continue
+                try:
+                    tool_result = await selected_tool.ainvoke(tool_call["args"])
+                except Exception as exc:  # noqa: BLE001
+                    tool_result = f"Tool call failed: {exc}"
+                messages.append(ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"]))
+
+        if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+            raise RuntimeError(
+                f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                f"reached before final decision for run_tool_calling_selection"
+            )
+        self._openai_call_count += 1
+        messages.append(HumanMessage(
+            content=(
+                "Give your final decision now. Cite the exact tool_call_id for every "
+                "distance, ETA, or price you rely on - never restate a number yourself."
+            )
+        ))
+        decision_model = self._openai().with_structured_output(ToolCallingSelectionOutput)
+        decision: ToolCallingSelectionOutput = await decision_model.ainvoke(messages)
+        self._record_meta("openai", self._settings.openai_model, used_fallback=False)
+        return decision
 
     async def generate_validation_summary_and_proposal(
         self,
