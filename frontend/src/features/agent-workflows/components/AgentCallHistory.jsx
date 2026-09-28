@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { History, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, RotateCcw } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { History, ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, RotateCcw, ArrowLeft, ExternalLink } from 'lucide-react'
 import { useLoadMatchHistoryQuery } from '../api/agentWorkflowsApi.js'
 import { formatCurrency } from '../../loads/lib/format.js'
 
@@ -96,7 +97,7 @@ function StepRow({ step }) {
   )
 }
 
-function AttemptCard({ attempt, defaultOpen }) {
+function AttemptCard({ attempt, defaultOpen, loadId }) {
   const [open, setOpen] = useState(defaultOpen)
 
   return (
@@ -152,16 +153,56 @@ function AttemptCard({ attempt, defaultOpen }) {
               <StepRow key={step.stepNo} step={step} />
             ))}
           </div>
+          {loadId && (
+            <Link
+              to={`/agent-workflows?loadId=${loadId}&workflowRunId=${attempt.workflowRunId}`}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-secondary hover:text-primary hover:underline"
+            >
+              View full details for this run
+              <ExternalLink className="h-3 w-3" />
+            </Link>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-export default function AgentCallHistory({ loadId }) {
-  const [isOpen, setIsOpen] = useState(false)
+export default function AgentCallHistory({ loadId, forceOpen = false, focusWorkflowRunId = null }) {
+  const [isOpen, setIsOpen] = useState(forceOpen || Boolean(focusWorkflowRunId))
   const historyQuery = useLoadMatchHistoryQuery(loadId, { enabled: isOpen })
-  const attempts = historyQuery.data?.attempts || []
+  const allAttempts = historyQuery.data?.attempts || []
+  const attempts = focusWorkflowRunId
+    ? allAttempts.filter((a) => a.workflowRunId === focusWorkflowRunId)
+    : allAttempts
+
+  // Deep-linked to one specific attempt (?workflowRunId=...): show exactly that workflow
+  // run's own detail, expanded, with no collapsible wrapper and no list of other attempts -
+  // the caller already knows which run it wants, so there's nothing to "browse" here.
+  if (focusWorkflowRunId) {
+    return (
+      <div className="space-y-3" data-testid="agent-call-history-focused">
+        <Link
+          to={`/agent-workflows?loadId=${loadId}`}
+          className="inline-flex items-center gap-1 text-sm font-medium text-secondary hover:text-primary"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to this load
+        </Link>
+        {historyQuery.isLoading && <p className="text-body-sm text-on-surface-variant">Loading workflow run…</p>}
+        {historyQuery.isError && (
+          <p className="text-body-sm text-status-red-text">
+            {historyQuery.error?.message || 'Failed to load this workflow run.'}
+          </p>
+        )}
+        {!historyQuery.isLoading && !historyQuery.isError && attempts.length === 0 && (
+          <p className="text-body-sm text-on-surface-variant">No workflow run found with that id for this load.</p>
+        )}
+        {attempts.map((attempt) => (
+          <AttemptCard key={attempt.workflowRunId} attempt={attempt} defaultOpen />
+        ))}
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-lg border border-slate-border bg-surface-container-lowest shadow-soft">
@@ -196,7 +237,7 @@ export default function AgentCallHistory({ loadId }) {
             <p className="text-body-sm text-on-surface-variant">No matching attempts have been made yet.</p>
           )}
           {attempts.map((attempt, idx) => (
-            <AttemptCard key={attempt.workflowRunId} attempt={attempt} defaultOpen={idx === 0} />
+            <AttemptCard key={attempt.workflowRunId} attempt={attempt} defaultOpen={idx === 0} loadId={loadId} />
           ))}
         </div>
       )}

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AgentWorkflowConsolePage from '../../pages/AgentWorkflowConsolePage.jsx'
@@ -23,6 +23,7 @@ vi.mock('../../api/agentWorkflowsApi.js', async (importOriginal) => {
     useLoadMatchQuery: vi.fn(),
     useTriggerMatchMutation: vi.fn(),
     useConfirmMatchMutation: vi.fn(),
+    useLoadMatchHistoryQuery: vi.fn(),
   }
 })
 
@@ -78,12 +79,23 @@ const mockMatchData = {
   existingAssignment: null,
 }
 
+beforeEach(() => {
+  // Sane default so tests that don't care about the call history section (most of them)
+  // don't crash AgentCallHistory's internal useLoadMatchHistoryQuery() call.
+  agentWorkflowsApi.useLoadMatchHistoryQuery.mockReturnValue({
+    isLoading: false,
+    isError: false,
+    data: undefined,
+  })
+})
+
 afterEach(() => {
   vi.mocked(loadsApi.useLoadsQuery).mockReset()
   vi.mocked(loadsApi.useLoadDetailQuery).mockReset()
   vi.mocked(agentWorkflowsApi.useLoadMatchQuery).mockReset()
   vi.mocked(agentWorkflowsApi.useTriggerMatchMutation).mockReset()
   vi.mocked(agentWorkflowsApi.useConfirmMatchMutation).mockReset()
+  vi.mocked(agentWorkflowsApi.useLoadMatchHistoryQuery).mockReset()
   cleanup()
 })
 
@@ -214,5 +226,92 @@ describe('AgentWorkflowConsolePage', () => {
       expect(mutate).toHaveBeenCalledWith('load-1')
     })
     expect(mutate).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows only the agent call history, not the live decision UI, once the load is already Matched', () => {
+    loadsApi.useLoadsQuery.mockReturnValue({
+      isLoading: false,
+      data: { items: [mockLoad] },
+    })
+    loadsApi.useLoadDetailQuery.mockReturnValue({
+      isLoading: false,
+      data: mockLoad,
+    })
+    agentWorkflowsApi.useLoadMatchQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: {
+        ...mockMatchData,
+        loadStatus: 'Matched',
+        workflowStatus: 'Completed',
+        existingAssignment: {
+          assignmentId: 'assign-1',
+          agencyId: 'agency-101',
+          agencyName: 'Rapid Haul Logistics',
+          status: 'Proposed',
+          proposedPrice: 68000,
+          createdAt: '2026-09-28T10:00:00Z',
+        },
+      },
+      refetch: vi.fn(),
+    })
+    agentWorkflowsApi.useTriggerMatchMutation.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+    agentWorkflowsApi.useConfirmMatchMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+
+    renderWithProviders(<AgentWorkflowConsolePage />, {
+      route: '/agent-workflows',
+      initialEntries: ['/agent-workflows?loadId=load-1'],
+      authState: { role: UserRole.SHIPPER, isAuthenticated: true },
+    })
+
+    expect(screen.getByTestId('finalized-load-history-view')).toBeInTheDocument()
+    expect(screen.getByText('Agent Call History')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Approve Match & Dispatch/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent 1: Planner')).not.toBeInTheDocument()
+  })
+
+  it('shows only the focused workflow run view when ?workflowRunId= is present, not the live UI or the history list', () => {
+    loadsApi.useLoadsQuery.mockReturnValue({
+      isLoading: false,
+      data: { items: [mockLoad] },
+    })
+    loadsApi.useLoadDetailQuery.mockReturnValue({
+      isLoading: false,
+      data: mockLoad,
+    })
+    agentWorkflowsApi.useLoadMatchQuery.mockReturnValue({
+      isLoading: false,
+      isError: false,
+      data: mockMatchData,
+      refetch: vi.fn(),
+    })
+    agentWorkflowsApi.useTriggerMatchMutation.mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+    agentWorkflowsApi.useConfirmMatchMutation.mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    })
+
+    renderWithProviders(<AgentWorkflowConsolePage />, {
+      route: '/agent-workflows',
+      initialEntries: ['/agent-workflows?loadId=load-1&workflowRunId=run-1'],
+      authState: { role: UserRole.SHIPPER, isAuthenticated: true },
+    })
+
+    expect(screen.getByTestId('focused-workflow-run-view')).toBeInTheDocument()
+    expect(screen.getByTestId('agent-call-history-focused')).toBeInTheDocument()
+    expect(screen.queryByTestId('finalized-load-history-view')).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent 1: Planner')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Approve Match & Dispatch/i })).not.toBeInTheDocument()
   })
 })

@@ -30,6 +30,7 @@ import AgentCallHistory from '../components/AgentCallHistory.jsx'
 export default function AgentWorkflowConsolePage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const loadIdParam = searchParams.get('loadId')
+  const workflowRunIdParam = searchParams.get('workflowRunId')
 
   // Fetch loads for selection (Posted and Matched loads are primary candidates)
   const loadsQuery = useLoadsQuery({ page: 1, pageSize: 50 })
@@ -73,6 +74,7 @@ export default function AgentWorkflowConsolePage() {
   useEffect(() => {
     if (
       activeLoadId &&
+      !workflowRunIdParam &&
       matchData?.workflowStatus === 'NotStarted' &&
       !triggeredLoadIdsRef.current.has(activeLoadId) &&
       !triggerMutation.isPending
@@ -80,7 +82,15 @@ export default function AgentWorkflowConsolePage() {
       triggeredLoadIdsRef.current.add(activeLoadId)
       triggerMutation.mutate(activeLoadId)
     }
-  }, [activeLoadId, matchData?.workflowStatus, triggerMutation])
+  }, [activeLoadId, workflowRunIdParam, matchData?.workflowStatus, triggerMutation])
+
+  // Once a load is Matched (or has any operational assignment already), the live
+  // approve/reject/revise decision UI no longer applies - there's nothing left to decide,
+  // and showing the full "awaiting your decision" pipeline for an already-settled load just
+  // confuses the shipper. Show the agent call history instead. A specific ?workflowRunId=
+  // deep link takes priority over both views - it means "show me exactly that run", not the
+  // live console or the full history list.
+  const isFinalized = matchData?.loadStatus === 'Matched' || Boolean(matchData?.existingAssignment)
 
   // Handle switching active load
   const handleSelectLoad = (newLoadId) => {
@@ -245,8 +255,22 @@ export default function AgentWorkflowConsolePage() {
         </Card>
       )}
 
-      {/* Main Content: Workflow Pipeline, Recommendation, and Validation */}
-      {matchData && (
+      {/* Main Content: a specific ?workflowRunId= deep link wins over everything else, then
+          an already-decided (Matched) load collapses to just its call history, and only an
+          actively-undecided load shows the full live pipeline/recommendation/decision UI. */}
+      {matchData && workflowRunIdParam && (
+        <div data-testid="focused-workflow-run-view" className="space-y-6">
+          <AgentCallHistory loadId={activeLoadId} focusWorkflowRunId={workflowRunIdParam} />
+        </div>
+      )}
+
+      {matchData && !workflowRunIdParam && isFinalized && (
+        <div data-testid="finalized-load-history-view" className="space-y-6">
+          <AgentCallHistory loadId={activeLoadId} forceOpen />
+        </div>
+      )}
+
+      {matchData && !workflowRunIdParam && !isFinalized && (
         <div className="space-y-6">
           {/* 0. Agent 1's conversational message to the shipper */}
           {matchData.shipperMessage && (
@@ -311,7 +335,8 @@ export default function AgentWorkflowConsolePage() {
             />
           </div>
 
-          {/* 4. Full Agent Call History (every attempt, every tool call) */}
+          {/* 4. Full Agent Call History (every attempt, every tool call) - collapsed by
+              default while a decision is still pending. */}
           <AgentCallHistory loadId={activeLoadId} />
         </div>
       )}
