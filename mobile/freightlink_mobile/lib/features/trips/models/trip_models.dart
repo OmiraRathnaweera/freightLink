@@ -1,4 +1,5 @@
 import 'trip_evidence.dart';
+import 'trip_event.dart';
 
 /// Request payload for dispatching and creating a new Trip (POST /api/v1/trips).
 class CreateTripRequest {
@@ -37,14 +38,22 @@ class TripResponse {
     required this.status,
     this.pickupAddress,
     this.dropoffAddress,
+    this.pickupLat,
+    this.pickupLng,
+    this.dropoffLat,
+    this.dropoffLng,
     this.cargoDescription,
     this.weightKg,
     this.volumeM3,
     this.pickupWindowStart,
     this.pickupWindowEnd,
     this.referenceCode,
+    this.shipperUserId,
+    this.shipperName,
+    this.agreedPrice,
     this.routedDistanceKm,
     this.proposedEtaMinutes,
+    this.events = const [],
     this.evidence = const [],
     required this.createdAt,
     this.updatedAt,
@@ -72,6 +81,11 @@ class TripResponse {
             .toList() ??
         const <TripEvidence>[];
 
+    final eventsList = (json['events'] as List<dynamic>?)
+            ?.map((e) => TripEvent.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        const <TripEvent>[];
+
     return TripResponse(
       tripId: json['tripId'] as String? ?? '',
       assignmentId: json['assignmentId'] as String? ?? '',
@@ -85,14 +99,22 @@ class TripResponse {
       status: json['status'] as String? ?? 'Assigned',
       pickupAddress: json['pickupAddress'] as String?,
       dropoffAddress: json['dropoffAddress'] as String?,
+      pickupLat: parseDouble(json['pickupLat']),
+      pickupLng: parseDouble(json['pickupLng']),
+      dropoffLat: parseDouble(json['dropoffLat']),
+      dropoffLng: parseDouble(json['dropoffLng']),
       cargoDescription: json['cargoDescription'] as String?,
       weightKg: parseDouble(json['weightKg']),
       volumeM3: parseDouble(json['volumeM3']),
       pickupWindowStart: tryParseDate(json['pickupWindowStart']),
       pickupWindowEnd: tryParseDate(json['pickupWindowEnd']),
       referenceCode: json['referenceCode'] as String?,
+      shipperUserId: json['shipperUserId'] as String?,
+      shipperName: json['shipperName'] as String?,
+      agreedPrice: parseDouble(json['agreedPrice']),
       routedDistanceKm: parseDouble(json['routedDistanceKm']),
       proposedEtaMinutes: json['proposedEtaMinutes'] as int?,
+      events: eventsList,
       evidence: evidenceList,
       createdAt: parseDate(json['createdAt']),
       updatedAt: json['updatedAt'] != null ? parseDate(json['updatedAt']) : null,
@@ -111,17 +133,31 @@ class TripResponse {
   final String status;
   final String? pickupAddress;
   final String? dropoffAddress;
+  final double? pickupLat;
+  final double? pickupLng;
+  final double? dropoffLat;
+  final double? dropoffLng;
   final String? cargoDescription;
   final double? weightKg;
   final double? volumeM3;
   final DateTime? pickupWindowStart;
   final DateTime? pickupWindowEnd;
   final String? referenceCode;
+  final String? shipperUserId;
+  final String? shipperName;
+
+  /// The agreed price from the accepted assignment (the job proposal / AI-matched price the
+  /// Shipper already approved) — the default Create Invoice amount for this trip once Delivered.
+  final double? agreedPrice;
   final double? routedDistanceKm;
   final int? proposedEtaMinutes;
+  final List<TripEvent> events;
   final List<TripEvidence> evidence;
   final DateTime createdAt;
   final DateTime? updatedAt;
+
+  bool get hasRouteCoordinates =>
+      pickupLat != null && pickupLng != null && dropoffLat != null && dropoffLng != null;
 
   bool get isAssigned => status.toLowerCase() == 'assigned';
   bool get isPickedUp =>

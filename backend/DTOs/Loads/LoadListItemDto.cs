@@ -52,6 +52,14 @@ public class LoadListItemDto
     /// <summary>The load's current status (e.g. "Draft", "Posted", "Matched").</summary>
     public string Status { get; set; } = string.Empty;
 
+    /// <summary>
+    /// True once a Trip has been dispatched for this load's assignment. <see cref="Status"/> alone
+    /// can't signal this — it stays <c>Matched</c> through dispatch and only advances later, when the
+    /// trip's own status is changed (e.g. to PickedUp) — so a client that wants to hide a one-time
+    /// "Dispatch" action after it's been used must check this instead of <see cref="Status"/>.
+    /// </summary>
+    public bool HasTrip { get; set; }
+
     /// <summary>When the load was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 }

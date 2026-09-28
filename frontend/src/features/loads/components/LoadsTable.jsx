@@ -43,6 +43,7 @@ function LoadsTable({
   showShipperColumn = false,
   role,
   onAcceptLoad,
+  onSendProposal,
   onDispatchLoad,
 }) {
   return (
@@ -109,7 +110,16 @@ function LoadsTable({
                       Accept
                     </button>
                   )}
-                  {onDispatchLoad && load.status === 'Matched' && (
+                  {onSendProposal && load.status === 'Posted' && (
+                    <button
+                      type="button"
+                      onClick={() => onSendProposal(load)}
+                      className="inline-flex items-center gap-1 rounded border border-primary/40 bg-white px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/5"
+                    >
+                      Propose Price
+                    </button>
+                  )}
+                  {onDispatchLoad && load.status === 'Matched' && !load.hasTrip && (
                     <Link
                       to={`/trips?dispatch=${load.loadId}`}
                       className="inline-flex items-center gap-1 rounded border border-slate-300 bg-surface px-2.5 py-1 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-50"

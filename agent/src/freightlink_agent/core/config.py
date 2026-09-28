@@ -1,5 +1,4 @@
 from functools import lru_cache
-from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,12 +20,17 @@ class Settings(BaseSettings):
     agent_service_port: int = 8001
     log_level: str = "INFO"
 
-    # LLM provider (ADR-008 addendum: Gemini free tier primary, Ollama fallback)
-    llm_provider: Literal["gemini", "ollama"] = "gemini"
-    gemini_api_key: str | None = None
-    gemini_model: str = "gemini-2.5-flash"
-    ollama_model: str = "llama3.2"
-    ollama_base_url: str = "http://localhost:11434"
+    # LLM provider (ADR-008 addendum #2: OpenAI is the only LLM provider - supersedes the
+    # earlier NVIDIA NIM -> Gemini history, see ADR-008 for the full story. No Gemini, no
+    # Ollama, no other fallback provider remains anywhere in this service; if OpenAI is
+    # unreachable, each caller falls back to its own deterministic template copy instead.)
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4o-mini"
+    # Hard per-run cap on OpenAI calls, independent of any provider-side rate limit - a bug
+    # that loops/retries the pipeline must not be able to run up an unbounded bill during
+    # development (plans/03-openai-migration.md §5). Each agent's LLM call increments a
+    # per-process counter in llm.py; exceeding this raises rather than calling the API again.
+    openai_max_calls_per_process: int = 200
 
     # Routing tool (OpenRouteService, ADR-012)
     openrouteservice_api_key: str | None = None

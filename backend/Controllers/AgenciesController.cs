@@ -61,6 +61,18 @@ public class AgenciesController : ControllerBase
     }
 
     /// <summary>
+    /// System-wide agency/driver/vehicle counts for the Admin dashboard's summary cards -
+    /// unaffected by any search/status filter or page on the list above (issue #45).
+    /// </summary>
+    [HttpGet("summary")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<AgencyPlatformSummaryDto>> GetPlatformSummary(CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetPlatformSummaryAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Retrieves a list of agencies with compliance documents expiring soon.
     /// </summary>
     [HttpGet("expiring-compliance")]
@@ -183,6 +195,34 @@ public class AgenciesController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
+    /// <summary>Edits a vehicle's registration, type, and capacity without changing its status.</summary>
+    [HttpPut("{id:guid}/vehicles/{vehicleId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<VehicleResponseDto>> UpdateVehicle(
+        Guid id,
+        Guid vehicleId,
+        [FromBody] VehicleUpdateDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateVehicleAsync(
+            id, vehicleId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Updates a vehicle's availability for matching. OnTrip is system-managed by trip execution.</summary>
+    [HttpPatch("{id:guid}/vehicles/{vehicleId:guid}/status")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<VehicleResponseDto>> UpdateVehicleStatus(
+        Guid id,
+        Guid vehicleId,
+        [FromBody] UpdateVehicleStatusDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateVehicleStatusAsync(
+            id, vehicleId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
     /// <summary>
     /// Lists all vehicles in an agency's fleet.
     /// </summary>
@@ -214,6 +254,29 @@ public class AgenciesController : ControllerBase
     {
         var result = await _agencyService.AddDriverAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// Updates an existing driver's editable details.
+    /// </summary>
+    [HttpPut("{id:guid}/drivers/{driverId:guid}")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<DriverResponseDto>> UpdateDriver(Guid id, Guid driverId, [FromBody] DriverUpdateDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateDriverAsync(id, driverId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Removes or reinstates a driver on the agency's active roster (Active/Inactive only — OnTrip
+    /// is managed exclusively by trip execution).
+    /// </summary>
+    [HttpPatch("{id:guid}/drivers/{driverId:guid}/status")]
+    [Authorize(Roles = nameof(UserRole.AgencyStaff))]
+    public async Task<ActionResult<DriverResponseDto>> UpdateDriverStatus(Guid id, Guid driverId, [FromBody] UpdateDriverStatusDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateDriverStatusAsync(id, driverId, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
     }
 
     /// <summary>

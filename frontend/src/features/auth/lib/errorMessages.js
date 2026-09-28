@@ -8,6 +8,8 @@ const AUTH_ERROR_MESSAGES = {
   CONFLICT: 'An account or organization with these details already exists.',
   INVALID_CREDENTIALS: 'The email address or password you entered is incorrect.',
   USER_LOCKED_OUT: 'This account has been locked. Please contact support.',
+  EMAIL_ALREADY_REGISTERED: 'An account with this email address already exists.',
+  INCORRECT_CURRENT_PASSWORD: 'The current password you entered is incorrect.',
 }
 
 /**

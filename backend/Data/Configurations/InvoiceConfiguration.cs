@@ -61,6 +61,18 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(x => x.PaymentProofFile)
+            .WithMany()
+            .HasForeignKey(x => x.PaymentProofFileId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        builder.HasOne(x => x.PaymentProofUploadedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.PaymentProofUploadedByUserId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasMany(x => x.LineItems)
             .WithOne(li => li.Invoice)
             .HasForeignKey(li => li.InvoiceId)

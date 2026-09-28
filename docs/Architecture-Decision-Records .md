@@ -237,6 +237,24 @@ Use **NVIDIA NIM** (`build.nvidia.com`) as the primary LLM provider — a free t
 - **Paid OpenAI/Anthropic API key:** Rejected — not required by the spec and adds unnecessary cost/dependency for a student project.
 - **Ollama as the sole/primary provider:** Rejected as primary (kept as fallback only) — local model quality and setup consistency across four students' machines was judged less reliable than a shared hosted free-tier endpoint for day-to-day development.
 
+### Addendum (September 2026): NVIDIA NIM → Gemini → OpenAI
+
+**Status:** Superseded (this addendum is the current decision; the NVIDIA NIM section above is kept for history)
+
+The provider actually in use has moved twice since the original decision above, and neither move was documented at the time it happened — this addendum tells the whole story in one place instead of leaving three scattered, silently-drifting edits, per the Sep 27 2026 multi-agent implementation audit's recommendation.
+
+**Move 1 — NVIDIA NIM → Gemini (undocumented at the time).** The team switched the primary provider to Google Gemini (`gemini-2.5-flash`, later `gemini-3.6-flash` once `2.5-flash` was retired for new API keys), keeping the free-tier/no-cost rationale from the original decision and keeping Ollama as the fallback. No ADR update was made when this happened; `config.py`/`llm.py` comments referencing "ADR-008 addendum" predate this addendum actually existing.
+
+**Move 2 — Gemini → OpenAI (this addendum, decided during P0/P1 stabilization).** The team found Gemini's free-tier rate limits and structured-output reliability insufficient for a dependable 4-agent sequential run across repeated development/test cycles, and moved the primary provider to **OpenAI**, specifically **`gpt-4o-mini`** — the cheapest current OpenAI tier that reliably supports structured output via LangChain's `with_structured_output`. This is a genuine, acknowledged deviation from the original free-tier-only constraint (Section 14's spirit), made consciously rather than silently:
+
+- **Cost control, in code, not just trust:** `AgentLLM` enforces a hard per-process call cap (`OPENAI_MAX_CALLS_PER_PROCESS`, default 200) — once hit, the call is refused and the caller's deterministic fallback runs instead, so a bug that loops or retries the pipeline cannot run up unbounded spend during development.
+- **Cost control, outside code:** whoever holds the OpenAI API key is expected to set a hard spend limit / billing alert on the OpenAI account itself, as a second, independent layer of protection.
+- **Provider provenance is now recorded on every call.** Previously a successful agent step carried no proof of which (if any) model actually responded. Every `AgentLLM` call now records `{provider, model, usedFallback}` (via `AgentLLM.last_call_meta`), which the calling agent attaches to its own `AgentStep.outputJson` as `llmProvenance` — real, checkable evidence per run of which provider/model responded, not just an assumption.
+
+**Move 3 — Ollama fallback and remaining Gemini config removed (team decision, this addendum).** The two-provider design above (OpenAI primary, Ollama fallback, `LLM_PROVIDER` also still accepting `gemini`) was deliberately simplified to **OpenAI only**. No Gemini, no Ollama, no other LLM provider remains anywhere in this service — no provider-selection code, no `langchain-google-genai`/`langchain-ollama` dependency, no `LLM_PROVIDER`/`GEMINI_*`/`OLLAMA_*` config key. If the OpenAI call fails or the per-process cap is hit, each of the three LLM-calling agents (Planner, MatchingPricing, ValidationSafety) falls back to its own deterministic, template-based copy instead of trying a second LLM provider — this fallback already existed in each agent as the last resort even when Ollama was present, so removing Ollama removes a rarely-exercised middle step, not the safety net itself.
+
+**Consequences — Negative (accepted trade-off):** This is a real, non-free deviation from the original Section 14 no-cost framing, now with no local/offline LLM path at all. It is accepted because (a) the per-process call cap plus account-level spend limits bound the risk to a small, known amount even under a bug, (b) `gpt-4o-mini` is priced for exactly this kind of repeated low-volume development/demo usage, and (c) a genuine OpenAI outage during the live demo now degrades to each agent's deterministic template copy (a real, tested code path, not a crash) rather than to a second live model — an accepted simplification in exchange for one provider integration to reason about and defend in the viva instead of three.
+
 ---
 
 ## ADR-009: Agentic AI Runs as a Separate Python Service (Called Only by ASP.NET Core)
@@ -337,7 +355,7 @@ Section 11 of the specification requires at least one meaningful third-party API
 ### Decision
 Integrate **three** third-party services, all called exclusively from the ASP.NET Core backend (never directly by React or Flutter):
 1. **OpenRouteService** — distance and ETA calculation between an agency's yard and a load's pickup location; this call **doubles as the Agentic AI's allow-listed tool** (`get_route_and_eta`), used by Agent 3.
-2. **PayHere (sandbox/test mode)** — invoice payment on Component D: checkout session creation and webhook-driven payment confirmation.
+2. **PayHere (sandbox/test mode)** — invoice payment on Component D: checkout session creation and webhook-driven payment confirmation. *(Superseded — see ADR-021: this mechanism was replaced by manual payment-proof upload and Agency confirmation before implementation of Component D was complete.)*
 3. **Transactional email API** (e.g. Brevo or Resend, free tier) — shipper notifications on the decline/retry loop introduced in ADR-018 (agency declined, new match found, no auto-match found), sent via a shared `IEmailService` owned by Component A.
 
 ### Consequences
@@ -465,7 +483,7 @@ estimatedPrice = baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)
 The original design (see the "Admin" wording still present in early drafts of ADR-007, ADR-010, and ADR-013 before this ADR) had the Admin reviewing and approving the AI's recommended agency match, mirroring a generic "platform overseer approves everything" pattern. On review, the team reconsidered who actually has the standing to make this call: it is the shipper's cargo and the shipper's money at stake in each match, not the platform operator's.
 
 ### Decision
-The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignment and approves, rejects, or requests revision. This happens on the Shipper's own React console (Component A), which displays the recommended agency, ETA, price, and the price-deviation percentage as decision-support context. The **Admin's** role is narrowed to two functions only: **agency KYC/compliance verification** (Component B) and **system-wide analytics**. Admin has no involvement in per-load matching decisions. *(ADR-019 subsequently adds a third, narrow Admin function — maintaining the pricing-configuration reference data — which does not involve per-load matching decisions and is consistent with this ADR's separation-of-concerns intent; see ADR-019 for the reasoning.)*
+The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignment and approves, rejects, or requests revision. This happens on the Shipper's own React console (Component A), which displays the recommended agency, ETA, price, and the price-deviation percentage as decision-support context. The **Admin** retains platform-oversight functions only: **agency KYC/compliance verification** (Component B), **system-wide analytics**, **pricing-configuration reference data** (ADR-019), and **dispute adjudication**. Admin has no involvement in per-load matching decisions.
 
 ### Consequences
 **Positive**
@@ -476,14 +494,15 @@ The **Shipper** — not the Admin — reviews Agent 4's proposed agency assignme
 **Negative**
 - The approval endpoint must now be guarded to accept a decision only from the specific load's own shipper (not just "any authenticated user with the Shipper role"), which is a small but necessary additional authorization check beyond simple role-based access control.
 - Unlike a small, predictable Admin user population, the live demo now depends on the correct Shipper account being logged in and responsive at the exact moment the recommendation is ready — the demo script must have that session open in advance.
-- Narrows Component D's ("Billing & Admin Oversight") scope, since the approval console it previously owned moves to Component A. This is judged an acceptable, even positive, simplification, since Component D retains full ownership of Agent 4's computation, the `ApprovalDecision` write endpoint, invoicing, and (pending confirmation) dispute resolution.
+- Narrows Component D's ("Billing & Admin Oversight") scope, since the approval console it previously owned moves to Component A. This is judged an acceptable, even positive, simplification, since Component D retains full ownership of Agent 4's computation, the `ApprovalDecision` write endpoint, invoicing, and dispute resolution.
 
 ### Alternatives Considered
 - **Admin approves (original design):** Rejected — a weaker mirror of real-world incentives, and unnecessarily routes every single match through a staff account that has no direct stake in the outcome.
 - **Dual approval (both Shipper and Admin must approve):** Rejected — adds friction and an extra state to test and demo, with no rubric requirement to justify it within the 8-week timeline.
 
-### Open Follow-On Question
-Whether Admin's narrowed "KYC + analytics only" remit also removes dispute resolution from Component D, or whether disputes remain with Admin as a distinct function unrelated to per-load matching, is not yet resolved by the team — flagged for confirmation before Component D's individual report is finalized.
+### Follow-On Decision — Resolved (27 September 2026)
+
+Dispute resolution remains an **Admin-only** function, exercised on the React web portal. It is distinct from per-load AI-match approval and is consistent with Admin's platform-oversight remit. Component D owns disputes end to end: claimant raise and visibility, followed by Admin review and resolution.
 
 ---
 
@@ -649,6 +668,38 @@ Two substantive points were settled while producing the inventory:
 
 ---
 
+## ADR-021: Payment Confirmation — Manual Payment-Proof Upload (Supersedes the Payment-Gateway Clause of ADR-012)
+
+**Status:** Accepted
+**Date:** September 2026
+
+### Context
+ADR-012 (accepted, August 2026) documented **PayHere sandbox checkout + webhook-driven payment confirmation** as one of three third-party integrations. A September 27, 2026 implementation audit found that this is no longer what the system does: the `webview_flutter` dependency (used for the PayHere checkout flow on mobile) is present but **unused** — dead weight left over from a removed integration — and both the web and backend now implement a **manual payment-proof upload** flow instead: the Shipper uploads a receipt/screenshot, and the Agency Staff manually reviews it and confirms payment via a dedicated endpoint (`POST /{id}/confirm-payment`).
+
+This is not hypothetical — it is the actual, tested, working behavior of the current backend (48 tests covering this exact flow) and web frontend. The ADR file was simply never updated when the team pivoted away from PayHere. Left uncorrected, this is a real viva risk: a reviewer reading this document would expect to find a live payment gateway integration that does not exist in the codebase.
+
+### Decision
+**Payment confirmation is manual, not gateway-driven.** The Shipper uploads a payment-proof file as evidence of an external payment (bank transfer, cash, etc.); the Agency Staff reviews it and manually confirms via `POST /{id}/confirm-payment`, transitioning the invoice `PaymentPending → Paid`. **No payment gateway (PayHere or otherwise) is integrated.** This clause **supersedes** the PayHere-specific portion of ADR-012 §Decision item 2. ADR-012's other two integrations (OpenRouteService, transactional email) are unaffected and remain as originally decided.
+
+The Admin's role with respect to invoices is **read-only** across the full cashflow — all invoices, all statuses, aggregate totals — with no write access of any kind, consistent with ADR-016's narrowing of Admin to non-transactional oversight functions.
+
+### Consequences
+**Positive**
+- Removes a real documentation/implementation mismatch before it becomes a viva surprise.
+- Simpler and more reliable for a live demo than a sandbox payment gateway: no external service dependency, no webhook signature verification, no risk of a gateway outage during evaluation — consistent with the same demo-reliability reasoning already applied to the LLM (ADR-008), email (ADR-012), and pricing-config (ADR-019) fallback decisions.
+- Still demonstrates a genuine, testable business workflow with a real human-verification step (Agency Staff reviewing evidence before confirming) — a strong "business logic beyond CRUD" story for the rubric.
+- Frees `webview_flutter` for removal from the mobile app's `pubspec.yaml`, reducing unused dependency surface.
+
+**Negative**
+- Loses the "real third-party payment integration" depth point that ADR-012 originally claimed as scope addition beyond the rubric's minimum requirement. The rubric's minimum third-party-integration requirement is unaffected (OpenRouteService alone already satisfies it, per ADR-012's own original reasoning).
+- Payment confirmation now depends on Agency Staff diligence (reviewing the uploaded proof) rather than automated gateway verification — a manual-process risk, but an accepted and realistic one for a Sri Lankan B2B freight context where many payments are bank transfers outside any single gateway's reach anyway.
+
+### Alternatives Considered
+- **Revive the PayHere integration to match ADR-012 as originally written:** Rejected — the team's confirmed intended flow (manual proof upload, agency confirmation) does not use a gateway at all; reviving PayHere would mean building a feature the team has already decided not to use, purely to match a stale document instead of updating the document to match the actual decision.
+- **Leave ADR-012 unedited and treat this as an undocumented implementation detail:** Rejected — an ADR that doesn't match the shipped system is worse than no ADR.
+
+---
+
 ## Summary of Decisions
 
 | ADR No. | Title | Status |
@@ -673,6 +724,7 @@ Two substantive points were settled while producing the inventory:
 | ADR-018 | Automatic retry with a capped attempt limit, and Shipper email notifications, on agency decline | Accepted |
 | ADR-019 | Admin-managed pricing configuration — fuel price & vehicle-class efficiency reference tables | Accepted |
 | ADR-020 | Enumerated value sets as native enum types, not lookup tables | Accepted |
+| ADR-021 | Payment confirmation — manual payment-proof upload (supersedes ADR-012's payment-gateway clause) | Accepted |
 
 ---
 

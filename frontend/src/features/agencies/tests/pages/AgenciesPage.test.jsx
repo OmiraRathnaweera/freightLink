@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AgenciesPage from "../../pages/AgenciesPage.jsx";
 import { UserRole } from "../../../../lib/enums.js";
@@ -11,6 +11,7 @@ vi.mock("../../api/agencyApi.js", async (importOriginal) => {
   return {
     ...actual,
     useAgenciesQuery: vi.fn(),
+    useAgenciesSummaryQuery: vi.fn(),
     useAgencyFleetQuery: vi.fn(),
   };
 });
@@ -41,15 +42,61 @@ function sampleAgency(overrides = {}) {
   };
 }
 
-function renderAgenciesPage(role = UserRole.ADMIN) {
+function pagedResponse(items, overrides = {}) {
+  return {
+    items,
+    page: 1,
+    pageSize: 20,
+    totalItems: items.length,
+    totalPages: 1,
+    ...overrides,
+  };
+}
+
+function sampleSummary(overrides = {}) {
+  return {
+    totalAgencies: 2,
+    activeAgencies: 2,
+    totalDrivers: 24,
+    activeDrivers: 20,
+    totalVehicles: 13,
+    ...overrides,
+  };
+}
+
+function renderAgenciesPage(role = UserRole.ADMIN, options = {}) {
   return renderWithProviders(<AgenciesPage />, {
     route: "/agencies",
     authState: { role, isAuthenticated: true },
+    ...options,
+  });
+}
+
+function mockDefaultQueries({ agenciesData, summaryData } = {}) {
+  agencyApi.useAgenciesQuery.mockReturnValue({
+    isLoading: false,
+    isError: false,
+    data: agenciesData ?? pagedResponse([sampleAgency()]),
+    isFetching: false,
+    refetch: vi.fn(),
+  });
+  agencyApi.useAgenciesSummaryQuery.mockReturnValue({
+    isLoading: false,
+    isError: false,
+    data: summaryData ?? sampleSummary(),
+  });
+  agencyApi.useAgencyFleetQuery.mockReturnValue({
+    isLoading: false,
+    isError: false,
+    data: undefined,
+    isFetching: false,
+    refetch: vi.fn(),
   });
 }
 
 afterEach(() => {
   vi.mocked(agencyApi.useAgenciesQuery).mockReset();
+  vi.mocked(agencyApi.useAgenciesSummaryQuery).mockReset();
   vi.mocked(agencyApi.useAgencyFleetQuery).mockReset();
   cleanup();
 });
@@ -63,6 +110,7 @@ describe("AgenciesPage — Admin View", () => {
       isFetching: false,
       refetch: vi.fn(),
     });
+    agencyApi.useAgenciesSummaryQuery.mockReturnValue({ isLoading: true, isError: false, data: undefined });
     agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
@@ -84,6 +132,7 @@ describe("AgenciesPage — Admin View", () => {
       isFetching: false,
       refetch,
     });
+    agencyApi.useAgenciesSummaryQuery.mockReturnValue({ isLoading: false, isError: false, data: sampleSummary() });
     agencyApi.useAgencyFleetQuery.mockReturnValue({
       isLoading: false,
       isError: false,
@@ -97,20 +146,7 @@ describe("AgenciesPage — Admin View", () => {
   });
 
   it("renders empty state when no agencies are registered", () => {
-    agencyApi.useAgenciesQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { items: [] },
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    agencyApi.useAgencyFleetQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: undefined,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
+    mockDefaultQueries({ agenciesData: pagedResponse([], { totalItems: 0, totalPages: 0 }), summaryData: sampleSummary({ totalAgencies: 0, activeAgencies: 0, totalDrivers: 0, activeDrivers: 0, totalVehicles: 0 }) });
 
     renderAgenciesPage(UserRole.ADMIN);
     expect(screen.getByText("No agencies found")).toBeInTheDocument();
@@ -134,31 +170,18 @@ describe("AgenciesPage — Admin View", () => {
       status: "Active",
     });
 
-    agencyApi.useAgenciesQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { items: [agency1, agency2] },
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    agencyApi.useAgencyFleetQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: undefined,
-      isFetching: false,
-      refetch: vi.fn(),
+    mockDefaultQueries({
+      agenciesData: pagedResponse([agency1, agency2]),
+      summaryData: sampleSummary({ totalDrivers: 24, totalVehicles: 13 }),
     });
 
     renderAgenciesPage(UserRole.ADMIN);
 
-    // Verify aggregate metrics
+    // Verify aggregate metrics (from the system-wide summary endpoint, not the page's own rows)
     expect(screen.getByText("Registered Agencies")).toBeInTheDocument();
     expect(screen.getByText("Total Drivers")).toBeInTheDocument();
     expect(screen.getByText("Fleet Vehicles")).toBeInTheDocument();
-
-    // Total drivers aggregate: 18 + 6 = 24
     expect(screen.getByText("24")).toBeInTheDocument();
-    // Total vehicles aggregate: 8 + 5 = 13
     expect(screen.getByText("13")).toBeInTheDocument();
 
     // Verify agency rows and driver counts
@@ -169,21 +192,23 @@ describe("AgenciesPage — Admin View", () => {
     expect(screen.getByText("6")).toBeInTheDocument();
   });
 
+  it("summary cards reflect system-wide totals distinct from the current page's row count", () => {
+    // Regression test for issue #45: only 1 agency is on this page, but the platform has 500 —
+    // the summary cards must show the platform total, not this.data.items.length.
+    mockDefaultQueries({
+      agenciesData: pagedResponse([sampleAgency()], { totalItems: 500, totalPages: 25 }),
+      summaryData: sampleSummary({ totalAgencies: 500, activeAgencies: 480, totalDrivers: 1200, activeDrivers: 1100, totalVehicles: 900 }),
+    });
+
+    renderAgenciesPage(UserRole.ADMIN);
+
+    expect(screen.getByText("500")).toBeInTheDocument();
+    expect(screen.getByText("1200")).toBeInTheDocument();
+    expect(screen.getByText("900")).toBeInTheDocument();
+  });
+
   it("displays dispatch rule indicating trip dispatch authority belongs only to agencies", () => {
-    agencyApi.useAgenciesQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { items: [] },
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    agencyApi.useAgencyFleetQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: undefined,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
+    mockDefaultQueries({ agenciesData: pagedResponse([], { totalItems: 0, totalPages: 0 }) });
 
     renderAgenciesPage(UserRole.ADMIN);
     expect(screen.getByText(/Platform Dispatch Rule:/i)).toBeInTheDocument();
@@ -192,54 +217,91 @@ describe("AgenciesPage — Admin View", () => {
     ).toBeInTheDocument();
   });
 
-  it("filters agencies table based on search input", async () => {
-    const user = userEvent.setup();
-    const agency1 = sampleAgency({ agencyId: "ag-1", name: "Colombo Express Logistics" });
-    const agency2 = sampleAgency({ agencyId: "ag-2", name: "Galle Freight Lines" });
+  it("debounces search input before sending it to the API, and resets to page 1", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ delay: null });
+    mockDefaultQueries();
 
-    agencyApi.useAgenciesQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { items: [agency1, agency2] },
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    agencyApi.useAgencyFleetQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: undefined,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-
-    renderAgenciesPage(UserRole.ADMIN);
-    expect(screen.getByText("Colombo Express Logistics")).toBeInTheDocument();
-    expect(screen.getByText("Galle Freight Lines")).toBeInTheDocument();
+    renderAgenciesPage(UserRole.ADMIN, { initialEntries: ["/agencies?page=3"] });
 
     const searchInput = screen.getByPlaceholderText(/search agency name/i);
     await user.type(searchInput, "Galle");
 
-    expect(screen.queryByText("Colombo Express Logistics")).not.toBeInTheDocument();
-    expect(screen.getByText("Galle Freight Lines")).toBeInTheDocument();
+    // Not yet committed to the query — still debouncing.
+    expect(agencyApi.useAgenciesQuery.mock.calls.at(-1)[0].search).toBeUndefined();
+
+    await vi.advanceTimersByTimeAsync(500);
+
+    await waitFor(() => {
+      const lastCall = agencyApi.useAgenciesQuery.mock.calls.at(-1)[0];
+      expect(lastCall.search).toBe("Galle");
+      // Changing the search term resets the page back to 1.
+      expect(lastCall.page).toBe(1);
+    });
+
+    vi.useRealTimers();
+  });
+
+  it("sends the selected status filter to the API and resets to page 1", async () => {
+    const user = userEvent.setup();
+    mockDefaultQueries();
+
+    renderAgenciesPage(UserRole.ADMIN, { initialEntries: ["/agencies?page=2"] });
+
+    const statusSelect = screen.getByDisplayValue("All Statuses");
+    await user.selectOptions(statusSelect, "Suspended");
+
+    await waitFor(() => {
+      const lastCall = agencyApi.useAgenciesQuery.mock.calls.at(-1)[0];
+      expect(lastCall.status).toBe("Suspended");
+      expect(lastCall.page).toBe(1);
+    });
+  });
+
+  it("renders pagination controls and requests the next page on click", async () => {
+    const user = userEvent.setup();
+    mockDefaultQueries({
+      agenciesData: pagedResponse([sampleAgency()], { page: 1, pageSize: 20, totalItems: 45, totalPages: 3 }),
+    });
+
+    renderAgenciesPage(UserRole.ADMIN);
+
+    expect(
+      screen.getByText((_, element) => element?.textContent === "Showing 1–20 of 45")
+    ).toBeInTheDocument();
+    const nextPageButton = screen.getByRole("button", { name: /next page/i });
+    await user.click(nextPageButton);
+
+    await waitFor(() => {
+      const lastCall = agencyApi.useAgenciesQuery.mock.calls.at(-1)[0];
+      expect(lastCall.page).toBe(2);
+    });
+  });
+
+  it("keeps the fleet inspection drawer open for the selected agency after the page changes", async () => {
+    const user = userEvent.setup();
+    const agency = sampleAgency({ agencyId: "ag-1", name: "Colombo Express Logistics" });
+    mockDefaultQueries({
+      agenciesData: pagedResponse([agency], { page: 1, pageSize: 20, totalItems: 45, totalPages: 3 }),
+    });
+
+    renderAgenciesPage(UserRole.ADMIN);
+
+    await user.click(screen.getByRole("button", { name: /view fleet/i }));
+    expect(screen.getByText("Agency Fleet Overview")).toBeInTheDocument();
+
+    const nextPageButton = screen.getByRole("button", { name: /next page/i });
+    await user.click(nextPageButton);
+
+    // The drawer is keyed off selectedAgencyId local state, not the current page's rows, so it
+    // must still be showing after paging away from the row that opened it.
+    expect(screen.getByText("Agency Fleet Overview")).toBeInTheDocument();
   });
 });
 
 describe("AgenciesPage — AgencyStaff View", () => {
   it("routes AgencyStaff to AgencyProfilePage (compliance docs, vehicles, profile)", () => {
-    agencyApi.useAgenciesQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: { items: [] },
-      isFetching: false,
-      refetch: vi.fn(),
-    });
-    agencyApi.useAgencyFleetQuery.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: undefined,
-      isFetching: false,
-      refetch: vi.fn(),
-    });
+    mockDefaultQueries({ agenciesData: pagedResponse([], { totalItems: 0, totalPages: 0 }) });
 
     renderAgenciesPage(UserRole.AGENCY_STAFF);
 

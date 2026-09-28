@@ -2,6 +2,71 @@ import * as Yup from 'yup'
 import { SRI_LANKAN_VEHICLE_REG_REGEX, VEHICLE_CLASS_CONFIG } from './vehicleClasses.js'
 
 /**
+ * Validation schema for an Agency onboarding a new driver.
+ *
+ * Mirrors the backend's CreateDriverRequestDto: email/fullName/licenceNo are required, phoneE164 is
+ * optional, and licenceExpiry must be a future date. There is no password field — the server
+ * generates a temporary password and emails it to the driver.
+ */
+export const addDriverSchema = Yup.object({
+  fullName: Yup.string()
+    .trim()
+    .min(2, 'Full name must be at least 2 characters')
+    .max(200, 'Full name must be 200 characters or fewer')
+    .required('Full name is required'),
+
+  email: Yup.string()
+    .trim()
+    .email('Enter a valid email address')
+    .max(256, 'Email must be 256 characters or fewer')
+    .required('Email is required'),
+
+  phoneE164: Yup.string()
+    .trim()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .matches(
+      /^\+[1-9]\d{6,14}$/,
+      'Phone number must be in E.164 format with country code (e.g. +94771234567)',
+    )
+    .optional(),
+
+  licenceNo: Yup.string()
+    .trim()
+    .min(2, 'Licence number must be at least 2 characters')
+    .max(100, 'Licence number must be 100 characters or fewer')
+    .required('Licence number is required'),
+
+  licenceExpiry: Yup.date()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .min(new Date(), 'Licence expiry date must be in the future')
+    .required('Licence expiry date is required'),
+})
+
+/**
+ * Validation schema for updating an existing driver's editable details.
+ *
+ * Mirrors the backend's DriverUpdateDto: only fullName, licenceNo, and licenceExpiry are editable
+ * (email is immutable after creation, status has its own dedicated endpoint/schema).
+ */
+export const updateDriverSchema = Yup.object({
+  fullName: Yup.string()
+    .trim()
+    .min(2, 'Full name must be at least 2 characters')
+    .max(200, 'Full name must be 200 characters or fewer')
+    .required('Full name is required'),
+
+  licenceNo: Yup.string()
+    .trim()
+    .min(2, 'Licence number must be at least 2 characters')
+    .max(100, 'Licence number must be 100 characters or fewer')
+    .required('Licence number is required'),
+
+  licenceExpiry: Yup.date()
+    .transform((value, originalValue) => (originalValue === '' ? undefined : value))
+    .required('Licence expiry date is required'),
+})
+
+/**
  * Validation schema for registering a new fleet vehicle in an agency.
  *
  * Rules:
@@ -67,3 +132,24 @@ export const addVehicleSchema = Yup.object({
     .positive('Volume must be greater than 0')
     .max(1000, 'Volume cannot exceed 1,000 m³'),
 })
+
+/**
+ * Existing fleets may contain registration values accepted by the backend
+ * before the current web registration pattern was introduced. An unchanged
+ * plate must not prevent an Agency Staff member from correcting other fields.
+ */
+export function updateVehicleSchema(originalRegistrationNo) {
+  return addVehicleSchema.shape({
+    registrationNo: Yup.string()
+      .trim()
+      .required('Registration number is required')
+      .max(50, 'Registration number must be 50 characters or fewer')
+      .test(
+        'registration-format',
+        'Enter a valid Sri Lankan vehicle registration number (e.g. WP CAB-1234, WP-CAD-1020, or CAB-5678)',
+        (value) =>
+          value?.toUpperCase() === originalRegistrationNo?.trim().toUpperCase() ||
+          SRI_LANKAN_VEHICLE_REG_REGEX.test(value ?? ''),
+      ),
+  })
+}

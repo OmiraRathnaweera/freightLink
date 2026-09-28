@@ -13,6 +13,7 @@ public class LoadMatchRecommendationDto
     public int AttemptNo { get; set; } = 1;
     public string WorkflowStatus { get; set; } = "PendingReview";
     public string Objective { get; set; } = string.Empty;
+    public string? ShipperMessage { get; set; }
 
     public RecommendedAgencyDto? RecommendedAgency { get; set; }
     public List<AlternateCandidateAgencyDto> AlternateCandidates { get; set; } = new();

@@ -25,7 +25,8 @@ public class TripServiceTests
 
     private static async Task<(Trip trip, Guid shipperUserId, Guid agencyStaffUserId, Guid driverUserId, Guid otherUserId)> SeedTripHierarchyAsync(
         AppDbContext db,
-        TripStatus tripStatus = TripStatus.Assigned)
+        TripStatus tripStatus = TripStatus.Assigned,
+        LoadStatus loadStatus = LoadStatus.Matched)
     {
         var now = DateTimeOffset.UtcNow;
 
@@ -143,7 +144,7 @@ public class TripServiceTests
             DropoffLng = 80.6337m,
             PickupWindowStart = now.AddDays(1),
             PickupWindowEnd = now.AddDays(2),
-            Status = LoadStatus.InTransit,
+            Status = loadStatus,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -270,6 +271,20 @@ public class TripServiceTests
     }
 
     [Fact]
+    public async Task GetByIdAsync_ExposesShipperAndAgreedPrice_ForCreateInvoiceAutoFill()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+        var (trip, shipperUserId, agencyStaffUserId, _, _) = await SeedTripHierarchyAsync(db);
+
+        var result = await sut.GetByIdAsync(trip.TripId, agencyStaffUserId, UserRole.AgencyStaff);
+
+        Assert.Equal(shipperUserId, result.ShipperUserId);
+        Assert.Equal("Shipper User", result.ShipperName);
+        Assert.Equal(45000m, result.AgreedPrice);
+    }
+
+    [Fact]
     public async Task GetByIdAsync_DeniesOtherShipper_With403()
     {
         using var db = CreateContext();
@@ -314,24 +329,25 @@ public class TripServiceTests
     }
 
     [Fact]
-    public async Task UploadEvidenceAsync_EnforcesRolePairing_AndAdvancesStatus()
+    public async Task UploadEvidenceAsync_IsDriverOnly_AndAdvancesStatus()
     {
         using var db = CreateContext();
         var sut = CreateSut(db);
         var (trip, _, staffUserId, driverUserId, _) = await SeedTripHierarchyAsync(db, TripStatus.Assigned);
 
-        // Driver cannot submit PickupProof
+        // Agency Staff can no longer submit evidence at all — the assigned Driver captures both
+        // Proof of Pickup and Proof of Delivery over the course of a trip.
         var roleEx = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.UploadEvidenceAsync(trip.TripId, driverUserId, UserRole.Driver, new UploadTripEvidenceDto
+            sut.UploadEvidenceAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new UploadTripEvidenceDto
             {
                 EvidenceType = EvidenceType.PickupProof,
                 PublicId = "pickup-photo-1"
             }));
         Assert.Equal(HttpStatusCode.Forbidden, roleEx.StatusCode);
-        Assert.Equal(ErrorCode.TRIP_EVIDENCE_ROLE_MISMATCH, roleEx.Code);
+        Assert.Equal(ErrorCode.TRIP_ACCESS_DENIED, roleEx.Code);
 
-        // AgencyStaff successfully uploads PickupProof
-        var uploadResult = await sut.UploadEvidenceAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new UploadTripEvidenceDto
+        // The assigned Driver successfully uploads PickupProof
+        var uploadResult = await sut.UploadEvidenceAsync(trip.TripId, driverUserId, UserRole.Driver, new UploadTripEvidenceDto
         {
             EvidenceType = EvidenceType.PickupProof,
             PublicId = "pickup-photo-1"
@@ -340,7 +356,7 @@ public class TripServiceTests
 
         // Duplicate pickup evidence rejected
         var dupEx = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.UploadEvidenceAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new UploadTripEvidenceDto
+            sut.UploadEvidenceAsync(trip.TripId, driverUserId, UserRole.Driver, new UploadTripEvidenceDto
             {
                 EvidenceType = EvidenceType.PickupProof,
                 PublicId = "pickup-photo-2"
@@ -348,8 +364,8 @@ public class TripServiceTests
         Assert.Equal(HttpStatusCode.Conflict, dupEx.StatusCode);
         Assert.Equal(ErrorCode.TRIP_EVIDENCE_ALREADY_EXISTS, dupEx.Code);
 
-        // Now status advance to PickedUp succeeds
-        var statusResult = await sut.ChangeStatusAsync(trip.TripId, staffUserId, UserRole.AgencyStaff, new ChangeTripStatusDto
+        // Now status advance to PickedUp succeeds (still callable by AgencyStaff or Driver)
+        var statusResult = await sut.ChangeStatusAsync(trip.TripId, driverUserId, UserRole.Driver, new ChangeTripStatusDto
         {
             TargetStatus = TripStatus.PickedUp,
             Notes = "Loaded at port"
@@ -357,6 +373,64 @@ public class TripServiceTests
         Assert.Equal("PickedUp", statusResult.Status);
         Assert.Single(statusResult.Events);
         Assert.Equal("PickedUp", statusResult.Events[0].ToStatus);
+    }
+
+    [Fact]
+    public async Task ChangeStatusAsync_SyncsLoadStatus_ToInTransit_WhenTripAdvancesToPickedUp()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+        var (trip, _, _, driverUserId, _) = await SeedTripHierarchyAsync(db, TripStatus.Assigned);
+
+        await db.TripEvidences.AddAsync(new TripEvidence
+        {
+            TripEvidenceId = Guid.NewGuid(),
+            TripId = trip.TripId,
+            CapturedByUserId = driverUserId,
+            EvidenceType = EvidenceType.PickupProof,
+            StorageKey = "pickup-photo-1",
+            CapturedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        await sut.ChangeStatusAsync(trip.TripId, driverUserId, UserRole.Driver, new ChangeTripStatusDto
+        {
+            TargetStatus = TripStatus.PickedUp
+        });
+
+        var load = await db.Loads.AsNoTracking().FirstAsync();
+        Assert.Equal(LoadStatus.InTransit, load.Status);
+
+        var history = await db.LoadStatusHistories.AsNoTracking().SingleAsync(h => h.LoadId == load.LoadId);
+        Assert.Equal(LoadStatus.Matched, history.FromStatus);
+        Assert.Equal(LoadStatus.InTransit, history.ToStatus);
+    }
+
+    [Fact]
+    public async Task ChangeStatusAsync_SyncsLoadStatus_ToDelivered_WhenTripCompletes()
+    {
+        using var db = CreateContext();
+        var sut = CreateSut(db);
+        var (trip, _, _, driverUserId, _) = await SeedTripHierarchyAsync(db, TripStatus.InTransit);
+
+        await db.TripEvidences.AddAsync(new TripEvidence
+        {
+            TripEvidenceId = Guid.NewGuid(),
+            TripId = trip.TripId,
+            CapturedByUserId = driverUserId,
+            EvidenceType = EvidenceType.DeliveryProof,
+            StorageKey = "delivery-photo-1",
+            CapturedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        await sut.ChangeStatusAsync(trip.TripId, driverUserId, UserRole.Driver, new ChangeTripStatusDto
+        {
+            TargetStatus = TripStatus.Delivered
+        });
+
+        var load = await db.Loads.AsNoTracking().FirstAsync();
+        Assert.Equal(LoadStatus.Delivered, load.Status);
     }
 
     [Fact]

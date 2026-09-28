@@ -1,4 +1,5 @@
 import { ShieldCheck, CheckCircle2, XCircle, AlertTriangle, Info } from 'lucide-react'
+import FormattedAiText from './FormattedAiText.jsx'
 
 export default function ValidationChecklist({ validation }) {
   if (!validation) {
@@ -78,7 +79,7 @@ export default function ValidationChecklist({ validation }) {
       {explanation && (
         <div className="mt-3.5 flex items-start gap-2.5 rounded-md bg-surface-container-low p-3 text-sm text-on-surface">
           <Info className="h-4 w-4 shrink-0 text-secondary mt-0.5" />
-          <p className="leading-relaxed">{explanation}</p>
+          <FormattedAiText text={explanation} className="leading-relaxed" />
         </div>
       )}
 

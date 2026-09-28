@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CheckCircle2, MapPin, Package, ShieldCheck, Truck, X } from "lucide-react";
+import { CheckCircle2, MapPin, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import Button from "../../../components/Button.jsx";
 import { useApproveAssignmentMutation } from "../../trips/api/assignmentsApi.js";

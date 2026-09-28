@@ -6,13 +6,19 @@ import PublicRoute from './PublicRoute.jsx'
 import LandingPage from '../features/marketing/pages/LandingPage.jsx'
 import LoginPage from '../features/auth/pages/LoginPage.jsx'
 import RegisterPage from '../features/auth/pages/RegisterPage.jsx'
+import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage.jsx'
+import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage.jsx'
+import VerifyEmailPage from '../features/auth/pages/VerifyEmailPage.jsx'
 import UnauthorizedPage from '../features/auth/pages/UnauthorizedPage.jsx'
+import AccountSettingsPage from '../features/auth/pages/AccountSettingsPage.jsx'
 import LoadsPage from '../features/loads/pages/LoadsPage.jsx'
 import PostLoadPage from '../features/loads/pages/PostLoadPage.jsx'
+import LoadProposalsPage from '../features/loads/pages/LoadProposalsPage.jsx'
 import LoadDetailPage from '../features/loads/pages/LoadDetailPage.jsx'
 import EditLoadPage from '../features/loads/pages/EditLoadPage.jsx'
 import AgenciesPage from '../features/agencies/pages/AgenciesPage.jsx'
 import FleetVehiclesPage from '../features/agencies/pages/FleetVehiclesPage.jsx'
+import FleetDriversPage from '../features/agencies/pages/FleetDriversPage.jsx'
 import AgencyVerificationPage from '../features/agencies/pages/AgencyVerificationPage.jsx'
 import TripsPage from '../features/trips/pages/TripsPage.jsx'
 import TripDetailPage from '../features/trips/pages/TripDetailPage.jsx'
@@ -22,8 +28,11 @@ import FuelRatesPage from '../features/pricingConfig/pages/FuelRatesPage.jsx'
 import VehicleEfficiencyPage from '../features/pricingConfig/pages/VehicleEfficiencyPage.jsx'
 import PricingFormulaPage from '../features/pricingConfig/pages/PricingFormulaPage.jsx'
 import AdminDisputesPage from '../features/disputes/pages/AdminDisputesPage.jsx'
-import PaymentSuccessPage from '../features/billing/pages/PaymentSuccessPage.jsx'
-import PaymentCancelledPage from '../features/billing/pages/PaymentCancelledPage.jsx'
+import MyDisputesPage from '../features/disputes/pages/MyDisputesPage.jsx'
+import RaiseDisputePage from '../features/disputes/pages/RaiseDisputePage.jsx'
+import ClaimantDisputeDetailPage from '../features/disputes/pages/ClaimantDisputeDetailPage.jsx'
+import AdminAnalyticsPage from '../features/analytics/pages/AdminAnalyticsPage.jsx'
+import AssignmentActionPage from '../features/assignmentActions/pages/AssignmentActionPage.jsx'
 
 // Still createBrowserRouter + RouterProvider (the data-router API, wired up
 // in App.jsx), tree written as JSX <Route> elements via createRoutesFromElements.
@@ -40,32 +49,40 @@ const router = createBrowserRouter(
     <>
       <Route path="/" element={<LandingPage />} />
 
+      {/* Outside both PublicRoute and ProtectedRoute, like the landing page: an email
+          Accept/Decline action link must work regardless of whatever session (or none)
+          happens to be active in the clicking browser, so it must never be bounced by
+          PublicRoute's "already logged in -> redirect" behavior. */}
+      <Route path="/agency/job-proposals/respond" element={<AssignmentActionPage />} />
+
       {/* --- Public-only routes: bounced to role home if already signed in --- */}
       <Route element={<PublicRoute />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
 
       {/* --- Everything below requires a signed-in session, role-checked by path --- */}
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/account" element={<AccountSettingsPage />} />
 
           <Route path="/loads" element={<LoadsPage />} />
           <Route path="/loads/new" element={<PostLoadPage />} />
+          <Route path="/loads/proposals" element={<LoadProposalsPage />} />
           <Route path="/loads/:loadId" element={<LoadDetailPage />} />
           <Route path="/loads/:loadId/edit" element={<EditLoadPage />} />
 
           <Route path="/agencies" element={<AgenciesPage />} />
           <Route path="/agencies/vehicles" element={<FleetVehiclesPage />} />
+          <Route path="/agencies/drivers" element={<FleetDriversPage />} />
           <Route path="/agencies/verification" element={<AgencyVerificationPage />} />
           <Route path="/trips" element={<TripsPage />} />
           <Route path="/trips/:tripId" element={<TripDetailPage />} />
           <Route path="/billing" element={<BillingPage />} />
-          <Route path="/invoices/:id/payment-success" element={<PaymentSuccessPage />} />
-          <Route path="/invoices/:id/payment-cancelled" element={<PaymentCancelledPage />} />
-          <Route path="/payment/success" element={<PaymentSuccessPage />} />
-          <Route path="/payment/cancel" element={<PaymentCancelledPage />} />
           <Route path="/agent-workflows" element={<AgentWorkflowConsolePage />} />
 
           <Route path="/pricing-config" element={<Navigate to="/pricing-config/fuel-rates" replace />} />
@@ -73,6 +90,10 @@ const router = createBrowserRouter(
           <Route path="/pricing-config/vehicle-efficiency" element={<VehicleEfficiencyPage />} />
           <Route path="/pricing-config/formula" element={<PricingFormulaPage />} />
           <Route path="/disputes" element={<AdminDisputesPage />} />
+          <Route path="/my-disputes" element={<MyDisputesPage />} />
+          <Route path="/my-disputes/new" element={<RaiseDisputePage />} />
+          <Route path="/my-disputes/:disputeId" element={<ClaimantDisputeDetailPage />} />
+          <Route path="/analytics" element={<AdminAnalyticsPage />} />
         </Route>
       </Route>
     </>,
@@ -80,4 +101,3 @@ const router = createBrowserRouter(
 )
 
 export default router
-

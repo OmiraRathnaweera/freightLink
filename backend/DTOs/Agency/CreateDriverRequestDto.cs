@@ -5,26 +5,20 @@ namespace FreightLink.Api.DTOs.Agency;
 
 /// <summary>
 /// Payload for onboarding/creating a driver under an agency (<c>POST /api/v1/agencies/{id}/drivers</c>).
+/// No password field: the server generates a temporary password and emails it to the driver
+/// (see <see cref="DriverResponseDto.TemporaryPassword"/> and <c>AgencyService.AddDriverAsync</c>).
 /// </summary>
 public class CreateDriverRequestDto
 {
     /// <summary>
-    /// Login email for the new driver user; must be unique across all users.
+    /// Login email for the new driver user; must be unique across all users. The temporary password
+    /// is sent here.
     /// </summary>
     [Required]
     [EmailAddress]
     [RegularExpression(AuthPatterns.EmailPattern, ErrorMessage = "Email must be a valid email address.")]
     [StringLength(256)]
     public string Email { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Account password; must satisfy <see cref="StrongPasswordAttribute"/> and fit within
-    /// <see cref="PasswordPolicy.MaxBytes"/>.
-    /// </summary>
-    [Required]
-    [StrongPassword]
-    [MaxUtf8Bytes(PasswordPolicy.MaxBytes)]
-    public string Password { get; set; } = string.Empty;
 
     /// <summary>Full name of the driver registering.</summary>
     [Required]

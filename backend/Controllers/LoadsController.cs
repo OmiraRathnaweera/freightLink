@@ -30,18 +30,18 @@ public class LoadsController : ControllerBase
     /// </summary>
     private const string ShipperRole = nameof(UserRole.Shipper);
 
-    /// <summary>See <see cref="ShipperRole"/>.</summary>
-    private const string ShipperOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.Admin);
     private const string ShipperOrAgencyStaffOrAdminRoles = nameof(UserRole.Shipper) + "," + nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
 
     private readonly ILoadService _loadService;
     private readonly IAssignmentService _assignmentService;
+    private readonly IPricingEstimatorService _pricingEstimatorService;
 
     /// <summary>Creates the controller with its injected services.</summary>
-    public LoadsController(ILoadService loadService, IAssignmentService assignmentService)
+    public LoadsController(ILoadService loadService, IAssignmentService assignmentService, IPricingEstimatorService pricingEstimatorService)
     {
         _loadService = loadService;
         _assignmentService = assignmentService;
+        _pricingEstimatorService = pricingEstimatorService;
     }
 
     /// <summary>Creates a new load owned by the authenticated Shipper.</summary>
@@ -118,24 +118,90 @@ public class LoadsController : ControllerBase
     }
 
     /// <summary>
+    /// Computes a rough, pre-matching price quote for the load using the straight-line (haversine)
+    /// distance between its own pickup/dropoff coordinates — no external routing call, no agency/vehicle
+    /// chosen yet. Accessible only by the owning Shipper. This is a preview only: it does not persist
+    /// anything onto the load, and is distinct from the AI agent's own <c>Load.EstimatedPrice</c>.
+    /// </summary>
+    /// <param name="id">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="LoadPriceEstimateResponseDto"/>.</returns>
+    [HttpPost("{id:guid}/estimate")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<LoadPriceEstimateResponseDto>> EstimatePrice(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _pricingEstimatorService.EstimateForShipperAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
     /// Gets the match recommendation, candidates, validation checks, and workflow steps for a load.
-    /// Accessible by Shippers (who own the load) and Admins.
+    /// Accessible only by the Shipper who owns the load. Admins oversee agencies and pricing but
+    /// must not view, rerun, approve, reject, or revise a shipper's AI match decision.
+    /// Purely read-only — never triggers the Agentic AI pipeline as a side effect (plans/
+    /// 04-backend-integration.md §1); use <see cref="TriggerMatch"/> to actually start a run.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the <see cref="LoadMatchRecommendationDto"/>.</returns>
     [HttpGet("{loadId:guid}/match")]
-    [Authorize(Roles = ShipperOrAdminRoles)]
+    [Authorize(Roles = ShipperRole)]
     public async Task<ActionResult<LoadMatchRecommendationDto>> GetMatchRecommendation(
         Guid loadId,
-        [FromQuery] bool rerun = false,
         CancellationToken cancellationToken = default)
     {
         var result = await _assignmentService.GetMatchRecommendationAsync(
             loadId,
             GetCurrentUserId(),
             GetCurrentUserRole(),
-            rerun,
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Fetches every agent workflow run attempt ever made for a load - not just the latest
+    /// (unlike <see cref="GetMatchRecommendation"/>) - each with its own 4 agent steps and
+    /// every tool call made during them, for the AI Workflow Console's call history view.
+    /// Purely read-only. Only the owning Shipper may view it.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="LoadMatchHistoryDto"/>.</returns>
+    [HttpGet("{loadId:guid}/match/history")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<LoadMatchHistoryDto>> GetMatchHistory(
+        Guid loadId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _assignmentService.GetMatchHistoryAsync(
+            loadId,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Explicitly triggers the Agentic AI pipeline for a load — a deliberate command, not a side
+    /// effect of viewing data (plans/04-backend-integration.md §1). Creates the next
+    /// AgentWorkflowRun attempt and returns the resulting recommendation once the agent service
+    /// responds. Only the owning Shipper may trigger matching for their own load.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the resulting <see cref="LoadMatchRecommendationDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/trigger")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<LoadMatchRecommendationDto>> TriggerMatch(
+        Guid loadId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _assignmentService.TriggerMatchAsync(
+            loadId,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
             cancellationToken);
 
         return Ok(result);
@@ -144,20 +210,71 @@ public class LoadsController : ControllerBase
     /// <summary>
     /// Confirms a matched agency proposal for a load (concurrency-safe, ADR-013 / ADR-016).
     /// Creates an Assignment in Proposed status, records ApprovalDecision, sends agency proposal email,
-    /// and completes the workflow run. Accessible by Shippers (who own the load) and Admins.
+    /// and completes the workflow run. Only the owning Shipper may take this decision.
     /// </summary>
     /// <param name="loadId">The load id.</param>
     /// <param name="request">The agency chosen by the shipper.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the created <see cref="AssignmentResponseDto"/>.</returns>
     [HttpPost("{loadId:guid}/match/confirm")]
-    [Authorize(Roles = ShipperOrAdminRoles)]
+    [Authorize(Roles = ShipperRole)]
     public async Task<ActionResult<AssignmentResponseDto>> ConfirmMatch(
         Guid loadId,
         [FromBody] ConfirmMatchDto request,
         CancellationToken cancellationToken)
     {
         var result = await _assignmentService.ConfirmMatchAsync(
+            loadId,
+            request,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Rejects the load's current match recommendation. Records a Reject approval decision
+    /// with the shipper's reason and aborts the workflow run. Only the owning Shipper may take this decision.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="request">The shipper's reason for rejecting the recommendation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="MatchDecisionResponseDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/reject")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<MatchDecisionResponseDto>> RejectMatch(
+        Guid loadId,
+        [FromBody] MatchDecisionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.RejectMatchAsync(
+            loadId,
+            request,
+            GetCurrentUserId(),
+            GetCurrentUserRole(),
+            cancellationToken);
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Requests a revised match recommendation for the load. Records a Revise approval decision
+    /// with the shipper's reason and aborts the workflow run so a fresh recommendation can be fetched.
+    /// Only the owning Shipper may take this decision.
+    /// </summary>
+    /// <param name="loadId">The load id.</param>
+    /// <param name="request">The shipper's reason for requesting a revised recommendation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the <see cref="MatchDecisionResponseDto"/>.</returns>
+    [HttpPost("{loadId:guid}/match/revise")]
+    [Authorize(Roles = ShipperRole)]
+    public async Task<ActionResult<MatchDecisionResponseDto>> ReviseMatch(
+        Guid loadId,
+        [FromBody] MatchDecisionRequestDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _assignmentService.ReviseMatchAsync(
             loadId,
             request,
             GetCurrentUserId(),

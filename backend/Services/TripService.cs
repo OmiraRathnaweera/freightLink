@@ -104,6 +104,13 @@ public class TripService : ITripService
             tripsQuery = tripsQuery.Where(t => t.Status == query.Status.Value);
         }
 
+        if (query.HasInvoice.HasValue)
+        {
+            tripsQuery = query.HasInvoice.Value
+                ? tripsQuery.Where(t => t.Invoice != null)
+                : tripsQuery.Where(t => t.Invoice == null);
+        }
+
         tripsQuery = query.SortBy?.ToLowerInvariant() switch
         {
             "updatedat" => query.SortDir?.ToLowerInvariant() == "asc"
@@ -143,6 +150,7 @@ public class TripService : ITripService
                 .ThenInclude(a => a.Agency)
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Load)
+                    .ThenInclude(l => l.ShipperUser)
             .Include(t => t.Driver)
                 .ThenInclude(d => d.User)
             .Include(t => t.Vehicle)
@@ -173,6 +181,7 @@ public class TripService : ITripService
                 .ThenInclude(a => a.Agency)
             .Include(t => t.Assignment)
                 .ThenInclude(a => a.Load)
+                    .ThenInclude(l => l.ShipperUser)
             .Include(t => t.Driver)
                 .ThenInclude(d => d.User)
             .Include(t => t.Vehicle)
@@ -254,6 +263,38 @@ public class TripService : ITripService
         trip.Status = target;
         trip.UpdatedAt = now;
 
+        // Keep the Load's own status in step with the Trip it's running on — without this, a Load
+        // stays "Matched" for the entire trip lifecycle (PickedUp/InTransit/Delivered), since nothing
+        // else ever moves it forward once a Trip exists. Mirrors the sync already done for the
+        // Cancelled path in CancelAsync/DeleteAsync below.
+        if (TripToLoadStatusMap.TryGetValue(target, out var mappedLoadStatus))
+        {
+            var load = trip.Assignment?.Load;
+            if (load != null && load.Status != mappedLoadStatus)
+            {
+                var prevLoadStatus = load.Status;
+                load.Status = mappedLoadStatus;
+                load.UpdatedAt = now;
+
+                _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+                {
+                    LoadStatusHistoryId = Guid.NewGuid(),
+                    LoadId = load.LoadId,
+                    FromStatus = prevLoadStatus,
+                    ToStatus = mappedLoadStatus,
+                    Reason = $"Trip advanced to '{target}'.",
+                    ChangedByUserId = actingUserId,
+                    ChangedAt = now
+                });
+
+                if (target == TripStatus.Cancelled && trip.Assignment != null)
+                {
+                    trip.Assignment.Status = AssignmentStatus.Cancelled;
+                    trip.Assignment.UpdatedAt = now;
+                }
+            }
+        }
+
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
@@ -266,6 +307,19 @@ public class TripService : ITripService
         return MapToDetailResponse(trip);
     }
 
+    /// <summary>
+    /// Maps a Trip status this method can transition into to the Load status it should carry the
+    /// owning Load to. <see cref="TripStatus.Assigned"/> has no entry — a Trip is only ever created
+    /// once its Load is already <see cref="LoadStatus.Matched"/>, so there is nothing to advance.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<TripStatus, LoadStatus> TripToLoadStatusMap = new Dictionary<TripStatus, LoadStatus>
+    {
+        [TripStatus.PickedUp] = LoadStatus.InTransit,
+        [TripStatus.InTransit] = LoadStatus.InTransit,
+        [TripStatus.Delivered] = LoadStatus.Delivered,
+        [TripStatus.Cancelled] = LoadStatus.Cancelled
+    };
+
     /// <inheritdoc />
     public async Task<TripEvidenceResponseDto> UploadEvidenceAsync(
         Guid tripId,
@@ -274,10 +328,7 @@ public class TripService : ITripService
         UploadTripEvidenceDto request,
         CancellationToken cancellationToken = default)
     {
-        var trip = await _dbContext.Trips
-            .Include(t => t.Assignment)
-                .ThenInclude(a => a.Agency)
-            .FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
+        var trip = await _dbContext.Trips.FirstOrDefaultAsync(t => t.TripId == tripId, cancellationToken);
 
         if (trip == null)
         {
@@ -289,44 +340,22 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "EvidenceType is required.");
         }
 
-        if (actingUserRole == UserRole.AgencyStaff && request.EvidenceType.Value != EvidenceType.PickupProof)
+        // The assigned Driver captures both evidence types over the course of a trip — Proof of
+        // Pickup at departure and Proof of Delivery at handover. Agency Staff no longer submits
+        // evidence directly (also enforced at the controller via [Authorize(Roles = Driver)]; this
+        // is defense-in-depth, matching the pattern established elsewhere in this service).
+        if (actingUserRole != UserRole.Driver)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_EVIDENCE_ROLE_MISMATCH, "Agency staff may only submit Proof of Pickup.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only the assigned Driver may submit trip evidence.");
         }
 
-        if (actingUserRole == UserRole.Driver && request.EvidenceType.Value != EvidenceType.DeliveryProof)
+        var driver = await _dbContext.Drivers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.UserId == actingUserId, cancellationToken);
+
+        if (driver == null || trip.DriverId != driver.DriverId)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_EVIDENCE_ROLE_MISMATCH, "Drivers may only submit Proof of Delivery.");
-        }
-
-        if (actingUserRole != UserRole.AgencyStaff && actingUserRole != UserRole.Driver)
-        {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only AgencyStaff and Drivers may submit trip evidence.");
-        }
-
-        if (actingUserRole == UserRole.AgencyStaff)
-        {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == actingUserId, cancellationToken);
-
-            if (agencyStaff == null || trip.Assignment.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
-            }
-
-            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
-        }
-        else if (actingUserRole == UserRole.Driver)
-        {
-            var driver = await _dbContext.Drivers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(d => d.UserId == actingUserId, cancellationToken);
-
-            if (driver == null || trip.DriverId != driver.DriverId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
-            }
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to submit evidence for this trip.");
         }
 
         var alreadyExists = await _dbContext.TripEvidences
@@ -490,6 +519,9 @@ public class TripService : ITripService
         PickupWindowStart = t.Assignment?.Load?.PickupWindowStart,
         PickupWindowEnd = t.Assignment?.Load?.PickupWindowEnd,
         ReferenceCode = t.Assignment?.Load?.ReferenceCode,
+        ShipperUserId = t.Assignment?.Load?.ShipperUserId,
+        ShipperName = t.Assignment?.Load?.ShipperUser?.FullName,
+        AgreedPrice = t.Assignment?.ProposedPrice,
         RoutedDistanceKm = t.Assignment?.RoutedDistanceKm,
         ProposedEtaMinutes = t.Assignment?.ProposedEtaMinutes,
         Status = t.Status.ToString(),
@@ -716,9 +748,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may update trip assignments. Drivers are not permitted to update trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may update trip assignments. Admins have view-only access to trips, and Drivers are not permitted to update trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -731,19 +763,16 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
         }
 
-        if (currentUserRole == UserRole.AgencyStaff)
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+        if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
         {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
-
-            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
-            }
-
-            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to modify this trip.");
         }
+
+        AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
 
         if (trip.Status != TripStatus.Assigned)
         {
@@ -851,9 +880,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may cancel trips. Drivers are not permitted to cancel trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may cancel trips. Admins have view-only access to trips, and Drivers are not permitted to cancel trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -868,19 +897,16 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
         }
 
-        if (currentUserRole == UserRole.AgencyStaff)
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+        if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
         {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
-
-            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
-            }
-
-            AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to cancel this trip.");
         }
+
+        AgencyStatusGuard.EnsureActive(trip.Assignment.Agency.Status);
 
         if (trip.Status == TripStatus.Delivered || trip.Status == TripStatus.Cancelled)
         {
@@ -911,7 +937,7 @@ public class TripService : ITripService
             trip.Assignment.Status = AssignmentStatus.Cancelled;
             trip.Assignment.UpdatedAt = now;
 
-            if (trip.Assignment.Load != null)
+            if (trip.Assignment.Load != null && trip.Assignment.Load.Status != LoadStatus.Cancelled)
             {
                 var prevLoadStatus = trip.Assignment.Load.Status;
                 trip.Assignment.Load.Status = LoadStatus.Cancelled;
@@ -942,9 +968,9 @@ public class TripService : ITripService
         UserRole currentUserRole,
         CancellationToken cancellationToken = default)
     {
-        if (currentUserRole != UserRole.AgencyStaff && currentUserRole != UserRole.Admin)
+        if (currentUserRole != UserRole.AgencyStaff)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff and Admin may delete trips. Drivers are not permitted to delete trips.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "Only Agency Staff may delete trips. Admins have view-only access to trips, and Drivers are not permitted to delete trips.");
         }
 
         var trip = await _dbContext.Trips
@@ -961,16 +987,13 @@ public class TripService : ITripService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.TRIP_NOT_FOUND, "The requested trip could not be found.");
         }
 
-        if (currentUserRole == UserRole.AgencyStaff)
-        {
-            var agencyStaff = await _dbContext.AgencyStaff
-                .AsNoTracking()
-                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+        var agencyStaff = await _dbContext.AgencyStaff
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
 
-            if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
-            {
-                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
-            }
+        if (agencyStaff == null || trip.Assignment?.AgencyId != agencyStaff.AgencyId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.TRIP_ACCESS_DENIED, "You do not have permission to delete this trip.");
         }
 
         if (trip.Status == TripStatus.Delivered)
@@ -988,7 +1011,7 @@ public class TripService : ITripService
         var load = assignment?.Load;
 
         // Requirement 4: When an agency deletes a shipment load it has received, the load's status must revert to "Posted," allowing another agency to accept it.
-        if (load != null)
+        if (load != null && load.Status != LoadStatus.Posted)
         {
             var prevLoadStatus = load.Status;
             load.Status = LoadStatus.Posted;

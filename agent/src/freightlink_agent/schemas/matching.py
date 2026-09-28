@@ -49,6 +49,14 @@ class RouteAndEtaResponse(CamelModel):
     eta_minutes: int | None = None
     success: bool = True
     error_message: str | None = None
+    is_simulated: bool = False
+    """True when distance/ETA came from the Haversine detour-factor model, not a real
+    OpenRouteService lookup (no API key configured, or ORS failed/quota-exceeded).
+    A demo running on a simulated route must be visibly labeled as such, not
+    indistinguishable from a real routed result (plans/02-contracts-and-agent-fixes.md §1.4)."""
+    simulation_source: str | None = None
+    """Why this result is simulated, e.g. "no_api_key" or "ors_failed" - None when
+    is_simulated is False."""
 
 
 class EstimatePricingRequest(CamelModel):

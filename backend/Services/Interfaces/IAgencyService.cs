@@ -24,6 +24,12 @@ public interface IAgencyService
     Task<PagedAgencyResponseDto> GetListAsync(Guid currentUserId, UserRole currentUserRole, AgencyListQueryDto query, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Computes system-wide agency/driver/vehicle counts, unaffected by any list search/status
+    /// filter or page — backs the Admin dashboard's summary cards (issue #45).
+    /// </summary>
+    Task<AgencyPlatformSummaryDto> GetPlatformSummaryAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Retrieves a list of agencies that have compliance documents expiring within the specified number of days.
     /// </summary>
     Task<IEnumerable<AgencyExpiringComplianceDto>> GetAgenciesWithExpiringComplianceAsync(int days, CancellationToken cancellationToken = default);
@@ -73,6 +79,12 @@ public interface IAgencyService
 
     Task<VehicleResponseDto> AddVehicleAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, VehicleCreateDto request, CancellationToken cancellationToken = default);
 
+    /// <summary>Agency Staff edits a vehicle's fleet details while it is Available or in Maintenance.</summary>
+    Task<VehicleResponseDto> UpdateVehicleAsync(Guid agencyId, Guid vehicleId, Guid currentUserId, UserRole currentUserRole, VehicleUpdateDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Agency Staff updates a vehicle's manually managed availability state.</summary>
+    Task<VehicleResponseDto> UpdateVehicleStatusAsync(Guid agencyId, Guid vehicleId, Guid currentUserId, UserRole currentUserRole, UpdateVehicleStatusDto request, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Lists vehicles belonging to an agency.
     /// </summary>
@@ -87,6 +99,17 @@ public interface IAgencyService
     /// Adds a driver to an agency.
     /// </summary>
     Task<DriverResponseDto> AddDriverAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CreateDriverRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates an existing driver's editable details.
+    /// </summary>
+    Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes/reactivates a driver from an agency's active roster by transitioning between Active
+    /// and Inactive. OnTrip is trip-execution-owned and can never be set or cleared here.
+    /// </summary>
+    Task<DriverResponseDto> UpdateDriverStatusAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, UpdateDriverStatusDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves full fleet resources (vehicles and drivers) for an agency.

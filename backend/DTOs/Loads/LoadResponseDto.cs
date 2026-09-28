@@ -64,6 +64,14 @@ public class LoadResponseDto
     /// <summary>The id of the current agent workflow run matching this load, if one exists.</summary>
     public Guid? WorkflowRunId { get; set; }
 
+    /// <summary>
+    /// The id of the Trip dispatched for this load's accepted assignment, if one exists yet. Null
+    /// while the load is still Draft/Posted, or Matched but not yet dispatched by the agency — a
+    /// client uses this (not <see cref="Status"/> alone, which stays "Matched" through dispatch) to
+    /// know whether trip-progress details can be fetched via <c>GET /api/v1/trips/{tripId}</c>.
+    /// </summary>
+    public Guid? TripId { get; set; }
+
     /// <summary>When the load was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
 

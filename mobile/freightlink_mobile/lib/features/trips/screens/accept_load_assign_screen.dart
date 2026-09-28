@@ -6,14 +6,17 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../../shared/widgets/auto_resize_text.dart';
 import '../../../shared/widgets/primary_button.dart';
+import 'package:latlong2/latlong.dart';
+
 import '../../../shared/widgets/section_card.dart';
 import '../../../shared/widgets/status_pill.dart';
+import '../../loads/widgets/route_map_preview.dart';
 import '../data/trips_repository.dart';
 import '../models/fleet_resources.dart';
 import '../models/job_proposal.dart';
 import '../models/trip_models.dart';
-import 'proof_of_pickup_screen.dart';
 
 /// Screen where Agency Staff reviews an AI-proposed load and assigns a specific
 /// vehicle and driver from their fleet using the concurrency-safe endpoint (Y3S01-54).
@@ -161,27 +164,16 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
           title: const Text('Trip Dispatched!'),
           content: Text(
             'Load #${_proposal!.referenceCode ?? _proposal!.loadId.substring(0, 8)} has been assigned '
-            'to ${_selectedDriver!.fullName} on vehicle ${_selectedVehicle!.registrationNo}.',
+            'to ${_selectedDriver!.fullName} on vehicle ${_selectedVehicle!.registrationNo}. '
+            '${_selectedDriver!.fullName} will start the trip and capture proof of pickup from their app.',
           ),
           actions: [
-            TextButton(
+            FilledButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
                 Navigator.of(context).pop(true);
               },
               child: const Text('Done'),
-            ),
-            FilledButton.icon(
-              icon: const Icon(Icons.camera_alt_rounded, size: 16),
-              label: const Text('Capture Proof of Pickup'),
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<bool>(
-                    builder: (_) => ProofOfPickupScreen(trip: trip),
-                  ),
-                );
-              },
             ),
           ],
         ),
@@ -349,6 +341,9 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
                             ],
 
                             _buildPricingHeroCard(),
+                            const SizedBox(height: AppConstants.spaceLg),
+
+                            _buildRouteMapPreview(),
                             const SizedBox(height: AppConstants.spaceLg),
 
                             _buildCargoAndRouteCard(),
@@ -615,8 +610,9 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
+          AutoResizeText.kpi(
             priceStr,
+            minFontSize: 16,
             style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
@@ -628,27 +624,56 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
             children: [
               const Icon(Icons.navigation_rounded, size: 14, color: AppColors.statusMatchedBg),
               const SizedBox(width: 4),
-              Text(
-                '$distanceStr • $durationStr transit',
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: AppColors.statusMatchedBg,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              if (_proposal!.referenceCode != null)
-                Text(
-                  _proposal!.referenceCode!,
+              Flexible(
+                child: AutoResizeText(
+                  '$distanceStr • $durationStr transit',
+                  maxLines: 1,
+                  minFontSize: 10,
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.inkFaint,
+                    fontSize: 13,
+                    color: AppColors.statusMatchedBg,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+              ),
+              if (_proposal!.referenceCode != null) ...[
+                const SizedBox(width: AppConstants.spaceSm),
+                Flexible(
+                  child: AutoResizeText(
+                    _proposal!.referenceCode!,
+                    maxLines: 1,
+                    minFontSize: 10,
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.inkFaint,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRouteMapPreview() {
+    var pLat = _proposal!.pickupLat ?? 6.9271;
+    var pLng = _proposal!.pickupLng ?? 79.8612;
+    var dLat = _proposal!.dropoffLat ?? 7.2906;
+    var dLng = _proposal!.dropoffLng ?? 80.6337;
+
+    // Guard against identical coordinates so CameraFit bounds calculation never collapses.
+    if ((pLat - dLat).abs() < 0.0001 && (pLng - dLng).abs() < 0.0001) {
+      dLat += 0.01;
+      dLng += 0.01;
+    }
+
+    return RouteMapPreview(
+      pickup: LatLng(pLat, pLng),
+      dropoff: LatLng(dLat, dLng),
+      height: 190,
     );
   }
 
@@ -853,12 +878,16 @@ class _AcceptLoadAssignScreenState extends State<AcceptLoadAssignScreen> {
                 const Icon(Icons.check_circle_outline_rounded,
                     size: 14, color: AppColors.statusSuccessFg),
                 const SizedBox(width: 4),
-                Text(
-                  'Capacity Verified (${_selectedVehicle!.capacityKg.toInt()} kg max)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.statusSuccessFg,
-                    fontWeight: FontWeight.w500,
+                Expanded(
+                  child: AutoResizeText(
+                    'Capacity Verified (${_selectedVehicle!.capacityKg.toInt()} kg max)',
+                    maxLines: 1,
+                    minFontSize: 10,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.statusSuccessFg,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],

@@ -52,6 +52,44 @@ public class EmailTemplatesTests
     }
 
     [Fact]
+    public void BuildJobProposal_WithActionUrls_IncludesAcceptAndDeclineLinks()
+    {
+        var (subject, html, text) = EmailTemplates.BuildJobProposal(
+            "Swift Cargo", "REF-005", "Garments", 1200m, "Colombo Port", "Kandy Depot", 18500m,
+            "https://app.example.com/agency/job-proposals/respond?token=accept-raw",
+            "https://app.example.com/agency/job-proposals/respond?token=decline-raw");
+
+        Assert.Contains("REF-005", subject);
+        Assert.Contains("token=accept-raw", html);
+        Assert.Contains("token=decline-raw", html);
+        Assert.Contains("token=accept-raw", text);
+        Assert.Contains("token=decline-raw", text);
+        Assert.DoesNotContain("Please log in to your FreightLink Agency portal", html);
+    }
+
+    [Fact]
+    public void BuildJobProposal_WithoutActionUrls_FallsBackToLogInCopy()
+    {
+        var (_, html, text) = EmailTemplates.BuildJobProposal(
+            "Swift Cargo", "REF-006", "Garments", 1200m, "Colombo Port", "Kandy Depot", 18500m,
+            acceptUrl: null, declineUrl: null);
+
+        Assert.Contains("Please log in to your FreightLink Agency portal", html);
+        Assert.Contains("Please log in to your FreightLink Agency portal", text);
+        Assert.DoesNotContain("href", text);
+    }
+
+    [Fact]
+    public void BuildJobProposal_HtmlEncodesInterpolatedValues()
+    {
+        var (_, html, _) = EmailTemplates.BuildJobProposal(
+            "<script>alert(1)</script>", "REF-007", "Garments", 1200m, "Colombo Port", "Kandy Depot", 18500m,
+            acceptUrl: null, declineUrl: null);
+
+        Assert.DoesNotContain("<script>alert(1)</script>", html);
+    }
+
+    [Fact]
     public void BuildAgencyDeclined_HtmlEncodesInterpolatedValues()
     {
         var (_, html, _) = EmailTemplates.BuildAgencyDeclined("<script>alert(1)</script>", "REF-004", "Agency & Co", 1);

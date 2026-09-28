@@ -1,13 +1,18 @@
-﻿using System.Net;
+using System.Net;
+using System.Security.Cryptography;
 using FreightLink.Api.Common.Domain;
+using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Errors;
 using FreightLink.Api.Common.Exceptions;
+using FreightLink.Api.Common.Options;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 
 namespace FreightLink.Api.Services;
@@ -17,12 +22,23 @@ public class AgencyService : IAgencyService
 {
     private readonly AppDbContext _dbContext;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IEmailService? _emailService;
+    private readonly EmailOptions _emailOptions;
+    private readonly ILogger<AgencyService>? _logger;
 
-    /// <summary>Creates the agency service with its DB context and password hasher.</summary>
-    public AgencyService(AppDbContext dbContext, IPasswordHasher passwordHasher)
+    /// <summary>Creates the agency service with its DB context, password hasher, and email sender.</summary>
+    public AgencyService(
+        AppDbContext dbContext,
+        IPasswordHasher passwordHasher,
+        IEmailService? emailService = null,
+        IOptions<EmailOptions>? emailOptions = null,
+        ILogger<AgencyService>? logger = null)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
+        _emailService = emailService;
+        _emailOptions = emailOptions?.Value ?? new EmailOptions();
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -141,6 +157,28 @@ public class AgencyService : IAgencyService
             PageSize = query.PageSize,
             TotalItems = totalItems,
             TotalPages = (int)Math.Ceiling(totalItems / (double)query.PageSize)
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<AgencyPlatformSummaryDto> GetPlatformSummaryAsync(Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can view platform-wide agency summary.");
+        }
+
+        // Direct COUNT queries against the whole table - never paged through and summed
+        // client-side, and never derived from a search/status-filtered listing - so these numbers
+        // stay accurate no matter how many agencies exist or what the admin's list view is
+        // currently filtered to (issue #45).
+        return new AgencyPlatformSummaryDto
+        {
+            TotalAgencies = await _dbContext.Agencies.CountAsync(cancellationToken),
+            ActiveAgencies = await _dbContext.Agencies.CountAsync(a => a.Status == AgencyStatus.Active, cancellationToken),
+            TotalDrivers = await _dbContext.Drivers.CountAsync(cancellationToken),
+            ActiveDrivers = await _dbContext.Drivers.CountAsync(d => d.Status == DriverStatus.Active, cancellationToken),
+            TotalVehicles = await _dbContext.Vehicles.CountAsync(cancellationToken)
         };
     }
 
@@ -458,7 +496,7 @@ public class AgencyService : IAgencyService
             VehicleId = Guid.NewGuid(),
             AgencyId = agencyId,
             RegistrationNo = request.RegistrationNo,
-            VehicleType = request.VehicleType,
+            VehicleType = request.VehicleType!.Value,
             CapacityKg = request.CapacityKg,
             VolumeM3 = request.VolumeM3,
             Status = VehicleStatus.Available,
@@ -478,7 +516,237 @@ public class AgencyService : IAgencyService
             CapacityKg = vehicle.CapacityKg,
             VolumeM3 = vehicle.VolumeM3,
             Status = vehicle.Status.ToString(),
-            CreatedAt = vehicle.CreatedAt
+            IsAvailable = true,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<VehicleResponseDto> UpdateVehicleAsync(
+        Guid agencyId,
+        Guid vehicleId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        VehicleUpdateDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.AgencyStaff)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only agency staff may edit fleet vehicles.");
+        }
+
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies.AsNoTracking()
+            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+        if (agency is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
+        }
+        AgencyStatusGuard.EnsureActive(agency.Status);
+
+        var vehicle = await _dbContext.Vehicles.FirstOrDefaultAsync(
+            v => v.VehicleId == vehicleId && v.AgencyId == agencyId,
+            cancellationToken);
+        if (vehicle is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.VEHICLE_NOT_FOUND, "Vehicle not found in this agency fleet.");
+        }
+        if (vehicle.Status is VehicleStatus.OnTrip or VehicleStatus.Retired)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.VEHICLE_CANNOT_BE_MODIFIED,
+                "Vehicles on a trip or retired cannot have their fleet details changed.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.RegistrationNo))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Registration number is required.");
+        }
+        var registrationNo = request.RegistrationNo.Trim().ToUpperInvariant();
+        if (await _dbContext.Vehicles.AnyAsync(
+            v => v.AgencyId == agencyId && v.VehicleId != vehicleId && v.RegistrationNo == registrationNo,
+            cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.VEHICLE_REGISTRATION_ALREADY_EXISTS,
+                "A vehicle with this registration number already exists in your fleet.");
+        }
+
+        vehicle.RegistrationNo = registrationNo;
+        vehicle.VehicleType = request.VehicleType!.Value;
+        vehicle.CapacityKg = request.CapacityKg;
+        vehicle.VolumeM3 = request.VolumeM3;
+        vehicle.UpdatedAt = DateTimeOffset.UtcNow;
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505", ConstraintName: "uq_vehicle_agency_regno" })
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.VEHICLE_REGISTRATION_ALREADY_EXISTS,
+                "A vehicle with this registration number already exists in your fleet.");
+        }
+
+        return new VehicleResponseDto
+        {
+            VehicleId = vehicle.VehicleId,
+            AgencyId = vehicle.AgencyId,
+            RegistrationNo = vehicle.RegistrationNo,
+            VehicleType = vehicle.VehicleType.ToString(),
+            CapacityKg = vehicle.CapacityKg,
+            VolumeM3 = vehicle.VolumeM3,
+            Status = vehicle.Status.ToString(),
+            IsAvailable = vehicle.Status == VehicleStatus.Available,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<VehicleResponseDto> UpdateVehicleStatusAsync(
+        Guid agencyId,
+        Guid vehicleId,
+        Guid currentUserId,
+        UserRole currentUserRole,
+        UpdateVehicleStatusDto request,
+        CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
+        if (agency is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+        AgencyStatusGuard.EnsureActive(agency.Status);
+
+        var vehicle = await _dbContext.Vehicles.FirstOrDefaultAsync(
+            v => v.VehicleId == vehicleId && v.AgencyId == agencyId,
+            cancellationToken);
+        if (vehicle is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.VEHICLE_NOT_FOUND, "The requested vehicle could not be found in this agency fleet.");
+        }
+
+        // Trip assignment/execution is the sole authority for OnTrip. Retired vehicles are
+        // deliberately terminal so matching cannot accidentally revive a decommissioned vehicle.
+        var targetStatus = request.Status!.Value;
+        if (targetStatus == VehicleStatus.OnTrip || vehicle.Status == VehicleStatus.OnTrip ||
+            (vehicle.Status == VehicleStatus.Retired && targetStatus != VehicleStatus.Retired))
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_VEHICLE_STATUS_TRANSITION,
+                "Vehicle availability can only move between Available, Maintenance, and Retired. OnTrip is managed by trip execution and Retired is terminal.");
+        }
+
+        vehicle.Status = targetStatus;
+        vehicle.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new VehicleResponseDto
+        {
+            VehicleId = vehicle.VehicleId,
+            AgencyId = vehicle.AgencyId,
+            RegistrationNo = vehicle.RegistrationNo,
+            VehicleType = vehicle.VehicleType.ToString(),
+            CapacityKg = vehicle.CapacityKg,
+            VolumeM3 = vehicle.VolumeM3,
+            Status = vehicle.Status.ToString(),
+            IsAvailable = vehicle.Status == VehicleStatus.Available,
+            CreatedAt = vehicle.CreatedAt,
+            UpdatedAt = vehicle.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<DriverResponseDto> UpdateDriverAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, DriverUpdateDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var driver = await _dbContext.Drivers
+            .Include(d => d.User)
+            .FirstOrDefaultAsync(d => d.DriverId == driverId && d.AgencyId == agencyId, cancellationToken);
+
+        if (driver == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DRIVER_NOT_FOUND, "Driver not found.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.FullName))
+        {
+            driver.User.FullName = request.FullName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.LicenceNo) && request.LicenceNo != driver.LicenceNo)
+        {
+            var licenceExists = await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo && d.DriverId != driverId, cancellationToken);
+            if (licenceExists)
+            {
+                throw new ApiException(HttpStatusCode.Conflict, ErrorCode.LICENCE_ALREADY_REGISTERED, "License number is already registered.");
+            }
+            driver.LicenceNo = request.LicenceNo;
+        }
+
+        if (request.LicenceExpiry.HasValue)
+        {
+            driver.LicenceExpiry = request.LicenceExpiry.Value;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = driver.UserId,
+            AgencyId = driver.AgencyId,
+            Email = driver.User.Email,
+            FullName = driver.User.FullName,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<DriverResponseDto> UpdateDriverStatusAsync(Guid agencyId, Guid driverId, Guid currentUserId, UserRole currentUserRole, UpdateDriverStatusDto request, CancellationToken cancellationToken = default)
+    {
+        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        var driver = await _dbContext.Drivers
+            .Include(d => d.User)
+            .FirstOrDefaultAsync(d => d.DriverId == driverId && d.AgencyId == agencyId, cancellationToken);
+
+        if (driver == null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.DRIVER_NOT_FOUND, "Driver not found.");
+        }
+
+        // Trip assignment/execution is the sole authority for OnTrip, mirroring vehicle availability:
+        // staff may only toggle a driver between Active and Inactive.
+        if (request.Status == DriverStatus.OnTrip || driver.Status == DriverStatus.OnTrip)
+        {
+            throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.INVALID_DRIVER_STATUS_TRANSITION,
+                "Driver roster status can only move between Active and Inactive. OnTrip is managed by trip execution.");
+        }
+
+        driver.Status = request.Status;
+        driver.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DriverResponseDto
+        {
+            DriverId = driver.DriverId,
+            UserId = driver.UserId,
+            AgencyId = driver.AgencyId,
+            Email = driver.User.Email,
+            FullName = driver.User.FullName,
+            LicenceNo = driver.LicenceNo,
+            LicenceExpiry = driver.LicenceExpiry,
+            Status = driver.Status,
+            CreatedAt = driver.CreatedAt,
+            UpdatedAt = driver.UpdatedAt
         };
     }
 
@@ -548,8 +816,7 @@ public class AgencyService : IAgencyService
             Email = d.User?.Email ?? string.Empty,
             LicenceNo = d.LicenceNo,
             LicenceExpiry = d.LicenceExpiry,
-            Status = d.Status.ToString(),
-            IsActive = d.Status == DriverStatus.Active,
+            Status = d.Status,
             CreatedAt = d.CreatedAt,
             UpdatedAt = d.UpdatedAt
         }).ToList();
@@ -583,15 +850,21 @@ public class AgencyService : IAgencyService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var temporaryPassword = GenerateTemporaryPassword();
         var user = new User
         {
             UserId = Guid.NewGuid(),
             Role = UserRole.Driver,
             Email = normalizedEmail,
-            PasswordHash = _passwordHasher.Hash(request.Password),
+            PasswordHash = _passwordHasher.Hash(temporaryPassword),
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            // The employing Agency is vouching for this driver's identity/email (there is no
+            // separate driver-side verification step in this flow), so the account must be
+            // immediately usable with the emailed credentials rather than blocked behind
+            // EmailOptions.RequireEmailVerification.
+            EmailVerifiedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -628,6 +901,8 @@ public class AgencyService : IAgencyService
             throw;
         }
 
+        await TrySendDriverCredentialsAsync(user, agency.Name, temporaryPassword, cancellationToken);
+
         return new DriverResponseDto
         {
             DriverId = driver.DriverId,
@@ -637,11 +912,80 @@ public class AgencyService : IAgencyService
             Email = user.Email,
             LicenceNo = driver.LicenceNo,
             LicenceExpiry = driver.LicenceExpiry,
-            Status = driver.Status.ToString(),
-            IsActive = true,
+            Status = driver.Status,
             CreatedAt = driver.CreatedAt,
-            UpdatedAt = driver.UpdatedAt
+            UpdatedAt = driver.UpdatedAt,
+            TemporaryPassword = temporaryPassword
         };
+    }
+
+    /// <summary>
+    /// Generates a cryptographically random password satisfying <see cref="Common.Validation.StrongPasswordAttribute"/>
+    /// (upper, lower, digit, special character, 12 characters) for a newly-onboarded driver.
+    /// </summary>
+    private static string GenerateTemporaryPassword()
+    {
+        const string uppers = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I/O — avoids visual ambiguity
+        const string lowers = "abcdefghijkmnpqrstuvwxyz";
+        const string digits = "23456789";
+        const string specials = "!@#$%^&*?";
+        const string all = uppers + lowers + digits + specials;
+        const int length = 12;
+
+        var chars = new char[length];
+        chars[0] = uppers[RandomNumberGenerator.GetInt32(uppers.Length)];
+        chars[1] = lowers[RandomNumberGenerator.GetInt32(lowers.Length)];
+        chars[2] = digits[RandomNumberGenerator.GetInt32(digits.Length)];
+        chars[3] = specials[RandomNumberGenerator.GetInt32(specials.Length)];
+        for (var i = 4; i < length; i++)
+        {
+            chars[i] = all[RandomNumberGenerator.GetInt32(all.Length)];
+        }
+
+        // Fisher-Yates shuffle so the guaranteed-category characters aren't always in positions 0-3.
+        for (var i = length - 1; i > 0; i--)
+        {
+            var j = RandomNumberGenerator.GetInt32(i + 1);
+            (chars[i], chars[j]) = (chars[j], chars[i]);
+        }
+
+        return new string(chars);
+    }
+
+    /// <summary>
+    /// Emails the newly-onboarded driver their login email and temporary password. Failures are
+    /// logged, never thrown — the account is fully created and usable (the Agency also sees the
+    /// temporary password once in the API response) even if the email can't be delivered.
+    /// </summary>
+    private async Task TrySendDriverCredentialsAsync(User driverUser, string agencyName, string temporaryPassword, CancellationToken cancellationToken)
+    {
+        if (_emailService is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var loginUrl = string.IsNullOrWhiteSpace(_emailOptions.FrontendBaseUrl)
+                ? string.Empty
+                : $"{_emailOptions.FrontendBaseUrl.TrimEnd('/')}/login";
+
+            var (subject, htmlBody, textBody) = EmailTemplates.BuildDriverCredentials(
+                driverUser.FullName, driverUser.Email, temporaryPassword, agencyName, loginUrl);
+
+            await _emailService.SendAsync(new EmailMessage
+            {
+                To = driverUser.Email,
+                Subject = subject,
+                HtmlBody = htmlBody,
+                TextBody = textBody,
+                Metadata = new Dictionary<string, string> { ["template"] = "driver-credentials" }
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unable to send driver-credentials email to {Email}.", driverUser.Email);
+        }
     }
 
     /// <inheritdoc />

@@ -106,5 +106,6 @@ void main() {
       expect(provider.currentPushBanner, isNull);
       expect(provider.unreadCount, 0);
     });
+
   });
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   AlertCircle,
   ArrowRight,
@@ -6,13 +6,11 @@ import {
   MapPin,
   Package,
   PlusCircle,
-  SlidersHorizontal,
   Truck,
   User,
   X,
 } from "lucide-react";
 import Button from "../../../components/Button.jsx";
-import Input from "../../../components/Input.jsx";
 import { useCreateTripMutation } from "../api/tripsApi.js";
 import { useAssignmentsQuery } from "../api/assignmentsApi.js";
 import { useAgencyFleetQuery } from "../../agencies/api/agencyApi.js";
@@ -23,7 +21,6 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
   const [vehicleId, setVehicleId] = useState("");
   const [driverId, setDriverId] = useState("");
   const [notes, setNotes] = useState("");
-  const [isManualMode, setIsManualMode] = useState(false);
 
   // Fetch all assignments for the agency
   const assignmentsQuery = useAssignmentsQuery(
@@ -61,11 +58,12 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
     [assignments, assignmentId]
   );
 
-  useEffect(() => {
-    if (selectedAssignment && selectedAssignment.assignmentId !== assignmentId) {
-      setAssignmentId(selectedAssignment.assignmentId);
-    }
-  }, [selectedAssignment, assignmentId]);
+  // Normalize assignmentId to its canonical value once the assignment resolves (it may have
+  // started as a loadId from a deep link — see the find() above). Adjusted directly during render
+  // rather than in an effect, per https://react.dev/learn/you-might-not-need-an-effect.
+  if (selectedAssignment && selectedAssignment.assignmentId !== assignmentId) {
+    setAssignmentId(selectedAssignment.assignmentId);
+  }
 
   // Fetch fleet (vehicles and drivers) for caller's agency
   const fleetQuery = useAgencyFleetQuery(selectedAssignment?.agencyId, {
@@ -148,35 +146,20 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
                 <Package className="h-4 w-4 text-primary" />
                 Select Assignment / Load
               </label>
-              {!isManualMode && dispatchableAssignments.length > 0 && (
+              {dispatchableAssignments.length > 0 && (
                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {dispatchableAssignments.length} ready to dispatch
                 </span>
               )}
             </div>
 
-            {isManualMode ? (
-              <Input
-                type="text"
-                placeholder="e.g. 22222222-2222-2222-2222-222222222222"
-                value={assignmentId}
-                onChange={(e) => setAssignmentId(e.target.value)}
-                required
-              />
-            ) : assignmentsQuery.isLoading ? (
+            {assignmentsQuery.isLoading ? (
               <div className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
             ) : dispatchableAssignments.length === 0 && alreadyDispatchedAssignments.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center">
                 <p className="text-body-sm text-on-surface-variant">
                   No assignments found for your agency yet.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsManualMode(true)}
-                  className="mt-2 text-xs font-medium text-primary hover:underline"
-                >
-                  Enter an Assignment ID manually
-                </button>
               </div>
             ) : (
               <select
@@ -214,7 +197,7 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
             )}
 
             {/* Selected Assignment Preview Card */}
-            {selectedAssignment && !isManualMode && (
+            {selectedAssignment && (
               <div className="mt-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2.5">
                 <div className="flex items-center justify-between text-xs font-medium text-primary">
                   <span className="font-semibold tracking-wide">
@@ -255,26 +238,11 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
               Assign Fleet Vehicle
             </label>
 
-            {isManualMode ? (
-              <Input
-                type="text"
-                placeholder="e.g. 55555555-5555-5555-5555-555555555555"
-                value={vehicleId}
-                onChange={(e) => setVehicleId(e.target.value)}
-                required
-              />
-            ) : fleetQuery.isLoading ? (
+            {fleetQuery.isLoading ? (
               <div className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
             ) : vehicles.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-body-sm text-on-surface-variant">
-                No vehicles found in your agency fleet.{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsManualMode(true)}
-                  className="font-medium text-primary hover:underline"
-                >
-                  Enter Vehicle ID manually
-                </button>
+                No vehicles found in your agency fleet.
               </div>
             ) : (
               <select
@@ -299,7 +267,7 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
               </select>
             )}
 
-            {selectedVehicle && !isManualMode && (
+            {selectedVehicle && (
               <p className="mt-1 text-xs text-on-surface-variant">
                 Registration: <strong className="text-on-surface">{selectedVehicle.registrationNo}</strong> • Type: {selectedVehicle.vehicleType} • Capacity: {selectedVehicle.capacityKg} kg
               </p>
@@ -313,26 +281,11 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
               Assign Driver
             </label>
 
-            {isManualMode ? (
-              <Input
-                type="text"
-                placeholder="e.g. 66666666-6666-6666-6666-666666666666"
-                value={driverId}
-                onChange={(e) => setDriverId(e.target.value)}
-                required
-              />
-            ) : fleetQuery.isLoading ? (
+            {fleetQuery.isLoading ? (
               <div className="h-10 w-full animate-pulse rounded-lg bg-slate-100" />
             ) : drivers.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-body-sm text-on-surface-variant">
-                No drivers registered in your agency fleet.{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsManualMode(true)}
-                  className="font-medium text-primary hover:underline"
-                >
-                  Enter Driver ID manually
-                </button>
+                No drivers registered in your agency fleet.
               </div>
             ) : (
               <select
@@ -345,7 +298,7 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
               >
                 <option value="">-- Choose an active driver --</option>
                 {drivers.map((d) => {
-                  const isActive = d.isActive && d.status === "Active";
+                  const isActive = d.status === "Active";
                   return (
                     <option key={d.driverId} value={d.driverId} disabled={!isActive}>
                       {d.fullName}
@@ -357,7 +310,7 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
               </select>
             )}
 
-            {selectedDriver && !isManualMode && (
+            {selectedDriver && (
               <p className="mt-1 text-xs text-on-surface-variant">
                 Driver: <strong className="text-on-surface">{selectedDriver.fullName}</strong> • Licence: {selectedDriver.licenceNo || "N/A"} • Email: {selectedDriver.email}
               </p>
@@ -391,39 +344,28 @@ function CreateTripDialog({ onClose, onCreated, defaultAssignmentId = "" }) {
           )}
 
           {/* Footer Controls */}
-          <div className="flex items-center justify-between pt-4 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setIsManualMode(!isManualMode)}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-on-surface-variant hover:text-primary transition-colors"
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={createMutation.isPending || !assignmentId || !vehicleId || !driverId}
+              className="inline-flex items-center gap-2 font-semibold shadow-sm"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              <span>{isManualMode ? "Use Dropdown Selectors" : "Enter IDs Manually"}</span>
-            </button>
-
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="secondary" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={createMutation.isPending || !assignmentId || !vehicleId || !driverId}
-                className="inline-flex items-center gap-2 font-semibold shadow-sm"
-              >
-                {createMutation.isPending ? (
-                  <>
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    <span>Dispatching...</span>
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>Create & Dispatch Trip</span>
-                  </>
-                )}
-              </Button>
-            </div>
+              {createMutation.isPending ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  <span>Dispatching...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Create & Dispatch Trip</span>
+                </>
+              )}
+            </Button>
           </div>
         </form>
       </div>

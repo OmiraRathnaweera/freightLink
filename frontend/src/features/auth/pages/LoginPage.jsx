@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Formik, Form } from 'formik'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { FormikTextField, FormikPasswordField, FormikSubmitButton } from '../../../components/form/index.js'
 import { loginSchema } from '../lib/validationSchemas.js'
 import { useAppDispatch } from '../../../hooks/useAppDispatch.js'
@@ -69,9 +69,9 @@ function LoginPage() {
             <div>
               <FormikPasswordField name="password" label="Password" placeholder="••••••••" />
               <div className="mt-2 flex justify-end">
-                <a href="#" className="text-body-md text-status-blue-text hover:underline">
+                <Link to="/forgot-password" className="text-body-md text-status-blue-text hover:underline">
                   Forgot Password?
-                </a>
+                </Link>
               </div>
             </div>
             <FormikSubmitButton className="w-full">Sign In</FormikSubmitButton>

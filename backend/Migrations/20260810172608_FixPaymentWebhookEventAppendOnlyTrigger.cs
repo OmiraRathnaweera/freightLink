@@ -19,7 +19,7 @@ namespace FreightLink.Api.Migrations
             migrationBuilder.Sql("""
                 DROP TRIGGER IF EXISTS trg_deny_mutation_paymentwebhookevents ON "PaymentWebhookEvents";
 
-                CREATE FUNCTION fn_protect_webhook_receipt() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION fn_protect_webhook_receipt() RETURNS trigger AS $$
                 BEGIN
                     IF TG_OP = 'DELETE' THEN
                         RAISE EXCEPTION 'PaymentWebhookEvents rows cannot be deleted';

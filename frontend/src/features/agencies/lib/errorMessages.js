@@ -5,6 +5,17 @@ const AGENCY_ERROR_MESSAGES = {
   AGENCY_NOT_ACTIVE: 'Your agency is not active yet. Compliance documents must be verified by an administrator before registering fleet vehicles.',
   AGENCY_NOT_FOUND: 'Agency organization could not be found.',
   FORBIDDEN: 'You are not authorized to perform this fleet management action.',
+  EMAIL_ALREADY_REGISTERED: 'An account with this email already exists.',
+  DRIVER_LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',
+  // Thrown by the update-driver endpoint specifically (as opposed to DRIVER_LICENCE_ALREADY_REGISTERED,
+  // thrown on create) — same meaning, different code, so both must be mapped.
+  LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',
+  DRIVER_NOT_FOUND: 'Driver could not be found in your fleet.',
+  INVALID_DRIVER_STATUS_TRANSITION: 'Driver status can only be set to Active or Inactive — OnTrip is managed automatically during trips.',
+  VEHICLE_NOT_FOUND: 'Vehicle could not be found in your fleet.',
+  VEHICLE_REGISTRATION_ALREADY_EXISTS: 'A vehicle with this registration number already exists in your fleet.',
+  VEHICLE_CANNOT_BE_MODIFIED: 'Vehicles on a trip or retired cannot be edited.',
+  INVALID_VEHICLE_STATUS_TRANSITION: 'This vehicle status change is not allowed. OnTrip is managed during trips and Retired is final.',
 }
 
 /**
@@ -13,6 +24,10 @@ const AGENCY_ERROR_MESSAGES = {
  * @returns {string}
  */
 export function getAgencyErrorMessage(error) {
+  if (error?.code && AGENCY_ERROR_MESSAGES[error.code]) {
+    return AGENCY_ERROR_MESSAGES[error.code]
+  }
+
   if (error?.status === 409 || error?.code === 'CONFLICT') {
     return 'A vehicle with this registration number already exists in your fleet.'
   }

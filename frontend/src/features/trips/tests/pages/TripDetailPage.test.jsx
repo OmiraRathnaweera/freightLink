@@ -12,7 +12,6 @@ vi.mock("../../api/tripsApi.js", async (importOriginal) => {
     ...actual,
     useTripDetailQuery: vi.fn(),
     useChangeTripStatusMutation: vi.fn(),
-    useUploadTripEvidenceMutation: vi.fn(),
     useUpdateTripMutation: vi.fn(),
     useCancelTripMutation: vi.fn(),
     useDeleteTripMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
@@ -72,7 +71,6 @@ function renderTripDetailPage(tripId = "11111111-1111-1111-1111-111111111111", r
 afterEach(() => {
   vi.mocked(tripsApi.useTripDetailQuery).mockReset();
   vi.mocked(tripsApi.useChangeTripStatusMutation).mockReset();
-  vi.mocked(tripsApi.useUploadTripEvidenceMutation).mockReset();
   vi.mocked(tripsApi.useUpdateTripMutation).mockReset();
   vi.mocked(tripsApi.useCancelTripMutation).mockReset();
   cleanup();
@@ -113,10 +111,6 @@ describe("TripDetailPage — render states", () => {
       mutate: vi.fn(),
       isPending: false,
     });
-    tripsApi.useUploadTripEvidenceMutation.mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-    });
 
     renderTripDetailPage();
 
@@ -138,10 +132,6 @@ describe("TripDetailPage — render states", () => {
       data: trip,
     });
     tripsApi.useChangeTripStatusMutation.mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-    });
-    tripsApi.useUploadTripEvidenceMutation.mockReturnValue({
       mutate: vi.fn(),
       isPending: false,
     });

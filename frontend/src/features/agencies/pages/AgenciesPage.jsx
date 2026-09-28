@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import {
   Building2,
   CheckCircle2,
@@ -21,8 +21,16 @@ import Skeleton from '../../../components/Skeleton.jsx'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
 import { UserRole } from '../../../lib/enums.js'
 import { cx } from '../../../lib/cx.js'
-import { useAgenciesQuery, useAgencyFleetQuery } from '../api/agencyApi.js'
+import { useAgenciesQuery, useAgenciesSummaryQuery, useAgencyFleetQuery } from '../api/agencyApi.js'
+// Pagination and its debounce hook already live under features/loads and are reused here rather
+// than duplicated — TripsPage does the same for Pagination (frontend/CLAUDE.md's feature-folder
+// isolation is about not scattering business logic across features, not about single generic UI
+// widgets like this one).
+import Pagination from '../../loads/components/Pagination.jsx'
+import { useDebouncedValue } from '../../loads/hooks/useDebouncedValue.js'
 import AgencyProfilePage from './AgencyProfilePage.jsx'
+
+const DEFAULT_PAGE_SIZE = 20
 
 function getAgencyStatusTone(status) {
   switch (status) {
@@ -53,45 +61,80 @@ function formatDate(isoString) {
 }
 
 function AdminAgenciesDashboard() {
-  const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [searchParams, setSearchParams] = useSearchParams()
   const [selectedAgencyId, setSelectedAgencyId] = useState(null)
 
-  const agenciesQuery = useAgenciesQuery(undefined, { refetchInterval: 15000 })
+  const page = Number(searchParams.get('page') ?? '1')
+  const pageSize = Number(searchParams.get('pageSize') ?? String(DEFAULT_PAGE_SIZE))
+  const statusFilter = searchParams.get('status') ?? 'ALL'
+  const search = searchParams.get('search') ?? ''
+
+  // Local input state, debounced before it ever reaches the URL/API — typing shouldn't fire a
+  // GET /agencies on every keystroke (issue #45's "consider debouncing search input"). Mirrors
+  // LoadFilterBar's debounce-then-commit pattern (frontend/src/features/loads/components/
+  // LoadFilterBar.jsx): lastEmittedRef distinguishes "search changed because our own debounce
+  // just committed" from "search changed for some other reason" (browser back/forward, a filter
+  // reset elsewhere), so the two effects below never fight each other or loop.
+  const [searchInput, setSearchInput] = useState(search)
+  const debouncedSearch = useDebouncedValue(searchInput, 400)
+  const lastEmittedRef = useRef(search)
+
+  function updateParams(patch, { resetPage = true } = {}) {
+    const next = new URLSearchParams(searchParams)
+    Object.entries(patch).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === '') {
+        next.delete(key)
+      } else {
+        next.set(key, String(value))
+      }
+    })
+    if (resetPage) next.delete('page')
+    setSearchParams(next)
+  }
+
+  useEffect(() => {
+    if (debouncedSearch !== search) {
+      lastEmittedRef.current = debouncedSearch
+      updateParams({ search: debouncedSearch || undefined })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch])
+
+  useEffect(() => {
+    if (search !== lastEmittedRef.current) {
+      lastEmittedRef.current = search
+      setSearchInput(search)
+    }
+  }, [search])
+
+  const agenciesQuery = useAgenciesQuery(
+    {
+      page,
+      pageSize,
+      search: search || undefined,
+      status: statusFilter === 'ALL' ? undefined : statusFilter,
+    },
+    { refetchInterval: 15000 },
+  )
+  // System-wide totals for the summary cards, deliberately independent of the table's current
+  // page/search/status filter (issue #45) — never derive these from agenciesQuery.data.items.
+  const summaryQuery = useAgenciesSummaryQuery()
+
   const fleetQuery = useAgencyFleetQuery(selectedAgencyId, {
     enabled: Boolean(selectedAgencyId),
   })
 
-  // GetListAsync returns a paged envelope ({ items, page, pageSize, ... }),
+  // GetListAsync returns a paged envelope ({ items, page, pageSize, totalItems, totalPages }),
   // not a raw array — see backend/Services/AgencyService.cs.
-  const rawAgencies = agenciesQuery.data?.items ?? []
+  const agencies = agenciesQuery.data?.items ?? []
 
-  const filteredAgencies = useMemo(() => {
-    return rawAgencies.filter((agency) => {
-      const matchesSearch =
-        !searchTerm ||
-        agency.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agency.businessRegNo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        agency.yardAddress?.toLowerCase().includes(searchTerm.toLowerCase())
-
-      const matchesStatus =
-        statusFilter === 'ALL' ||
-        agency.status?.toLowerCase() === statusFilter.toLowerCase()
-
-      return matchesSearch && matchesStatus
-    })
-  }, [rawAgencies, searchTerm, statusFilter])
-
-  // Aggregate Metrics for Admin
-  const metrics = useMemo(() => {
-    const total = rawAgencies.length
-    const active = rawAgencies.filter((a) => a.status === 'Active').length
-    const totalDrivers = rawAgencies.reduce((acc, a) => acc + (a.driverCount ?? 0), 0)
-    const activeDrivers = rawAgencies.reduce((acc, a) => acc + (a.activeDriverCount ?? 0), 0)
-    const totalVehicles = rawAgencies.reduce((acc, a) => acc + (a.vehicleCount ?? 0), 0)
-
-    return { total, active, totalDrivers, activeDrivers, totalVehicles }
-  }, [rawAgencies])
+  const metrics = summaryQuery.data ?? {
+    totalAgencies: 0,
+    activeAgencies: 0,
+    totalDrivers: 0,
+    activeDrivers: 0,
+    totalVehicles: 0,
+  }
 
   return (
     <div className="space-y-6">
@@ -132,8 +175,8 @@ function AdminAgenciesDashboard() {
           <div>
             <p className="text-label-caps text-on-surface-variant">Registered Agencies</p>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-headline-md font-bold text-on-surface">{metrics.total}</span>
-              <span className="text-xs font-medium text-emerald-600">({metrics.active} active)</span>
+              <span className="text-headline-md font-bold text-on-surface">{metrics.totalAgencies}</span>
+              <span className="text-xs font-medium text-emerald-600">({metrics.activeAgencies} active)</span>
             </div>
           </div>
         </Card>
@@ -168,7 +211,9 @@ function AdminAgenciesDashboard() {
           <div>
             <p className="text-label-caps text-on-surface-variant">Active Rate</p>
             <span className="text-headline-md font-bold text-on-surface">
-              {metrics.total > 0 ? `${Math.round((metrics.active / metrics.total) * 100)}%` : '100%'}
+              {metrics.totalAgencies > 0
+                ? `${Math.round((metrics.activeAgencies / metrics.totalAgencies) * 100)}%`
+                : '100%'}
             </span>
           </div>
         </Card>
@@ -181,8 +226,8 @@ function AdminAgenciesDashboard() {
           <input
             type="text"
             placeholder="Search agency name, BR number, or yard address..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full rounded-md border border-slate-300 bg-surface pl-9 pr-3 py-1.5 text-body-md text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -190,7 +235,7 @@ function AdminAgenciesDashboard() {
           <Filter className="h-4 w-4 text-on-surface-variant" />
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => updateParams({ status: e.target.value === 'ALL' ? undefined : e.target.value })}
             className="rounded-md border border-slate-300 bg-surface px-3 py-1.5 text-body-md text-on-surface focus:border-primary focus:outline-none"
           >
             <option value="ALL">All Statuses</option>
@@ -217,21 +262,22 @@ function AdminAgenciesDashboard() {
               onRetry={() => agenciesQuery.refetch()}
             />
           </div>
-        ) : filteredAgencies.length === 0 ? (
+        ) : agencies.length === 0 ? (
           <div className="p-8">
             <EmptyState
               icon={Building2}
               title="No agencies found"
               description={
-                searchTerm || statusFilter !== 'ALL'
+                search || statusFilter !== 'ALL'
                   ? 'No registered agencies match your search and filter criteria.'
                   : 'No transportation agencies are currently registered on the platform.'
               }
             />
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-body-md">
+            <table className="w-full text-left text-body-md" data-testid="agencies-table">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/75 text-label-caps text-on-surface-variant">
                   <th className="py-3 pl-4 pr-3 font-normal">Agency Name</th>
@@ -245,7 +291,7 @@ function AdminAgenciesDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAgencies.map((agency, index) => (
+                {agencies.map((agency, index) => (
                   <tr
                     key={agency.agencyId}
                     className={cx(
@@ -315,6 +361,15 @@ function AdminAgenciesDashboard() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={agenciesQuery.data.page}
+            pageSize={agenciesQuery.data.pageSize}
+            totalItems={agenciesQuery.data.totalItems}
+            totalPages={agenciesQuery.data.totalPages}
+            onPageChange={(nextPage) => updateParams({ page: nextPage }, { resetPage: false })}
+            onPageSizeChange={(nextPageSize) => updateParams({ pageSize: nextPageSize })}
+          />
+          </>
         )}
       </Card>
 

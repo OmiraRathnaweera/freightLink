@@ -140,25 +140,6 @@ builder.Services.Configure<InternalApiOptions>(options =>
 
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
 
-// PayHere settings (PayHere:* / PAYHERE__* env vars or flat PAYHERE_* env vars).
-builder.Services.Configure<PayHereOptions>(options =>
-{
-    builder.Configuration.GetSection(PayHereOptions.SectionName).Bind(options);
-
-    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_MERCHANT_ID"]))
-        options.MerchantId = builder.Configuration["PAYHERE_MERCHANT_ID"]!;
-    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_MERCHANT_SECRET"]))
-        options.MerchantSecret = builder.Configuration["PAYHERE_MERCHANT_SECRET"]!;
-    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_ENV"]))
-        options.Env = builder.Configuration["PAYHERE_ENV"]!;
-    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_RETURN_URL"]))
-        options.ReturnUrl = builder.Configuration["PAYHERE_RETURN_URL"]!;
-    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_CANCEL_URL"]))
-        options.CancelUrl = builder.Configuration["PAYHERE_CANCEL_URL"]!;
-    if (!string.IsNullOrWhiteSpace(builder.Configuration["PAYHERE_NOTIFY_URL"]))
-        options.NotifyUrl = builder.Configuration["PAYHERE_NOTIFY_URL"]!;
-});
-
 // Email settings (Email:* / EMAIL__* env vars) for GmailEmailService. Only validated when
 // EMAIL__ENABLED is true — mirrors the JWT key-length fail-fast above, but is itself opt-in since
 // email sending (unlike JWT) is an optional feature that's allowed to be entirely unconfigured.
@@ -265,13 +246,15 @@ builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
-builder.Services.AddScoped<IPayHereService, PayHereService>();
 builder.Services.AddScoped<IDisputeService, DisputeService>();
 builder.Services.AddScoped<IEmailService, GmailEmailService>();
 builder.Services.AddScoped<IAgencyService, AgencyService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
+builder.Services.AddScoped<IAssignmentActionTokenService, AssignmentActionTokenService>();
+builder.Services.AddScoped<ILoadProposalService, LoadProposalService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
 builder.Services.AddScoped<ITripService, TripService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<IRouteService, RouteService>();
 
@@ -329,9 +312,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-// Skipped only in Development: local/sandbox clients (e.g. the PayHere webhook callback, which
-// posts to a localhost NOTIFYURL — see .env.example) hit this API over plain HTTP, and the
-// redirect was breaking that flow. Staging/Production still enforce HTTPS.
+// Skipped only in Development: local/sandbox clients (e.g. the mobile app's emulator/device
+// hitting a localhost API) hit this API over plain HTTP, and the redirect was breaking that flow.
+// Staging/Production still enforce HTTPS.
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();

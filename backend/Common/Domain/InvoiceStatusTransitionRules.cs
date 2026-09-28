@@ -21,18 +21,20 @@ public static class InvoiceStatusTransitionRules
         new HashSet<InvoiceStatus> { InvoiceStatus.Draft, InvoiceStatus.Issued, InvoiceStatus.PaymentPending, InvoiceStatus.Failed };
 
     /// <summary>
-    /// Statuses that may only be written by the signature-verified payment-gateway webhook.
-    /// Authenticated users must never be permitted to drive an invoice into one of these states
-    /// directly; doing so would bypass the gateway's signature verification entirely.
+    /// Statuses reachable only through a dedicated action, never through the generic
+    /// status-update endpoint. <see cref="InvoiceStatus.Paid"/> must go through
+    /// <c>InvoiceService.ConfirmPaymentAsync</c>, which requires a Shipper-submitted payment proof
+    /// to already be on file; <see cref="InvoiceStatus.Failed"/> has no dedicated action today and is
+    /// simply unreachable.
     /// </summary>
-    public static readonly IReadOnlySet<InvoiceStatus> GatewayOwnedStatuses =
+    public static readonly IReadOnlySet<InvoiceStatus> DedicatedActionOnlyStatuses =
         new HashSet<InvoiceStatus> { InvoiceStatus.Paid, InvoiceStatus.Failed };
 
     /// <summary>
-    /// Returns <c>true</c> when <paramref name="status"/> may only be set by the payment gateway,
-    /// never by an authenticated application user.
+    /// Returns <c>true</c> when <paramref name="status"/> may only be reached via a dedicated
+    /// service action, never by an authenticated user through the generic status-update endpoint.
     /// </summary>
-    public static bool IsGatewayOwned(InvoiceStatus status) => GatewayOwnedStatuses.Contains(status);
+    public static bool RequiresDedicatedAction(InvoiceStatus status) => DedicatedActionOnlyStatuses.Contains(status);
 
     /// <summary>The legal state machine graph for invoice status transitions.</summary>
     public static readonly IReadOnlyDictionary<InvoiceStatus, IReadOnlySet<InvoiceStatus>> AllowedTransitions =

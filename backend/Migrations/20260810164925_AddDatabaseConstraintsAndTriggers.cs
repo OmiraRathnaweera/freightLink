@@ -652,7 +652,7 @@ namespace FreightLink.Api.Migrations
             // equivalent — blocks a Trip transitioning to PickedUp/Delivered without a matching
             // TripEvidence row of the corresponding EvidenceType.
             migrationBuilder.Sql("""
-                CREATE FUNCTION fn_require_trip_evidence() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION fn_require_trip_evidence() RETURNS trigger AS $$
                 BEGIN
                     IF NEW."Status" = 'PickedUp' AND OLD."Status" IS DISTINCT FROM 'PickedUp' THEN
                         IF NOT EXISTS (
@@ -685,7 +685,7 @@ namespace FreightLink.Api.Migrations
             // fn_deny_mutation: generic append-only guard applied to every event-log-style table
             // (no UPDATE/DELETE after insert). Cross-cutting behavior with no Fluent API surface.
             migrationBuilder.Sql("""
-                CREATE FUNCTION fn_deny_mutation() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION fn_deny_mutation() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% rows are append-only and cannot be updated or deleted', TG_TABLE_NAME;
                     RETURN NULL;
@@ -723,7 +723,7 @@ namespace FreightLink.Api.Migrations
 
             // fn_set_updated_at: maintains UpdatedAt on every mutable-entity table that has one.
             migrationBuilder.Sql("""
-                CREATE FUNCTION fn_set_updated_at() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION fn_set_updated_at() RETURNS trigger AS $$
                 BEGIN
                     NEW."UpdatedAt" = now();
                     RETURN NEW;

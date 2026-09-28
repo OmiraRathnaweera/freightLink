@@ -2,8 +2,10 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using FreightLink.Api.Common.Errors;
+using FreightLink.Api.Common.Email;
 using FreightLink.Api.Common.Exceptions;
 using FreightLink.Api.Common.Options;
+using FreightLink.Api.Common.Security;
 using FreightLink.Api.Common.Validation;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Auth;
@@ -22,7 +24,9 @@ public class AuthService : IAuthService
     private readonly AppDbContext _dbContext;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
+    private readonly IEmailService _emailService;
     private readonly AdminSeedOptions _adminSeedOptions;
+    private readonly EmailOptions _emailOptions;
     private readonly ILogger<AuthService> _logger;
 
     /// <summary>Creates the auth service with its DB context, password hasher, token service, and admin-seed settings.</summary>
@@ -30,13 +34,17 @@ public class AuthService : IAuthService
         AppDbContext dbContext,
         IPasswordHasher passwordHasher,
         ITokenService tokenService,
+        IEmailService emailService,
         IOptions<AdminSeedOptions> adminSeedOptions,
+        IOptions<EmailOptions> emailOptions,
         ILogger<AuthService> logger)
     {
         _dbContext = dbContext;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
+        _emailService = emailService;
         _adminSeedOptions = adminSeedOptions.Value;
+        _emailOptions = emailOptions.Value;
         _logger = logger;
     }
 
@@ -61,6 +69,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var verificationToken = AccountTokens.CreateToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -70,6 +79,8 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            EmailVerificationTokenHash = AccountTokens.HashToken(verificationToken),
+            EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -99,9 +110,11 @@ public class AuthService : IAuthService
             throw MapUniqueViolationToApiException(pg);
         }
 
+        await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+
         return new RegisterResponseDto
         {
-            Message = "Shipper registered successfully.",
+            Message = "Registration successful. Check your email to verify your account before signing in.",
             UserId = user.UserId,
             Email = user.Email
         };
@@ -123,6 +136,7 @@ public class AuthService : IAuthService
         }
 
         var now = DateTimeOffset.UtcNow;
+        var verificationToken = AccountTokens.CreateToken();
         var user = new User
         {
             UserId = Guid.NewGuid(),
@@ -132,6 +146,8 @@ public class AuthService : IAuthService
             FullName = request.FullName,
             PhoneE164 = request.PhoneE164,
             IsActive = true,
+            EmailVerificationTokenHash = AccountTokens.HashToken(verificationToken),
+            EmailVerificationTokenExpiresAt = now.AddHours(24),
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -174,91 +190,17 @@ public class AuthService : IAuthService
             throw MapUniqueViolationToApiException(pg);
         }
 
+        await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+
         return new RegisterResponseDto
         {
-            Message = "Agency registered successfully.",
+            Message = "Registration successful. Check your email to verify your account before signing in.",
             UserId = user.UserId,
             Email = user.Email
         };
     }
 
     /// <inheritdoc />
-    public async Task<RegisterResponseDto> RegisterDriverAsync(RegisterDriverRequestDto request, CancellationToken cancellationToken = default)
-    {
-        var normalizedEmail = NormalizeEmail(request.Email);
-
-        if (await _dbContext.Users.AnyAsync(u => u.Email == normalizedEmail, cancellationToken))
-        {
-            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
-        }
-
-        var agency = await _dbContext.Agencies.FirstOrDefaultAsync(a => a.AgencyId == request.AgencyId, cancellationToken);
-        if (agency is null)
-        {
-            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The selected agency could not be found.");
-        }
-
-        if (agency.Status == AgencyStatus.Suspended)
-        {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Cannot register under a suspended agency.");
-        }
-
-        if (request.LicenceExpiry <= DateOnly.FromDateTime(DateTime.UtcNow))
-        {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Licence expiry date must be in the future.");
-        }
-
-        if (await _dbContext.Drivers.AnyAsync(d => d.LicenceNo == request.LicenceNo, cancellationToken))
-        {
-            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists.");
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var user = new User
-        {
-            UserId = Guid.NewGuid(),
-            Role = UserRole.Driver,
-            Email = normalizedEmail,
-            PasswordHash = _passwordHasher.Hash(request.Password),
-            FullName = request.FullName,
-            PhoneE164 = request.PhoneE164,
-            IsActive = true,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        var driver = new Driver
-        {
-            DriverId = Guid.NewGuid(),
-            UserId = user.UserId,
-            AgencyId = request.AgencyId,
-            LicenceNo = request.LicenceNo,
-            LicenceExpiry = request.LicenceExpiry,
-            Status = DriverStatus.Active,
-            CreatedAt = now,
-            UpdatedAt = now
-        };
-
-        _dbContext.Users.Add(user);
-        _dbContext.Drivers.Add(driver);
-
-        try
-        {
-            await _dbContext.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
-        {
-            throw MapUniqueViolationToApiException(pg);
-        }
-
-        return new RegisterResponseDto
-        {
-            Message = "Driver registered successfully.",
-            UserId = user.UserId,
-            Email = user.Email
-        };
-    }
-
     /// <inheritdoc />
     public async Task<List<AgencyLookupDto>> GetAgenciesLookupAsync(CancellationToken cancellationToken = default)
     {
@@ -271,6 +213,106 @@ public class AuthService : IAuthService
                 Name = a.Name
             })
             .ToListAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task RequestPasswordResetAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.Email == NormalizeEmail(request.Email), cancellationToken);
+
+        // Always return success to the controller. This endpoint must not disclose whether a
+        // particular email address is registered, active, or eligible for login.
+        if (user is null || !user.IsActive)
+        {
+            return;
+        }
+
+        var rawToken = AccountTokens.CreateToken();
+        user.PasswordResetTokenHash = AccountTokens.HashToken(rawToken);
+        user.PasswordResetTokenExpiresAt = DateTimeOffset.UtcNow.AddHours(1);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await TrySendPasswordResetAsync(user, rawToken, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task ResetPasswordAsync(ResetPasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var tokenHash = AccountTokens.HashToken(request.Token);
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.PasswordResetTokenHash == tokenHash
+                 && u.PasswordResetTokenExpiresAt != null
+                 && u.PasswordResetTokenExpiresAt > now,
+            cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+                "This password-reset link is invalid or has expired.");
+        }
+
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        user.PasswordResetTokenHash = null;
+        user.PasswordResetTokenExpiresAt = null;
+        user.UpdatedAt = now;
+
+        // A reset invalidates every browser/device session, including the requester’s own session.
+        var activeRefreshTokens = await _dbContext.RefreshTokens
+            .Where(token => token.UserId == user.UserId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var refreshToken in activeRefreshTokens)
+        {
+            refreshToken.RevokedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task VerifyEmailAsync(VerifyEmailRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var tokenHash = AccountTokens.HashToken(request.Token);
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.EmailVerificationTokenHash == tokenHash
+                 && u.EmailVerificationTokenExpiresAt != null
+                 && u.EmailVerificationTokenExpiresAt > now,
+            cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+                "This email-verification link is invalid or has expired.");
+        }
+
+        user.EmailVerifiedAt = now;
+        user.EmailVerificationTokenHash = null;
+        user.EmailVerificationTokenExpiresAt = null;
+        user.UpdatedAt = now;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task ResendEmailVerificationAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(
+            u => u.Email == NormalizeEmail(request.Email), cancellationToken);
+
+        if (user is null || !user.IsActive || user.EmailVerifiedAt is not null)
+        {
+            return;
+        }
+
+        var rawToken = AccountTokens.CreateToken();
+        user.EmailVerificationTokenHash = AccountTokens.HashToken(rawToken);
+        user.EmailVerificationTokenExpiresAt = DateTimeOffset.UtcNow.AddHours(24);
+        user.UpdatedAt = DateTimeOffset.UtcNow;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        await TrySendEmailVerificationAsync(user, rawToken, cancellationToken);
     }
 
     /// <inheritdoc />
@@ -290,6 +332,12 @@ public class AuthService : IAuthService
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ACCOUNT_INACTIVE, "This account is inactive.");
         }
 
+        if (_emailOptions.RequireEmailVerification && user.EmailVerifiedAt is null)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.EMAIL_NOT_VERIFIED,
+                "Verify your email address before signing in. You can request a new verification email from the sign-in page.");
+        }
+
         return await IssueTokenPairAsync(user, userAgent, cancellationToken);
     }
 
@@ -306,6 +354,12 @@ public class AuthService : IAuthService
         if (!refreshToken.User.IsActive)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.ACCOUNT_INACTIVE, "This account is inactive.");
+        }
+
+        if (_emailOptions.RequireEmailVerification && refreshToken.User.EmailVerifiedAt is null)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.EMAIL_NOT_VERIFIED,
+                "Verify your email address before continuing.");
         }
 
         // Atomic revoke-old + issue-successor (single transaction, concurrency-checked) — see
@@ -348,6 +402,93 @@ public class AuthService : IAuthService
         }
 
         return MapToCurrentUserResponse(user);
+    }
+
+    /// <inheritdoc />
+    public async Task<CurrentUserResponseDto> UpdateProfileAsync(Guid userId, UpdateProfileRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users
+            .Include(u => u.AgencyStaff)
+            .FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.USER_NOT_FOUND, "The current user could not be found.");
+        }
+
+        var normalizedEmail = NormalizeEmail(request.Email);
+        var emailChanged = normalizedEmail != user.Email;
+
+        if (emailChanged && await _dbContext.Users.AnyAsync(u => u.UserId != userId && u.Email == normalizedEmail, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        user.FullName = request.FullName;
+        user.PhoneE164 = request.PhoneE164;
+        user.UpdatedAt = now;
+
+        string? verificationToken = null;
+        if (emailChanged)
+        {
+            user.Email = normalizedEmail;
+            user.EmailVerifiedAt = null;
+            verificationToken = AccountTokens.CreateToken();
+            user.EmailVerificationTokenHash = AccountTokens.HashToken(verificationToken);
+            user.EmailVerificationTokenExpiresAt = now.AddHours(24);
+        }
+
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" } pg)
+        {
+            // Races against the AnyAsync pre-check above: two concurrent requests can both pass
+            // the pre-check and then collide here. Translate the raw unique-violation into the
+            // same ApiException the pre-check would have thrown, instead of an unhandled 500.
+            throw MapUniqueViolationToApiException(pg);
+        }
+
+        if (emailChanged && verificationToken is not null)
+        {
+            await TrySendEmailVerificationAsync(user, verificationToken, cancellationToken);
+        }
+
+        return MapToCurrentUserResponse(user);
+    }
+
+    /// <inheritdoc />
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request, CancellationToken cancellationToken = default)
+    {
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId, cancellationToken);
+
+        if (user is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.USER_NOT_FOUND, "The current user could not be found.");
+        }
+
+        if (!_passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))
+        {
+            throw new ApiException(HttpStatusCode.Unauthorized, ErrorCode.INCORRECT_CURRENT_PASSWORD, "The current password you entered is incorrect.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+        user.UpdatedAt = now;
+
+        // A password change invalidates every session, including the requester's own — mirrors
+        // ResetPasswordAsync. The caller must sign in again with the new password afterward.
+        var activeRefreshTokens = await _dbContext.RefreshTokens
+            .Where(token => token.UserId == user.UserId && token.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var refreshToken in activeRefreshTokens)
+        {
+            refreshToken.RevokedAt = now;
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <inheritdoc />
@@ -394,6 +535,7 @@ public class AuthService : IAuthService
             PasswordHash = _passwordHasher.Hash(_adminSeedOptions.Password),
             FullName = "System Administrator",
             IsActive = true,
+            EmailVerifiedAt = now,
             CreatedAt = now,
             UpdatedAt = now
         };
@@ -417,6 +559,54 @@ public class AuthService : IAuthService
         };
     }
 
+    private async Task TrySendEmailVerificationAsync(User user, string rawToken, CancellationToken cancellationToken)
+    {
+        var url = BuildFrontendActionUrl("/verify-email", rawToken);
+        var (subject, htmlBody, textBody) = EmailTemplates.BuildEmailVerification(user.FullName, url);
+        await TrySendAccountEmailAsync(user.Email, subject, htmlBody, textBody, "email-verification", cancellationToken);
+    }
+
+    private async Task TrySendPasswordResetAsync(User user, string rawToken, CancellationToken cancellationToken)
+    {
+        var url = BuildFrontendActionUrl("/reset-password", rawToken);
+        var (subject, htmlBody, textBody) = EmailTemplates.BuildPasswordReset(user.FullName, url);
+        await TrySendAccountEmailAsync(user.Email, subject, htmlBody, textBody, "password-reset", cancellationToken);
+    }
+
+    private async Task TrySendAccountEmailAsync(
+        string email,
+        string subject,
+        string htmlBody,
+        string textBody,
+        string templateKey,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _emailService.SendAsync(new EmailMessage
+            {
+                To = email,
+                Subject = subject,
+                HtmlBody = htmlBody,
+                TextBody = textBody,
+                Metadata = new Dictionary<string, string> { ["template"] = templateKey }
+            }, cancellationToken);
+        }
+        catch (ApiException exception) when (exception.Code == ErrorCode.EMAIL_SEND_FAILED)
+        {
+            // The account action is persisted even if SMTP is temporarily unavailable. Returning
+            // success prevents reset/resend endpoints from becoming account-enumeration oracles;
+            // the caller can safely request another message later.
+            _logger.LogError(exception, "Unable to send {TemplateKey} email to {Email}.", templateKey, email);
+        }
+    }
+
+    private string BuildFrontendActionUrl(string path, string rawToken)
+    {
+        var baseUrl = _emailOptions.FrontendBaseUrl.TrimEnd('/');
+        return $"{baseUrl}{path}?token={Uri.EscapeDataString(rawToken)}";
+    }
+
     /// <summary>Maps a <see cref="User"/> entity to its safe, wire-facing representation (no password hash).</summary>
     private static CurrentUserResponseDto MapToCurrentUserResponse(User user) => new()
     {
@@ -426,6 +616,7 @@ public class AuthService : IAuthService
         PhoneE164 = user.PhoneE164,
         Role = user.Role.ToString(),
         IsActive = user.IsActive,
+        IsEmailVerified = user.EmailVerifiedAt is not null,
         CreatedAt = user.CreatedAt,
         AgencyId = user.AgencyStaff?.AgencyId
     };
@@ -445,7 +636,6 @@ public class AuthService : IAuthService
         "uq_user_email" => new ApiException(HttpStatusCode.Conflict, ErrorCode.EMAIL_ALREADY_REGISTERED, "An account with this email already exists."),
         "uq_shipperprofile_regno" => new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "A shipper with this business registration number already exists."),
         "uq_agency_regno" => new ApiException(HttpStatusCode.Conflict, ErrorCode.BUSINESS_REG_NO_ALREADY_REGISTERED, "An agency with this business registration number already exists."),
-        "IX_Drivers_LicenceNo" => new ApiException(HttpStatusCode.Conflict, ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, "A driver with this driving licence number already exists."),
         _ => throw new DbUpdateException("Unhandled unique-constraint violation.", pg)
     };
 }

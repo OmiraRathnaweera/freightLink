@@ -273,6 +273,27 @@ public class InvoiceServiceTests
     }
 
     [Fact]
+    public async Task CreateAsync_TripLinked_NoAmountOrLineItemsGiven_DefaultsToAssignmentAgreedPrice()
+    {
+        using var db = CreateContext();
+        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        // No Amount, no LineItems — only TripId. There is no direct-customer/manual-quote path in
+        // this system, so the invoice must default to the already-agreed job proposal price.
+        var request = new CreateInvoiceDto
+        {
+            TripId = trip.TripId
+        };
+
+        var result = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, request);
+
+        Assert.Equal(45000m, result.TotalAmount);
+        Assert.Equal(shipper.UserId, result.RecipientId);
+        Assert.Single(result.LineItems);
+    }
+
+    [Fact]
     public async Task CreateAsync_NonPositiveAmount_ThrowsBadRequest()
     {
         using var db = CreateContext();
@@ -546,11 +567,32 @@ public class InvoiceServiceTests
     }
 
     // =========================================================================
-    // 5. RBAC & Workflow — Shipper Payment
+    // 5. RBAC & Workflow — Shipper Payment Receipt Upload + Agency Confirmation
     // =========================================================================
 
+    /// <summary>Directly inserts an <see cref="UploadedFile"/> owned by <paramref name="uploadedByUserId"/>.</summary>
+    private static async Task<UploadedFile> SeedUploadedFileAsync(AppDbContext dbContext, Guid uploadedByUserId)
+    {
+        var uploadedFile = new UploadedFile
+        {
+            FileId = Guid.NewGuid(),
+            UploadedByUserId = uploadedByUserId,
+            PublicId = $"fake/{Guid.NewGuid():N}",
+            SecureUrl = "https://res.cloudinary.com/fake/raw/upload/receipt.pdf",
+            Format = "pdf",
+            Bytes = 2048,
+            ResourceType = "raw",
+            ContentType = "application/pdf",
+            OriginalFileName = "receipt.pdf",
+            UploadedAt = DateTimeOffset.UtcNow
+        };
+        dbContext.UploadedFiles.Add(uploadedFile);
+        await dbContext.SaveChangesAsync();
+        return uploadedFile;
+    }
+
     [Fact]
-    public async Task PayAsync_AssignedShipper_IssuedStatus_TransitionsToPaid()
+    public async Task UploadPaymentProofAsync_AssignedShipper_IssuedStatus_TransitionsToPaymentPending()
     {
         using var db = CreateContext();
         var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
@@ -565,25 +607,19 @@ public class InvoiceServiceTests
             IssueImmediately = true
         });
 
-        var paid = await sut.PayAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper, new PayInvoiceDto
-        {
-            PaymentReference = "TXN-PAYHERE-123456",
-            PaymentMethod = "PayHere"
-        });
+        var uploadedFile = await SeedUploadedFileAsync(db, shipper.UserId);
 
-        Assert.Equal(InvoiceStatus.Paid, paid.Status);
-        Assert.NotNull(paid.PaidAt);
-        Assert.Equal("TXN-PAYHERE-123456", paid.PaymentReference);
+        var updated = await sut.UploadPaymentProofAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper,
+            new UploadPaymentProofDto { PublicId = uploadedFile.PublicId });
 
-        // Verify payment record in database
-        var paymentRow = await db.Payments.FirstOrDefaultAsync(p => p.InvoiceId == created.InvoiceId);
-        Assert.NotNull(paymentRow);
-        Assert.Equal(PaymentStatus.Success, paymentRow.Status);
-        Assert.Equal("TXN-PAYHERE-123456", paymentRow.GatewayRef);
+        Assert.Equal(InvoiceStatus.PaymentPending, updated.Status);
+        Assert.Equal(uploadedFile.SecureUrl, updated.PaymentProofUrl);
+        Assert.NotNull(updated.PaymentProofUploadedAt);
+        Assert.Null(updated.PaidAt);
     }
 
     [Fact]
-    public async Task PayAsync_UnassignedShipper_ThrowsForbidden()
+    public async Task UploadPaymentProofAsync_UnassignedShipper_ThrowsForbidden()
     {
         using var db = CreateContext();
         var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
@@ -599,15 +635,18 @@ public class InvoiceServiceTests
         });
 
         var otherShipperId = Guid.NewGuid();
+        var uploadedFile = await SeedUploadedFileAsync(db, otherShipperId);
+
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.PayAsync(created.InvoiceId, otherShipperId, UserRole.Shipper));
+            sut.UploadPaymentProofAsync(created.InvoiceId, otherShipperId, UserRole.Shipper,
+                new UploadPaymentProofDto { PublicId = uploadedFile.PublicId }));
 
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
         Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
     }
 
     [Fact]
-    public async Task PayAsync_Agent_ThrowsForbidden()
+    public async Task UploadPaymentProofAsync_Agent_ThrowsForbidden()
     {
         using var db = CreateContext();
         var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
@@ -622,15 +661,18 @@ public class InvoiceServiceTests
             IssueImmediately = true
         });
 
+        var uploadedFile = await SeedUploadedFileAsync(db, staffUser.UserId);
+
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.PayAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff));
+            sut.UploadPaymentProofAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff,
+                new UploadPaymentProofDto { PublicId = uploadedFile.PublicId }));
 
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
         Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
     }
 
     [Fact]
-    public async Task PayAsync_Admin_ThrowsForbidden()
+    public async Task UploadPaymentProofAsync_Admin_ThrowsForbidden()
     {
         using var db = CreateContext();
         var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
@@ -645,15 +687,19 @@ public class InvoiceServiceTests
             IssueImmediately = true
         });
 
+        var adminId = Guid.NewGuid();
+        var uploadedFile = await SeedUploadedFileAsync(db, adminId);
+
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.PayAsync(created.InvoiceId, Guid.NewGuid(), UserRole.Admin));
+            sut.UploadPaymentProofAsync(created.InvoiceId, adminId, UserRole.Admin,
+                new UploadPaymentProofDto { PublicId = uploadedFile.PublicId }));
 
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
         Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
     }
 
     [Fact]
-    public async Task PayAsync_WhenDraft_ThrowsBadRequest()
+    public async Task UploadPaymentProofAsync_WhenDraft_ThrowsBadRequest()
     {
         using var db = CreateContext();
         var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
@@ -668,15 +714,18 @@ public class InvoiceServiceTests
             IssueImmediately = false
         });
 
+        var uploadedFile = await SeedUploadedFileAsync(db, shipper.UserId);
+
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.PayAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper));
+            sut.UploadPaymentProofAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper,
+                new UploadPaymentProofDto { PublicId = uploadedFile.PublicId }));
 
         Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
         Assert.Equal(ErrorCode.VALIDATION_ERROR, ex.Code);
     }
 
     [Fact]
-    public async Task PayAsync_WhenAlreadyPaid_ThrowsBadRequest()
+    public async Task ConfirmPaymentAsync_AfterProofSubmitted_TransitionsToPaid()
     {
         using var db = CreateContext();
         var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
@@ -691,10 +740,89 @@ public class InvoiceServiceTests
             IssueImmediately = true
         });
 
-        await sut.PayAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper);
+        var uploadedFile = await SeedUploadedFileAsync(db, shipper.UserId);
+        await sut.UploadPaymentProofAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper,
+            new UploadPaymentProofDto { PublicId = uploadedFile.PublicId });
+
+        var paid = await sut.ConfirmPaymentAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff);
+
+        Assert.Equal(InvoiceStatus.Paid, paid.Status);
+        Assert.NotNull(paid.PaidAt);
+    }
+
+    [Fact]
+    public async Task ConfirmPaymentAsync_WithoutProofSubmitted_ThrowsBadRequest()
+    {
+        using var db = CreateContext();
+        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            RecipientId = shipper.UserId,
+            Amount = 45000m,
+            Currency = "LKR",
+            IssueImmediately = true
+        });
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.PayAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper));
+            sut.ConfirmPaymentAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff));
+
+        Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVOICE_PAYMENT_PROOF_REQUIRED, ex.Code);
+    }
+
+    [Fact]
+    public async Task ConfirmPaymentAsync_Shipper_ThrowsForbidden()
+    {
+        using var db = CreateContext();
+        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            RecipientId = shipper.UserId,
+            Amount = 45000m,
+            Currency = "LKR",
+            IssueImmediately = true
+        });
+
+        var uploadedFile = await SeedUploadedFileAsync(db, shipper.UserId);
+        await sut.UploadPaymentProofAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper,
+            new UploadPaymentProofDto { PublicId = uploadedFile.PublicId });
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ConfirmPaymentAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper));
+
+        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
+        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
+    }
+
+    [Fact]
+    public async Task ConfirmPaymentAsync_WhenAlreadyPaid_ThrowsBadRequest()
+    {
+        using var db = CreateContext();
+        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
+        var sut = CreateSut(db);
+
+        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
+        {
+            TripId = trip.TripId,
+            RecipientId = shipper.UserId,
+            Amount = 45000m,
+            Currency = "LKR",
+            IssueImmediately = true
+        });
+
+        var uploadedFile = await SeedUploadedFileAsync(db, shipper.UserId);
+        await sut.UploadPaymentProofAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper,
+            new UploadPaymentProofDto { PublicId = uploadedFile.PublicId });
+        await sut.ConfirmPaymentAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.ConfirmPaymentAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff));
 
         Assert.Equal(HttpStatusCode.BadRequest, ex.StatusCode);
         Assert.Equal(ErrorCode.INVOICE_ALREADY_PAID, ex.Code);
@@ -716,7 +844,10 @@ public class InvoiceServiceTests
             IssueImmediately = true
         });
 
-        await sut.PayAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper);
+        var uploadedFile = await SeedUploadedFileAsync(db, shipper.UserId);
+        await sut.UploadPaymentProofAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper,
+            new UploadPaymentProofDto { PublicId = uploadedFile.PublicId });
+        await sut.ConfirmPaymentAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff);
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             sut.VoidAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff, "Cannot void"));

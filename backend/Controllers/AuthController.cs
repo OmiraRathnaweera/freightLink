@@ -47,18 +47,7 @@ public class AuthController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    /// <summary>Registers a new Driver under an existing Agency (self-service, public).</summary>
-    /// <param name="request">Driver registration payload.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>201 with a success message and the new user's id/email.</returns>
-    [HttpPost("register/driver")]
-    public async Task<ActionResult<RegisterResponseDto>> RegisterDriver([FromBody] RegisterDriverRequestDto request, CancellationToken cancellationToken)
-    {
-        var result = await _authService.RegisterDriverAsync(request, cancellationToken);
-        return StatusCode(StatusCodes.Status201Created, result);
-    }
-
-    /// <summary>Public lookup of active agencies for driver registration selection.</summary>
+    /// <summary>Public lookup of active agencies.</summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with list of active agencies.</returns>
     [HttpGet("agencies")]
@@ -77,6 +66,47 @@ public class AuthController : ControllerBase
     {
         var result = await _authService.LoginAsync(request, Request.Headers.UserAgent.ToString(), cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Requests a password-reset message. Always returns the same response so callers cannot use
+    /// this endpoint to discover which email addresses have FreightLink accounts.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    public async Task<ActionResult<AccountActionResponseDto>> ForgotPassword([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.RequestPasswordResetAsync(request, cancellationToken);
+        return Accepted(new AccountActionResponseDto
+        {
+            Message = "If an active account exists for that email address, a password-reset link has been sent."
+        });
+    }
+
+    /// <summary>Consumes a one-time password-reset token, then revokes all existing sessions for that account.</summary>
+    [HttpPost("reset-password")]
+    public async Task<ActionResult<AccountActionResponseDto>> ResetPassword([FromBody] ResetPasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.ResetPasswordAsync(request, cancellationToken);
+        return Ok(new AccountActionResponseDto { Message = "Your password has been reset. Please sign in with your new password." });
+    }
+
+    /// <summary>Consumes a one-time email-verification token.</summary>
+    [HttpPost("verify-email")]
+    public async Task<ActionResult<AccountActionResponseDto>> VerifyEmail([FromBody] VerifyEmailRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.VerifyEmailAsync(request, cancellationToken);
+        return Ok(new AccountActionResponseDto { Message = "Your email address has been verified. You can now sign in." });
+    }
+
+    /// <summary>Resends an email-verification message without disclosing account existence or verification state.</summary>
+    [HttpPost("resend-verification")]
+    public async Task<ActionResult<AccountActionResponseDto>> ResendVerification([FromBody] ForgotPasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.ResendEmailVerificationAsync(request, cancellationToken);
+        return Accepted(new AccountActionResponseDto
+        {
+            Message = "If an unverified active account exists for that email address, a verification link has been sent."
+        });
     }
 
     /// <summary>Exchanges a refresh token for a new access/refresh pair, revoking the old one (rotation).</summary>
@@ -111,6 +141,30 @@ public class AuthController : ControllerBase
     {
         var result = await _authService.GetCurrentUserAsync(GetCurrentUserId(), cancellationToken);
         return Ok(result);
+    }
+
+    /// <summary>Updates the authenticated caller's own name/email/phone.</summary>
+    /// <param name="request">Profile-update payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the updated <see cref="CurrentUserResponseDto"/>.</returns>
+    [HttpPatch("me")]
+    [Authorize]
+    public async Task<ActionResult<CurrentUserResponseDto>> UpdateProfile([FromBody] UpdateProfileRequestDto request, CancellationToken cancellationToken)
+    {
+        var result = await _authService.UpdateProfileAsync(GetCurrentUserId(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Changes the authenticated caller's own password, then revokes every active session.</summary>
+    /// <param name="request">Change-password payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with a success message.</returns>
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<AccountActionResponseDto>> ChangePassword([FromBody] ChangePasswordRequestDto request, CancellationToken cancellationToken)
+    {
+        await _authService.ChangePasswordAsync(GetCurrentUserId(), request, cancellationToken);
+        return Ok(new AccountActionResponseDto { Message = "Your password has been changed. Please sign in again with your new password." });
     }
 
     /// <summary>Extracts the authenticated user's id from the <c>NameIdentifier</c> claim on the access token.</summary>

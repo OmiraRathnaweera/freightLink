@@ -5,15 +5,18 @@ import {
   Clock,
   Navigation,
   Check,
+  X,
   RotateCcw,
   CheckCircle2,
   Building2,
   TrendingDown,
   UserCheck,
   ShieldCheck,
+  AlertTriangle,
 } from 'lucide-react'
 import { formatCurrency } from '../../loads/lib/format.js'
 import Button from '../../../components/Button.jsx'
+import FormattedAiText from './FormattedAiText.jsx'
 
 const VEHICLE_CLASS_LABELS = {
   SmallVan: 'Small Van (Up to 1,500 kg)',
@@ -26,6 +29,7 @@ const VEHICLE_CLASS_LABELS = {
 export default function MatchRecommendationCard({
   loadId,
   loadStatus,
+  workflowStatus,
   recommendedAgency,
   selectedAgencyId,
   alternateCandidates = [],
@@ -33,8 +37,12 @@ export default function MatchRecommendationCard({
   existingAssignment,
   onApproveMatch,
   onRetryMatch,
+  onRejectMatch,
+  onReviseMatch,
   isApproving,
   isRetrying,
+  isRejecting,
+  isRevising,
 }) {
   if (!recommendedAgency) {
     return (
@@ -57,6 +65,11 @@ export default function MatchRecommendationCard({
   }
 
   const isMatched = loadStatus === 'Matched' || Boolean(existingAssignment)
+  // Once the shipper has rejected this recommendation (or an auto-retry never happened),
+  // the underlying AgentWorkflowRun is Aborted/Failed and can no longer be approved,
+  // rejected, or revised - the backend only accepts those decisions while a run is
+  // AwaitingApproval. The only forward action left is asking for a brand new recommendation.
+  const isAborted = !isMatched && (workflowStatus === 'Aborted' || workflowStatus === 'Failed')
 
   const selectedCandidate =
     selectedAgencyId && selectedAgencyId !== recommendedAgency.agencyId
@@ -231,9 +244,10 @@ export default function MatchRecommendationCard({
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />
               <span>Multi-Agent Selection Rationale (Agent 3 & 4)</span>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-slate-800 italic">
-              "{recommendedAgency.selectionJustification}"
-            </p>
+            <FormattedAiText
+              text={recommendedAgency.selectionJustification}
+              className="mt-2 text-sm leading-relaxed text-slate-800 italic"
+            />
           </div>
         )}
 
@@ -262,55 +276,116 @@ export default function MatchRecommendationCard({
           </div>
         )}
 
+        {/* Recommendation No Longer Actionable Banner (rejected, or a prior run failed/
+            was aborted) - the underlying AgentWorkflowRun can no longer be approved,
+            rejected, or revised, only started over. */}
+        {isAborted && (
+          <div className="rounded-lg border border-status-amber-text/40 bg-status-amber-bg p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-status-amber-text" />
+            <div>
+              <h4 className="font-heading text-sm font-bold text-status-amber-text">
+                {workflowStatus === 'Failed' ? 'No Automatic Match Found' : 'Recommendation Rejected'}
+              </h4>
+              <p className="text-xs text-on-surface-variant">
+                {workflowStatus === 'Failed'
+                  ? "Agent 3 couldn't find a suitable carrier for this load. Request a new recommendation to try again."
+                  : 'This recommendation has been rejected and can no longer be approved or revised as-is. Request a new recommendation below.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Action Decision Area */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-t border-slate-border pt-5">
-          <div className="flex items-center gap-2">
-            <Button
-              id="retry-match-btn"
-              data-testid="retry-match-btn"
-              variant="secondary"
-              onClick={onRetryMatch}
-              disabled={isRetrying || isApproving}
-            >
-              <RotateCcw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
-              Retry Match
-            </Button>
-            <p className="text-xs text-on-surface-variant hidden sm:block">
-              Re-evaluates available active carriers and real-time positioning.
-            </p>
-          </div>
+          {!isAborted && (
+            <div className="flex items-center gap-2">
+              <Button
+                id="retry-match-btn"
+                data-testid="retry-match-btn"
+                variant="secondary"
+                onClick={onRetryMatch}
+                disabled={isRetrying || isApproving}
+              >
+                <RotateCcw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                Retry Match
+              </Button>
+              <p className="text-xs text-on-surface-variant hidden sm:block">
+                Re-evaluates available active carriers and real-time positioning.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
-            {!isMatched ? (
+            {isAborted ? (
               <button
-                id="approve-match-btn"
-                data-testid="approve-match-btn"
+                id="request-new-recommendation-btn"
+                data-testid="request-new-recommendation-btn"
                 type="button"
-                onClick={() =>
-                  onApproveMatch({
-                    loadId,
-                    agencyId: selectedAgencyId || recommendedAgency.agencyId,
-                  })
-                }
-                disabled={isApproving}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={onRetryMatch}
+                disabled={isRetrying}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-status-amber-text px-4 py-2.5 text-sm font-bold text-status-amber-text transition-all hover:bg-status-amber-bg disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isApproving ? (
-                  <>
-                    <RotateCcw className="h-4 w-4 animate-spin" />
-                    <span>Confirming Match...</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="h-5 w-5 stroke-[2.5]" />
-                    <span>
-                      {selectedCandidate
-                        ? `Approve ${selectedCandidate.name} & Dispatch`
-                        : 'Approve Match & Dispatch'}
-                    </span>
-                  </>
-                )}
+                <RotateCcw className={`h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+                <span>Request Revision</span>
               </button>
+            ) : !isMatched ? (
+              <>
+                {onReviseMatch && (
+                  <button
+                    id="revise-match-btn"
+                    data-testid="revise-match-btn"
+                    type="button"
+                    onClick={() => onReviseMatch({ loadId })}
+                    disabled={isApproving || isRevising || isRejecting}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-status-amber-text px-4 py-2.5 text-sm font-bold text-status-amber-text transition-all hover:bg-status-amber-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    <span>Request Revision</span>
+                  </button>
+                )}
+                {onRejectMatch && (
+                  <button
+                    id="reject-match-btn"
+                    data-testid="reject-match-btn"
+                    type="button"
+                    onClick={() => onRejectMatch({ loadId })}
+                    disabled={isApproving || isRevising || isRejecting}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-status-red-text px-4 py-2.5 text-sm font-bold text-status-red-text transition-all hover:bg-status-red-bg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <X className="h-4 w-4" />
+                    <span>Reject Match</span>
+                  </button>
+                )}
+                <button
+                  id="approve-match-btn"
+                  data-testid="approve-match-btn"
+                  type="button"
+                  onClick={() =>
+                    onApproveMatch({
+                      loadId,
+                      agencyId: selectedAgencyId || recommendedAgency.agencyId,
+                    })
+                  }
+                  disabled={isApproving}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:bg-emerald-700 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isApproving ? (
+                    <>
+                      <RotateCcw className="h-4 w-4 animate-spin" />
+                      <span>Confirming Match...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="h-5 w-5 stroke-[2.5]" />
+                      <span>
+                        {selectedCandidate
+                          ? `Approve ${selectedCandidate.name} & Dispatch`
+                          : 'Approve Match & Dispatch'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              </>
             ) : (
               <span className="inline-flex items-center gap-2 rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />

@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required to allow the app to make network requests to your backend -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required by geolocator to show the driver's live position on the trip route map -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
 
     <application
         android:label="freightlink_mobile"

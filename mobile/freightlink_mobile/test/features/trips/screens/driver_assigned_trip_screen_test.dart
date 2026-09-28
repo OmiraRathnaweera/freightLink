@@ -185,8 +185,8 @@ void main() {
     expect(find.byKey(const Key('active_trip_view')), findsOneWidget);
     expect(find.byKey(const Key('new_assignment_banner')), findsOneWidget);
     expect(find.text('New Assigned Trip (Post-Approval)'), findsOneWidget);
-    expect(find.byKey(const Key('assigned_status_card')), findsOneWidget);
-    expect(find.text('Awaiting Pickup Verification'), findsOneWidget);
+    expect(find.byKey(const Key('start_trip_button')), findsOneWidget);
+    expect(find.text('Start Trip'), findsOneWidget);
     expect(find.text('TRIP #C2000000'), findsOneWidget);
     expect(find.text('ASSIGNED'), findsOneWidget);
     expect(find.text('Load Ref: LD-KLY-GAL-02'), findsOneWidget);
@@ -356,7 +356,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    // 1. In Assigned state: Driver sees awaiting pickup verification; no cancel/delete options exist.
+    // 1. In Assigned state: Driver sees a "Start Trip" action; no cancel/delete options exist.
     when(() => mockTripsRepo.getDriverActiveTrip()).thenAnswer((_) async => sampleAssignedTrip);
 
     await pumpApp(
@@ -367,7 +367,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Awaiting Pickup Verification'), findsOneWidget);
+    expect(find.text('Start Trip'), findsOneWidget);
     expect(find.textContaining('Cancel', findRichText: true), findsNothing);
     expect(find.textContaining('Delete', findRichText: true), findsNothing);
     expect(find.byIcon(Icons.delete_outline), findsNothing);

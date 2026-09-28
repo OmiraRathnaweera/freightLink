@@ -71,10 +71,6 @@ class AppShell extends StatelessWidget {
             icon: Icon(Icons.payments_outlined),
             label: 'Payments',
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'Reports',
-          ),
         ],
       ),
     );

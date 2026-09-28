@@ -1,4 +1,5 @@
 using FreightLink.Api.DTOs.Internal;
+using FreightLink.Api.Entities.Enums;
 
 namespace FreightLink.Api.Services.Interfaces;
 
@@ -32,4 +33,25 @@ public interface IPricingEstimatorService
     /// 409 <see cref="Common.Errors.ErrorCode.LOAD_CONCURRENCY_CONFLICT"/> on a concurrent write race.
     /// </exception>
     Task<PricingEstimateResponseDto> EstimateAsync(EstimatePricingRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Computes a rough, pre-matching price quote for the Shipper-facing <c>POST /api/v1/loads/{id}/estimate</c>,
+    /// per Component A's price-estimation contract: the straight-line (haversine) distance between the
+    /// load's own pickup/dropoff coordinates (no routing call), a vehicle class resolved from the load's
+    /// weight/volume via <see cref="IPricingConfigService.GetTierForWeightAndVolume"/> (no agency/vehicle
+    /// chosen yet), and the same <c>baseFare + (distanceKm × ratePerKm) + (weightKg × ratePerKg)</c> formula
+    /// and reference-rate tables as <see cref="EstimateAsync"/>. Unlike <see cref="EstimateAsync"/>, this
+    /// does not write to <see cref="Entities.Load.EstimatedPrice"/> — that column is the AI agent's own
+    /// computed price (Agent 3), and this rough shipper preview must not be confused with or overwrite it.
+    /// </summary>
+    /// <param name="loadId">The load to estimate.</param>
+    /// <param name="currentUserId">The authenticated caller's id.</param>
+    /// <param name="currentUserRole">The authenticated caller's role.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="Common.Exceptions.ApiException">
+    /// 404 if the load doesn't exist; 403 <see cref="Common.Errors.ErrorCode.LOAD_NOT_OWNED"/> if the
+    /// caller is not the owning Shipper; 503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/>
+    /// if no matching vehicle-class tier or current reference-rate row exists.
+    /// </exception>
+    Task<FreightLink.Api.DTOs.Loads.LoadPriceEstimateResponseDto> EstimateForShipperAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

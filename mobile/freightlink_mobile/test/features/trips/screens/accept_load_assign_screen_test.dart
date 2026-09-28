@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:freightlink_mobile/core/network/api_exception.dart';
+import 'package:freightlink_mobile/features/loads/widgets/route_map_preview.dart';
 import 'package:freightlink_mobile/features/trips/models/fleet_resources.dart';
 import 'package:freightlink_mobile/features/trips/models/job_proposal.dart';
 import 'package:freightlink_mobile/features/trips/models/trip_models.dart';
@@ -108,6 +109,9 @@ void main() {
     expect(find.textContaining('78,500.00'), findsOneWidget);
     expect(find.textContaining('395.5 km'), findsOneWidget);
     expect(find.textContaining('7h transit'), findsOneWidget);
+
+    // Verify Route Map Preview
+    expect(find.byType(RouteMapPreview), findsOneWidget);
 
     // Verify Cargo & Address
     expect(find.text('Fresh Northern Agricultural Produce & Dry Goods'), findsOneWidget);

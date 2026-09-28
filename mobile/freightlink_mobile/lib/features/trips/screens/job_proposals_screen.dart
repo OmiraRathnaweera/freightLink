@@ -6,6 +6,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_top_bar.dart';
+import '../../../shared/widgets/auto_resize_text.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/status_pill.dart';
@@ -246,15 +247,20 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  proposal.referenceCode ?? proposal.loadId.substring(0, 8).toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.4,
-                    color: AppColors.inkMuted,
+                Expanded(
+                  child: AutoResizeText(
+                    proposal.referenceCode ?? proposal.loadId.substring(0, 8).toUpperCase(),
+                    maxLines: 1,
+                    minFontSize: 11,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: AppColors.inkMuted,
+                    ),
                   ),
                 ),
+                const SizedBox(width: AppConstants.spaceSm),
                 StatusPill(
                   label: proposal.status.displayName,
                   foreground: proposal.isProposed
@@ -273,7 +279,7 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
             const SizedBox(height: 8),
 
             // Cargo Description
-            Text(
+            AutoResizeText(
               proposal.cargoDescription,
               style: const TextStyle(
                 fontSize: 16,
@@ -281,7 +287,7 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
                 color: AppColors.ink,
               ),
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+              minFontSize: 13,
             ),
             const SizedBox(height: 6),
 
@@ -291,11 +297,11 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
                 const Icon(Icons.arrow_forward_rounded, size: 14, color: AppColors.inkMuted),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
+                  child: AutoResizeText(
                     '${proposal.pickupAddress} → ${proposal.dropoffAddress}',
                     style: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    minFontSize: 11,
                   ),
                 ),
               ],
@@ -308,13 +314,13 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
                 if (weightStr != null) ...[
                   const Icon(Icons.scale_rounded, size: 14, color: AppColors.inkMuted),
                   const SizedBox(width: 4),
-                  Text(weightStr, style: const TextStyle(fontSize: 12, color: AppColors.ink)),
+                  AutoResizeText(weightStr, style: const TextStyle(fontSize: 12, color: AppColors.ink)),
                   const SizedBox(width: 12),
                 ],
                 if (distanceStr != null) ...[
                   const Icon(Icons.straighten_rounded, size: 14, color: AppColors.inkMuted),
                   const SizedBox(width: 4),
-                  Text(distanceStr, style: const TextStyle(fontSize: 12, color: AppColors.ink)),
+                  AutoResizeText(distanceStr, style: const TextStyle(fontSize: 12, color: AppColors.ink)),
                 ],
                 const Spacer(),
                 Column(
@@ -329,8 +335,10 @@ class _JobProposalsScreenState extends State<JobProposalsScreen> {
                         color: AppColors.inkMuted,
                       ),
                     ),
-                    Text(
+                    AutoResizeText(
                       priceStr,
+                      maxLines: 1,
+                      minFontSize: 12,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,

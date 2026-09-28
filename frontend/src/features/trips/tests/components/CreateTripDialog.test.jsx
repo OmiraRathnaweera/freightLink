@@ -230,7 +230,7 @@ describe("CreateTripDialog", () => {
     });
   });
 
-  it("allows switching to manual ID entry mode and back", async () => {
+  it("never offers manual ID entry — only the dropdown selectors, even with empty lists", async () => {
     assignmentsApi.useAssignmentsQuery.mockReturnValue({
       isLoading: false,
       data: { items: [] },
@@ -249,16 +249,12 @@ describe("CreateTripDialog", () => {
 
     renderWithProviders(<CreateTripDialog onClose={vi.fn()} />);
 
-    const toggleBtn = screen.getByRole("button", { name: /enter ids manually/i });
-    await userEvent.click(toggleBtn);
-
-    expect(screen.getByPlaceholderText("e.g. 22222222-2222-2222-2222-222222222222")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("e.g. 55555555-5555-5555-5555-555555555555")).toBeInTheDocument();
-    expect(screen.getByPlaceholderText("e.g. 66666666-6666-6666-6666-666666666666")).toBeInTheDocument();
-
-    const switchBackBtn = screen.getByRole("button", { name: /use dropdown selectors/i });
-    await userEvent.click(switchBackBtn);
-
-    expect(screen.queryByPlaceholderText("e.g. 22222222-2222-2222-2222-222222222222")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /enter ids manually/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /enter an assignment id manually/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /enter vehicle id manually/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /enter driver id manually/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/no assignments found for your agency yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no vehicles found in your agency fleet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no drivers registered in your agency fleet/i)).toBeInTheDocument();
   });
 });

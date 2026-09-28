@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { X, AlertCircle, Truck, User, Calendar, MapPin, Building, ArrowRight } from 'lucide-react'
+import { X, AlertCircle, Truck, User, MapPin } from 'lucide-react'
 import Button from '../../../components/Button.jsx'
 import DisputeCategoryBadge from './DisputeCategoryBadge.jsx'
 import DisputeStatusBadge from './DisputeStatusBadge.jsx'

@@ -12,4 +12,4 @@ AgentStepStatus = Literal["Pending", "Running", "Succeeded", "Failed"]
 VehicleClass = Literal["MiniTruck", "MediumLorry", "ContainerTruck"]
 
 # Mirrors backend/Entities/Enums/ToolName.cs.
-ToolName = Literal["get_route_and_eta"]
+ToolName = Literal["get_route_and_eta", "estimate_price"]

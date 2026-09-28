@@ -186,7 +186,13 @@ public class LoadService : ILoadService
             .Select(r => (Guid?)r.WorkflowRunId)
             .FirstOrDefaultAsync(cancellationToken);
 
-        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory, estimatedPrice, workflowRunId);
+        // Resolve the dispatched trip id, if any, so a Shipper can look up trip-progress details.
+        var tripId = await _dbContext.Assignments
+            .Where(a => a.LoadId == loadId && a.Trip != null)
+            .Select(a => (Guid?)a.Trip!.TripId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory, estimatedPrice, workflowRunId, tripId);
     }
 
     /// <inheritdoc />
@@ -235,8 +241,13 @@ public class LoadService : ILoadService
             }
             else
             {
-                // Show loads assigned to caller's agency
-                loads = loads.Where(l => l.Assignments.Any(a => a.AgencyId == callerAgencyId && (a.Status == AssignmentStatus.Accepted || a.Status == AssignmentStatus.Proposed)));
+                // Show loads the caller's agency has actually accepted. A Proposed assignment
+                // (an AI-recommended match or manual proposal still awaiting this agency's
+                // accept/decline) deliberately does NOT appear here — surfacing it under "My
+                // Agency Shipments" before the agency has decided would make an unactioned
+                // proposal look like a confirmed shipment. Reviewing/acting on a Proposed
+                // assignment happens via the Flutter Job Proposals inbox or the proposal email.
+                loads = loads.Where(l => l.Assignments.Any(a => a.AgencyId == callerAgencyId && a.Status == AssignmentStatus.Accepted));
                 if (query.Status is { } agencyStatus)
                 {
                     loads = loads.Where(l => l.Status == agencyStatus);
@@ -295,9 +306,17 @@ public class LoadService : ILoadService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var pageOfLoadIds = pageOfLoads.Select(l => l.LoadId).ToList();
+        var loadIdsWithTrip = await _dbContext.Assignments
+            .Where(a => pageOfLoadIds.Contains(a.LoadId) && a.Trip != null)
+            .Select(a => a.LoadId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var loadIdsWithTripSet = loadIdsWithTrip.ToHashSet();
+
         return new PagedLoadResponseDto
         {
-            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName))).ToList(),
+            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName), loadIdsWithTripSet.Contains(l.LoadId))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalItems = totalItems,
@@ -530,7 +549,8 @@ public class LoadService : ILoadService
         string shipperName,
         List<LoadStatusHistoryResponseDto>? statusHistory = null,
         decimal? estimatedPrice = null,
-        Guid? workflowRunId = null) => new()
+        Guid? workflowRunId = null,
+        Guid? tripId = null) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -550,6 +570,7 @@ public class LoadService : ILoadService
         EstimatedPrice = estimatedPrice ?? load.EstimatedPrice,
         Status = load.Status.ToString(),
         WorkflowRunId = workflowRunId,
+        TripId = tripId,
         CreatedAt = load.CreatedAt,
         UpdatedAt = load.UpdatedAt,
         StatusHistory = statusHistory ?? new List<LoadStatusHistoryResponseDto>()
@@ -569,7 +590,8 @@ public class LoadService : ILoadService
     /// <summary>Maps a <see cref="Load"/> entity to its lightweight list-row representation.</summary>
     /// <param name="load">The load entity.</param>
     /// <param name="shipperName">The resolved display name of the load's owning Shipper.</param>
-    private static LoadListItemDto MapToListItem(Load load, string shipperName) => new()
+    /// <param name="hasTrip">Whether a Trip already exists for one of this load's assignments.</param>
+    private static LoadListItemDto MapToListItem(Load load, string shipperName, bool hasTrip) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -583,6 +605,7 @@ public class LoadService : ILoadService
         PickupWindowEnd = load.PickupWindowEnd,
         EstimatedPrice = load.EstimatedPrice,
         Status = load.Status.ToString(),
+        HasTrip = hasTrip,
         CreatedAt = load.CreatedAt
     };
 }

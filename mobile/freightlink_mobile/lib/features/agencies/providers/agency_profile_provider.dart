@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../../core/network/api_exception.dart';
 import '../data/agencies_repository.dart';
 
 enum ProfileState { loading, loaded, saving, error }
@@ -23,9 +24,12 @@ class AgencyProfileProvider extends ChangeNotifier {
     try {
       _profileData = await _repository.getProfile();
       _state = ProfileState.loaded;
-    } catch (e) {
+    } on ApiException catch (e) {
       _state = ProfileState.error;
-      _errorMessage = e.toString();
+      _errorMessage = e.message;
+    } catch (_) {
+      _state = ProfileState.error;
+      _errorMessage = 'Failed to load agency profile. Please try again.';
     }
     notifyListeners();
   }
@@ -44,9 +48,14 @@ class AgencyProfileProvider extends ChangeNotifier {
       _state = ProfileState.loaded;
       notifyListeners();
       return true;
-    } catch (e) {
+    } on ApiException catch (e) {
       _state = ProfileState.loaded; // Revert to loaded, just show error
-      _errorMessage = e.toString();
+      _errorMessage = e.message;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      _state = ProfileState.loaded;
+      _errorMessage = 'Failed to update agency profile. Please try again.';
       notifyListeners();
       return false;
     }

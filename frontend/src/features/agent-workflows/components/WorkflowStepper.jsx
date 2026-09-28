@@ -32,19 +32,17 @@ const AGENT_METADATA = [
 ]
 
 export default function WorkflowStepper({ steps = [], workflowStatus = 'PendingReview' }) {
-  // Map step status from backend steps
+  // Map step status from backend steps only — never assume a step completed just because the
+  // overall workflow looks done. A step this agent didn't actually report stays "Pending"; showing
+  // it as Completed would claim an agent ran when there's no real AgentStep behind it.
   const getStepData = (stepNo, role) => {
     const recorded = steps.find((s) => s.stepNo === stepNo || s.agentRole?.toLowerCase() === role.toLowerCase())
     if (recorded) {
       return {
-        status: recorded.status || 'Completed',
+        status: recorded.status || 'Pending',
         durationMs: recorded.durationMs,
         errorMessage: recorded.errorMessage,
       }
-    }
-    // If workflow is Completed or Succeeded, default to completed
-    if (workflowStatus === 'Completed' || workflowStatus === 'Succeeded' || workflowStatus === 'PendingReview') {
-      return { status: 'Completed', durationMs: 120 + stepNo * 85 }
     }
     return { status: 'Pending', durationMs: null }
   }
@@ -68,7 +66,17 @@ export default function WorkflowStepper({ steps = [], workflowStatus = 'PendingR
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-status-blue-bg px-2.5 py-1 text-xs font-semibold text-status-blue-text">
             <span className="h-1.5 w-1.5 rounded-full bg-status-blue-text animate-pulse" />
-            {workflowStatus === 'Completed' ? 'Workflow Completed' : 'Proposal Ready for Decision'}
+            {workflowStatus === 'Completed'
+              ? 'Workflow Completed'
+              : workflowStatus === 'AwaitingApproval'
+              ? 'Proposal Ready for Decision'
+              : workflowStatus === 'NotStarted'
+              ? 'Matching Not Started Yet'
+              : workflowStatus === 'Failed'
+              ? 'Matching Failed'
+              : workflowStatus === 'Aborted'
+              ? 'Recommendation Rejected'
+              : 'Matching In Progress'}
           </span>
         </div>
       </div>

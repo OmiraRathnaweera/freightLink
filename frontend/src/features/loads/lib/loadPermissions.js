@@ -13,7 +13,10 @@ import { LoadStatus, UserRole } from '../../../lib/enums.js'
 // backend remains the actual enforcement layer regardless of what the UI
 // hides (a stale/cached role or status could still get a 403/422).
 const EDITABLE_STATUSES = [LoadStatus.DRAFT, LoadStatus.POSTED]
-const CANCELLABLE_STATUSES = [LoadStatus.DRAFT, LoadStatus.POSTED, LoadStatus.MATCHED]
+// Matched is deliberately excluded: once a load is Matched, an agency has
+// accepted and a Trip (with an allocated driver/vehicle) exists for it, so
+// the shipper can no longer back out through this endpoint.
+const CANCELLABLE_STATUSES = [LoadStatus.DRAFT, LoadStatus.POSTED]
 const PUBLISHABLE_STATUSES = [LoadStatus.DRAFT]
 
 export function isLoadEditable(status) {

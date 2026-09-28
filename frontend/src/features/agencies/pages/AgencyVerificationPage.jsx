@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -10,6 +10,8 @@ import Button from '../../../components/Button.jsx'
 import Card from '../../../components/Card.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
+import ViewComplianceDocsModal from '../components/ViewComplianceDocsModal.jsx'
+
 import {
   useAgenciesQuery,
   useVerificationQueueQuery,
@@ -71,6 +73,7 @@ export default function AgencyVerificationPage() {
     onError: (err) => toast.error(`Failed to suspend agency: ${err.message}`),
   })
 
+  const [selectedAgencyForDocs, setSelectedAgencyForDocs] = useState(null)
   const [actionedDocIds, setActionedDocIds] = useState(() => new Set())
 
   const verifyDocMutation = useVerifyComplianceDocMutation({
@@ -126,7 +129,7 @@ export default function AgencyVerificationPage() {
         subtitle="Review uploaded compliance documents, approve or reject each one, then verify and activate the agency."
       />
 
-      {isLoading && <p className="text-slate-500">Loading agencies…</p>}
+      {isLoading && <p className="text-slate-500">Loading agenciesâ€¦</p>}
       {isError && <p className="text-status-red-text">Failed to load the verification queue.</p>}
 
       {!isLoading && !isError && (
@@ -160,6 +163,13 @@ export default function AgencyVerificationPage() {
                             {verifiedMandatoryCount} / {MANDATORY_DOC_TYPE_IDS.length} mandatory docs verified
                           </span>
                           <StatusBadge tone={getAgencyStatusTone(agency.status)}>{agency.status}</StatusBadge>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setSelectedAgencyForDocs(agency)}
+                      >
+                        <ExternalLink className="mr-1.5 h-4 w-4" />
+                        View Docs
+                      </Button>
                         </div>
                       </Card.Header>
 
@@ -168,7 +178,7 @@ export default function AgencyVerificationPage() {
 
                         {complianceDocs.length === 0 ? (
                           <p className="text-body-sm italic text-slate-500">
-                            No documents uploaded yet — this agency cannot be verified until its
+                            No documents uploaded yet â€” this agency cannot be verified until its
                             mandatory documents are submitted.
                           </p>
                         ) : (
@@ -259,7 +269,7 @@ export default function AgencyVerificationPage() {
                                           ) : isUpdatingThis ? (
                                             <span className="inline-flex items-center gap-1.5 text-body-xs text-slate-500">
                                               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                                              Updating…
+                                              Updatingâ€¦
                                             </span>
                                           ) : null}
                                         </div>
@@ -281,7 +291,7 @@ export default function AgencyVerificationPage() {
                           onClick={() => suspendMutation.mutate(agency.agencyId)}
                         >
                           {suspendMutation.isPending && suspendMutation.variables === agency.agencyId
-                            ? 'Suspending…'
+                            ? 'Suspendingâ€¦'
                             : 'Suspend Agency'}
                         </Button>
                         <Button
@@ -291,7 +301,7 @@ export default function AgencyVerificationPage() {
                           onClick={() => verifyAgencyMutation.mutate(agency.agencyId)}
                         >
                           {verifyAgencyMutation.isPending && verifyAgencyMutation.variables === agency.agencyId
-                            ? 'Verifying…'
+                            ? 'Verifyingâ€¦'
                             : 'Verify Agency'}
                         </Button>
                       </Card.Footer>
@@ -325,13 +335,20 @@ export default function AgencyVerificationPage() {
                     <div className="flex items-center gap-3">
                       <StatusBadge tone={getAgencyStatusTone(agency.status)}>{agency.status}</StatusBadge>
                       <Button
+                        variant="secondary"
+                        onClick={() => setSelectedAgencyForDocs(agency)}
+                      >
+                        <ExternalLink className="mr-1.5 h-4 w-4" />
+                        View Docs
+                      </Button>
+                      <Button
                         variant="status"
                         status="red"
                         disabled={agencyActionPending}
                         onClick={() => suspendMutation.mutate(agency.agencyId)}
                       >
                         {suspendMutation.isPending && suspendMutation.variables === agency.agencyId
-                          ? 'Suspending…'
+                          ? 'Suspendingâ€¦'
                           : 'Suspend'}
                       </Button>
                       <Button
@@ -341,7 +358,7 @@ export default function AgencyVerificationPage() {
                         onClick={() => activateMutation.mutate(agency.agencyId)}
                       >
                         {activateMutation.isPending && activateMutation.variables === agency.agencyId
-                          ? 'Activating…'
+                          ? 'Activatingâ€¦'
                           : 'Activate Agency'}
                       </Button>
                     </div>
@@ -352,6 +369,12 @@ export default function AgencyVerificationPage() {
           </section>
         </>
       )}
+          <ViewComplianceDocsModal
+        isOpen={!!selectedAgencyForDocs}
+        onClose={() => setSelectedAgencyForDocs(null)}
+        agencyId={selectedAgencyForDocs?.agencyId}
+        agencyName={selectedAgencyForDocs?.name}
+      />
     </div>
   )
 }

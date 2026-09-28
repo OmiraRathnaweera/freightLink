@@ -13,9 +13,10 @@ import '../data/trips_repository.dart';
 import '../models/trip_models.dart';
 import '../services/image_capture_service.dart';
 
-/// Screen for Agency Staff to capture a photo at dispatch/pickup using the device camera.
-/// Creates a `TripEvidence` row of type `PickupProof` that satisfies the evidence
-/// hard-block from Y3S01-74 before the trip can transition to `PickedUp`.
+/// Screen for the assigned Driver to capture a photo at pickup using the device camera, reached by
+/// tapping "Start Trip" on `DriverAssignedTripScreen`. Creates a `TripEvidence` row of type
+/// `PickupProof` that satisfies the evidence hard-block from Y3S01-74 before the trip can
+/// transition to `PickedUp`.
 class ProofOfPickupScreen extends StatefulWidget {
   const ProofOfPickupScreen({
     super.key,
@@ -281,18 +282,28 @@ class _ProofOfPickupScreenState extends State<ProofOfPickupScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'TRIP #$tripCode',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                  color: AppColors.inkMuted,
+              Flexible(
+                child: Text(
+                  'TRIP #$tripCode',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: AppColors.inkMuted,
+                  ),
                 ),
               ),
-              Text(
-                DateFormat('dd MMM yyyy, HH:mm').format(_currentTrip.createdAt),
-                style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+              const SizedBox(width: AppConstants.spaceSm),
+              Flexible(
+                child: Text(
+                  DateFormat('dd MMM yyyy, HH:mm').format(_currentTrip.createdAt),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontSize: 12, color: AppColors.inkMuted),
+                ),
               ),
             ],
           ),

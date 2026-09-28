@@ -47,7 +47,7 @@ public class InvoiceService : IInvoiceService
     /// <inheritdoc />
     public async Task<InvoiceResponseDto> CreateAsync(Guid currentUserId, UserRole role, CreateInvoiceDto request, CancellationToken cancellationToken = default)
     {
-        if (role != UserRole.AgencyStaff && role != UserRole.Agent)
+        if (role != UserRole.AgencyStaff)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only agents have permission to create invoices.");
         }
@@ -114,8 +114,18 @@ public class InvoiceService : IInvoiceService
                 $"An invoice cannot be created directly into status '{initialStatus}'.");
         }
 
+        // When creating from a trip and the caller didn't supply an explicit amount or line items,
+        // default to the agreed price from the accepted assignment (the job proposal / AI-matched
+        // price the Shipper already approved) — there is no direct-customer/manual-quote path in
+        // this system, so a trip-linked invoice's starting amount is always the already-agreed budget.
+        var amountToUse = request.Amount;
+        if (amountToUse is null && (request.LineItems is null || request.LineItems.Count == 0) && trip is not null)
+        {
+            amountToUse = trip.Assignment.ProposedPrice;
+        }
+
         // Calculate line items and totals
-        var (lineEntities, subtotal, taxTotal, discountTotal, totalAmount) = CalculateLineItemsAndTotals(request.LineItems, request.Amount, request.DiscountTotal);
+        var (lineEntities, subtotal, taxTotal, discountTotal, totalAmount) = CalculateLineItemsAndTotals(request.LineItems, amountToUse, request.DiscountTotal);
 
         var now = DateTimeOffset.UtcNow;
         var invoice = new Invoice
@@ -190,6 +200,8 @@ public class InvoiceService : IInvoiceService
             .Include(i => i.CreatedByUser)
             .Include(i => i.UpdatedByUser)
             .Include(i => i.VoidedByUser)
+            .Include(i => i.PaymentProofFile)
+            .Include(i => i.PaymentProofUploadedByUser)
             .Include(i => i.Trip)
                 .ThenInclude(t => t!.Assignment)
                     .ThenInclude(a => a.Load)
@@ -238,7 +250,7 @@ public class InvoiceService : IInvoiceService
                 (i.Trip != null && i.Trip.Assignment != null && i.Trip.Assignment.Load != null && i.Trip.Assignment.Load.ShipperUserId == currentUserId))
                 && i.Status != InvoiceStatus.Draft);
         }
-        else if (role == UserRole.AgencyStaff || role == UserRole.Agent)
+        else if (role == UserRole.AgencyStaff)
         {
             queryable = queryable.Where(i =>
                 i.RecipientId == currentUserId ||
@@ -320,6 +332,7 @@ public class InvoiceService : IInvoiceService
                 DueDate = i.DueDate,
                 PaidAt = i.PaidAt,
                 PaymentReference = i.PaymentReference,
+                HasPaymentProof = i.PaymentProofFileId != null,
                 CreatedByName = i.CreatedByUser != null ? i.CreatedByUser.FullName : null,
                 UpdatedByName = i.UpdatedByUser != null ? i.UpdatedByUser.FullName : null,
                 CreatedAt = i.CreatedAt,
@@ -455,6 +468,16 @@ public class InvoiceService : IInvoiceService
                 invoice.DiscountTotal = Math.Max(0m, request.DiscountTotal.Value);
                 invoice.Amount = Math.Max(0m, invoice.Subtotal + invoice.TaxTotal - invoice.DiscountTotal);
             }
+
+            // Keep the single auto-generated line item (the only shape this system's simplified,
+            // trip-linked invoices ever have) in sync with the amount-only update above — otherwise
+            // the line-item breakdown would keep showing the stale pre-edit amount.
+            if (invoice.LineItems.Count == 1)
+            {
+                var onlyLine = invoice.LineItems.Single();
+                onlyLine.UnitPrice = request.Amount.Value;
+                onlyLine.Amount = request.Amount.Value;
+            }
         }
         else if (request.DiscountTotal.HasValue)
         {
@@ -541,10 +564,10 @@ public class InvoiceService : IInvoiceService
             AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
         }
 
-        if (InvoiceStatusTransitionRules.IsGatewayOwned(request.Status))
+        if (InvoiceStatusTransitionRules.RequiresDedicatedAction(request.Status))
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.INVALID_INVOICE_STATUS_TRANSITION,
-                $"Status '{request.Status}' is managed exclusively by payment processing.");
+                $"Status '{request.Status}' cannot be set directly; use the dedicated action for it instead.");
         }
 
         if (!InvoiceStatusTransitionRules.CanTransition(invoice.Status, request.Status))
@@ -883,7 +906,7 @@ public class InvoiceService : IInvoiceService
             return;
         }
 
-        if (role == UserRole.AgencyStaff || role == UserRole.Agent)
+        if (role == UserRole.AgencyStaff)
         {
             return;
         }
@@ -904,31 +927,25 @@ public class InvoiceService : IInvoiceService
 
     private static void EnforceInvoiceModifyAuthorization(Invoice invoice, Guid currentUserId, UserRole role)
     {
-        if (role != UserRole.AgencyStaff && role != UserRole.Agent)
+        if (role != UserRole.AgencyStaff)
         {
             throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only agents have permission to modify invoices.");
         }
     }
 
     /// <inheritdoc />
-    public async Task<InvoiceResponseDto> PayAsync(Guid invoiceId, Guid currentUserId, UserRole role, PayInvoiceDto? request = null, CancellationToken cancellationToken = default)
+    public async Task<InvoiceResponseDto> UploadPaymentProofAsync(Guid invoiceId, Guid currentUserId, UserRole role, UploadPaymentProofDto request, CancellationToken cancellationToken = default)
     {
         if (role != UserRole.Shipper)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only shippers can pay invoices.");
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only shippers can submit a payment receipt.");
         }
 
         var invoice = await _dbContext.Invoices
-            .Include(i => i.LineItems)
-            .Include(i => i.Payments)
             .Include(i => i.Recipient)
             .Include(i => i.Trip)
                 .ThenInclude(t => t!.Assignment)
                     .ThenInclude(a => a.Load)
-            .Include(i => i.Trip)
-                .ThenInclude(t => t!.Assignment)
-                    .ThenInclude(a => a.Agency)
-                        .ThenInclude(ag => ag.Staff)
             .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId, cancellationToken);
 
         if (invoice is null)
@@ -951,48 +968,92 @@ public class InvoiceService : IInvoiceService
 
         if (invoice.Status == InvoiceStatus.Draft)
         {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Cannot pay an invoice in Draft status. The invoice must be Issued first.");
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Cannot submit a payment receipt for an invoice in Draft status. The invoice must be Issued first.");
         }
 
         if (invoice.Status == InvoiceStatus.Void || invoice.Status == InvoiceStatus.Voided)
         {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Cannot pay a voided invoice.");
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "Cannot submit a payment receipt for a voided invoice.");
         }
 
         if (invoice.Status != InvoiceStatus.Issued && invoice.Status != InvoiceStatus.PaymentPending)
         {
-            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, $"Invoice in status '{invoice.Status}' cannot be paid. Only 'Issued' invoices can be paid.");
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, $"Invoice in status '{invoice.Status}' cannot accept a payment receipt.");
+        }
+
+        var uploadedFile = await _dbContext.UploadedFiles.FirstOrDefaultAsync(f => f.PublicId == request.PublicId, cancellationToken);
+        if (uploadedFile is null)
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.INVOICE_PAYMENT_PROOF_FILE_NOT_FOUND, "The referenced uploaded file could not be found.");
+        }
+
+        if (uploadedFile.UploadedByUserId != currentUserId)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FILE_NOT_OWNED, "You do not have permission to attach this file.");
         }
 
         var now = DateTimeOffset.UtcNow;
-        var paymentRef = !string.IsNullOrWhiteSpace(request?.PaymentReference)
-            ? request.PaymentReference.Trim()
-            : $"PAY-{Guid.NewGuid():N}"[..16].ToUpperInvariant();
-
-        invoice.Status = InvoiceStatus.Paid;
-        invoice.PaidAt = now;
-        invoice.PaymentReference = paymentRef;
+        invoice.PaymentProofFileId = uploadedFile.FileId;
+        invoice.PaymentProofUploadedAt = now;
+        invoice.PaymentProofUploadedByUserId = currentUserId;
+        invoice.Status = InvoiceStatus.PaymentPending;
         invoice.UpdatedByUserId = currentUserId;
         invoice.UpdatedAt = now;
 
-        int nextAttempt = (invoice.Payments.Any() ? invoice.Payments.Max(p => p.AttemptNo) : 0) + 1;
-        var payment = new Payment
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        _logger?.LogInformation("Shipper {ShipperId} submitted a payment receipt for Invoice #{InvoiceNumber}; awaiting Agency confirmation.",
+            currentUserId, invoice.InvoiceNumber);
+
+        return await GetByIdAsync(invoice.InvoiceId, currentUserId, role, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<InvoiceResponseDto> ConfirmPaymentAsync(Guid invoiceId, Guid currentUserId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        var invoice = await _dbContext.Invoices
+            .Include(i => i.Trip)
+                .ThenInclude(t => t!.Assignment)
+                    .ThenInclude(a => a.Load)
+            .Include(i => i.Trip)
+                .ThenInclude(t => t!.Assignment)
+                    .ThenInclude(a => a.Agency)
+                        .ThenInclude(ag => ag.Staff)
+            .FirstOrDefaultAsync(i => i.InvoiceId == invoiceId, cancellationToken);
+
+        if (invoice is null)
         {
-            PaymentId = Guid.NewGuid(),
-            InvoiceId = invoice.InvoiceId,
-            GatewayRef = paymentRef,
-            Amount = invoice.Amount,
-            Status = PaymentStatus.Success,
-            AttemptNo = nextAttempt,
-            ProcessedAt = now,
-            CreatedAt = now
-        };
-        _dbContext.Payments.Add(payment);
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.INVOICE_NOT_FOUND, $"Invoice '{invoiceId}' was not found.");
+        }
+
+        EnforceInvoiceModifyAuthorization(invoice, currentUserId, role);
+
+        if (invoice.Trip != null)
+        {
+            AgencyStatusGuard.EnsureActive(invoice.Trip.Assignment.Agency.Status);
+        }
+
+        if (invoice.Status == InvoiceStatus.Paid)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVOICE_ALREADY_PAID, "Invoice is already paid.");
+        }
+
+        if (invoice.PaymentProofFileId is null || invoice.Status != InvoiceStatus.PaymentPending)
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.INVOICE_PAYMENT_PROOF_REQUIRED,
+                "This invoice has no payment receipt submitted by the Shipper yet.");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        invoice.Status = InvoiceStatus.Paid;
+        invoice.PaidAt = now;
+        invoice.UpdatedByUserId = currentUserId;
+        invoice.UpdatedAt = now;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        _logger?.LogInformation("Invoice #{InvoiceNumber} was successfully paid by Shipper {ShipperId}. Payment Reference: {PaymentRef}",
-            invoice.InvoiceNumber, currentUserId, paymentRef);
+        _logger?.LogInformation("Agency user {AgentId} confirmed payment and closed Invoice #{InvoiceNumber}.",
+            currentUserId, invoice.InvoiceNumber);
 
         return await GetByIdAsync(invoice.InvoiceId, currentUserId, role, cancellationToken);
     }
@@ -1061,6 +1122,10 @@ public class InvoiceService : IInvoiceService
         DueDate = invoice.DueDate,
         PaidAt = invoice.PaidAt,
         PaymentReference = invoice.PaymentReference,
+        PaymentProofUrl = invoice.PaymentProofFile?.SecureUrl,
+        PaymentProofFileName = invoice.PaymentProofFile?.OriginalFileName,
+        PaymentProofUploadedAt = invoice.PaymentProofUploadedAt,
+        PaymentProofUploadedByName = invoice.PaymentProofUploadedByUser?.FullName,
         CreatedAt = invoice.CreatedAt,
         UpdatedAt = invoice.UpdatedAt,
         LineItems = invoice.LineItems.OrderBy(li => li.SortOrder).Select(li => new InvoiceLineItemDto
@@ -1086,4 +1151,67 @@ public class InvoiceService : IInvoiceService
             UpdatedAt = invoice.UpdatedAt
         }
     };
+
+    /// <inheritdoc />
+    public async Task<InvoiceSummaryDto> GetSummaryAsync(Guid currentUserId, UserRole role, CancellationToken cancellationToken = default)
+    {
+        if (role != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only Admin can view the invoice cashflow summary.");
+        }
+
+        var statusCounts = await _dbContext.Invoices
+            .AsNoTracking()
+            .GroupBy(i => i.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var countByStatus = new InvoiceStatusCountsDto();
+        foreach (var group in statusCounts)
+        {
+            switch (group.Status)
+            {
+                case InvoiceStatus.Draft: countByStatus.Draft = group.Count; break;
+                case InvoiceStatus.Issued: countByStatus.Issued = group.Count; break;
+                case InvoiceStatus.PaymentPending: countByStatus.PaymentPending = group.Count; break;
+                case InvoiceStatus.Paid: countByStatus.Paid = group.Count; break;
+                case InvoiceStatus.Failed: countByStatus.Failed = group.Count; break;
+                case InvoiceStatus.Void: countByStatus.Void = group.Count; break;
+            }
+        }
+
+        var totalInvoiced = await _dbContext.Invoices
+            .AsNoTracking()
+            .Where(i => i.Status != InvoiceStatus.Void)
+            .SumAsync(i => (decimal?)i.Amount, cancellationToken) ?? 0m;
+
+        var totalPaid = await _dbContext.Invoices
+            .AsNoTracking()
+            .Where(i => i.Status == InvoiceStatus.Paid)
+            .SumAsync(i => (decimal?)i.Amount, cancellationToken) ?? 0m;
+
+        var recentActivity = await _dbContext.Invoices
+            .AsNoTracking()
+            .OrderByDescending(i => i.UpdatedAt)
+            .Take(10)
+            .Select(i => new InvoiceRecentActivityDto
+            {
+                InvoiceId = i.InvoiceId,
+                InvoiceNumber = i.InvoiceNumber,
+                Status = i.Status.ToString(),
+                Amount = i.Amount,
+                Currency = i.Currency,
+                UpdatedAt = i.UpdatedAt
+            })
+            .ToListAsync(cancellationToken);
+
+        return new InvoiceSummaryDto
+        {
+            TotalInvoiced = totalInvoiced,
+            TotalPaid = totalPaid,
+            TotalOutstanding = totalInvoiced - totalPaid,
+            CountByStatus = countByStatus,
+            RecentActivity = recentActivity
+        };
+    }
 }

@@ -27,6 +27,7 @@ public class Load
     public ICollection<LoadStatusHistory> StatusHistory { get; set; } = new List<LoadStatusHistory>();
     public ICollection<LoadFile> Files { get; set; } = new List<LoadFile>();
     public ICollection<Assignment> Assignments { get; set; } = new List<Assignment>();
+    public ICollection<LoadProposal> Proposals { get; set; } = new List<LoadProposal>();
     public ICollection<AgentWorkflowRun> WorkflowRuns { get; set; } = new List<AgentWorkflowRun>();
     public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 }

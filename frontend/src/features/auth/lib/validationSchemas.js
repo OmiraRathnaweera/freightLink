@@ -6,6 +6,24 @@ export const loginSchema = Yup.object({
   password: Yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
 })
 
+export const forgotPasswordSchema = Yup.object({
+  email: Yup.string().trim().email('Enter a valid email address').required('Email is required'),
+})
+
+export const resetPasswordSchema = Yup.object({
+  password: Yup.string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(100, 'Password must be 100 characters or fewer')
+    .matches(/[A-Z]/, 'Password must contain at least one uppercase letter')
+    .matches(/[a-z]/, 'Password must contain at least one lowercase letter')
+    .matches(/[0-9]/, 'Password must contain at least one number')
+    .matches(/[^A-Za-z0-9]/, 'Password must contain at least one special character')
+    .required('Password is required'),
+  confirmPassword: Yup.string()
+    .oneOf([Yup.ref('password')], 'Passwords must match')
+    .required('Confirm your password'),
+})
+
 // Shared password validation rules
 // Enforces minimum 8 characters, upper, lower, digit, and special character
 const passwordSchema = Yup.string()
@@ -133,4 +151,25 @@ export const agencyRegisterSchema = Yup.object({
     .required('Yard address is required'),
   yardLat: coordinateField({ label: 'Yard latitude', min: -90, max: 90 }),
   yardLng: coordinateField({ label: 'Yard longitude', min: -180, max: 180 }),
+})
+
+/**
+ * Update-own-profile schema, matching `UpdateProfileRequestDto`
+ * (backend/DTOs/Auth/UpdateProfileRequestDto.cs): required [fullName, email], optional [phoneE164].
+ */
+export const updateProfileSchema = Yup.object({
+  fullName: fullNameSchema,
+  email: emailSchema,
+  phoneE164: phoneE164Schema,
+})
+
+/**
+ * Change-own-password schema, matching `ChangePasswordRequestDto`
+ * (backend/DTOs/Auth/ChangePasswordRequestDto.cs). currentPassword only needs to be present — its
+ * strength was already enforced when it was first set — newPassword reuses the same strength rules
+ * as registration/reset.
+ */
+export const changePasswordSchema = Yup.object({
+  currentPassword: Yup.string().required('Current password is required'),
+  newPassword: passwordSchema,
 })

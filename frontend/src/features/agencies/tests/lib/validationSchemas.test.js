@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addVehicleSchema } from '../../lib/validationSchemas.js'
+import { addVehicleSchema, updateVehicleSchema } from '../../lib/validationSchemas.js'
 
 describe('addVehicleSchema', () => {
   const validPayload = {
@@ -173,5 +173,19 @@ describe('addVehicleSchema', () => {
     await expect(
       addVehicleSchema.validate({ ...validPayload, volumeM3: 1001 }),
     ).rejects.toThrow(/cannot exceed 1,000 m³/i)
+  })
+})
+
+describe('updateVehicleSchema', () => {
+  it('accepts an unchanged legacy registration but validates a replacement plate', async () => {
+    const values = {
+      vehicleType: 'Container',
+      registrationNo: 'ND-TEST-0001',
+      capacityKg: 25000,
+      volumeM3: 70,
+    }
+    await expect(updateVehicleSchema('ND-TEST-0001').validate(values)).resolves.toBeTruthy()
+    await expect(updateVehicleSchema('ND-TEST-0001').validate({ ...values, registrationNo: 'INVALID-99' }))
+      .rejects.toThrow(/valid sri lankan vehicle registration/i)
   })
 })

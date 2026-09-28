@@ -38,7 +38,10 @@ public class AuthServiceTests
     };
 
     /// <summary>Builds a real <see cref="AuthService"/> wired to the given DB context and admin-seed options.</summary>
-    private static AuthService CreateSut(AppDbContext dbContext, AdminSeedOptions? adminSeedOptions = null)
+    private static AuthService CreateSut(
+        AppDbContext dbContext,
+        AdminSeedOptions? adminSeedOptions = null,
+        bool requireEmailVerification = false)
     {
         var passwordHasher = new PasswordHasher();
         var tokenService = new TokenService(dbContext, Options.Create(CreateJwtOptions()));
@@ -46,8 +49,22 @@ public class AuthServiceTests
             dbContext,
             passwordHasher,
             tokenService,
+            new GmailEmailService(Options.Create(new EmailOptions { Enabled = false }), NullLogger<GmailEmailService>.Instance),
             Options.Create(adminSeedOptions ?? new AdminSeedOptions { Email = "admin@freightlink.test", Password = "Adm1n$trongPass!" }),
+            Options.Create(new EmailOptions
+            {
+                Enabled = false,
+                FrontendBaseUrl = "http://localhost:5173",
+                RequireEmailVerification = requireEmailVerification
+            }),
             NullLogger<AuthService>.Instance);
+    }
+
+    private static async Task MarkEmailVerifiedAsync(AppDbContext dbContext, Guid userId)
+    {
+        var user = await dbContext.Users.FindAsync(userId);
+        user!.EmailVerifiedAt = DateTimeOffset.UtcNow;
+        await dbContext.SaveChangesAsync();
     }
 
     /// <summary>A valid Shipper registration payload, with an overridable email/business reg no for uniqueness tests.</summary>
@@ -72,18 +89,6 @@ public class AuthServiceTests
         YardAddress = "456 Yard Road, Kandy",
         YardLat = 7.2906m,
         YardLng = 80.6337m
-    };
-
-    /// <summary>A valid Driver registration payload.</summary>
-    private static RegisterDriverRequestDto ValidDriverRequest(Guid agencyId, string email = "driver@example.com", string licenceNo = "DL-123456") => new()
-    {
-        AgencyId = agencyId,
-        Email = email,
-        Password = "Sup3r$ecret1",
-        FullName = "John Driver",
-        PhoneE164 = "+94771234567",
-        LicenceNo = licenceNo,
-        LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(1))
     };
 
     // --- Registration ---
@@ -181,90 +186,6 @@ public class AuthServiceTests
         Assert.True(new PasswordHasher().Verify(request.Password, user.PasswordHash));
     }
 
-    /// <summary>Registering a driver creates both the User (Role=Driver) and Driver entity rows.</summary>
-    [Fact]
-    public async Task RegisterDriverAsync_Succeeds_WithValidData()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var agency = await sut.RegisterAgencyAsync(ValidAgencyRequest());
-        var agencyEntity = await dbContext.Agencies.FirstAsync();
-
-        var driverReq = ValidDriverRequest(agencyEntity.AgencyId);
-        var result = await sut.RegisterDriverAsync(driverReq);
-
-        Assert.NotEqual(Guid.Empty, result.UserId);
-        var user = await dbContext.Users.FindAsync(result.UserId);
-        Assert.NotNull(user);
-        Assert.Equal(UserRole.Driver, user!.Role);
-        var driver = await dbContext.Drivers.FirstOrDefaultAsync(d => d.UserId == result.UserId);
-        Assert.NotNull(driver);
-        Assert.Equal(agencyEntity.AgencyId, driver!.AgencyId);
-        Assert.Equal(driverReq.LicenceNo, driver.LicenceNo);
-    }
-
-    /// <summary>Registering a driver with a non-existent agency throws AGENCY_NOT_FOUND.</summary>
-    [Fact]
-    public async Task RegisterDriverAsync_Throws_WhenAgencyNotFound()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var driverReq = ValidDriverRequest(Guid.NewGuid());
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(driverReq));
-        Assert.Equal(ErrorCode.AGENCY_NOT_FOUND, exception.Code);
-    }
-
-    /// <summary>Registering a driver with an already registered email throws EMAIL_ALREADY_REGISTERED.</summary>
-    [Fact]
-    public async Task RegisterDriverAsync_Throws_WhenEmailAlreadyRegistered()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        await sut.RegisterAgencyAsync(ValidAgencyRequest());
-        var agencyEntity = await dbContext.Agencies.FirstAsync();
-
-        var driverReq = ValidDriverRequest(agencyEntity.AgencyId, email: "dup-driver@example.com");
-        await sut.RegisterDriverAsync(driverReq);
-
-        var duplicateReq = ValidDriverRequest(agencyEntity.AgencyId, email: "dup-driver@example.com", licenceNo: "DL-999999");
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(duplicateReq));
-        Assert.Equal(ErrorCode.EMAIL_ALREADY_REGISTERED, exception.Code);
-    }
-
-    /// <summary>Registering a driver with duplicate licence number throws DRIVER_LICENCE_ALREADY_REGISTERED.</summary>
-    [Fact]
-    public async Task RegisterDriverAsync_Throws_WhenLicenceAlreadyRegistered()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        await sut.RegisterAgencyAsync(ValidAgencyRequest());
-        var agencyEntity = await dbContext.Agencies.FirstAsync();
-
-        var driverReq1 = ValidDriverRequest(agencyEntity.AgencyId, email: "driver1@example.com", licenceNo: "DL-SAME");
-        await sut.RegisterDriverAsync(driverReq1);
-
-        var driverReq2 = ValidDriverRequest(agencyEntity.AgencyId, email: "driver2@example.com", licenceNo: "DL-SAME");
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(driverReq2));
-        Assert.Equal(ErrorCode.DRIVER_LICENCE_ALREADY_REGISTERED, exception.Code);
-    }
-
-    /// <summary>Registering a driver with expired licence throws VALIDATION_ERROR.</summary>
-    [Fact]
-    public async Task RegisterDriverAsync_Throws_WhenLicenceExpired()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        await sut.RegisterAgencyAsync(ValidAgencyRequest());
-        var agencyEntity = await dbContext.Agencies.FirstAsync();
-
-        var driverReq = ValidDriverRequest(agencyEntity.AgencyId);
-        driverReq.LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.RegisterDriverAsync(driverReq));
-        Assert.Equal(ErrorCode.VALIDATION_ERROR, exception.Code);
-    }
-
     /// <summary>GetAgenciesLookupAsync returns non-suspended agencies ordered by name.</summary>
     [Fact]
     public async Task GetAgenciesLookupAsync_ReturnsNonSuspendedAgencies()
@@ -314,12 +235,31 @@ public class AuthServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
-        await sut.RegisterShipperAsync(request);
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
 
         var tokens = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, "test-agent");
 
         Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(tokens.RefreshToken));
+    }
+
+    /// <summary>When enabled, email verification prevents token issuance until the account owner verifies the one-time link.</summary>
+    [Fact]
+    public async Task LoginAsync_Throws_WhenEmailIsNotVerified()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext, requireEmailVerification: true);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+
+        var user = await dbContext.Users.FindAsync(registration.UserId);
+        Assert.NotNull(user!.EmailVerificationTokenHash);
+        Assert.NotNull(user.EmailVerificationTokenExpiresAt);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() =>
+            sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null));
+        Assert.Equal(ErrorCode.EMAIL_NOT_VERIFIED, exception.Code);
     }
 
     /// <summary>Logging in with the wrong password throws INVALID_CREDENTIALS.</summary>
@@ -375,7 +315,8 @@ public class AuthServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
-        await sut.RegisterShipperAsync(request);
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         var refreshed = await sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null);
@@ -403,6 +344,7 @@ public class AuthServiceTests
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
         var registerResult = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registerResult.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         var user = await dbContext.Users.FindAsync(registerResult.UserId);
@@ -421,7 +363,8 @@ public class AuthServiceTests
         using var dbContext = CreateContext();
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
-        await sut.RegisterShipperAsync(request);
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         await sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null);
@@ -440,9 +383,157 @@ public class AuthServiceTests
         var sut = CreateSut(dbContext);
         var request = ValidShipperRequest();
         var registerResult = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registerResult.UserId);
         var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
 
         await sut.LogoutAsync(registerResult.UserId, new RefreshRequestDto { RefreshToken = loginResult.RefreshToken });
+
+        await Assert.ThrowsAsync<ApiException>(() =>
+            sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null));
+    }
+
+    // --- Update profile ---
+
+    /// <summary>Updating name/phone without changing the email leaves email verification untouched.</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_UpdatesNameAndPhone_WithoutTouchingEmailVerification_WhenEmailUnchanged()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest("jane@example.com");
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Updated",
+            Email = "jane@example.com",
+            PhoneE164 = "+14155552671"
+        });
+
+        Assert.Equal("Jane Updated", result.FullName);
+        Assert.Equal("+14155552671", result.PhoneE164);
+        Assert.Equal("jane@example.com", result.Email);
+        Assert.True(result.IsEmailVerified);
+    }
+
+    /// <summary>Changing the email resets verification and issues a fresh verification token.</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_ResetsEmailVerification_WhenEmailChanges()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("old@example.com"));
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Shipper",
+            Email = "new@example.com"
+        });
+
+        Assert.Equal("new@example.com", result.Email);
+        Assert.False(result.IsEmailVerified);
+
+        var user = await dbContext.Users.FindAsync(registration.UserId);
+        Assert.NotNull(user!.EmailVerificationTokenHash);
+        Assert.NotNull(user.EmailVerificationTokenExpiresAt);
+    }
+
+    /// <summary>Changing to an email already registered to a different account throws EMAIL_ALREADY_REGISTERED.</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_Throws_WhenNewEmailBelongsToAnotherAccount()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await sut.RegisterShipperAsync(ValidShipperRequest("taken@example.com"));
+        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("mine@example.com"));
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Shipper",
+            Email = "taken@example.com"
+        }));
+        Assert.Equal(ErrorCode.EMAIL_ALREADY_REGISTERED, exception.Code);
+    }
+
+    /// <summary>Re-submitting the same email in a different case is not treated as a change (normalized comparison).</summary>
+    [Fact]
+    public async Task UpdateProfileAsync_DoesNotResetVerification_WhenEmailOnlyDiffersByCase()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("jane@example.com"));
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
+        {
+            FullName = "Jane Shipper",
+            Email = "JANE@EXAMPLE.COM"
+        });
+
+        Assert.True(result.IsEmailVerified);
+    }
+
+    // --- Change password ---
+
+    /// <summary>Changing the password succeeds and the new password works for a subsequent login.</summary>
+    [Fact]
+    public async Task ChangePasswordAsync_Succeeds_AndNewPasswordWorksForLogin()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        await sut.ChangePasswordAsync(registration.UserId, new ChangePasswordRequestDto
+        {
+            CurrentPassword = request.Password,
+            NewPassword = "N3w$trongPass!"
+        });
+
+        var tokens = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = "N3w$trongPass!" }, null);
+        Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
+    }
+
+    /// <summary>An incorrect current password throws INCORRECT_CURRENT_PASSWORD and leaves the password unchanged.</summary>
+    [Fact]
+    public async Task ChangePasswordAsync_Throws_ForIncorrectCurrentPassword()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+
+        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.ChangePasswordAsync(registration.UserId, new ChangePasswordRequestDto
+        {
+            CurrentPassword = "WrongPassword1!",
+            NewPassword = "N3w$trongPass!"
+        }));
+        Assert.Equal(ErrorCode.INCORRECT_CURRENT_PASSWORD, exception.Code);
+
+        var tokens = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
+        Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
+    }
+
+    /// <summary>A successful password change revokes every active refresh token, including the caller's own.</summary>
+    [Fact]
+    public async Task ChangePasswordAsync_RevokesAllActiveRefreshTokens()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var request = ValidShipperRequest();
+        var registration = await sut.RegisterShipperAsync(request);
+        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
+        var loginResult = await sut.LoginAsync(new LoginRequestDto { Email = request.Email, Password = request.Password }, null);
+
+        await sut.ChangePasswordAsync(registration.UserId, new ChangePasswordRequestDto
+        {
+            CurrentPassword = request.Password,
+            NewPassword = "N3w$trongPass!"
+        });
 
         await Assert.ThrowsAsync<ApiException>(() =>
             sut.RefreshAsync(new RefreshRequestDto { RefreshToken = loginResult.RefreshToken }, null));

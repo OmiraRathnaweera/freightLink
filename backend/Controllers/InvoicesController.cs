@@ -11,7 +11,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace FreightLink.Api.Controllers;
 
 /// <summary>
-/// Invoice management endpoints: manual creation, line items drafting, issuing, voiding, and role-based retrieval.
+/// Invoice management endpoints: manual creation, line items drafting, issuing, voiding, receipt-based
+/// settlement (Shipper uploads proof, Agency confirms), and role-based retrieval.
 /// </summary>
 [ApiController]
 [Route("api/invoices")]
@@ -19,9 +20,9 @@ namespace FreightLink.Api.Controllers;
 [Authorize]
 public class InvoicesController : ControllerBase
 {
-    private const string AgentRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Agent);
+    private const string AgentRoles = nameof(UserRole.AgencyStaff);
     private const string ShipperRoles = nameof(UserRole.Shipper);
-    private const string DeliveryEventRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Agent);
+    private const string DeliveryEventRoles = nameof(UserRole.AgencyStaff);
 
     private readonly IInvoiceService _invoiceService;
 
@@ -49,6 +50,17 @@ public class InvoicesController : ControllerBase
     public async Task<ActionResult<List<InvoiceRecipientDto>>> GetRecipients(CancellationToken cancellationToken)
     {
         var result = await _invoiceService.GetRecipientsAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Admin-only, read-only aggregate cashflow summary: totals, per-status counts, recent activity.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the cashflow summary.</returns>
+    [HttpGet("summary")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<InvoiceSummaryDto>> GetSummary(CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.GetSummaryAsync(GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 
@@ -114,16 +126,33 @@ public class InvoicesController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>Settles and pays an issued invoice (Shipper only).</summary>
+    /// <summary>
+    /// Submits an already-uploaded file as the Shipper's proof-of-payment receipt (Shipper only).
+    /// Advances the invoice to 'PaymentPending' for Agency review.
+    /// </summary>
     /// <param name="id">The invoice's ID.</param>
-    /// <param name="request">Optional payment parameters.</param>
+    /// <param name="request">Reference to the uploaded receipt file.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 OK with the updated invoice.</returns>
+    [HttpPost("{id:guid}/payment-proof")]
+    [Authorize(Roles = ShipperRoles)]
+    public async Task<ActionResult<InvoiceResponseDto>> UploadPaymentProof(Guid id, [FromBody] UploadPaymentProofDto request, CancellationToken cancellationToken)
+    {
+        var result = await _invoiceService.UploadPaymentProofAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Confirms a Shipper's submitted payment receipt and closes the invoice as 'Paid' (Agent only).
+    /// </summary>
+    /// <param name="id">The invoice's ID.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the paid invoice.</returns>
-    [HttpPost("{id:guid}/pay")]
-    [Authorize(Roles = ShipperRoles)]
-    public async Task<ActionResult<InvoiceResponseDto>> Pay(Guid id, [FromBody] PayInvoiceDto? request, CancellationToken cancellationToken)
+    [HttpPost("{id:guid}/confirm-payment")]
+    [Authorize(Roles = AgentRoles)]
+    public async Task<ActionResult<InvoiceResponseDto>> ConfirmPayment(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _invoiceService.PayAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        var result = await _invoiceService.ConfirmPaymentAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
         return Ok(result);
     }
 

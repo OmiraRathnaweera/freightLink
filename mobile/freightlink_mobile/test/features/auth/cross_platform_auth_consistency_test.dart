@@ -34,6 +34,9 @@ void main() {
 
     setUp(() {
       tokenStorage = MockTokenStorage();
+      when(() => tokenStorage.readRefreshToken()).thenAnswer((_) async => null);
+      when(() => tokenStorage.saveTokenPair(accessToken: any(named: 'accessToken'), refreshToken: any(named: 'refreshToken'))).thenAnswer((_) async {});
+      when(() => tokenStorage.clear()).thenAnswer((_) async {});
       mockLoadsRepo = MockLoadsRepository();
       mockTripsRepo = MockTripsRepository();
 
@@ -218,13 +221,11 @@ void main() {
     });
 
     test('6. Admin login is blocked with explicit Web Portal direction policy', () async {
-      when(() => tokenStorage.saveAccessToken(any())).thenAnswer((_) async {});
-      when(() => tokenStorage.clear()).thenAnswer((_) async {});
 
       final client = MockClient((request) async {
         if (request.url.path.endsWith('/auth/login')) {
           return http.Response(
-            jsonEncode({'accessToken': 'admin-jwt-token'}),
+            jsonEncode({'accessToken': 'admin-jwt-token', 'refreshToken': 'admin-refresh-token'}),
             200,
             headers: {'content-type': 'application/json'},
           );
@@ -256,7 +257,7 @@ void main() {
       );
 
       expect(success, isFalse);
-      expect(authProvider.status, AuthStatus.unknown);
+      expect(authProvider.status, AuthStatus.guest);
       expect(
         authProvider.errorMessage,
         'Admin accounts can\'t sign in to the mobile app. Please use the web portal instead.',
@@ -265,13 +266,11 @@ void main() {
     });
 
     test('7. 401 Unauthorized invokes session clearing and switches status to guest', () async {
-      when(() => tokenStorage.saveAccessToken(any())).thenAnswer((_) async {});
-      when(() => tokenStorage.clear()).thenAnswer((_) async {});
 
       final client = MockClient((request) async {
         if (request.url.path.endsWith('/auth/login')) {
           return http.Response(
-            jsonEncode({'accessToken': 'valid-token'}),
+            jsonEncode({'accessToken': 'valid-token', 'refreshToken': 'valid-refresh-token'}),
             200,
             headers: {'content-type': 'application/json'},
           );
@@ -286,6 +285,15 @@ void main() {
               'isActive': true,
             }),
             200,
+            headers: {'content-type': 'application/json'},
+          );
+        }
+        if (request.url.path.endsWith('/auth/refresh')) {
+          return http.Response(
+            jsonEncode({
+              'error': {'code': 'INVALID_REFRESH_TOKEN', 'message': 'Refresh token expired.'}
+            }),
+            401,
             headers: {'content-type': 'application/json'},
           );
         }

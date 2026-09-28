@@ -26,14 +26,17 @@ public interface IAuthService
     /// <exception cref="Common.Exceptions.ApiException">409 if the email or business registration number is already registered.</exception>
     Task<RegisterResponseDto> RegisterAgencyAsync(RegisterAgencyRequestDto request, CancellationToken cancellationToken = default);
 
-    /// <summary>
-    /// Registers a new Driver under an existing agency: creates the <c>User</c> row and its <c>Driver</c> profile atomically.
-    /// </summary>
-    /// <param name="request">Validated driver registration payload.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A success message with the new user's id and email.</returns>
-    /// <exception cref="Common.Exceptions.ApiException">404 if the agency does not exist; 409 if email or licence number is already registered.</exception>
-    Task<RegisterResponseDto> RegisterDriverAsync(RegisterDriverRequestDto request, CancellationToken cancellationToken = default);
+    /// <summary>Requests a password-reset email without revealing whether the address belongs to an account.</summary>
+    Task RequestPasswordResetAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Consumes a one-time reset token, changes the password, and revokes all active sessions.</summary>
+    Task ResetPasswordAsync(ResetPasswordRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Consumes a one-time email-verification token.</summary>
+    Task VerifyEmailAsync(VerifyEmailRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Resends an email-verification message without revealing account existence.</summary>
+    Task ResendEmailVerificationAsync(ForgotPasswordRequestDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns a list of active agencies available for driver registration selection.
@@ -70,6 +73,27 @@ public interface IAuthService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The current user's safe profile.</returns>
     Task<CurrentUserResponseDto> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the authenticated caller's own name/email/phone. Changing the email resets email
+    /// verification and sends a fresh verification message, mirroring registration.
+    /// </summary>
+    /// <param name="userId">The id of the authenticated caller, from the access token claims.</param>
+    /// <param name="request">Validated profile-update payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The caller's updated safe profile.</returns>
+    /// <exception cref="Common.Exceptions.ApiException">409 if the new email is already registered to another account.</exception>
+    Task<CurrentUserResponseDto> UpdateProfileAsync(Guid userId, UpdateProfileRequestDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Changes the authenticated caller's own password after re-confirming the current one, then
+    /// revokes every active session (including the caller's own), mirroring <see cref="ResetPasswordAsync"/>.
+    /// </summary>
+    /// <param name="userId">The id of the authenticated caller, from the access token claims.</param>
+    /// <param name="request">Validated change-password payload.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="Common.Exceptions.ApiException">401 if <see cref="ChangePasswordRequestDto.CurrentPassword"/> doesn't match.</exception>
+    Task ChangePasswordAsync(Guid userId, ChangePasswordRequestDto request, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates the default Admin user from <c>ADMIN_USER_EMAIL</c>/<c>ADMIN_USER_PASSWORD</c> if one

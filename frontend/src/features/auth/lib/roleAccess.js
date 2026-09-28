@@ -16,10 +16,15 @@ import { UserRole } from '../../../lib/enums.js'
 // Matches docs/api-contract-openapi-skeleton.md's per-resource role matrix
 // (Sections 4.2-4.6).
 export const ROLE_ALLOWED_PREFIXES = {
-  [UserRole.SHIPPER]: ['/loads', '/billing', '/agent-workflows'],
-  [UserRole.AGENCY_STAFF]: ['/loads', '/agencies', '/trips', '/billing'],
+  // '/trips/' (trailing slash, not bare '/trips') deliberately grants only
+  // trip-detail pages, not the Agency Staff trips list — a Shipper can view
+  // their own load's dispatched trip once they have its id (from
+  // LoadResponseDto.tripId), but GET /trips (list) is Agency/Driver/Admin
+  // only on the backend regardless.
+  [UserRole.SHIPPER]: ['/loads', '/billing', '/agent-workflows', '/trips/', '/my-disputes'],
+  [UserRole.AGENCY_STAFF]: ['/loads', '/agencies', '/trips', '/billing', '/my-disputes'],
   [UserRole.DRIVER]: [], // Requirement 1: drivers only have access to mobile application UI
-  [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/agent-workflows', '/pricing-config', '/disputes'],
+  [UserRole.ADMIN]: ['/loads', '/agencies', '/trips', '/billing', '/pricing-config', '/disputes', '/analytics'],
 }
 
 function isPathGated(pathname) {

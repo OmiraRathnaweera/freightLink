@@ -27,6 +27,15 @@ export const LoadStatus = Object.freeze({
   CANCELLED: 'Cancelled',
 })
 
+// Lifecycle of a manual price proposal an Agency sends on a Posted load, alongside (not through)
+// the multi-agent matching pipeline.
+export const LoadProposalStatus = Object.freeze({
+  PENDING: 'Pending',
+  ACCEPTED: 'Accepted',
+  REJECTED: 'Rejected',
+  WITHDRAWN: 'Withdrawn',
+})
+
 // Kind of file attached to a load.
 export const FileType = Object.freeze({
   MANIFEST: 'Manifest',
@@ -113,14 +122,17 @@ export const EvidenceType = Object.freeze({
 })
 
 // --- Component D: Billing ---
-// Lifecycle of an invoice.
+// Lifecycle of an invoice. Matches the backend's InvoiceStatus enum exactly
+// (Draft -> Issued -> PaymentPending -> Paid, with Failed/Void reachable from
+// most non-terminal states) — see ADR-021. There is no Refunded or Overdue
+// status on the backend; do not reintroduce either here.
 export const InvoiceStatus = Object.freeze({
   DRAFT: 'Draft',
   ISSUED: 'Issued',
   PAYMENT_PENDING: 'PaymentPending',
   PAID: 'Paid',
   FAILED: 'Failed',
-  REFUNDED: 'Refunded',
+  VOID: 'Void',
 })
 
 // State of a payment attempt against an invoice.

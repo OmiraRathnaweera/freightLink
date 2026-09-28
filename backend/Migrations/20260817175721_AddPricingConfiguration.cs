@@ -117,7 +117,7 @@ namespace FreightLink.Api.Migrations
             // DELETE, as a database-level backstop; it never infers who issued the delete, since the
             // service layer is the sole source of the acting Admin's id.
             migrationBuilder.Sql("""
-                CREATE FUNCTION fn_deny_delete() RETURNS trigger AS $$
+                CREATE OR REPLACE FUNCTION fn_deny_delete() RETURNS trigger AS $$
                 BEGIN
                     RAISE EXCEPTION '% rows cannot be hard-deleted; soft-delete via DeletedAt/DeletedByUserId instead', TG_TABLE_NAME;
                     RETURN NULL;

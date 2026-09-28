@@ -40,7 +40,37 @@ class FleetListScreen extends StatelessWidget {
                   leading: const CircleAvatar(child: Icon(Icons.local_shipping)),
                   title: Text(vehicle['registrationNo'] ?? 'Unknown Vehicle'),
                   subtitle: Text('${vehicle['vehicleType'] ?? ''} - Status: ${vehicle['status'] ?? ''}'),
-                  trailing: Text('${vehicle['capacityKg'] ?? '0'} kg'),
+                  trailing: PopupMenuButton<String>(
+                    tooltip: 'Manage availability',
+                    onSelected: (status) async {
+                      final success = await provider.updateVehicleStatus(
+                        vehicle['vehicleId'] as String,
+                        status,
+                      );
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(success
+                              ? 'Vehicle availability updated to $status.'
+                              : provider.errorMessage ?? 'Could not update vehicle availability.'),
+                        ),
+                      );
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'Available', child: Text('Mark available')),
+                      PopupMenuItem(value: 'Maintenance', child: Text('Mark in maintenance')),
+                      PopupMenuItem(value: 'Retired', child: Text('Retire vehicle')),
+                    ],
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text('${vehicle['capacityKg'] ?? '0'} kg'),
+                        const SizedBox(height: 2),
+                        const Icon(Icons.more_vert, size: 18),
+                      ],
+                    ),
+                  ),
                 );
               },
             );

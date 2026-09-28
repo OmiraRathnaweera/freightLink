@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/auth/screens/account_settings_screen.dart';
 import '../../features/notifications/providers/notification_provider.dart';
 import '../../features/notifications/widgets/notification_center_sheet.dart';
 
@@ -75,9 +76,9 @@ class _BackButton extends StatelessWidget {
 }
 
 /// The circular avatar shown as the leading widget on top-level tab screens.
-/// Tapping it opens a small menu with the signed-in user's name/email and a
-/// "Log out" action — there's no dedicated account screen yet, so this is
-/// the one place logout is reachable from.
+/// Tapping it opens a small menu with the signed-in user's name/email, a
+/// "My Account" action (opens [AccountSettingsScreen]), and a "Log out"
+/// action — the one place both are reachable from, for every role.
 class AppAvatar extends StatelessWidget {
   const AppAvatar({super.key});
 
@@ -149,6 +150,20 @@ class AppAvatar extends StatelessWidget {
             ),
           if (user != null) const PopupMenuDivider(),
           const PopupMenuItem<String>(
+            value: _accountMenuValue,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.manage_accounts_outlined,
+                  size: 18,
+                  color: AppColors.inkMuted,
+                ),
+                SizedBox(width: 12),
+                Text('My Account'),
+              ],
+            ),
+          ),
+          const PopupMenuItem<String>(
             value: _logoutMenuValue,
             child: Row(
               children: [
@@ -166,7 +181,15 @@ class AppAvatar extends StatelessWidget {
             ),
           ),
         ],
-        onSelected: (_) => _confirmLogout(context, auth),
+        onSelected: (value) {
+          if (value == _accountMenuValue) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AccountSettingsScreen()),
+            );
+          } else {
+            _confirmLogout(context, auth);
+          }
+        },
         child: CircleAvatar(
           radius: 16,
           backgroundColor: AppColors.statusNeutralBg,
@@ -185,6 +208,7 @@ class AppAvatar extends StatelessWidget {
 }
 
 const _logoutMenuValue = 'logout';
+const _accountMenuValue = 'account';
 
 /// The notification bell trailing action shown on top-level tab screens.
 class NotificationBellButton extends StatelessWidget {

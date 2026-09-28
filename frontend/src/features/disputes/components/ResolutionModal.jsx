@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { X, CheckCircle2, AlertCircle, Loader2, ArrowRight } from 'lucide-react'
+import { X, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react'
 import Button from '../../../components/Button.jsx'
 import Textarea from '../../../components/Textarea.jsx'
 import DisputeCategoryBadge from './DisputeCategoryBadge.jsx'
@@ -11,15 +11,19 @@ export default function ResolutionModal({ dispute, isOpen, onClose, onConfirm, i
   const [error, setError] = useState(null)
   const [touched, setTouched] = useState(false)
 
-  // Reset form when modal opens with a new dispute
-  useEffect(() => {
+  // Reset form when the modal opens for a (possibly new) dispute. Adjusted directly during
+  // render rather than in an effect, per https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes â€” `openKey` tracks the last (isOpen, disputeId) pair the form was reset for, so this only fires once per actual change, not on every render.
+  const openKey = isOpen ? (dispute?.disputeId ?? 'open') : null
+  const [resetForKey, setResetForKey] = useState(openKey)
+  if (openKey !== resetForKey) {
+    setResetForKey(openKey)
     if (isOpen) {
       setOutcome('Upheld')
       setResolutionNote('')
       setError(null)
       setTouched(false)
     }
-  }, [isOpen, dispute?.disputeId])
+  }
 
   // Handle Escape key
   useEffect(() => {

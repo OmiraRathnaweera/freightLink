@@ -156,7 +156,7 @@ function EditTripDialog({ trip, onClose }) {
               >
                 <option value="">-- Choose an active driver --</option>
                 {drivers.map((d) => {
-                  const isActive = d.driverId === trip.driverId || (d.isActive && d.status === "Active");
+                  const isActive = d.driverId === trip.driverId || d.status === "Active";
                   return (
                     <option key={d.driverId} value={d.driverId} disabled={!isActive}>
                       {d.fullName}

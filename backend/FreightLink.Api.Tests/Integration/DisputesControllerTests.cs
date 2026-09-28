@@ -4,6 +4,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Disputes;
 using FreightLink.Api.Entities;
@@ -19,8 +21,16 @@ namespace FreightLink.Api.Tests.Integration;
 /// </summary>
 public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory>
 {
+    private static readonly JsonSerializerOptions ApiJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     private readonly CustomWebApplicationFactory _factory;
     private readonly HttpClient _client;
+
+    private static Task<DisputeResponseDto?> ReadDisputeAsync(HttpContent content) =>
+        content.ReadFromJsonAsync<DisputeResponseDto>(ApiJsonOptions);
 
     public DisputesControllerTests(CustomWebApplicationFactory factory)
     {
@@ -226,7 +236,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        var dispute = await response.Content.ReadFromJsonAsync<DisputeResponseDto>();
+        var dispute = await ReadDisputeAsync(response.Content);
         Assert.NotNull(dispute);
         Assert.Equal(trip.TripId, dispute.TripId);
         Assert.Equal(DisputeStatus.Raised, dispute.Status);
@@ -250,7 +260,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         };
         createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
         var createRes = await _client.SendAsync(createReq);
-        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        var created = (await ReadDisputeAsync(createRes.Content))!;
         Assert.Equal(DisputeStatus.Raised, created.Status);
 
         // Move to UnderReview first
@@ -258,7 +268,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         reviewReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
         var reviewRes = await _client.SendAsync(reviewReq);
         Assert.Equal(HttpStatusCode.OK, reviewRes.StatusCode);
-        var reviewed = (await reviewRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        var reviewed = (await ReadDisputeAsync(reviewRes.Content))!;
         Assert.Equal(DisputeStatus.UnderReview, reviewed.Status);
 
         // Then resolve
@@ -274,7 +284,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         var resolveRes = await _client.SendAsync(resolveReq);
 
         Assert.Equal(HttpStatusCode.OK, resolveRes.StatusCode);
-        var resolved = await resolveRes.Content.ReadFromJsonAsync<DisputeResponseDto>();
+        var resolved = await ReadDisputeAsync(resolveRes.Content);
         Assert.NotNull(resolved);
         Assert.Equal(DisputeStatus.Resolved, resolved.Status);
         Assert.NotNull(resolved.Resolution);
@@ -299,7 +309,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         };
         createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
         var createRes = await _client.SendAsync(createReq);
-        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        var created = (await ReadDisputeAsync(createRes.Content))!;
 
         // Attempting direct jump Raised -> Resolved must return 400 Bad Request
         var resolveReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/disputes/{created.DisputeId}/resolve")
@@ -334,7 +344,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         };
         createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
         var createRes = await _client.SendAsync(createReq);
-        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        var created = (await ReadDisputeAsync(createRes.Content))!;
 
         // Move to review
         var reviewReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/review");
@@ -374,7 +384,7 @@ public class DisputesControllerTests : IClassFixture<CustomWebApplicationFactory
         };
         createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
         var createRes = await _client.SendAsync(createReq);
-        var created = (await createRes.Content.ReadFromJsonAsync<DisputeResponseDto>())!;
+        var created = (await ReadDisputeAsync(createRes.Content))!;
 
         // Move to review
         var reviewReq = new HttpRequestMessage(HttpMethod.Patch, $"/api/v1/disputes/{created.DisputeId}/review");

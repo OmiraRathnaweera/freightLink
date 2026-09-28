@@ -22,13 +22,17 @@ class StatusPill extends StatelessWidget {
         color: background,
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        label.toUpperCase(),
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-          color: foreground,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          label.toUpperCase(),
+          maxLines: 1,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.3,
+            color: foreground,
+          ),
         ),
       ),
     );

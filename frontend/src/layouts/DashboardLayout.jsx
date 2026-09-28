@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import {
+  BarChart3,
   Building2,
   CircleDollarSign,
   LogOut,
@@ -50,8 +51,16 @@ import { cx } from '../lib/cx.js'
 // bounced from, and there's one place (not two) to update when a role
 // gains access to a route.
 const GET_NAV_ITEMS = (role) => [
-  { to: '/loads', label: 'Loads', icon: Package },
-  { 
+  {
+    to: '/loads',
+    label: 'Loads',
+    icon: Package,
+    children: role === 'Shipper' ? [
+      { to: '/loads', label: 'My Loads', end: true },
+      { to: '/loads/proposals', label: 'Load Proposals' },
+    ] : undefined,
+  },
+  {
     to: '/agencies', 
     label: role === 'AgencyStaff' ? 'My Agency' : 'Agencies', 
     icon: Building2, 
@@ -60,11 +69,13 @@ const GET_NAV_ITEMS = (role) => [
       { to: '/agencies/verification', label: 'Verification Queue' } 
     ] : role === 'AgencyStaff' ? [
       { to: '/agencies', label: 'Compliance & Profile', end: true },
-      { to: '/agencies/vehicles', label: 'Fleet Vehicles' }
+      { to: '/agencies/vehicles', label: 'Fleet Vehicles' },
+      { to: '/agencies/drivers', label: 'Fleet Drivers' }
     ] : undefined
   },
   { to: '/trips', label: 'Trips', icon: RouteIcon },
   { to: '/billing', label: 'Billing', icon: Receipt },
+  { to: '/my-disputes', label: 'My Disputes', icon: Scale },
   { to: '/agent-workflows', label: 'Agent Workflows', icon: Workflow },
   {
     to: '/pricing-config',
@@ -77,6 +88,7 @@ const GET_NAV_ITEMS = (role) => [
     ],
   },
   { to: '/disputes', label: 'Disputes', icon: Scale },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ]
 
 function DashboardLayout() {
@@ -178,7 +190,14 @@ function DashboardLayoutContent() {
           )}
         </nav>
         <div className="flex items-center justify-between gap-2 border-t border-primary-container px-4 py-3">
-          <span className="truncate text-body-md text-on-primary/70">{user?.email}</span>
+          <NavLink
+            to="/account"
+            onClick={closeSidebar}
+            className="truncate text-body-md text-on-primary/70 hover:text-on-primary hover:underline"
+            title="My Account"
+          >
+            {user?.email}
+          </NavLink>
           <button
             type="button"
             onClick={() => dispatch(logout())}

@@ -11,14 +11,13 @@ public class VehicleCreateDto
     public string RegistrationNo { get; set; } = string.Empty;
 
     [Required]
+    [EnumDataType(typeof(VehicleType))]
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public VehicleType VehicleType { get; set; }
+    public VehicleType? VehicleType { get; set; }
 
-    [Required]
-    [Range(0, 100000)]
+    [Range(typeof(decimal), "0.01", "100000")]
     public decimal CapacityKg { get; set; }
 
-    [Required]
-    [Range(0, 1000)]
+    [Range(typeof(decimal), "0.001", "1000")]
     public decimal VolumeM3 { get; set; }
 }

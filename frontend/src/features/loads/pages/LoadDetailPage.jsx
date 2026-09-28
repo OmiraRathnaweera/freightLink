@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Sparkles, Truck } from 'lucide-react'
+import { ArrowLeft, Sparkles, Truck } from 'lucide-react'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
@@ -18,6 +18,7 @@ import LoadFilesSection from '../components/LoadFilesSection.jsx'
 import LoadStatusHistoryCard from '../components/LoadStatusHistoryCard.jsx'
 import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
 import AcceptShipmentDialog from '../components/AcceptShipmentDialog.jsx'
+import PriceEstimateCard from '../components/PriceEstimateCard.jsx'
 
 // Load detail — GET /api/v1/loads/{id}, full LoadResponseDto
 // (docs/load-management-api.md Section 3.6). RateBreakdownCard/
@@ -74,16 +75,6 @@ function LoadDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {role === UserRole.AGENCY_STAFF && load.status === 'Posted' && (
-            <Button
-              variant="primary"
-              onClick={() => setIsAcceptOpen(true)}
-              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              Accept Shipment
-            </Button>
-          )}
           {role === UserRole.AGENCY_STAFF && load.status === 'Matched' && (
             <Button
               as={Link}
@@ -95,7 +86,7 @@ function LoadDetailPage() {
               Dispatch Driver & Vehicle
             </Button>
           )}
-          {(role === UserRole.SHIPPER || role === UserRole.ADMIN) && (load.status === 'Posted' || load.status === 'Matched') && (
+          {role === UserRole.SHIPPER && (load.status === 'Posted' || load.status === 'Matched') && (
             <Button
               as={Link}
               to={`/agent-workflows?loadId=${load.loadId}`}
@@ -104,6 +95,17 @@ function LoadDetailPage() {
             >
               <Sparkles className="h-4 w-4 text-amber-300" />
               {load.status === 'Matched' ? 'View AI Match' : 'Review AI Match'}
+            </Button>
+          )}
+          {load.tripId && (role === UserRole.SHIPPER || role === UserRole.ADMIN) && (
+            <Button
+              as={Link}
+              to={`/trips/${load.tripId}`}
+              variant="secondary"
+              className="inline-flex items-center gap-1.5"
+            >
+              <Truck className="h-4 w-4" />
+              View Trip Status
             </Button>
           )}
           {canEditLoad(role, load.status) && (
@@ -119,7 +121,7 @@ function LoadDetailPage() {
         </div>
       </div>
 
-      {(load.status === 'Posted' || load.status === 'Matched') && (
+      {role === UserRole.SHIPPER && (load.status === 'Posted' || load.status === 'Matched') && (
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary-fixed/40 via-surface-container-low to-surface-container p-4 shadow-soft">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
@@ -195,6 +197,8 @@ function LoadDetailPage() {
             destinationLat={load.dropoffLat}
             destinationLng={load.dropoffLng}
           />
+
+          {role === UserRole.SHIPPER && <PriceEstimateCard loadId={load.loadId} />}
 
           <LoadFilesSection loadId={load.loadId} role={role} />
         </div>

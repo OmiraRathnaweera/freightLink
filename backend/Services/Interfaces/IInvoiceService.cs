@@ -36,13 +36,26 @@ public interface IInvoiceService
     Task<List<InvoiceRecipientDto>> GetRecipientsAsync(Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Settle and pay an issued invoice (Shipper only). Locks invoice from further edits or voiding.
+    /// Attaches an already-uploaded file as the Shipper's proof-of-payment receipt for an Issued
+    /// (or previously-submitted) invoice, and advances its status to PaymentPending for Agency review.
     /// </summary>
-    Task<InvoiceResponseDto> PayAsync(Guid invoiceId, Guid currentUserId, UserRole role, PayInvoiceDto? request = null, CancellationToken cancellationToken = default);
+    Task<InvoiceResponseDto> UploadPaymentProofAsync(Guid invoiceId, Guid currentUserId, UserRole role, UploadPaymentProofDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Closes out a PaymentPending invoice as Paid (Agency only), after the Agency has reviewed the
+    /// Shipper's submitted payment proof. Fails if no payment proof has been submitted yet.
+    /// </summary>
+    Task<InvoiceResponseDto> ConfirmPaymentAsync(Guid invoiceId, Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Idempotency guard for legacy trip-delivered callbacks. Returns existing invoice if one exists,
     /// or safely creates a placeholder invoice if none exists.
     /// </summary>
     Task<InvoiceResponseDto> CreateOnTripDeliveredAsync(Guid tripId, Guid? currentUserId = null, UserRole? role = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Admin-only, read-only aggregate cashflow summary: totals, per-status counts, and recent activity,
+    /// computed at the database level across all invoices.
+    /// </summary>
+    Task<InvoiceSummaryDto> GetSummaryAsync(Guid currentUserId, UserRole role, CancellationToken cancellationToken = default);
 }

@@ -102,6 +102,7 @@ class Load {
     this.estimatedPrice,
     required this.status,
     this.workflowRunId,
+    this.tripId,
     required this.createdAt,
     required this.updatedAt,
     this.statusHistory = const [],
@@ -127,6 +128,7 @@ class Load {
       estimatedPrice: (json['estimatedPrice'] as num?)?.toDouble(),
       status: LoadStatus.fromWire(json['status'] as String),
       workflowRunId: json['workflowRunId'] as String?,
+      tripId: json['tripId'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       statusHistory: (json['statusHistory'] as List<dynamic>? ?? [])
@@ -154,6 +156,7 @@ class Load {
   final double? estimatedPrice;
   final LoadStatus status;
   final String? workflowRunId;
+  final String? tripId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<LoadStatusEvent> statusHistory;

@@ -29,6 +29,7 @@ export const loadKeys = {
  * @property {string} pickupWindowEnd
  * @property {number|null} estimatedPrice
  * @property {string} status
+ * @property {boolean} hasTrip - True once a Trip has been dispatched for this load's assignment; status alone stays 'Matched' through dispatch, so this is what gates a one-time "Dispatch" action.
  * @property {string} createdAt
  */
 
@@ -93,6 +94,15 @@ export async function cancelLoad(id, { reason }) {
 /** Publishes a Draft load via `changeLoadStatus`. */
 export async function publishLoad(id) {
   return changeLoadStatus(id, { status: 'Posted' })
+}
+
+/**
+ * POST /loads/{id}/estimate â€” a rough, pre-matching price quote using the load's own
+ * pickup/dropoff coordinates (haversine distance, no routing call). Preview only: it is not
+ * persisted, and is distinct from the load's own `estimatedPrice` field (the AI agent's price).
+ */
+export async function estimateLoadPrice(id) {
+  return api.post(`/loads/${id}/estimate`)
 }
 
 /**
@@ -187,6 +197,14 @@ export function usePublishLoadMutation(id, options) {
       queryClient.invalidateQueries({ queryKey: loadKeys.detail(id) })
       options?.onSuccess?.(data, variables, context)
     },
+    ...options,
+  })
+}
+
+/** Price-estimate mutation, scoped to one load â€” no cache invalidation, since nothing is persisted. */
+export function useEstimateLoadPriceMutation(id, options) {
+  return useMutation({
+    mutationFn: () => estimateLoadPrice(id),
     ...options,
   })
 }

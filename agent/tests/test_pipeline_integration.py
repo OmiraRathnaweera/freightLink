@@ -31,12 +31,10 @@ def mock_planner_llm():
             ],
         }
     )
-    mock_llm.justify_selection = AsyncMock(
-        return_value={
-            "headline": "Optimal match: Peliyagoda Logistics",
-            "detailed_reasoning": "Fastest positioning ETA with verified MediumLorry capacity.",
-        }
-    )
+    # Deliberately no run_tool_calling_selection mock: calling it on this plain MagicMock
+    # raises (not awaitable), which agents.matching_pricing.run() catches and falls back to
+    # its own deterministic selection algorithm - proven separately, with a real tool-
+    # calling mock, in tests/test_matching_pricing.py.
     return mock_llm
 
 
@@ -110,6 +108,7 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
     mock_step2_report = AsyncMock()
     mock_step3_report = AsyncMock()
     mock_step4_report = AsyncMock()
+    mock_record_match_candidates = AsyncMock()
 
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
@@ -118,8 +117,13 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
             "freightlink_agent.agents.matching_pricing.get_price_estimate",
             new=AsyncMock(return_value=(mock_pricing_response, {"httpStatusCode": 200, "durationMs": 45})),
         ),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
         patch("freightlink_agent.agents.planner.report", new=mock_step1_report),
         patch("freightlink_agent.agents.domain_analysis.report", new=mock_step2_report),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=mock_record_match_candidates),
         patch("freightlink_agent.agents.matching_pricing.report", new=mock_step3_report),
         patch("freightlink_agent.agents.validation_safety.report", new=mock_step4_report),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
@@ -167,6 +171,13 @@ async def test_pipeline_happy_path_all_four_agents(mock_planner_llm, sample_cand
     candidates = result.get("candidates", [])
     assert len(candidates) == 2
     assert all(c["eligible"] is True for c in candidates)
+
+    # Agent 2 persists the full evaluated shortlist as real MatchCandidate audit rows
+    # (POST /internal/agent-workflow-runs/{id}/candidates), not just embedded step JSON.
+    mock_record_match_candidates.assert_awaited_once()
+    recorded = mock_record_match_candidates.await_args.args[1]
+    assert len(recorded) == 2
+    assert all(r.eligible for r in recorded)
 
     tool_calls = result.get("tool_calls", [])
     assert len(tool_calls) >= 3  # 2 candidate routes + 1 cargo route + 1 pricing
@@ -255,8 +266,13 @@ async def test_short_circuit_agent_2_zero_eligible_agencies(mock_planner_llm):
 
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
         patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=AsyncMock()),
     ):
         pipeline = get_pipeline()
         result = await pipeline.ainvoke(state)
@@ -306,8 +322,13 @@ async def test_short_circuit_agent_3_routing_failure(mock_planner_llm, sample_ca
 
     with (
         patch("freightlink_agent.agents.planner.get_llm", return_value=mock_planner_llm),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
         patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=AsyncMock()),
         patch(
             "freightlink_agent.agents.matching_pricing.get_route_and_eta",
             new=AsyncMock(return_value=(failed_route, {"httpStatusCode": 504, "request": {}})),
@@ -332,8 +353,13 @@ async def test_short_circuit_agent_3_routing_failure(mock_planner_llm, sample_ca
 
 
 @pytest.mark.anyio
-async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates):
-    """Tests the HTTP POST /workflows/match endpoint contract end-to-end."""
+async def test_post_workflows_run_endpoint(mock_planner_llm, sample_candidates):
+    """Tests the HTTP POST /workflows/run endpoint contract end-to-end.
+
+    Replaces the old /workflows/match endpoint test - that route had no
+    production consumer (the backend only ever calls /workflows/run) and
+    was removed per plans/01-python-service-consolidation.md §3.
+    """
     from freightlink_agent.core.config import get_settings
 
     settings = get_settings()
@@ -385,13 +411,18 @@ async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates
         ),
         patch("freightlink_agent.agents.planner.report", new=AsyncMock()),
         patch("freightlink_agent.agents.domain_analysis.report", new=AsyncMock()),
+        patch("freightlink_agent.agents.domain_analysis.record_match_candidates", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.report", new=AsyncMock()),
         patch("freightlink_agent.agents.validation_safety.report", new=AsyncMock()),
         patch("freightlink_agent.agents.matching_pricing.record_tool_call", new=AsyncMock()),
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=uuid.uuid4())),
+        ),
     ):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             res = await client.post(
-                "/workflows/match",
+                "/workflows/run",
                 json=payload,
                 headers={"X-Internal-Api-Key": api_key},
             )
@@ -399,12 +430,6 @@ async def test_post_workflows_match_endpoint(mock_planner_llm, sample_candidates
     assert res.status_code == 200
     data = res.json()
 
-    # Verify exact consolidated response contract
-    assert "plan" in data and "objective" in data["plan"]
-    assert "steps" in data and len(data["steps"]) == 4
-    assert "candidates" in data and len(data["candidates"]) >= 1
-    assert "toolCalls" in data and len(data["toolCalls"]) >= 2
-    assert "rankedFive" in data and len(data["rankedFive"]) >= 1
-    assert "mostSuitable" in data and data["mostSuitable"] is not None
-    assert data["mostSuitable"]["estimatedPrice"] == 19000.0
-    assert "validation" in data and data["validation"]["recommendation"] == "Approve"
+    assert "workflowRunId" in data
+    assert "objective" in data
+    assert "planJson" in data

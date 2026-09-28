@@ -34,9 +34,6 @@ public class TripsController : ControllerBase
     /// <summary>Role authorized to dispatch trips (Requirement 3: only agencies dispatch trips).</summary>
     private const string AgencyStaffRole = nameof(UserRole.AgencyStaff);
 
-    /// <summary>Roles authorized to update, cancel, or delete trips (Requirement 4: drivers strictly excluded).</summary>
-    private const string AgencyStaffOrAdminRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Admin);
-
     /// <summary>See remarks on <see cref="ShipperOrAdminRoles"/> for why these are <see langword="nameof"/>-built, not string literals.</summary>
     private const string AgencyStaffOrDriverOrAdminRoles = nameof(UserRole.AgencyStaff) + "," + nameof(UserRole.Driver) + "," + nameof(UserRole.Admin);
 
@@ -106,14 +103,15 @@ public class TripsController : ControllerBase
     }
 
     /// <summary>
-    /// Modifies an existing trip's vehicle or driver assignment prior to departure (while still in Assigned status).
+    /// Modifies an existing trip's vehicle or driver assignment prior to departure (while still in
+    /// Assigned status). Only Agency Staff may update trips — Admin has view-only access (Requirement 4).
     /// </summary>
     /// <param name="id">The trip's id.</param>
     /// <param name="request">The updated vehicle and/or driver ids with optional notes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the updated <see cref="TripResponseDto"/>.</returns>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<ActionResult<TripResponseDto>> Update(Guid id, [FromBody] UpdateTripDto request, CancellationToken cancellationToken)
     {
         var result = await _tripService.UpdateAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -139,13 +137,13 @@ public class TripsController : ControllerBase
 
     /// <summary>
     /// Permanently deletes a trip record and unclaims the associated shipment load (reverting its status to Posted).
-    /// Only Agency Staff may delete trips (Requirement 4).
+    /// Only Agency Staff may delete trips — Admin has view-only access (Requirement 4).
     /// </summary>
     /// <param name="id">The trip's id.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>204 NoContent upon successful deletion.</returns>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
         await _tripService.DeleteAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -154,14 +152,14 @@ public class TripsController : ControllerBase
 
     /// <summary>
     /// Cancels an active trip (Assigned, PickedUp, or InTransit) with an optional request body.
-    /// Only Agency Staff may cancel trips (Requirement 4).
+    /// Only Agency Staff may cancel trips — Admin has view-only access (Requirement 4).
     /// </summary>
     /// <param name="id">The trip's id.</param>
     /// <param name="request">Optional cancellation payload.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 OK with the cancelled <see cref="TripResponseDto"/>.</returns>
     [HttpPatch("{id:guid}/cancel")]
-    [Authorize(Roles = AgencyStaffOrAdminRoles)]
+    [Authorize(Roles = AgencyStaffRole)]
     public async Task<ActionResult<TripResponseDto>> Cancel(Guid id, [FromBody] CancelTripDto? request, CancellationToken cancellationToken)
     {
         var result = await _tripService.CancelAsync(id, request, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
@@ -170,15 +168,16 @@ public class TripsController : ControllerBase
 
     /// <summary>
     /// Captures proof-of-pickup or proof-of-delivery by linking an already-uploaded file (from
-    /// <c>POST /api/v1/files/single</c>). AgencyStaff may only submit <c>PickupProof</c>; Driver may
-    /// only submit <c>DeliveryProof</c> — enforced by the service layer, not this controller.
+    /// <c>POST /api/v1/files/single</c>). Driver-only: the assigned Driver captures both evidence
+    /// types over the course of a trip (pickup at departure, delivery at handover) — Agency Staff no
+    /// longer submits evidence directly.
     /// </summary>
     /// <param name="id">The trip's id.</param>
     /// <param name="request">The uploaded file's public id, evidence type, and optional GPS coordinates.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>201 with the created <see cref="TripEvidenceResponseDto"/>.</returns>
     [HttpPost("{id:guid}/evidence")]
-    [Authorize(Roles = AgencyStaffOrDriverRoles)]
+    [Authorize(Roles = nameof(UserRole.Driver))]
     public async Task<ActionResult<TripEvidenceResponseDto>> UploadEvidence(Guid id, [FromBody] UploadTripEvidenceDto request, CancellationToken cancellationToken)
     {
         var result = await _tripService.UploadEvidenceAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);

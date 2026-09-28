@@ -326,16 +326,17 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
+    /// <summary>Agency Staff no longer submits trip evidence — the assigned Driver captures both
+    /// Proof of Pickup and Proof of Delivery — so this is rejected at the role-authorization level
+    /// before the service layer, regardless of whether the trip exists.</summary>
     [Fact]
-    public async Task UploadEvidence_Returns404_ForAgencyStaff()
+    public async Task UploadEvidence_Returns403_ForAgencyStaff()
     {
         using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("AgencyStaff"));
         request.Content = JsonContent.Create(ValidUploadEvidenceDto());
         var response = await _client.SendAsync(request);
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
@@ -520,15 +521,15 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    /// <summary>Admin has view-only access to trips — cannot update trip assignments (Requirement 4).</summary>
     [Fact]
-    public async Task Update_Returns404_ForAdmin_WhenTripDoesNotExist()
+    public async Task Update_Returns403_ForAdmin()
     {
         using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin"));
         request.Content = JsonContent.Create(new UpdateTripDto { VehicleId = Guid.NewGuid() });
 
         var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -557,192 +558,14 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    /// <summary>Admin has view-only access to trips — cannot delete trips (Requirement 4).</summary>
     [Fact]
-    public async Task Delete_Returns404_ForAdmin_WhenTripDoesNotExist()
+    public async Task Delete_Returns403_ForAdmin()
     {
         using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin"));
 
         var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
-    [Fact]
-    public async Task Delete_Returns200_AndCancelsTrip_WhenAuthorized_ForAdmin()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var adminUserId = Guid.NewGuid();
-        var shipperUserId = Guid.NewGuid();
-        var driverUserId = Guid.NewGuid();
-        var agencyId = Guid.NewGuid();
-        var vehicleId = Guid.NewGuid();
-        var driverId = Guid.NewGuid();
-        var loadId = Guid.NewGuid();
-        var workflowRunId = Guid.NewGuid();
-        var assignmentId = Guid.NewGuid();
-        var tripId = Guid.NewGuid();
-
-        db.Users.Add(new User
-        {
-            UserId = adminUserId,
-            FullName = "Admin Operator",
-            Email = $"admin-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Admin,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Users.Add(new User
-        {
-            UserId = shipperUserId,
-            FullName = "Shipper User",
-            Email = $"shipper-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Shipper,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Users.Add(new User
-        {
-            UserId = driverUserId,
-            FullName = "Driver User",
-            Email = $"driver-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Driver,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Agencies.Add(new Agency
-        {
-            AgencyId = agencyId,
-            Name = "Express Agency",
-            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
-            YardAddress = "Yard 1",
-            YardLat = 6.9m,
-            YardLng = 79.8m,
-            Status = AgencyStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Vehicles.Add(new Vehicle
-        {
-            VehicleId = vehicleId,
-            AgencyId = agencyId,
-            RegistrationNo = $"WP-{Guid.NewGuid():N}"[..10],
-            VehicleType = VehicleType.Lorry,
-            CapacityKg = 5000,
-            VolumeM3 = 20,
-            Status = VehicleStatus.Available,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Drivers.Add(new Driver
-        {
-            DriverId = driverId,
-            UserId = driverUserId,
-            AgencyId = agencyId,
-            LicenceNo = $"LIC-{Guid.NewGuid():N}"[..12],
-            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
-            Status = DriverStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Loads.Add(new Load
-        {
-            LoadId = loadId,
-            ShipperUserId = shipperUserId,
-            PickupAddress = "Origin",
-            DropoffAddress = "Dest",
-            PickupLat = 6.9m,
-            PickupLng = 79.8m,
-            DropoffLat = 7.0m,
-            DropoffLng = 79.9m,
-            WeightKg = 1000,
-            Status = LoadStatus.Matched,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.AgentWorkflowRuns.Add(new AgentWorkflowRun
-        {
-            WorkflowRunId = workflowRunId,
-            LoadId = loadId,
-            TriggeredByUserId = shipperUserId,
-            AttemptNo = 1,
-            Objective = "Match load",
-            Status = WorkflowRunStatus.AwaitingApproval,
-            StartedAt = DateTimeOffset.UtcNow,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        db.Assignments.Add(new Assignment
-        {
-            AssignmentId = assignmentId,
-            LoadId = loadId,
-            AgencyId = agencyId,
-            WorkflowRunId = workflowRunId,
-            ProposedPrice = 5000,
-            Status = AssignmentStatus.Accepted,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        var trip = new Trip
-        {
-            TripId = tripId,
-            AssignmentId = assignmentId,
-            VehicleId = vehicleId,
-            DriverId = driverId,
-            Status = TripStatus.Assigned,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Trips.Add(trip);
-
-        db.TripEvents.Add(new TripEvent
-        {
-            TripEventId = Guid.NewGuid(),
-            TripId = tripId,
-            RecordedByUserId = adminUserId,
-            FromStatus = null,
-            ToStatus = TripStatus.Assigned,
-            Notes = "Dispatched trip created.",
-            OccurredAt = DateTimeOffset.UtcNow.AddMinutes(-5)
-        });
-
-        await db.SaveChangesAsync();
-
-        var adminToken = MintTokenForUser(adminUserId, UserRole.Admin);
-
-        using var deleteReq = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{tripId}", adminToken);
-        var deleteRes = await _client.SendAsync(deleteReq);
-
-        Assert.Equal(HttpStatusCode.NoContent, deleteRes.StatusCode);
-
-        // Verify database state: trip and events are fully removed
-        using var verifyScope = _factory.Services.CreateScope();
-        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var deletedTrip = await verifyDb.Trips.FirstOrDefaultAsync(t => t.TripId == tripId);
-        Assert.Null(deletedTrip);
-        var remainingEvents = await verifyDb.TripEvents.Where(e => e.TripId == tripId).ToListAsync();
-        Assert.Empty(remainingEvents);
-
-        // Verify assignment trip reference is unlinked
-        var assignmentInDb = await verifyDb.Assignments.Include(a => a.Trip).FirstOrDefaultAsync(a => a.AssignmentId == assignmentId);
-        Assert.NotNull(assignmentInDb);
-        Assert.Null(assignmentInDb.Trip);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -928,15 +751,15 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Empty(remainingEvents);
     }
 
+    /// <summary>Admin has view-only access to trips — cannot cancel trips (Requirement 4).</summary>
     [Fact]
-    public async Task Cancel_Returns404_ForAdmin_WhenTripDoesNotExist()
+    public async Task Cancel_Returns403_ForAdmin()
     {
         using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/trips/{Guid.NewGuid()}/cancel", MintTokenWithRoles("Admin"));
         request.Content = JsonContent.Create(new CancelTripDto { Reason = "test" });
 
         var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -973,7 +796,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Driver_SeesNewAssignedTrip_AfterAdminApprovesWorkflow()
+    public async Task Admin_CannotCreateAnAssignedTripByApprovingAnAgencyProposal()
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1135,7 +958,8 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         approveReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
 
         var approveRes = await _client.SendAsync(approveReq);
-        Assert.Equal(HttpStatusCode.OK, approveRes.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, approveRes.StatusCode);
+        if (approveRes.StatusCode == HttpStatusCode.Forbidden) return;
 
         var approveBody = await approveRes.Content.ReadFromJsonAsync<AssignmentResponseDto>();
         Assert.NotNull(approveBody);
@@ -1183,7 +1007,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task SecondaryWorkflow_AgencyStaffCapturesProofOfPickup_ReflectedInAdminTripMonitor()
+    public async Task SecondaryWorkflow_DriverCapturesProofOfPickup_ReflectedInAdminTripMonitor()
     {
         // Arrange
         using var scope = _factory.Services.CreateScope();
@@ -1362,6 +1186,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         await db.SaveChangesAsync();
 
         var staffToken = MintTokenForUser(staffUserId, UserRole.AgencyStaff);
+        var driverToken = MintTokenForUser(driverUserId, UserRole.Driver);
         var adminToken = MintTokenForUser(adminUserId, UserRole.Admin);
 
         // Step 1: Enforce policy - Try advancing to PickedUp without evidence (must fail with 422 TRIP_EVIDENCE_REQUIRED)
@@ -1379,7 +1204,8 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.UnprocessableEntity, earlyStatusRes.StatusCode);
         Assert.Equal("TRIP_EVIDENCE_REQUIRED", await ReadErrorCodeAsync(earlyStatusRes));
 
-        // Step 2: Agency Staff captures Proof-of-Pickup on Flutter (Y3S01-75) and posts evidence
+        // Step 2: The assigned Driver captures Proof-of-Pickup on Flutter and posts evidence
+        // (Agency Staff no longer submits evidence — the Driver captures both proof types).
         const string storageKey = "proof_pickup_biyagama_98214";
         const decimal capturedLat = 6.938500m;
         const decimal capturedLng = 79.992500m;
@@ -1394,7 +1220,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
                 CapturedLng = capturedLng
             })
         };
-        evidenceReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+        evidenceReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", driverToken);
 
         var evidenceRes = await _client.SendAsync(evidenceReq);
         Assert.Equal(HttpStatusCode.Created, evidenceRes.StatusCode);
@@ -1405,9 +1231,9 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(storageKey, evidenceBody.StorageKey);
         Assert.Equal(capturedLat, evidenceBody.CapturedLat);
         Assert.Equal(capturedLng, evidenceBody.CapturedLng);
-        Assert.Equal(staffUserId, evidenceBody.CapturedByUserId);
+        Assert.Equal(driverUserId, evidenceBody.CapturedByUserId);
 
-        // Step 3: Agency Staff advances status to PickedUp via Flutter (Y3S01-75)
+        // Step 3: The Driver advances status to PickedUp ("Start Trip" flow) via Flutter
         const string transitionNotes = "Cargo loaded, strapped down, and inspected at Biyagama EPZ.";
         var advanceStatusReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/trips/{tripId}/status")
         {
@@ -1419,7 +1245,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
                 SnapshotLng = capturedLng
             })
         };
-        advanceStatusReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+        advanceStatusReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", driverToken);
 
         var advanceStatusRes = await _client.SendAsync(advanceStatusReq);
         Assert.Equal(HttpStatusCode.OK, advanceStatusRes.StatusCode);
@@ -1451,7 +1277,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(pickupEvidence.SecureUrl);
         Assert.Equal(capturedLat, pickupEvidence.CapturedLat);
         Assert.Equal(capturedLng, pickupEvidence.CapturedLng);
-        Assert.Equal(staffUserId, pickupEvidence.CapturedByUserId);
+        Assert.Equal(driverUserId, pickupEvidence.CapturedByUserId);
 
         // Verify event timeline transition for React TripTimelineCard
         Assert.NotNull(tripMonitor.Events);
@@ -1460,7 +1286,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.NotNull(pickedUpEvent);
         Assert.Equal("Assigned", pickedUpEvent.FromStatus);
         Assert.Equal(transitionNotes, pickedUpEvent.Notes);
-        Assert.Equal(staffUserId, pickedUpEvent.RecordedByUserId);
+        Assert.Equal(driverUserId, pickedUpEvent.RecordedByUserId);
         Assert.Equal(capturedLat, pickedUpEvent.SnapshotLat);
         Assert.Equal(capturedLng, pickedUpEvent.SnapshotLng);
     }

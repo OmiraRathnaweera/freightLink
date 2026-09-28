@@ -4,7 +4,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using FreightLink.Api.Data;
+using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.DTOs.Auth;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
@@ -23,6 +25,12 @@ public class CrossPlatformAuthConsistencyTests : IClassFixture<CustomWebApplicat
 {
     private readonly HttpClient _client;
     private readonly CustomWebApplicationFactory _factory;
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public CrossPlatformAuthConsistencyTests(CustomWebApplicationFactory factory)
     {
@@ -104,31 +112,34 @@ public class CrossPlatformAuthConsistencyTests : IClassFixture<CustomWebApplicat
 
     private async Task<(User User, string AccessToken, string RefreshToken)> RegisterDriverAsync()
     {
-        var (agencyUser, _, _) = await RegisterAgencyStaffAsync();
+        var (agencyUser, agencyStaffToken, _) = await RegisterAgencyStaffAsync();
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var agency = db.Agencies.First(a => a.Staff.Any(s => s.UserId == agencyUser.UserId));
 
         var driverEmail = $"driver-cross-{Guid.NewGuid():N}@example.com";
-        const string password = "Sup3r$ecret1";
 
-        var registerResponse = await _client.PostAsJsonAsync("/api/v1/auth/register/driver", new RegisterDriverRequestDto
+        using var addDriverReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/agencies/{agency.AgencyId}/drivers")
         {
-            AgencyId = agency.AgencyId,
-            Email = driverEmail,
-            Password = password,
-            FullName = "CrossPlatform Driver",
-            PhoneE164 = "+94770000000",
-            LicenceNo = $"DL-{Guid.NewGuid():N}"[..12],
-            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2))
-        });
+            Content = JsonContent.Create(new CreateDriverRequestDto
+            {
+                Email = driverEmail,
+                FullName = "CrossPlatform Driver",
+                PhoneE164 = "+94770000000",
+                LicenceNo = $"DL-{Guid.NewGuid():N}"[..12],
+                LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2))
+            })
+        };
+        addDriverReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agencyStaffToken);
+        var registerResponse = await _client.SendAsync(addDriverReq);
         registerResponse.EnsureSuccessStatusCode();
+        var createdDriver = await registerResponse.Content.ReadFromJsonAsync<DriverResponseDto>(JsonOpts);
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequestDto
         {
             Email = driverEmail,
-            Password = password
+            Password = createdDriver!.TemporaryPassword!
         });
         loginResponse.EnsureSuccessStatusCode();
 

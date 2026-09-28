@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+﻿import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../../lib/api/api.js'
 
 export const agencyKeys = {
@@ -62,6 +62,24 @@ export function useAgenciesQuery(queryParams, options) {
   })
 }
 
+/**
+ * GET /agencies/summary
+ * Admin-only: system-wide agency/driver/vehicle counts, unaffected by any search/status filter or
+ * page on the agencies list — backs the "Registered Agencies & Fleet" dashboard's summary cards
+ * (issue #45). Never derive these totals from a paged useAgenciesQuery response.
+ */
+export async function getAgenciesSummary() {
+  return api.get('/agencies/summary')
+}
+
+export function useAgenciesSummaryQuery(options) {
+  return useQuery({
+    queryKey: [...agencyKeys.all, 'summary'],
+    queryFn: getAgenciesSummary,
+    ...options,
+  })
+}
+
 export function useVerifyAgencyMutation(options) {
   return useMutation({
     mutationFn: verifyAgency,
@@ -86,7 +104,7 @@ export function useSuspendAgencyMutation(options) {
 /**
  * GET /agencies/verification-queue
  * Admin-only: every Pending agency bundled with the compliance documents it
- * has uploaded so far, in one call — avoids an N+1 round-trip per agency.
+ * has uploaded so far, in one call â€” avoids an N+1 round-trip per agency.
  */
 export async function getVerificationQueue() {
   return api.get('/agencies/verification-queue')
@@ -112,7 +130,7 @@ export async function addComplianceDoc({ agencyId, doc }) {
 /**
  * PUT /agencies/{id}/compliance-docs/{docId}
  * Replaces an existing document's file/number/dates in place (re-upload/renewal), rather than
- * inserting a new row — reusing addComplianceDoc for this would 500 while the existing document
+ * inserting a new row â€” reusing addComplianceDoc for this would 500 while the existing document
  * is still Pending/Verified (one-live-document-per-type constraint).
  */
 export async function updateComplianceDoc({ agencyId, docId, doc }) {
@@ -127,6 +145,86 @@ export async function addVehicle({ agencyId, vehicle }) {
   return api.post(`/agencies/${agencyId}/vehicles`, vehicle)
 }
 
+/** Updates editable fleet details without changing vehicle availability. */
+export async function updateVehicle({ agencyId, vehicleId, vehicle }) {
+  return api.put(`/agencies/${agencyId}/vehicles/${vehicleId}`, vehicle)
+}
+
+/** Agency Staff availability changes; OnTrip is controlled by trip execution. */
+export async function updateVehicleStatus({ agencyId, vehicleId, status }) {
+  return api.patch(`/agencies/${agencyId}/vehicles/${vehicleId}/status`, { status })
+}
+
+export async function getDrivers(agencyId) {
+  return api.get(`/agencies/${agencyId}/drivers`)
+}
+
+export async function addDriver({ agencyId, driver }) {
+  return api.post(`/agencies/${agencyId}/drivers`, driver)
+}
+
+/**
+ * PATCH /agencies/{id}/drivers/{driverId}/status
+ * Removes ("Inactive") or reinstates ("Active") a driver on the agency's roster. OnTrip is
+ * trip-execution-owned and cannot be set here.
+ */
+export async function updateDriverStatus({ agencyId, driverId, status }) {
+  return api.patch(`/agencies/${agencyId}/drivers/${driverId}/status`, { status })
+}
+
+/**
+ * PUT /agencies/{id}/drivers/{driverId}
+ * Updates a driver's editable details (fullName, licenceNo, licenceExpiry). Email/status are
+ * out of scope here — email is immutable after creation and status has its own endpoint above.
+ */
+export async function updateDriver({ agencyId, driverId, driver }) {
+  return api.put(`/agencies/${agencyId}/drivers/${driverId}`, driver)
+}
+
+export function useDriversQuery(agencyId, options) {
+  return useQuery({
+    queryKey: ['agencies', agencyId, 'drivers'],
+    queryFn: () => getDrivers(agencyId),
+    ...options,
+  })
+}
+
+export function useAddDriverMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: addDriver,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useUpdateDriverStatusMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateDriverStatus,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useUpdateDriverMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateDriver,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'drivers'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
 export function useComplianceDocsQuery(agencyId, options) {
   return useQuery({
     queryKey: ['agencies', agencyId, 'compliance-docs'],
@@ -135,23 +233,25 @@ export function useComplianceDocsQuery(agencyId, options) {
   })
 }
 
-export function useAddComplianceDocMutation(options) {
+export function useAddComplianceDocMutation({ onSuccess, ...options } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: addComplianceDoc,
-    onSuccess: (data, variables) => {
+    onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'compliance-docs'] })
+      if (onSuccess) onSuccess(data, variables, context)
     },
     ...options
   })
 }
 
-export function useUpdateComplianceDocMutation(options) {
+export function useUpdateComplianceDocMutation({ onSuccess, ...options } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: updateComplianceDoc,
-    onSuccess: (data, variables) => {
+    onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'compliance-docs'] })
+      if (onSuccess) onSuccess(data, variables, context)
     },
     ...options
   })
@@ -175,20 +275,26 @@ function invalidateComplianceDocQueries(queryClient, agencyId) {
   queryClient.invalidateQueries({ queryKey: ['agencies', 'verification-queue'] })
 }
 
-export function useVerifyComplianceDocMutation(options) {
+export function useVerifyComplianceDocMutation({ onSuccess, ...options } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: verifyComplianceDoc,
-    onSuccess: (data, variables) => invalidateComplianceDocQueries(queryClient, variables.agencyId),
+    onSuccess: (data, variables, context) => {
+      invalidateComplianceDocQueries(queryClient, variables.agencyId)
+      if (onSuccess) onSuccess(data, variables, context)
+    },
     ...options
   })
 }
 
-export function useRejectComplianceDocMutation(options) {
+export function useRejectComplianceDocMutation({ onSuccess, ...options } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: rejectComplianceDoc,
-    onSuccess: (data, variables) => invalidateComplianceDocQueries(queryClient, variables.agencyId),
+    onSuccess: (data, variables, context) => {
+      invalidateComplianceDocQueries(queryClient, variables.agencyId)
+      if (onSuccess) onSuccess(data, variables, context)
+    },
     ...options
   })
 }
@@ -201,14 +307,39 @@ export function useVehiclesQuery(agencyId, options) {
   })
 }
 
-export function useAddVehicleMutation(options) {
+export function useAddVehicleMutation({ onSuccess, ...options } = {}) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: addVehicle,
-    onSuccess: (data, variables) => {
+    onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'vehicles'] })
+      if (onSuccess) onSuccess(data, variables, context)
     },
     ...options
+  })
+}
+
+export function useUpdateVehicleMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateVehicle,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'vehicles'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
+  })
+}
+
+export function useUpdateVehicleStatusMutation({ onSuccess, ...options } = {}) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateVehicleStatus,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['agencies', variables.agencyId, 'vehicles'] })
+      if (onSuccess) onSuccess(data, variables, context)
+    },
+    ...options,
   })
 }
 
@@ -231,4 +362,3 @@ export function useAgencyFleetQuery(agencyId, options) {
     ...options,
   })
 }
-

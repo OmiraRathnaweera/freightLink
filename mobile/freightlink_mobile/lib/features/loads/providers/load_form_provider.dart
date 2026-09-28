@@ -48,10 +48,14 @@ class LoadFormProvider extends ChangeNotifier {
   Map<String, String> _fieldErrors = {};
   String? _formError;
   Load? _result;
+  LoadAttachment? _attachment;
+  String? _attachmentWarning;
 
   bool get isSubmitting => _isSubmitting;
   String? get formError => _formError;
   Load? get result => _result;
+  LoadAttachment? get attachment => _attachment;
+  String? get attachmentWarning => _attachmentWarning;
   String? errorFor(String field) =>
       _hasAttemptedSubmit ? _fieldErrors[field] : null;
 
@@ -96,6 +100,12 @@ class LoadFormProvider extends ChangeNotifier {
     pickupWindowStart = start;
     pickupWindowEnd = end;
     _revalidateIfDirty();
+    notifyListeners();
+  }
+
+  void setAttachment(LoadAttachment? value) {
+    _attachment = value;
+    _attachmentWarning = null;
     notifyListeners();
   }
 
@@ -282,6 +292,14 @@ class LoadFormProvider extends ChangeNotifier {
       _result = isEditing
           ? await _repository.update(editing!.loadId, data)
           : await _repository.create(data);
+      if (!isEditing && _attachment != null) {
+        try {
+          final publicId = await _repository.uploadFile(_attachment!.bytes, _attachment!.filename);
+          await _repository.attachFile(_result!.loadId, publicId, _attachment!.fileType);
+        } catch (error) {
+          _attachmentWarning = 'Load created, but ${_attachment!.filename} could not be attached: $error';
+        }
+      }
       return true;
     } on ApiException catch (error) {
       _formError = error.message;
@@ -303,4 +321,16 @@ class LoadFormProvider extends ChangeNotifier {
     if (field.isEmpty) return field;
     return field[0].toLowerCase() + field.substring(1);
   }
+}
+
+class LoadAttachment {
+  const LoadAttachment({
+    required this.filename,
+    required this.bytes,
+    required this.fileType,
+  });
+
+  final String filename;
+  final List<int> bytes;
+  final String fileType;
 }

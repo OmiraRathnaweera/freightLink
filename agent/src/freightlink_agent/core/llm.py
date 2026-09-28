@@ -1,10 +1,22 @@
-"""LLM access for Agent 1 (Planner) - the only agent implemented so far.
+"""LLM access shared by Agents 1, 3, and 4.
 
-ADR-008 addendum: Gemini (free tier) primary, Ollama fallback (covers the
-network-dependency risk of a hosted API during a live demo). LLM_PROVIDER
-picks the primary provider; when it's Gemini, a failed call additionally
-falls back to Ollama rather than propagating straight away. Always uses
-structured output (a typed Pydantic schema), never free-form text parsing.
+ADR-008 addendum #2: OpenAI (gpt-4o-mini by default) is the only LLM provider this
+service calls - no Gemini, no Ollama, no other fallback provider. Always uses structured
+output (a typed Pydantic schema), never free-form text parsing. If OpenAI is unreachable
+or the per-process call cap is hit, each caller falls back to its own deterministic,
+template-based copy (see plan()/run_tool_calling_selection()/
+generate_validation_summary_and_proposal() below) rather than trying a second LLM provider.
+
+Every call records which provider and model actually responded, and whether the
+deterministic fallback was used, on `self.last_call_meta` - callers read this immediately
+after awaiting a call and attach it to their own AgentStep's outputJson, so a "Succeeded"
+step carries real, checkable proof a model call happened (plans/03-openai-migration.md
+§4). This is an attribute rather than a return-value tuple specifically so it doesn't
+change the existing call signatures every agent (and every existing test's mock) already
+depends on.
+
+Agent 2 (DomainAnalysis) does not call the LLM - its output is a
+deterministic eligibility filter (see agents/domain_analysis.py).
 """
 
 import json
@@ -30,119 +42,19 @@ PipelineStage = Literal[
 
 class PlanOutput(BaseModel):
     objective: str
-    steps: list[PipelineStage]
-
-class DomainAnalysisExplanation(BaseModel):
-    explanation: str
-
-
-class AgentLLM:
-    def __init__(self) -> None:
-        self._settings = get_settings()
-
-    def _gemini(self):
-        from langchain_google_genai import ChatGoogleGenerativeAI
-
-        return ChatGoogleGenerativeAI(
-            model=self._settings.gemini_model,
-            google_api_key=self._settings.gemini_api_key,
-        )
-
-    def _ollama(self):
-        from langchain_ollama import ChatOllama
-
-        return ChatOllama(model=self._settings.ollama_model, base_url=self._settings.ollama_base_url)
-
-    async def plan(self, system_prompt: str, load_context: dict[str, Any]) -> dict:
-        messages = [
-            ("system", system_prompt),
-            ("human", json.dumps(load_context, default=str)),
-        ]
-
-        if self._settings.llm_provider == "ollama":
-            model = self._ollama().with_structured_output(PlanOutput)
-            result: PlanOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
-
-        try:
-            model = self._gemini().with_structured_output(PlanOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
-        except Exception:
-            logger.warning("Primary LLM (Gemini) failed, falling back to Ollama", exc_info=True)
-            model = self._ollama().with_structured_output(PlanOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
-
-        return result.model_dump()
-
-    async def domain_analysis_explain(self, system_prompt: str, data: dict[str, Any]) -> dict:
-        messages = [
-            ("system", system_prompt),
-            ("human", json.dumps(data, default=str)),
-        ]
-
-        if self._settings.llm_provider == "ollama":
-            model = self._ollama().with_structured_output(DomainAnalysisExplanation)
-            result: DomainAnalysisExplanation = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
-
-        try:
-            model = self._gemini().with_structured_output(DomainAnalysisExplanation)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
-        except Exception:
-            logger.warning("Primary LLM (Gemini) failed, falling back to Ollama", exc_info=True)
-            model = self._ollama().with_structured_output(DomainAnalysisExplanation)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
-
-        return result.model_dump()
-
-
-@lru_cache
-def get_llm() -> AgentLLM:
-    return AgentLLM()
-"""LLM access for Agent 1 (Planner) - the only agent implemented so far.
-
-ADR-008 addendum: Gemini (free tier) primary, Ollama fallback (covers the
-network-dependency risk of a hosted API during a live demo). LLM_PROVIDER
-picks the primary provider; when it's Gemini, a failed call additionally
-falls back to Ollama rather than propagating straight away. Always uses
-structured output (a typed Pydantic schema), never free-form text parsing.
-"""
-
-import json
-import logging
-import warnings
-from functools import lru_cache
-from typing import Any, Literal
-
-try:
-    from google.genai.models import AsyncModels, Models
-    AsyncModels._logged_afc_warning = True
-    Models._logged_afc_warning = True
-except Exception:
-    pass
-
-from pydantic import BaseModel
-
-from freightlink_agent.core.config import get_settings
-
-logger = logging.getLogger(__name__)
-
-# The pipeline is a fixed sequence (ADR-007); the Planner's job is to write
-# an objective and select/order among these stages, never invent new ones.
-PipelineStage = Literal[
-    "Evaluate candidate agencies",
-    "Select agency via routing",
-    "Validate and get shipper approval",
-    "Notify agency",
-]
-
-
-class PlanOutput(BaseModel):
-    objective: str
+    shipper_message: str
     steps: list[PipelineStage]
 
 
-class SelectionJustificationOutput(BaseModel):
+class ToolCallingSelectionOutput(BaseModel):
+    """Agent 3's final tool-calling decision. Every distance/ETA/price cited must trace
+    back to a tool_call_id the model actually received from a tool result - the model
+    never restates a number itself; only headline/detailed_reasoning are its own words."""
+
+    selected_candidate_agency_id: str
+    selected_positioning_tool_call_id: str
+    selected_cargo_tool_call_id: str
+    selected_pricing_tool_call_id: str
     headline: str
     detailed_reasoning: str
 
@@ -156,57 +68,58 @@ class ValidationLLMOutput(BaseModel):
 class AgentLLM:
     def __init__(self) -> None:
         self._settings = get_settings()
+        self.last_call_meta: dict[str, Any] = {}
+        self._openai_call_count = 0
 
-    def _gemini(self, model_name: str | None = None):
-        from langchain_google_genai import ChatGoogleGenerativeAI
+    def _openai(self, model_name: str | None = None):
+        from langchain_openai import ChatOpenAI
 
-        model = model_name or self._settings.gemini_model
-        return ChatGoogleGenerativeAI(
-            model=model,
-            google_api_key=self._settings.gemini_api_key,
+        return ChatOpenAI(
+            model=model_name or self._settings.openai_model,
+            api_key=self._settings.openai_api_key,
             timeout=15.0,
             max_retries=1,
         )
 
-    def _ollama(self):
-        from langchain_ollama import ChatOllama
+    def _record_meta(self, provider: str, model: str | None, *, used_fallback: bool) -> None:
+        self.last_call_meta = {"provider": provider, "model": model, "usedFallback": used_fallback}
 
-        return ChatOllama(model=self._settings.ollama_model, base_url=self._settings.ollama_base_url)
+    async def _invoke_structured(self, schema: type[BaseModel], messages: list[tuple[str, str]], label: str):
+        """Calls OpenAI - the only LLM provider this service has. Raises if the
+        per-process call cap is already hit, or if the OpenAI call itself fails; callers
+        catch this and fall back to their own deterministic, template-based copy, and are
+        responsible for recording the "deterministic_fallback" provenance themselves,
+        since only they know that fallback's shape.
+        """
+        if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+            raise RuntimeError(
+                f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                f"reached; refusing further calls for {label}"
+            )
+
+        self._openai_call_count += 1
+        model = self._openai().with_structured_output(schema)
+        result = await model.ainvoke(messages)
+        self._record_meta("openai", self._settings.openai_model, used_fallback=False)
+        return result
 
     async def plan(self, system_prompt: str, load_context: dict[str, Any]) -> dict:
         messages = [
             ("system", system_prompt),
             ("human", json.dumps(load_context, default=str)),
         ]
-
-        if self._settings.llm_provider == "ollama":
-            model = self._ollama().with_structured_output(PlanOutput)
-            result: PlanOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
-
-        candidate_models = [self._settings.gemini_model]
-        for m in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash"):
-            if m not in candidate_models:
-                candidate_models.append(m)
-
-        for gem_model in candidate_models:
-            try:
-                model = self._gemini(gem_model).with_structured_output(PlanOutput)
-                result = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception as exc:
-                logger.warning("Gemini model %s failed for plan: %s", gem_model, exc)
-                continue
-
-        logger.warning("All Gemini candidate models failed, attempting Ollama fallback")
         try:
-            model = self._ollama().with_structured_output(PlanOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
+            result: PlanOutput = await self._invoke_structured(PlanOutput, messages, "plan")
             return result.model_dump()
         except Exception:
-            logger.warning("Ollama fallback unavailable, using deterministic rule-based plan", exc_info=True)
+            logger.warning("OpenAI call failed for plan, using deterministic rule-based plan", exc_info=True)
+            self._record_meta("deterministic_fallback", None, used_fallback=True)
             return {
                 "objective": "Evaluate candidate agencies, select optimal carrier via routing, validate safety compliance, and confirm dispatch.",
+                "shipper_message": (
+                    "I'm reviewing your load's weight and volume to pick a suitable vehicle class, "
+                    "then finding the most suitable agency for you."
+                ),
                 "steps": [
                     "Evaluate candidate agencies",
                     "Select agency via routing",
@@ -215,53 +128,94 @@ class AgentLLM:
                 ],
             }
 
-    async def justify_selection(self, system_prompt: str, context: dict[str, Any]) -> dict:
-        messages = [
-            ("system", system_prompt),
-            ("human", json.dumps(context, default=str)),
+    async def run_tool_calling_selection(
+        self,
+        system_prompt: str,
+        context: dict[str, Any],
+        tools: list[Any],
+        max_iterations: int = 6,
+        max_tool_calls: int = 8,
+    ) -> ToolCallingSelectionOutput:
+        """Agent 3's genuine tool-use loop: the LLM itself decides when and which of
+        `tools` to call (and on which candidate) before producing a final structured
+        decision. Every turn - each tool-calling turn plus the final decision call -
+        counts against OPENAI_MAX_CALLS_PER_PROCESS and records last_call_meta, exactly
+        like plan()/generate_validation_summary_and_proposal() do for their single call.
+
+        Raises if the cap is already hit, if OpenAI is unreachable, or if a turn fails;
+        the caller (agents/matching_pricing.py) catches this and falls back to its own
+        deterministic selection algorithm - a total LLM outage must degrade to that
+        tested behavior, never crash and never fabricate a result.
+        """
+        from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+
+        if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+            raise RuntimeError(
+                f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                f"reached; refusing further calls for run_tool_calling_selection"
+            )
+
+        tools_by_name = {t.name: t for t in tools}
+        model_with_tools = self._openai().bind_tools(tools)
+
+        messages: list[Any] = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=json.dumps(context, default=str)),
         ]
+        total_tool_calls_made = 0
 
-        if self._settings.llm_provider == "ollama":
-            model = self._ollama().with_structured_output(SelectionJustificationOutput)
-            result: SelectionJustificationOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
+        for _ in range(max_iterations):
+            if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+                raise RuntimeError(
+                    f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                    f"reached mid tool-calling loop for run_tool_calling_selection"
+                )
+            self._openai_call_count += 1
+            ai_message = await model_with_tools.ainvoke(messages)
+            self._record_meta("openai", self._settings.openai_model, used_fallback=False)
+            messages.append(ai_message)
 
-        candidate_models = [self._settings.gemini_model]
-        for m in ("gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.7-flash", "gemini-3.5-flash"):
-            if m not in candidate_models:
-                candidate_models.append(m)
+            requested_tool_calls = getattr(ai_message, "tool_calls", None) or []
+            if not requested_tool_calls:
+                break
 
-        for gem_model in candidate_models:
-            try:
-                model = self._gemini(gem_model).with_structured_output(SelectionJustificationOutput)
-                result = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception as exc:
-                logger.warning("Gemini model %s failed for selection justification: %s", gem_model, exc)
-                continue
+            for tool_call in requested_tool_calls:
+                if total_tool_calls_made >= max_tool_calls:
+                    messages.append(ToolMessage(
+                        content=(
+                            "Tool-call budget exhausted. Make your final decision now, citing "
+                            "only tool_call_ids you already have."
+                        ),
+                        tool_call_id=tool_call["id"],
+                    ))
+                    continue
+                total_tool_calls_made += 1
+                selected_tool = tools_by_name.get(tool_call["name"])
+                if selected_tool is None:
+                    messages.append(ToolMessage(content=f"Unknown tool '{tool_call['name']}'.", tool_call_id=tool_call["id"]))
+                    continue
+                try:
+                    tool_result = await selected_tool.ainvoke(tool_call["args"])
+                except Exception as exc:  # noqa: BLE001
+                    tool_result = f"Tool call failed: {exc}"
+                messages.append(ToolMessage(content=str(tool_result), tool_call_id=tool_call["id"]))
 
-        logger.warning("All Gemini models failed, attempting Ollama fallback")
-        try:
-            model = self._ollama().with_structured_output(SelectionJustificationOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
-            return result.model_dump()
-        except Exception:
-            selected_agency = context.get("selectedAgency") if isinstance(context.get("selectedAgency"), dict) else {}
-            agency_name = selected_agency.get("name") or context.get("agency_name") or context.get("agencyName") or "Recommended Carrier"
-            yard_address = selected_agency.get("yardAddress") or "Verified Yard"
-            assigned_vehicle = selected_agency.get("assignedVehicle") or {}
-            assigned_driver = selected_agency.get("assignedDriver") or {}
-            reg_no = assigned_vehicle.get("registrationNo") or assigned_vehicle.get("registration_no") or "Assigned Fleet Vehicle"
-            driver_name = assigned_driver.get("name") or "Assigned Licensed Driver"
-            eta = selected_agency.get("etaMinutes") or context.get("eta_minutes") or context.get("etaMinutes") or "optimal"
-            dist = selected_agency.get("positioningDistanceKm") or "direct"
-            return {
-                "headline": f"Recommended Carrier: {agency_name} (Yard: {yard_address})",
-                "detailed_reasoning": (
-                    f"Selected {agency_name} based on real database fleet availability: assigned vehicle {reg_no} and driver {driver_name}. "
-                    f"This carrier provides the fastest positioning ETA ({eta} mins, {dist} km) to pickup, full payload capability, and verified safety compliance."
-                ),
-            }
+        if self._openai_call_count >= self._settings.openai_max_calls_per_process:
+            raise RuntimeError(
+                f"OpenAI per-process call cap ({self._settings.openai_max_calls_per_process}) "
+                f"reached before final decision for run_tool_calling_selection"
+            )
+        self._openai_call_count += 1
+        messages.append(HumanMessage(
+            content=(
+                "Give your final decision now. Cite the exact tool_call_id for every "
+                "distance, ETA, or price you rely on - never restate a number yourself."
+            )
+        ))
+        decision_model = self._openai().with_structured_output(ToolCallingSelectionOutput)
+        decision: ToolCallingSelectionOutput = await decision_model.ainvoke(messages)
+        self._record_meta("openai", self._settings.openai_model, used_fallback=False)
+        return decision
 
     async def generate_validation_summary_and_proposal(
         self,
@@ -277,36 +231,14 @@ class AgentLLM:
             ("system", system_prompt),
             ("human", json.dumps(context, default=str)),
         ]
-
-        if self._settings.llm_provider == "ollama":
-            try:
-                model = self._ollama().with_structured_output(ValidationLLMOutput)
-                result: ValidationLLMOutput = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception:
-                logger.warning("Ollama LLM call failed, utilizing template fallback", exc_info=True)
-                return self._fallback_validation_copy(context)
-
-        candidate_models = [self._settings.gemini_model]
-        for m in ("gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.5-flash"):
-            if m not in candidate_models:
-                candidate_models.append(m)
-
-        for gem_model in candidate_models:
-            try:
-                model = self._gemini(gem_model).with_structured_output(ValidationLLMOutput)
-                result = await model.ainvoke(messages)  # type: ignore[assignment]
-                return result.model_dump()
-            except Exception as exc:
-                logger.warning("Gemini model %s failed for validation proposal: %s", gem_model, exc)
-                continue
-
-        logger.warning("All Gemini models failed, attempting Ollama fallback")
         try:
-            model = self._ollama().with_structured_output(ValidationLLMOutput)
-            result = await model.ainvoke(messages)  # type: ignore[assignment]
+            result: ValidationLLMOutput = await self._invoke_structured(
+                ValidationLLMOutput, messages, "generate_validation_summary_and_proposal"
+            )
             return result.model_dump()
         except Exception:
+            logger.warning("OpenAI call failed for validation proposal, using template fallback", exc_info=True)
+            self._record_meta("deterministic_fallback", None, used_fallback=True)
             return self._fallback_validation_copy(context)
 
     def _fallback_validation_copy(self, context: dict[str, Any]) -> dict[str, str]:
@@ -367,7 +299,6 @@ class AgentLLM:
             "proposal_email_subject": email_subject,
             "proposal_email_body": email_body,
         }
-
 
 
 @lru_cache

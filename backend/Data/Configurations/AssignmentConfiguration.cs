@@ -40,9 +40,15 @@ public class AssignmentConfiguration : IEntityTypeConfiguration<Assignment>
             .HasDatabaseName("ux_assignment_live_per_load")
             .HasFilter("\"Status\" IN ('Proposed','Accepted')");
 
+        // Filtered to live rows only (mirrors ux_assignment_live_per_load above): an agency may only
+        // have one *live* (Proposed/Accepted) Assignment per load at a time, but a Declined/Cancelled
+        // row from an earlier propose/decline cycle must not permanently block that same agency from
+        // ever being assigned to this load again — without the filter, a fresh accept for an agency
+        // that was previously declined on this load collides on this index and 500s.
         builder.HasIndex(x => new { x.LoadId, x.AgencyId })
             .IsUnique()
-            .HasDatabaseName("ux_assignment_load_agency");
+            .HasDatabaseName("ux_assignment_load_agency")
+            .HasFilter("\"Status\" IN ('Proposed','Accepted')");
 
         builder.ToTable(t =>
         {

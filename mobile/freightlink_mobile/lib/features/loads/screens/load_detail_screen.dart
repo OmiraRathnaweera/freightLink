@@ -10,6 +10,7 @@ import '../../../shared/widgets/cancel_reason_dialog.dart';
 import '../../../shared/widgets/error_state.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/section_card.dart';
+import '../../trips/screens/agency_trip_detail_screen.dart';
 import '../data/loads_repository.dart';
 import '../models/load.dart';
 import '../providers/load_detail_provider.dart';
@@ -281,6 +282,18 @@ class _LoadDetailContent extends StatelessWidget {
             ),
           ),
         ),
+        if (load.tripId != null) ...[
+          const SizedBox(height: AppConstants.spaceLg),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => AgencyTripDetailScreen(tripId: load.tripId!),
+              ),
+            ),
+            icon: const Icon(Icons.local_shipping_outlined),
+            label: const Text('View Trip Status'),
+          ),
+        ],
       ],
     );
   }

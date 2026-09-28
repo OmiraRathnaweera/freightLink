@@ -17,11 +17,23 @@ public enum ErrorCode
     /// <summary>Credentials were correct but the account is marked inactive.</summary>
     ACCOUNT_INACTIVE,
 
+    /// <summary>Credentials were correct but the email address has not yet been verified.</summary>
+    EMAIL_NOT_VERIFIED,
+
+    /// <summary>An email-verification or password-reset token is unknown, expired, or already consumed.</summary>
+    INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+
     /// <summary>Registration was attempted with an email that already has an account.</summary>
     EMAIL_ALREADY_REGISTERED,
 
+    /// <summary>A change-password request's "current password" field didn't match the account's actual password.</summary>
+    INCORRECT_CURRENT_PASSWORD,
+
     /// <summary>Agency registration was attempted with a business registration number already on file.</summary>
     BUSINESS_REG_NO_ALREADY_REGISTERED,
+
+    /// <summary>Driver registration was attempted with a license number already on file.</summary>
+    LICENCE_ALREADY_REGISTERED,
 
     /// <summary>The supplied refresh token is unknown, revoked, or expired.</summary>
     INVALID_REFRESH_TOKEN,
@@ -120,22 +132,17 @@ public enum ErrorCode
     /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
     INVALID_INVOICE_STATUS_TRANSITION,
 
-    /// <summary>
-    /// A status transition targeting <c>Paid</c> or <c>Failed</c> was attempted via the public
-    /// user-facing status endpoint. Those statuses are exclusively managed by the
-    /// signature-verified payment-gateway webhook and may never be set directly by an
-    /// authenticated application user.
-    /// </summary>
-    INVOICE_STATUS_GATEWAY_OWNED,
-
     /// <summary>An invalid invoice amount was supplied.</summary>
     INVALID_INVOICE_AMOUNT,
 
     /// <summary>The invoice is already settled and paid.</summary>
     INVOICE_ALREADY_PAID,
 
-    /// <summary>The payment gateway webhook callback signature check failed.</summary>
-    PAYMENT_SIGNATURE_INVALID,
+    /// <summary>A payment-proof upload referenced an UploadedFile publicId that does not exist, or one the caller did not upload.</summary>
+    INVOICE_PAYMENT_PROOF_FILE_NOT_FOUND,
+
+    /// <summary>An Agency attempted to confirm payment on an invoice with no payment receipt submitted yet.</summary>
+    INVOICE_PAYMENT_PROOF_REQUIRED,
 
     /// <summary>
     /// The supplied <c>DueDate</c> falls before the invoice's issuance date.
@@ -179,6 +186,10 @@ public enum ErrorCode
 
     /// <summary>A soft delete was attempted on a <c>VehicleClassEfficiency</c> row that is already soft-deleted.</summary>
     VEHICLE_CLASS_EFFICIENCY_ALREADY_DELETED,
+
+    /// <summary>A fleet vehicle status change attempted to bypass trip-managed or terminal availability rules.</summary>
+    INVALID_VEHICLE_STATUS_TRANSITION,
+
 
     /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxPayloadKg</c> was not strictly greater than its <c>MinPayloadKg</c> (mirrors <c>ck_vce_payload_bounds</c>).</summary>
     VEHICLE_CLASS_EFFICIENCY_INVALID_PAYLOAD_BAND,
@@ -300,11 +311,23 @@ public enum ErrorCode
     /// <summary>The assignment exists but does not belong to the caller's agency.</summary>
     ASSIGNMENT_NOT_OWNED,
 
+    /// <summary>An assignment Accept/Decline email action token is unknown, expired, or already consumed.</summary>
+    INVALID_OR_EXPIRED_ASSIGNMENT_TOKEN,
+
+    /// <summary>The assignment an action token points to was already accepted/declined another way (e.g. via the app) since the email was sent.</summary>
+    ASSIGNMENT_NO_LONGER_ACTIONABLE,
+
     /// <summary>A trip has already been created for this assignment.</summary>
     TRIP_ALREADY_EXISTS,
 
     /// <summary>The requested vehicle could not be found.</summary>
     VEHICLE_NOT_FOUND,
+
+    /// <summary>A registration number already belongs to another vehicle in the agency's fleet.</summary>
+    VEHICLE_REGISTRATION_ALREADY_EXISTS,
+
+    /// <summary>An OnTrip or Retired vehicle's fleet details cannot be edited.</summary>
+    VEHICLE_CANNOT_BE_MODIFIED,
 
     /// <summary>The vehicle does not belong to the executing agency.</summary>
     VEHICLE_NOT_OWNED,
@@ -331,6 +354,52 @@ public enum ErrorCode
     WORKFLOW_RUN_ALREADY_APPROVED,
 
     /// <summary>Registration was attempted with a driving licence number already on file.</summary>
-    DRIVER_LICENCE_ALREADY_REGISTERED
-}
+    DRIVER_LICENCE_ALREADY_REGISTERED,
 
+    /// <summary>
+    /// A driver roster status change attempted to set/clear OnTrip directly, which is
+    /// trip-execution-owned, rather than the only staff-controllable transition (Active/Inactive).
+    /// </summary>
+    INVALID_DRIVER_STATUS_TRANSITION,
+
+    /// <summary>The requested load proposal could not be found.</summary>
+    LOAD_PROPOSAL_NOT_FOUND,
+
+    /// <summary>
+    /// An agency attempted to submit a second live (Pending) proposal on a load it already has one
+    /// on. Mirrors <c>ux_loadproposal_live_per_load_agency</c>.
+    /// </summary>
+    LOAD_PROPOSAL_ALREADY_EXISTS,
+
+    /// <summary>
+    /// A proposal was submitted, accepted, or rejected on a load that isn't <c>Posted</c>, or that
+    /// already has a live (Proposed/Accepted) <c>Assignment</c> — direct AI-matching and manual
+    /// agency proposals both compete for the same single live-assignment slot per load.
+    /// </summary>
+    LOAD_NOT_BIDDABLE,
+
+    /// <summary>A load-proposal mutation was attempted that violates allowed lifecycle rules (e.g. responding to a non-Pending proposal).</summary>
+    INVALID_LOAD_PROPOSAL_STATUS_TRANSITION,
+
+    /// <summary>
+    /// The Python Agentic AI pipeline could not be reached, timed out, or returned a non-success
+    /// response, or the AgentWorkflowRun it should have created isn't in our own database. Thrown
+    /// by <c>AssignmentService</c>'s trigger path - a real, honest failure, never a fabricated
+    /// success (plans/04-backend-integration.md §5).
+    /// </summary>
+    AGENT_SERVICE_UNAVAILABLE,
+
+    /// <summary>
+    /// The backend's own outbound API key for calling the Python agent service
+    /// (<c>AGENT_SERVICE_API_KEY</c>) is not configured. Fails closed rather than falling back to a
+    /// hardcoded default (plans/04-backend-integration.md §6).
+    /// </summary>
+    AGENT_SERVICE_NOT_CONFIGURED,
+
+    /// <summary>
+    /// The Shipper attempted to confirm a match for a load with no existing AgentWorkflowRun -
+    /// matching must be triggered first (<c>POST /loads/{loadId}/match/trigger</c>). Never
+    /// auto-created with a fabricated audit trail (plans/04-backend-integration.md §5).
+    /// </summary>
+    NO_MATCH_RUN_TO_CONFIRM
+}

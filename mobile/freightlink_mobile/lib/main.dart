@@ -8,10 +8,13 @@ import 'core/routing/app_router.dart';
 import 'features/auth/providers/auth_provider.dart';
 import 'features/loads/data/loads_repository.dart';
 import 'features/agencies/data/agencies_repository.dart';
+import 'features/billing/data/billing_repository.dart';
+import 'features/disputes/data/dispute_repository.dart';
 import 'features/notifications/providers/notification_provider.dart';
 import 'features/trips/data/trips_repository.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   final authProvider = AuthProvider()..bootstrap();
   final appRouter = createAppRouter(authProvider);
 
@@ -49,7 +52,14 @@ class FreightLinkApp extends StatelessWidget {
           update: (_, auth, _) => TripsRepository(auth.apiClient),
         ),
         ProxyProvider<AuthProvider, AgenciesRepository>(
-          update: (_, auth, _) => AgenciesRepository(auth.apiClient, auth.user?.agencyId),
+          update: (_, auth, _) =>
+              AgenciesRepository(auth.apiClient, auth.user?.agencyId),
+        ),
+        ProxyProvider<AuthProvider, BillingRepository>(
+          update: (_, auth, _) => BillingRepository(auth.apiClient),
+        ),
+        ProxyProvider<AuthProvider, DisputeRepository>(
+          update: (_, auth, _) => DisputeRepository(auth.apiClient),
         ),
       ],
       child: MaterialApp.router(

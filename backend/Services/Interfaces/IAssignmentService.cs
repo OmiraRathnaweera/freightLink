@@ -51,6 +51,36 @@ public interface IAssignmentService
 
     /// <summary>
     /// Fetches the AI workflow match recommendation, candidates, validation, and steps for a load.
+    /// Purely read-only: never calls the Python agent service or mutates any state (plans/
+    /// 04-backend-integration.md §1) - use <see cref="TriggerMatchAsync"/> to actually start a run.
     /// </summary>
-    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, bool rerun = false, CancellationToken cancellationToken = default);
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> GetMatchRecommendationAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches every AgentWorkflowRun attempt ever made for a load (not just the latest), each
+    /// with its own 4 agent steps and every tool call made during them - the full agent call
+    /// history, for the AI Workflow Console's history view. Purely read-only, same ownership
+    /// rule as <see cref="GetMatchRecommendationAsync"/>.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchHistoryDto> GetMatchHistoryAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Explicitly triggers the Python Agentic AI pipeline for a load (a deliberate command, not a
+    /// side effect of viewing data - plans/04-backend-integration.md §1). Creates the next
+    /// AgentWorkflowRun attempt, calls the agent service, and returns the resulting recommendation
+    /// once it responds.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.LoadMatchRecommendationDto> TriggerMatchAsync(Guid loadId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Rejects the load's current match recommendation. Records a Reject <c>ApprovalDecision</c> with the
+    /// Shipper's reason and aborts the workflow run; a new recommendation must be requested afterwards.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> RejectMatchAsync(Guid loadId, FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Requests a revised match recommendation for the load. Records a Revise <c>ApprovalDecision</c> with the
+    /// Shipper's reason and aborts the workflow run so a fresh recommendation can be fetched.
+    /// </summary>
+    Task<FreightLink.Api.DTOs.Loads.MatchDecisionResponseDto> ReviseMatchAsync(Guid loadId, FreightLink.Api.DTOs.Loads.MatchDecisionRequestDto request, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 }

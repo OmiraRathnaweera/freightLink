@@ -247,5 +247,14 @@ public class Agent3MatchingPricingTests
         Assert.Equal(2, alt1.Rank);
         Assert.Equal(110, alt1.PositioningEtaMinutes);
         Assert.Equal(120.0m, alt1.PositioningDistanceKm);
+
+        // 5. No AgentWorkflowRun exists for this load - the recommendation above is a real,
+        // computed preview (real agencies, real routing, real pricing), but it must never claim to
+        // be a genuinely agent-validated run: no fabricated Steps, no fabricated Validation, and a
+        // WorkflowStatus that honestly says so (plans/04-backend-integration.md §5).
+        Assert.Equal("NotStarted", result.WorkflowStatus);
+        Assert.Empty(result.Steps);
+        Assert.Null(result.Validation);
+        Assert.Null(result.WorkflowRunId);
     }
 }

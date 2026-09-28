@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { X, CheckCircle, Calendar, UserCheck, ShieldCheck, FileText, ArrowRight } from 'lucide-react'
+import { X, Calendar, UserCheck, ShieldCheck, FileText } from 'lucide-react'
 import Button from '../../../components/Button.jsx'
 import DisputeCategoryBadge from './DisputeCategoryBadge.jsx'
 import DisputeStatusBadge from './DisputeStatusBadge.jsx'
