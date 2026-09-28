@@ -7,6 +7,7 @@ using System.Text;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.DTOs.Assignments;
+using FreightLink.Api.DTOs.Loads;
 using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -1767,7 +1768,11 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
             DropoffAddress = "Site B",
             DropoffLat = 7.1m,
             DropoffLng = 80.1m,
-            Status = LoadStatus.Posted,
+            // Matched, not Posted: by the time an agency can decline a proposal, ConfirmMatchAsync
+            // has already moved the load to Matched (the Shipper confirmed an agency before that
+            // agency ever saw the proposal) - seeding Posted here would mask the exact Matched->Posted
+            // revert this test now verifies.
+            Status = LoadStatus.Matched,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
@@ -1837,6 +1842,139 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
 
         var updatedLoad = await checkDb.Loads.FirstAsync(l => l.LoadId == loadId);
         Assert.Equal(LoadStatus.Posted, updatedLoad.Status);
+    }
+
+    /// <summary>
+    /// Regression test: once an agency declines a proposed match, the Shipper's match-recommendation
+    /// view must stop reporting the load as finalized. Before this fix, Load.Status stayed stuck on
+    /// Matched (ConfirmMatchAsync sets it before the agency ever responds, and Decline never reverted
+    /// it) and GetMatchRecommendationAsync's ExistingAssignment lookup ignored status entirely, so it
+    /// kept returning the just-declined assignment - together these made the React console's
+    /// "isFinalized" check permanently true, hiding the live decision UI for the brand new
+    /// AwaitingApproval retry run a Shipper needs to act on next.
+    /// </summary>
+    [Fact]
+    public async Task Decline_ThenGetMatchRecommendation_NoLongerReportsLoadAsFinalized()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+        var shipperUserId = Guid.NewGuid();
+        var loadId = Guid.NewGuid();
+        var workflowRunId = Guid.NewGuid();
+        var assignmentId = Guid.NewGuid();
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Post-Decline Check Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "30 Decline Way",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = staffUserId,
+            FullName = "Post-Decline Staff",
+            Email = $"post-dec-staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Users.Add(new User
+        {
+            UserId = shipperUserId,
+            FullName = "Post-Decline Shipper",
+            Email = $"post-dec-shipper-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.Shipper,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Loads.Add(new Load
+        {
+            LoadId = loadId,
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-PDC-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Post-Decline Cargo",
+            WeightKg = 2000,
+            VolumeM3 = 8,
+            PickupAddress = "Site A",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffAddress = "Site B",
+            DropoffLat = 7.1m,
+            DropoffLng = 80.1m,
+            // Matched, mirroring ConfirmMatchAsync having already run before the agency responds.
+            Status = LoadStatus.Matched,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.AgentWorkflowRuns.Add(new AgentWorkflowRun
+        {
+            WorkflowRunId = workflowRunId,
+            LoadId = loadId,
+            TriggeredByUserId = shipperUserId,
+            AttemptNo = 1,
+            Objective = "Match load",
+            Status = WorkflowRunStatus.AwaitingApproval,
+            StartedAt = DateTimeOffset.UtcNow,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+
+        db.Assignments.Add(new Assignment
+        {
+            AssignmentId = assignmentId,
+            LoadId = loadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRunId,
+            ProposedPrice = 40000m,
+            Status = AssignmentStatus.Proposed,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var agencyToken = MintToken(staffUserId, UserRole.AgencyStaff);
+        var declineReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/decline")
+        {
+            Content = JsonContent.Create(new DeclineAssignmentDto { Reason = "No available heavy truck for this route." })
+        };
+        declineReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agencyToken);
+        var declineRes = await _client.SendAsync(declineReq);
+        Assert.Equal(HttpStatusCode.OK, declineRes.StatusCode);
+
+        var shipperToken = MintToken(shipperUserId, UserRole.Shipper);
+        var matchReq = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/loads/{loadId}/match");
+        matchReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
+        var matchRes = await _client.SendAsync(matchReq);
+        Assert.Equal(HttpStatusCode.OK, matchRes.StatusCode);
+
+        var match = await matchRes.Content.ReadFromJsonAsync<LoadMatchRecommendationDto>();
+        Assert.NotNull(match);
+        Assert.Equal("Posted", match.LoadStatus);
+        Assert.Null(match.ExistingAssignment);
     }
 
     [Fact]

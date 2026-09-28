@@ -626,6 +626,121 @@ public class LoadServiceTests
         Assert.Equal(shipperUserId, item.ShipperUserId);
     }
 
+    /// <summary>
+    /// Seeds an Agency + AgencyStaff user + a Load with one Assignment from that agency in the given
+    /// status, for exercising the AgencyStaff branch of GetListAsync ("My Agency Shipments").
+    /// </summary>
+    private static async Task<Guid> SeedAgencyStaffWithAssignedLoadAsync(AppDbContext dbContext, AssignmentStatus assignmentStatus)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var agencyId = Guid.NewGuid();
+        dbContext.Agencies.Add(new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Test Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "1 Yard Road",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        var staffUserId = Guid.NewGuid();
+        dbContext.Users.Add(new User
+        {
+            UserId = staffUserId,
+            FullName = "Agency Staffer",
+            Email = $"staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "unused-hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+        dbContext.AgencyStaff.Add(new AgencyStaff { UserId = staffUserId, AgencyId = agencyId, CreatedAt = now, UpdatedAt = now });
+
+        var shipperUserId = await SeedShipperUserAsync(dbContext);
+        var load = new Load
+        {
+            LoadId = Guid.NewGuid(),
+            ShipperUserId = shipperUserId,
+            ReferenceCode = $"LD-{Guid.NewGuid():N}"[..12],
+            CargoDescription = "Test Cargo",
+            WeightKg = 3000,
+            VolumeM3 = 12,
+            PickupAddress = "Origin",
+            DropoffAddress = "Destination",
+            PickupLat = 6.9m,
+            PickupLng = 79.8m,
+            DropoffLat = 7.2m,
+            DropoffLng = 80.6m,
+            Status = LoadStatus.Matched,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+        dbContext.Loads.Add(load);
+
+        var workflowRun = new AgentWorkflowRun
+        {
+            WorkflowRunId = Guid.NewGuid(),
+            LoadId = load.LoadId,
+            AttemptNo = 1,
+            Status = WorkflowRunStatus.Completed,
+            TriggeredByUserId = shipperUserId,
+            StartedAt = now,
+            CompletedAt = now
+        };
+        dbContext.AgentWorkflowRuns.Add(workflowRun);
+
+        dbContext.Assignments.Add(new Assignment
+        {
+            AssignmentId = Guid.NewGuid(),
+            LoadId = load.LoadId,
+            AgencyId = agencyId,
+            WorkflowRunId = workflowRun.WorkflowRunId,
+            ProposedPrice = 45000m,
+            Status = assignmentStatus,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        await dbContext.SaveChangesAsync();
+        return staffUserId;
+    }
+
+    /// <summary>
+    /// Regression test: a load whose Assignment to the caller's agency is still Proposed (an AI
+    /// match recommendation or manual proposal the agency hasn't accepted/declined yet) must NOT
+    /// appear in "My Agency Shipments" — otherwise an unactioned proposal looks like a confirmed
+    /// shipment. It should only appear once that agency has actually Accepted it.
+    /// </summary>
+    [Fact]
+    public async Task GetListAsync_ForAgencyStaff_ExcludesLoadsWithOnlyAProposedAssignment()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var staffUserId = await SeedAgencyStaffWithAssignedLoadAsync(dbContext, AssignmentStatus.Proposed);
+
+        var result = await sut.GetListAsync(new LoadListQueryDto(), staffUserId, UserRole.AgencyStaff);
+
+        Assert.Empty(result.Items);
+    }
+
+    /// <summary>Once the agency has Accepted the assignment, the load does appear in "My Agency Shipments".</summary>
+    [Fact]
+    public async Task GetListAsync_ForAgencyStaff_IncludesLoadsWithAnAcceptedAssignment()
+    {
+        using var dbContext = await CreateContextAsync();
+        var sut = CreateSut(dbContext);
+        var staffUserId = await SeedAgencyStaffWithAssignedLoadAsync(dbContext, AssignmentStatus.Accepted);
+
+        var result = await sut.GetListAsync(new LoadListQueryDto(), staffUserId, UserRole.AgencyStaff);
+
+        Assert.Single(result.Items);
+    }
+
     // --- Edit ---
 
     /// <summary>A load in Draft or Posted can have its content edited; Status is unaffected.</summary>

@@ -203,6 +203,30 @@ public class AssignmentService : IAssignmentService
         var loadRef = assignment.Load?.ReferenceCode ?? assignment.LoadId.ToString();
         var agencyName = assignment.Agency?.Name ?? "Assigned Agency";
 
+        // The Shipper's earlier confirmation already moved Load.Status to Matched (ConfirmMatchAsync
+        // sets it the moment the Shipper picks an agency, before that agency has accepted or declined
+        // anything). Now that the agency has declined, that confirmed match is void - Matched->Posted
+        // is explicitly modeled in LoadStatusTransitionRules for exactly this case. Without reverting
+        // it here, the Load stays stuck showing "Matched" (and the React console treats it as a
+        // finalized, no-action-needed load) even while a brand new AwaitingApproval run - or a Failed
+        // one, once the retry cap is hit - is actually what needs the Shipper's attention next.
+        if (assignment.Load != null && assignment.Load.Status == LoadStatus.Matched)
+        {
+            var prevLoadStatus = assignment.Load.Status;
+            assignment.Load.Status = LoadStatus.Posted;
+            assignment.Load.UpdatedAt = now;
+            _dbContext.LoadStatusHistories.Add(new LoadStatusHistory
+            {
+                LoadStatusHistoryId = Guid.NewGuid(),
+                LoadId = assignment.LoadId,
+                FromStatus = prevLoadStatus,
+                ToStatus = LoadStatus.Posted,
+                Reason = $"Agency {agencyName} declined the proposed match.",
+                ChangedByUserId = currentUserId,
+                ChangedAt = now
+            });
+        }
+
         var workflowRun = assignment.WorkflowRun ?? await _dbContext.AgentWorkflowRuns
             .FirstOrDefaultAsync(r => r.WorkflowRunId == assignment.WorkflowRunId || r.LoadId == assignment.LoadId, cancellationToken);
 
@@ -217,8 +241,8 @@ public class AssignmentService : IAssignmentService
                 {
                     await _emailService.SendAgencyDeclinedAsync(shipperEmail, shipperName, loadRef, agencyName, workflowRun.AttemptNo, cancellationToken);
                 }
-                // Load remains in Posted status; the next attempt is triggered directly below
-                // rather than left for some later, unrelated request to accidentally kick off
+                // Load was just reverted to Posted above; the next attempt is triggered directly
+                // below rather than left for some later, unrelated request to accidentally kick off
                 // (plans/04-backend-integration.md §4 - retry ownership belongs to the backend's
                 // own decline-handler, deterministically, not to whether a Shipper happens to
                 // reopen the match view again).
@@ -1690,10 +1714,14 @@ public class AssignmentService : IAssignmentService
             Objective = $"Find and assign suitable carrier for load {load.ReferenceCode}"
         };
 
-        // 1. Check if an assignment already exists for this load
+        // 1. Check if a still-live assignment exists for this load. Declined/Cancelled assignments
+        // from an earlier attempt must NOT surface here - the React console treats any non-null
+        // ExistingAssignment as proof the load is finalized (no further action needed), which would
+        // wrongly hide the live decision UI for a brand new AwaitingApproval run started after a
+        // decline (ADR-018 retry cascade).
         var existingAssignment = await _dbContext.Assignments
             .Include(a => a.Agency)
-            .Where(a => a.LoadId == loadId)
+            .Where(a => a.LoadId == loadId && (a.Status == AssignmentStatus.Proposed || a.Status == AssignmentStatus.Accepted))
             .OrderByDescending(a => a.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 

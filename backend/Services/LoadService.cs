@@ -241,8 +241,13 @@ public class LoadService : ILoadService
             }
             else
             {
-                // Show loads assigned to caller's agency
-                loads = loads.Where(l => l.Assignments.Any(a => a.AgencyId == callerAgencyId && (a.Status == AssignmentStatus.Accepted || a.Status == AssignmentStatus.Proposed)));
+                // Show loads the caller's agency has actually accepted. A Proposed assignment
+                // (an AI-recommended match or manual proposal still awaiting this agency's
+                // accept/decline) deliberately does NOT appear here — surfacing it under "My
+                // Agency Shipments" before the agency has decided would make an unactioned
+                // proposal look like a confirmed shipment. Reviewing/acting on a Proposed
+                // assignment happens via the Flutter Job Proposals inbox or the proposal email.
+                loads = loads.Where(l => l.Assignments.Any(a => a.AgencyId == callerAgencyId && a.Status == AssignmentStatus.Accepted));
                 if (query.Status is { } agencyStatus)
                 {
                     loads = loads.Where(l => l.Status == agencyStatus);
