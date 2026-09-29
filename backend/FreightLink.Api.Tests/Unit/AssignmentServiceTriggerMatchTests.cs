@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Tests for the fail-closed auth-key fix (plans/04-backend-integration.md §6): the backend must

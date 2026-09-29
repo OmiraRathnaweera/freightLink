@@ -9,7 +9,7 @@ using FreightLink.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Unit tests for <see cref="DisputeService"/> covering raising, reading, listing, editing, and resolving disputes.

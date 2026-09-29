@@ -1,7 +1,7 @@
 using FreightLink.Api.Common.Email;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Unit tests for <see cref="EmailTemplates"/>'s pure content-generation methods — no service, no DI,

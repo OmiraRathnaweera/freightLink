@@ -10,7 +10,7 @@ using FreightLink.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Unit tests for <see cref="PricingEstimatorService"/> — the internal

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Unit tests for <see cref="GmailEmailService"/>. Covers only the paths that never touch the
@@ -122,6 +122,7 @@ public class GmailEmailServiceTests
         Username = "sender@example.com",
         Password = "app-password",
         FromName = "FreightLink",
-        FromAddress = "sender@example.com"
+        FromAddress = "sender@example.com",
+        FrontendBaseUrl = "https://app.example.com"
     };
 }

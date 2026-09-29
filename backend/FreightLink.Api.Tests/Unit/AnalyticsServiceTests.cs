@@ -5,7 +5,7 @@ using FreightLink.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Unit tests for <see cref="AnalyticsService"/>, backed directly by EF Core's InMemory provider with

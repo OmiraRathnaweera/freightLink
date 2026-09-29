@@ -10,7 +10,7 @@ using FreightLink.Api.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// Unit tests verifying Agent 3's matching &amp; full pricing logic (ADR-012, ADR-015, ADR-019).

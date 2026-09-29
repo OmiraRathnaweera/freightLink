@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using FreightLink.Api.DTOs.Auth;
 using Xunit;
 
-namespace FreightLink.Api.Tests.Services;
+namespace FreightLink.Api.Tests.Unit;
 
 /// <summary>
 /// DataAnnotations validation tests for the register DTOs — email format, strong-password rules,
