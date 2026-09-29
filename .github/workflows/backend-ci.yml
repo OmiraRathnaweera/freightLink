@@ -20,6 +20,7 @@ jobs:
   build-and-test:
     name: Build and Test
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     defaults:
       run:
         working-directory: backend
@@ -49,4 +50,4 @@ jobs:
       - name: Run tests
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
-        run: dotnet test backend.sln --no-build --configuration Release
+        run: dotnet test backend.sln --no-build --configuration Release --blame-hang-timeout 90s --blame-hang-dump-type mini
