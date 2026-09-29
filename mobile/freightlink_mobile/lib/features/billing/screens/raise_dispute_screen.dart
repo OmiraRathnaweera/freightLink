@@ -79,7 +79,7 @@ class _RaiseDisputeScreenState extends State<RaiseDisputeScreen> {
               ),
               const SizedBox(height: 20),
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: const InputDecoration(labelText: 'Category'),
                 items: const [
                   DropdownMenuItem(value: 'Damage', child: Text('Damage')),

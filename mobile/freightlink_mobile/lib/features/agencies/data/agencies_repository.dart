@@ -14,9 +14,9 @@ class AgenciesRepository {
     }
     
     final results = await Future.wait([getFleet(), getDrivers(), getComplianceDocs()]);
-    final vehicles = results[0] as List<Map<String, dynamic>>;
-    final drivers = results[1] as List<Map<String, dynamic>>;
-    final complianceDocs = results[2] as List<Map<String, dynamic>>;
+    final vehicles = results[0];
+    final drivers = results[1];
+    final complianceDocs = results[2];
     
     return {
       'totalVehicles': vehicles.length,

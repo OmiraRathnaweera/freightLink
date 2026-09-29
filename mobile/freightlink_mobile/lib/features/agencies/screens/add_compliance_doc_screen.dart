@@ -201,7 +201,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
                 DropdownButtonFormField<String>(
-                  value: _selectedDocType,
+                  initialValue: _selectedDocType,
                   decoration: InputDecoration(
                     labelText: 'Document Type',
                     prefixIcon: const Icon(Icons.description_outlined),

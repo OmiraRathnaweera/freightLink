@@ -51,6 +51,7 @@ class _InvoiceDetailViewState extends State<_InvoiceDetailView> {
     );
     final picked = result.isEmpty ? null : result.first;
     if (picked == null) return;
+    if (!mounted) return;
 
     setState(() => _isUploadingProof = true);
     try {
