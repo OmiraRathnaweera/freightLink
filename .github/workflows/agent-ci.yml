@@ -1,0 +1,41 @@
+name: Agent CI
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'agent/**'
+      - '.github/workflows/agent-ci.yml'
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - 'agent/**'
+      - '.github/workflows/agent-ci.yml'
+
+concurrency:
+  group: agent-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: agent/uv.lock
+          python-version-file: agent/.python-version
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Run tests
+        run: uv run pytest tests

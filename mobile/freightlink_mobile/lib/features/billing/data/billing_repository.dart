@@ -65,8 +65,8 @@ class BillingRepository {
               '/invoices',
               body: {
                 'tripId': tripId,
-                if (amount != null) 'amount': amount,
-                if (notes != null) 'notes': notes,
+                'amount': ?amount,
+                'notes': ?notes,
                 'issueImmediately': issueImmediately,
               },
             )
@@ -83,7 +83,7 @@ class BillingRepository {
     final response =
         await _client.put(
               '/invoices/$invoiceId',
-              body: {'amount': amount, if (notes != null) 'notes': notes},
+              body: {'amount': amount, 'notes': ?notes},
             )
             as Map<String, dynamic>;
     return Invoice.fromJson(response);

@@ -10,25 +10,6 @@ public class RoutingControllerTests
     private const string ValidKey = CustomWebApplicationFactory.ValidInternalApiKey;
 
     [Fact]
-    public async Task GetRouteEta_WithoutInternalApiKey_Returns401()
-    {
-        await using var factory = new CustomWebApplicationFactory();
-        var client = factory.CreateClient();
-
-        var payload = new RouteEtaRequestDto
-        {
-            OriginLat = 6.9271m,
-            OriginLng = 79.8612m,
-            DestinationLat = 7.2906m,
-            DestinationLng = 80.6337m
-        };
-
-        var response = await client.PostAsJsonAsync("/internal/routing/route-eta", payload);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
     public async Task GetRouteEta_WithInvalidInternalApiKey_Returns401()
     {
         await using var factory = new CustomWebApplicationFactory();

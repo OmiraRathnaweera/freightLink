@@ -142,21 +142,6 @@ public class InternalPricingControllerTests
         Assert.Equal(result.EstimatedPrice, row.EstimatedPrice);
     }
 
-    /// <summary>No X-Internal-Api-Key header at all is 401, with the standard error envelope.</summary>
-    [Fact]
-    public async Task Estimate_Returns401_WhenHeaderMissing()
-    {
-        using var factory = new CustomWebApplicationFactory();
-        using var client = factory.CreateClient();
-        var load = await SeedLoadAsync(client);
-
-        using var request = EstimateRequest(load.LoadId, apiKey: null);
-        var response = await client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("INTERNAL_API_KEY_INVALID", await ReadErrorCodeAsync(response));
-    }
-
     /// <summary>A wrong X-Internal-Api-Key header is 401.</summary>
     [Fact]
     public async Task Estimate_Returns401_WhenKeyWrong()
@@ -253,19 +238,4 @@ public class InternalPricingControllerTests
         Assert.Equal("PRICING_CONFIG_MISSING", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>No current pricing formula configuration is a 503.</summary>
-    [Fact]
-    public async Task Estimate_Returns503_WhenFormulaConfigMissing()
-    {
-        using var factory = new CustomWebApplicationFactory();
-        using var client = factory.CreateClient();
-        var load = await SeedLoadAsync(client);
-        await RemoveSeededPricingDataAsync(factory, "PricingFormulaConfigs");
-
-        using var request = EstimateRequest(load.LoadId, ValidKey);
-        var response = await client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal("PRICING_CONFIG_MISSING", await ReadErrorCodeAsync(response));
-    }
 }

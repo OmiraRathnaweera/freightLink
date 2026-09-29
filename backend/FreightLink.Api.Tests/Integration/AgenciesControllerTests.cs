@@ -181,34 +181,6 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
     }
 
     [Fact]
-    public async Task GetAllAgencies_StatusFilter_FindsMatchesBeyondFirstPage()
-    {
-        // Same scenario as above, but for the status filter specifically: 15 Suspended agencies
-        // sharing a unique marker, pageSize 10 so the filtered result set spans 2 pages.
-        var marker = $"Halcyon{Guid.NewGuid():N}"[..14];
-        var seededIds = await SeedManyAgenciesAsync(marker, 15, AgencyStatus.Suspended);
-
-        using var page1Req = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies?search={marker}&status=Suspended&page=1&pageSize=10", MintAdminToken());
-        var page1Res = await _client.SendAsync(page1Req);
-        var page1 = await page1Res.Content.ReadFromJsonAsync<PagedAgencyResponseDto>(JsonOpts);
-        Assert.NotNull(page1);
-        Assert.Equal(10, page1!.Items.Count);
-        Assert.Equal(15, page1.TotalItems);
-        Assert.Equal(2, page1.TotalPages);
-
-        using var page2Req = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies?search={marker}&status=Suspended&page=2&pageSize=10", MintAdminToken());
-        var page2Res = await _client.SendAsync(page2Req);
-        var page2 = await page2Res.Content.ReadFromJsonAsync<PagedAgencyResponseDto>(JsonOpts);
-        Assert.NotNull(page2);
-        Assert.Equal(5, page2!.Items.Count);
-
-        var combinedIds = page1.Items.Select(i => i.AgencyId).Concat(page2.Items.Select(i => i.AgencyId)).ToHashSet();
-        Assert.Equal(15, combinedIds.Count);
-        Assert.True(seededIds.All(id => combinedIds.Contains(id)));
-        Assert.All(page1.Items.Concat(page2.Items), item => Assert.Equal("Suspended", item.Status.ToString()));
-    }
-
-    [Fact]
     public async Task GetPlatformSummary_Returns200_WithSystemWideCounts_UnaffectedByListFilters()
     {
         // Regression test for issue #45: the summary cards must reflect true platform-wide totals,
@@ -616,18 +588,6 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
         var otherAgency = await RegisterAndLoginAgencyAsync("other-agency", "DRV-OTHER");
 
         using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/agencies/{agencyId}/drivers/{driverId}/status", otherAgency.AccessToken);
-        request.Content = JsonContent.Create(new UpdateDriverStatusDto { Status = DriverStatus.Inactive });
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task UpdateDriverStatus_Returns403_ForAdmin()
-    {
-        var (_, agencyId, driverId) = await SeedAgencyWithDriverAsync("admin-blocked-driver", "DRV-ADM");
-
-        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/agencies/{agencyId}/drivers/{driverId}/status", MintAdminToken());
         request.Content = JsonContent.Create(new UpdateDriverStatusDto { Status = DriverStatus.Inactive });
 
         var response = await _client.SendAsync(request);

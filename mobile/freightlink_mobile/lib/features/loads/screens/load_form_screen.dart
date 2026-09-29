@@ -399,7 +399,7 @@ class _LoadFormBodyState extends State<_LoadFormBody> {
                 child: Column(
                   children: [
                     DropdownButtonFormField<String>(
-                      value: _attachmentType,
+                      initialValue: _attachmentType,
                       decoration: const InputDecoration(labelText: 'Attachment type'),
                       items: const [
                         DropdownMenuItem(value: 'CargoPhoto', child: Text('Cargo photo')),

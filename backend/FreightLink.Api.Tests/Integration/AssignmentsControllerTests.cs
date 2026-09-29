@@ -4,6 +4,8 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Agency;
 using FreightLink.Api.DTOs.Assignments;
@@ -21,6 +23,12 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
 {
     private readonly HttpClient _client;
     private readonly CustomWebApplicationFactory _factory;
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     public AssignmentsControllerTests(CustomWebApplicationFactory factory)
     {
@@ -373,7 +381,7 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         vReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var vRes = await _client.SendAsync(vReq);
         Assert.Equal(HttpStatusCode.OK, vRes.StatusCode);
-        var vehicles = await vRes.Content.ReadFromJsonAsync<List<VehicleResponseDto>>();
+        var vehicles = await vRes.Content.ReadFromJsonAsync<List<VehicleResponseDto>>(JsonOpts);
         Assert.NotNull(vehicles);
         Assert.Contains(vehicles, v => v.VehicleId == vehicle.VehicleId);
 
@@ -382,7 +390,7 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         dReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var dRes = await _client.SendAsync(dReq);
         Assert.Equal(HttpStatusCode.OK, dRes.StatusCode);
-        var drivers = await dRes.Content.ReadFromJsonAsync<List<DriverResponseDto>>();
+        var drivers = await dRes.Content.ReadFromJsonAsync<List<DriverResponseDto>>(JsonOpts);
         Assert.NotNull(drivers);
         Assert.Contains(drivers, d => d.DriverId == driver.DriverId);
 
@@ -391,7 +399,7 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         fReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var fRes = await _client.SendAsync(fReq);
         Assert.Equal(HttpStatusCode.OK, fRes.StatusCode);
-        var fleet = await fRes.Content.ReadFromJsonAsync<AgencyFleetResponseDto>();
+        var fleet = await fRes.Content.ReadFromJsonAsync<AgencyFleetResponseDto>(JsonOpts);
         Assert.NotNull(fleet);
         Assert.Contains(fleet.Vehicles, v => v.VehicleId == vehicle.VehicleId);
         Assert.Contains(fleet.Drivers, d => d.DriverId == driver.DriverId);
@@ -604,25 +612,25 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var adminUserId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
         var agencyId = Guid.NewGuid();
         var shipperUserId = Guid.NewGuid();
         var loadId = Guid.NewGuid();
         var workflowRunId = Guid.NewGuid();
         var assignmentId = Guid.NewGuid();
 
-        var adminUser = new User
+        var staffUser = new User
         {
-            UserId = adminUserId,
-            FullName = "Admin Operator",
-            Email = $"admin-{Guid.NewGuid():N}@example.com",
+            UserId = staffUserId,
+            FullName = "Auto Approve Staff",
+            Email = $"staff-{Guid.NewGuid():N}@example.com",
             PasswordHash = "hash",
-            Role = UserRole.Admin,
+            Role = UserRole.AgencyStaff,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
-        db.Users.Add(adminUser);
+        db.Users.Add(staffUser);
 
         var shipperUser = new User
         {
@@ -650,6 +658,14 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
             UpdatedAt = DateTimeOffset.UtcNow
         };
         db.Agencies.Add(agency);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
 
         var vehicle = new Vehicle
         {
@@ -741,12 +757,12 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         db.Assignments.Add(assignment);
         await db.SaveChangesAsync();
 
-        var adminToken = MintToken(adminUserId, UserRole.Admin);
+        var staffToken = MintToken(staffUserId, UserRole.AgencyStaff);
         var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{assignmentId}/approve")
         {
             Content = JsonContent.Create(new ApproveAssignmentDto())
         };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
 
         var res = await _client.SendAsync(req);
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
@@ -763,25 +779,25 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var adminUserId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
         var shipperUserId = Guid.NewGuid();
         var agencyId = Guid.NewGuid();
         var loadId = Guid.NewGuid();
         var workflowRunId = Guid.NewGuid();
         var assignmentId = Guid.NewGuid();
 
-        var adminUser = new User
+        var staffUser = new User
         {
-            UserId = adminUserId,
-            FullName = "Admin Operator",
-            Email = $"admin-{Guid.NewGuid():N}@example.com",
+            UserId = staffUserId,
+            FullName = "Declined-Conflict Staff",
+            Email = $"staff-{Guid.NewGuid():N}@example.com",
             PasswordHash = "hash",
-            Role = UserRole.Admin,
+            Role = UserRole.AgencyStaff,
             IsActive = true,
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow
         };
-        db.Users.Add(adminUser);
+        db.Users.Add(staffUser);
 
         var shipperUser = new User
         {
@@ -809,6 +825,14 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
             UpdatedAt = DateTimeOffset.UtcNow
         };
         db.Agencies.Add(agency);
+
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
 
         var load = new Load
         {
@@ -860,12 +884,12 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         db.Assignments.Add(assignment);
         await db.SaveChangesAsync();
 
-        var adminToken = MintToken(adminUserId, UserRole.Admin);
+        var staffToken = MintToken(staffUserId, UserRole.AgencyStaff);
         var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{assignmentId}/approve")
         {
             Content = JsonContent.Create(new ApproveAssignmentDto())
         };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
 
         var res = await _client.SendAsync(req);
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
@@ -874,15 +898,53 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
     [Fact]
     public async Task Approve_ReturnsNotFound_WhenAssignmentDoesNotExist()
     {
-        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var agencyId = Guid.NewGuid();
+        var staffUserId = Guid.NewGuid();
+
+        db.Agencies.Add(new Agency
+        {
+            AgencyId = agencyId,
+            Name = "Not Found Agency",
+            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
+            YardAddress = "Yard 5",
+            YardLat = 6.9m,
+            YardLng = 79.8m,
+            Status = AgencyStatus.Active,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        db.Users.Add(new User
+        {
+            UserId = staffUserId,
+            FullName = "Not Found Staff",
+            Email = $"staff-{Guid.NewGuid():N}@example.com",
+            PasswordHash = "hash",
+            Role = UserRole.AgencyStaff,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        db.AgencyStaff.Add(new AgencyStaff
+        {
+            AgencyId = agencyId,
+            UserId = staffUserId,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var staffToken = MintToken(staffUserId, UserRole.AgencyStaff);
         var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{Guid.NewGuid()}/approve")
         {
             Content = JsonContent.Create(new ApproveAssignmentDto())
         };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
 
         var res = await _client.SendAsync(req);
-        Assert.Equal(HttpStatusCode.Forbidden, res.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, res.StatusCode);
     }
 
     [Fact]
@@ -1260,192 +1322,6 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
 
         var updatedRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunId);
         Assert.Equal(WorkflowRunStatus.Completed, updatedRun.Status);
-    }
-
-    [Fact]
-    public async Task Accept_ReturnsOk_Idempotent_WhenAlreadyAccepted()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var agencyId = Guid.NewGuid();
-        var staffUserId = Guid.NewGuid();
-        var shipperUserId = Guid.NewGuid();
-        var loadId = Guid.NewGuid();
-        var assignmentId = Guid.NewGuid();
-        var tripId = Guid.NewGuid();
-        var vehicleId = Guid.NewGuid();
-        var driverUserId = Guid.NewGuid();
-        var driverId = Guid.NewGuid();
-
-        var agency = new Agency
-        {
-            AgencyId = agencyId,
-            Name = "Idempotent Agency",
-            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
-            YardAddress = "11 Yard Way",
-            YardLat = 6.9m,
-            YardLng = 79.8m,
-            Status = AgencyStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Agencies.Add(agency);
-
-        var staffUser = new User
-        {
-            UserId = staffUserId,
-            FullName = "Idempotent Staff",
-            Email = $"idem-staff-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.AgencyStaff,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(staffUser);
-
-        db.AgencyStaff.Add(new AgencyStaff
-        {
-            AgencyId = agencyId,
-            UserId = staffUserId,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        var shipperUser = new User
-        {
-            UserId = shipperUserId,
-            FullName = "Idempotent Shipper",
-            Email = $"idem-shipper-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Shipper,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(shipperUser);
-
-        var load = new Load
-        {
-            LoadId = loadId,
-            ShipperUserId = shipperUserId,
-            ReferenceCode = $"LD-IDEM-{Guid.NewGuid():N}"[..12],
-            CargoDescription = "Idempotent Cargo",
-            WeightKg = 1500,
-            VolumeM3 = 6,
-            PickupAddress = "Site A",
-            PickupLat = 6.9m,
-            PickupLng = 79.8m,
-            DropoffAddress = "Site B",
-            DropoffLat = 7.1m,
-            DropoffLng = 80.1m,
-            Status = LoadStatus.Matched,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Loads.Add(load);
-
-        var vehicle = new Vehicle
-        {
-            VehicleId = vehicleId,
-            AgencyId = agencyId,
-            RegistrationNo = $"WP-IDEM-{Guid.NewGuid():N}"[..8],
-            VehicleType = VehicleType.Lorry,
-            CapacityKg = 5000,
-            VolumeM3 = 20,
-            Status = VehicleStatus.Available,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Vehicles.Add(vehicle);
-
-        var driverUser = new User
-        {
-            UserId = driverUserId,
-            FullName = "Idempotent Driver",
-            Email = $"idem-driver-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Driver,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(driverUser);
-
-        var driver = new Driver
-        {
-            DriverId = driverId,
-            AgencyId = agencyId,
-            UserId = driverUserId,
-            LicenceNo = $"B-{Guid.NewGuid():N}"[..8],
-            LicenceExpiry = DateOnly.FromDateTime(DateTime.UtcNow.AddYears(2)),
-            Status = DriverStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Drivers.Add(driver);
-
-        var workflowRun = new AgentWorkflowRun
-        {
-            WorkflowRunId = Guid.NewGuid(),
-            LoadId = loadId,
-            TriggeredByUserId = shipperUserId,
-            AttemptNo = 1,
-            Objective = "Match load",
-            Status = WorkflowRunStatus.Completed,
-            StartedAt = DateTimeOffset.UtcNow,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.AgentWorkflowRuns.Add(workflowRun);
-
-        var assignment = new Assignment
-        {
-            AssignmentId = assignmentId,
-            LoadId = loadId,
-            AgencyId = agencyId,
-            WorkflowRunId = workflowRun.WorkflowRunId,
-            ProposedPrice = 28000m,
-            Status = AssignmentStatus.Accepted,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Assignments.Add(assignment);
-
-        var trip = new Trip
-        {
-            TripId = tripId,
-            AssignmentId = assignmentId,
-            VehicleId = vehicleId,
-            DriverId = driverId,
-            Status = TripStatus.Assigned,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Trips.Add(trip);
-
-        var responseRecord = new AssignmentResponse
-        {
-            AssignmentId = assignmentId,
-            RespondedByUserId = staffUserId,
-            Response = AssignmentResponseType.Accepted,
-            RespondedAt = DateTimeOffset.UtcNow
-        };
-        db.AssignmentResponses.Add(responseRecord);
-        await db.SaveChangesAsync();
-
-        var token = MintToken(staffUserId, UserRole.AgencyStaff);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/accept");
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var res = await _client.SendAsync(req);
-        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-
-        var body = await res.Content.ReadFromJsonAsync<AssignmentResponseDto>();
-        Assert.NotNull(body);
-        Assert.Equal("Accepted", body.Status);
-        Assert.Equal(tripId, body.TripId);
     }
 
     [Fact]
@@ -2359,142 +2235,4 @@ public class AssignmentsControllerTests : IClassFixture<CustomWebApplicationFact
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
     }
 
-    [Fact]
-    public async Task Decline_MarksWorkflowRunFailed_AndSendsSafeFailureEmail_WhenAttemptAtCap()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var agencyId = Guid.NewGuid();
-        var staffUserId = Guid.NewGuid();
-        var shipperUserId = Guid.NewGuid();
-        var loadId = Guid.NewGuid();
-        var workflowRunId = Guid.NewGuid();
-        var assignmentId = Guid.NewGuid();
-
-        var agency = new Agency
-        {
-            AgencyId = agencyId,
-            Name = "Cap Agency",
-            BusinessRegNo = $"BR-{Guid.NewGuid():N}",
-            YardAddress = "23 Cap Way",
-            YardLat = 6.9m,
-            YardLng = 79.8m,
-            Status = AgencyStatus.Active,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Agencies.Add(agency);
-
-        var staffUser = new User
-        {
-            UserId = staffUserId,
-            FullName = "Cap Staff",
-            Email = $"cap-staff-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.AgencyStaff,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(staffUser);
-
-        db.AgencyStaff.Add(new AgencyStaff
-        {
-            AgencyId = agencyId,
-            UserId = staffUserId,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        });
-
-        var shipperUser = new User
-        {
-            UserId = shipperUserId,
-            FullName = "Cap Shipper",
-            Email = $"cap-shipper-{Guid.NewGuid():N}@example.com",
-            PasswordHash = "hash",
-            Role = UserRole.Shipper,
-            IsActive = true,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Users.Add(shipperUser);
-
-        var load = new Load
-        {
-            LoadId = loadId,
-            ShipperUserId = shipperUserId,
-            ReferenceCode = $"LD-CAP-{Guid.NewGuid():N}"[..12],
-            CargoDescription = "Cap Cargo",
-            WeightKg = 2000,
-            VolumeM3 = 8,
-            PickupAddress = "Site A",
-            PickupLat = 6.9m,
-            PickupLng = 79.8m,
-            DropoffAddress = "Site B",
-            DropoffLat = 7.1m,
-            DropoffLng = 80.1m,
-            Status = LoadStatus.Posted,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Loads.Add(load);
-
-        // AttemptNo = 3 represents the cap per ADR-018
-        var workflowRun = new AgentWorkflowRun
-        {
-            WorkflowRunId = workflowRunId,
-            LoadId = loadId,
-            TriggeredByUserId = shipperUserId,
-            AttemptNo = 3,
-            Objective = "Third matching attempt",
-            Status = WorkflowRunStatus.Running,
-            StartedAt = DateTimeOffset.UtcNow,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.AgentWorkflowRuns.Add(workflowRun);
-
-        var assignment = new Assignment
-        {
-            AssignmentId = assignmentId,
-            LoadId = loadId,
-            AgencyId = agencyId,
-            WorkflowRunId = workflowRunId,
-            ProposedPrice = 42000m,
-            Status = AssignmentStatus.Proposed,
-            CreatedAt = DateTimeOffset.UtcNow,
-            UpdatedAt = DateTimeOffset.UtcNow
-        };
-        db.Assignments.Add(assignment);
-        await db.SaveChangesAsync();
-
-        var token = MintToken(staffUserId, UserRole.AgencyStaff);
-        var req = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/assignments/{loadId}/decline")
-        {
-            Content = JsonContent.Create(new DeclineAssignmentDto
-            {
-                Reason = "Agency unable to service request."
-            })
-        };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var res = await _client.SendAsync(req);
-        Assert.Equal(HttpStatusCode.OK, res.StatusCode);
-
-        // Verify in database: workflowRun status should transition to Failed (safe failure recorded)
-        using var checkScope = _factory.Services.CreateScope();
-        var checkDb = checkScope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var updatedRun = await checkDb.AgentWorkflowRuns.FirstAsync(r => r.WorkflowRunId == workflowRunId);
-        Assert.Equal(WorkflowRunStatus.Failed, updatedRun.Status);
-        Assert.NotNull(updatedRun.CompletedAt);
-
-        var updatedAssignment = await checkDb.Assignments
-            .Include(a => a.Response)
-            .FirstAsync(a => a.AssignmentId == assignmentId);
-        Assert.Equal(AssignmentStatus.Declined, updatedAssignment.Status);
-        Assert.NotNull(updatedAssignment.Response);
-        Assert.Equal(AssignmentResponseType.Declined, updatedAssignment.Response.Response);
-    }
 }

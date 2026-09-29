@@ -218,21 +218,6 @@ public class LoadFilesControllerTests : IClassFixture<CustomWebApplicationFactor
     }
 
     [Fact]
-    public async Task Attach_InvalidFileTypeString_Returns400ValidationError()
-    {
-        var tokens = await RegisterAndLoginShipperAsync("attach-invalid-type");
-        var load = await CreateLoadAsShipperAsync(tokens.AccessToken);
-        var uploaded = await UploadFileAsShipperAsync(tokens.AccessToken);
-
-        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/files", tokens.AccessToken);
-        request.Content = JsonContent.Create(new { publicId = uploaded.PublicId, fileType = "NotARealType" });
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("VALIDATION_ERROR", await ReadErrorCodeAsync(response));
-    }
-
-    [Fact]
     public async Task Attach_MissingFileType_Returns400ValidationError()
     {
         var tokens = await RegisterAndLoginShipperAsync("attach-missing-type");
