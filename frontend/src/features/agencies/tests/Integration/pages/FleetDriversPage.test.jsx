@@ -191,7 +191,7 @@ describe('FleetDriversPage', () => {
     })
   })
 
-  it('removes an Active driver from the roster when "Remove" is clicked', async () => {
+  it('removes an Active driver from the roster when its status is changed to Inactive', async () => {
     const user = userEvent.setup()
     mockUpdateStatusMutateAsync.mockResolvedValueOnce({ driverId: 'drv-1', status: 'Inactive' })
 
@@ -201,7 +201,7 @@ describe('FleetDriversPage', () => {
     renderPage()
 
     const row = screen.getByText('Nimal Perera').closest('tr')
-    await user.click(within(row).getByRole('button', { name: /remove/i }))
+    await user.selectOptions(within(row).getByRole('combobox'), 'Inactive')
 
     await waitFor(() => {
       expect(mockUpdateStatusMutateAsync).toHaveBeenCalledWith({
@@ -212,7 +212,7 @@ describe('FleetDriversPage', () => {
     })
   })
 
-  it('reinstates an Inactive driver when "Reinstate" is clicked', async () => {
+  it('reinstates an Inactive driver when its status is changed to Active', async () => {
     const user = userEvent.setup()
     mockUpdateStatusMutateAsync.mockResolvedValueOnce({ driverId: 'drv-3', status: 'Active' })
 
@@ -222,7 +222,7 @@ describe('FleetDriversPage', () => {
     renderPage()
 
     const row = screen.getByText('Sunil Fernando').closest('tr')
-    await user.click(within(row).getByRole('button', { name: /reinstate/i }))
+    await user.selectOptions(within(row).getByRole('combobox'), 'Active')
 
     await waitFor(() => {
       expect(mockUpdateStatusMutateAsync).toHaveBeenCalledWith({
@@ -240,6 +240,6 @@ describe('FleetDriversPage', () => {
     renderPage()
 
     const row = screen.getByText('Kamal Silva').closest('tr')
-    expect(within(row).getByRole('button', { name: /remove/i })).toBeDisabled()
+    expect(within(row).getByRole('combobox')).toBeDisabled()
   })
 })
