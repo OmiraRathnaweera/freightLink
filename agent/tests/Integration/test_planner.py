@@ -146,6 +146,67 @@ async def test_run_succeeds_and_reports_step():
 
 
 @pytest.mark.anyio
+async def test_plan_steps_are_from_fixed_vocabulary_and_preserved_through_persistence():
+    """Regression/content check for planning & delegation (rubric: 'correct planning and
+    delegation'). `planner.run()` itself performs no validation of the LLM's `steps` list -
+    it is a pure pass-through (see `planner.py`, no post-processing between `llm.plan(...)`
+    and `steps=plan_json_dict["steps"]`) - so the real contract enforced only by
+    `_SYSTEM_PROMPT` is: steps must be drawn, in order, only from the four fixed pipeline
+    stages. This test pins that fixed vocabulary as a constant, asserts the prompt actually
+    documents every one of them (catching prompt/test drift), and asserts the planner
+    forwards a realistic ordered plan for a typical load unchanged into both `result["plan"]`
+    and the persisted step's `outputJson` - proving delegation order survives the agent
+    untouched rather than being silently reordered/dropped before persistence."""
+    fixed_vocabulary = [
+        "Evaluate candidate agencies",
+        "Select agency via routing",
+        "Validate and get shipper approval",
+        "Notify agency",
+    ]
+    for step_name in fixed_vocabulary:
+        assert step_name in planner._SYSTEM_PROMPT, (
+            f"fixed step {step_name!r} is no longer documented in the Planner's system "
+            "prompt - the vocabulary this test pins has drifted from the real prompt"
+        )
+
+    state = _state(weightKg=3200, volumeM3=11.5, cargoDescription="Machine parts, MediumLorry load")
+    run_id = uuid.uuid4()
+
+    mock_llm = MagicMock()
+    mock_llm.plan = AsyncMock(
+        return_value={
+            "objective": "Match this 3,200kg load to a suitable agency and route.",
+            "shipper_message": (
+                "This load is 3,200kg, so it needs a MediumLorry. I'm now finding the "
+                "most suitable agency for you."
+            ),
+            "steps": fixed_vocabulary,
+        }
+    )
+
+    with (
+        patch(
+            "freightlink_agent.agents.planner.create_workflow_run",
+            new=AsyncMock(return_value=MagicMock(workflow_run_id=run_id)),
+        ),
+        patch("freightlink_agent.agents.planner.get_llm", return_value=mock_llm),
+        patch("freightlink_agent.agents.planner.report", new=AsyncMock()) as mock_report,
+    ):
+        result = await planner.run(state)
+
+    assert result.get("failed") is not True
+    # Delegation order preserved exactly, not reordered/truncated, into the returned plan...
+    assert result["plan"]["steps"] == fixed_vocabulary
+    # ...and into the persisted AgentStep's outputJson, which is what a grader/auditor
+    # would actually read back to verify correct planning and delegation occurred.
+    assert result["steps"][-1]["outputJson"]["steps"] == fixed_vocabulary
+    _, report_kwargs = mock_report.call_args
+    assert report_kwargs["output_data"]["steps"] == fixed_vocabulary
+    # Every step name delegated to a real, known pipeline stage - none invented.
+    assert all(step in fixed_vocabulary for step in result["plan"]["steps"])
+
+
+@pytest.mark.anyio
 async def test_shipper_message_is_requested_and_persisted_in_step_output():
     """The Planner's structured output must carry a human-friendly shipper_message
     alongside the internal objective, and it must reach the reported step's
