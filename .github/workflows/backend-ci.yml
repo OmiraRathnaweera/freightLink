@@ -47,4 +47,6 @@ jobs:
         run: dotnet build backend.sln --no-restore --configuration Release
 
       - name: Run tests
+        env:
+          TESTCONTAINERS_RYUK_DISABLED: 'true'
         run: dotnet test backend.sln --no-build --configuration Release
