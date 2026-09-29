@@ -41,10 +41,10 @@ jobs:
             ${{ runner.os }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore backend.sln
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build backend.sln --no-restore --configuration Release
 
       - name: Run tests
-        run: dotnet test --no-build --configuration Release
+        run: dotnet test backend.sln --no-build --configuration Release
