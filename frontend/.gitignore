@@ -24,7 +24,6 @@ dist-ssr
 *.sw?
 
 .env
-package-lock.json
 yarn.lock/in
 CLAUDE.md
 AGENTS.md
