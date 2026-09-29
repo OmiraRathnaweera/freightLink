@@ -40,4 +40,6 @@ Set `VITE_API_BASE_URL=http://localhost:5159/api/v1` for a locally running front
    Use your actual API hostname for the final command. Repeat the build, migration, and final `up` steps for later deployments. A failed migration must be fixed before updating the API. Production startup does not apply migrations automatically.
 4. In Vercel, set `VITE_API_BASE_URL=https://api.example.com/api/v1` for the frontend project and redeploy it. Include the `/api/v1` suffix. If using a Vercel custom domain, use its exact origin for `CORS_ORIGINS`; add additional origins as a comma-separated list only when needed.
 
+Swagger remains enabled in the Compose deployment even with `ASPNETCORE_ENVIRONMENT=Production`. Share `https://api.example.com/swagger` as the university documentation URL; the OpenAPI JSON is at `https://api.example.com/swagger/v1/swagger.json`. Set `SWAGGER_ENABLED=false` only if that public documentation is no longer required.
+
 For a PostgreSQL backup, run `docker compose exec -T db pg_dump -U freightlink -d freightlink -Fc > freightlink.dump` (adjust credentials if changed) and store the dump separately from the VPS. The named volumes `postgres_data`, `api_uploads`, `caddy_data`, and `caddy_config` survive container recreation. The API serves plain HTTP only inside Docker and on VPS loopback; Caddy is the public HTTPS entry point.

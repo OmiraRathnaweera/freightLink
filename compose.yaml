@@ -4,6 +4,7 @@ x-api-environment: &api-environment
   ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
   ASPNETCORE_URLS: http://+:8080
   BEHIND_HTTPS_PROXY: "true"
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
   CONNECTIONSTRINGS__DEFAULTCONNECTION: "Host=db;Port=5432;Database=${POSTGRES_DB:-freightlink};Username=${POSTGRES_USER:-freightlink};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
   JWT__ISSUER: ${JWT_ISSUER:-FreightLinkApi}
   JWT__AUDIENCE: ${JWT_AUDIENCE:-FreightLinkClient}

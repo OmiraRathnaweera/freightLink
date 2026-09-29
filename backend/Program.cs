@@ -317,7 +317,9 @@ using (var seedScope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-if (app.Environment.IsDevelopment())
+// The university deployment needs a public Swagger URL even when the API runs
+// in Production. Keep this opt-in for deployments outside the Compose stack.
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SWAGGER_ENABLED"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
