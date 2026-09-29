@@ -260,6 +260,17 @@ builder.Services.AddHttpClient<IRouteService, RouteService>();
 
 var app = builder.Build();
 
+// The maintenance container applies schema changes explicitly before a Production rollout.
+// Exit before startup seed operations and before opening the HTTP listener.
+if (builder.Configuration.GetValue<bool>("FREIGHTLINK_MIGRATE_ONLY"))
+{
+    using var migrationScope = app.Services.CreateScope();
+    var db = migrationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+    app.Logger.LogInformation("Database migrations completed.");
+    return;
+}
+
 // CORS_ORIGINS resolving to zero origins is a deliberate deny-all, not a bug — but it's also the
 // one CORS_ORIGINS outcome that produces no server-side signal at all: every symptom shows up only
 // as a browser-side CORS error on the client, with nothing in the API's own logs to point at the
@@ -306,16 +317,18 @@ using (var seedScope = app.Services.CreateScope())
 // Configure the HTTP request pipeline.
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-if (app.Environment.IsDevelopment())
+// The university deployment needs a public Swagger URL even when the API runs
+// in Production. Keep this opt-in for deployments outside the Compose stack.
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SWAGGER_ENABLED"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-// Skipped only in Development: local/sandbox clients (e.g. the mobile app's emulator/device
-// hitting a localhost API) hit this API over plain HTTP, and the redirect was breaking that flow.
-// Staging/Production still enforce HTTPS.
-if (!app.Environment.IsDevelopment())
+// Caddy terminates public HTTPS for the Docker deployment. Keep the container's
+// private HTTP listener from redirecting proxy requests back to the same URL.
+// Other Production deployments can retain the application's HTTPS redirect.
+if (!app.Environment.IsDevelopment() && !builder.Configuration.GetValue<bool>("BEHIND_HTTPS_PROXY"))
 {
     app.UseHttpsRedirection();
 }

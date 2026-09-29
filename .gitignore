@@ -48,5 +48,5 @@ Thumbs.db
 .DS_Store
 *.md
 !AGENTS.md
-!docs/ROLE_FEATURE_AUDIT.md
+docs/
 AGENTS.md

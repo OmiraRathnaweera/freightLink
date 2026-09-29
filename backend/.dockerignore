@@ -1,5 +1,6 @@
 ﻿**/.dockerignore
-**/.env
+**/.env*
+appsettings.*.json
 **/.git
 **/.gitignore
 **/.project
@@ -19,6 +20,9 @@
 **/node_modules
 **/npm-debug.log
 **/obj
+FreightLink.Api.Tests
+PerformanceTests
+storage
 **/secrets.dev.yaml
 **/values.dev.yaml
 LICENSE

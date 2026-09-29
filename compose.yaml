@@ -1,0 +1,144 @@
+name: freightlink
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+  ASPNETCORE_URLS: http://+:8080
+  BEHIND_HTTPS_PROXY: "true"
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+  CONNECTIONSTRINGS__DEFAULTCONNECTION: "Host=db;Port=5432;Database=${POSTGRES_DB:-freightlink};Username=${POSTGRES_USER:-freightlink};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
+  JWT__ISSUER: ${JWT_ISSUER:-FreightLinkApi}
+  JWT__AUDIENCE: ${JWT_AUDIENCE:-FreightLinkClient}
+  JWT__KEY: ${JWT_KEY:?Set JWT_KEY to at least 32 bytes}
+  JWT__ACCESSTOKENMINUTES: ${JWT_ACCESS_TOKEN_MINUTES:-15}
+  JWT__REFRESHTOKENDAYS: ${JWT_REFRESH_TOKEN_DAYS:-7}
+  INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY}
+  AGENT_API_BASE_URL: http://agent:8001
+  AGENT_SERVICE_API_KEY: ${AGENT_SHARED_SECRET:?Set AGENT_SHARED_SECRET}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+  FILE_STORAGE_PATH: /app/storage/uploads
+  ADMIN_USER_EMAIL: ${ADMIN_USER_EMAIL:?Set ADMIN_USER_EMAIL for the first database startup}
+  ADMIN_USER_PASSWORD: ${ADMIN_USER_PASSWORD:?Set ADMIN_USER_PASSWORD for the first database startup}
+  CLOUDINARY__CLOUDNAME: ${CLOUDINARY_CLOUD_NAME:-}
+  CLOUDINARY__APIKEY: ${CLOUDINARY_API_KEY:-}
+  CLOUDINARY__APISECRET: ${CLOUDINARY_API_SECRET:-}
+  CLOUDINARY__FOLDER: ${CLOUDINARY_FOLDER:-freightlink}
+  OPENROUTESERVICE__APIKEY: ${OPENROUTESERVICE_API_KEY:-}
+  OPENROUTESERVICE__BASEURL: ${OPENROUTESERVICE_BASE_URL:-https://api.openrouteservice.org}
+  EMAIL__ENABLED: ${EMAIL_ENABLED:-false}
+  EMAIL__SANDBOXMODE: ${EMAIL_SANDBOX_MODE:-true}
+  EMAIL__SMTPHOST: ${EMAIL_SMTP_HOST:-smtp.gmail.com}
+  EMAIL__SMTPPORT: ${EMAIL_SMTP_PORT:-587}
+  EMAIL__ENABLESSL: ${EMAIL_ENABLE_SSL:-true}
+  EMAIL__USERNAME: ${EMAIL_USERNAME:-}
+  EMAIL__PASSWORD: ${EMAIL_PASSWORD:-}
+  EMAIL__FROMNAME: ${EMAIL_FROM_NAME:-FreightLink}
+  EMAIL__FROMADDRESS: ${EMAIL_FROM_ADDRESS:-}
+  EMAIL__FRONTENDBASEURL: ${FRONTEND_BASE_URL:-http://localhost:5173}
+  EMAIL__REQUIREEMAILVERIFICATION: ${EMAIL_REQUIRE_VERIFICATION:-false}
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-freightlink}
+      POSTGRES_USER: ${POSTGRES_USER:-freightlink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - database
+
+  agent:
+    image: freightlink-agent:local
+    build:
+      context: ./agent
+    restart: unless-stopped
+    environment:
+      AGENT_API_BASE_URL: http://agent:8001
+      AGENT_SERVICE_PORT: "8001"
+      BACKEND_BASE_URL: http://api:8080
+      SHARED_SECRET: ${AGENT_SHARED_SECRET:?Set AGENT_SHARED_SECRET}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:?Set INTERNAL_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MAX_CALLS_PER_PROCESS: ${OPENAI_MAX_CALLS_PER_PROCESS:-200}
+      OPENROUTESERVICE_API_KEY: ${OPENROUTESERVICE_API_KEY:-}
+      OPENROUTESERVICE_BASE_URL: ${OPENROUTESERVICE_BASE_URL:-https://api.openrouteservice.org}
+      LOG_LEVEL: ${AGENT_LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - agent_api
+
+  api:
+    image: freightlink-api:local
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment: *api-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      agent:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${API_LOCAL_PORT:-5159}:8080"
+    volumes:
+      - api_uploads:/app/storage
+    networks:
+      - database
+      - agent_api
+      - public_api
+
+  migrate:
+    image: freightlink-api:local
+    profiles: ["maintenance"]
+    restart: "no"
+    environment:
+      <<: *api-environment
+      FREIGHTLINK_MIGRATE_ONLY: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - database
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["production"]
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - public_api
+
+volumes:
+  postgres_data:
+  api_uploads:
+  caddy_data:
+  caddy_config:
+
+networks:
+  database:
+    internal: true
+  agent_api:
+  public_api:
