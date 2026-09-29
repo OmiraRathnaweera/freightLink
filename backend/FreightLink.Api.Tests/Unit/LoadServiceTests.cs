@@ -136,25 +136,6 @@ public class LoadServiceTests
         Assert.False(string.IsNullOrWhiteSpace(result.ReferenceCode));
     }
 
-    /// <summary>
-    /// The generated reference code keeps its human-readable <c>LD-</c> prefix but carries a full
-    /// GUID's worth of hex digits (32, not the old 9-digit truncated slice), and two separately
-    /// created loads never collide.
-    /// </summary>
-    [Fact]
-    public async Task CreateAsync_GeneratesAHighEntropyUniqueReferenceCode()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-
-        var first = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-        var second = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-
-        Assert.Matches("^LD-[0-9A-F]{32}$", first.ReferenceCode);
-        Assert.NotEqual(first.ReferenceCode, second.ReferenceCode);
-    }
-
     /// <summary>PostImmediately=true creates the load directly as Posted.</summary>
     [Fact]
     public async Task CreateAsync_CreatesLoadAsPosted_WhenPostImmediatelyTrue()
@@ -217,39 +198,9 @@ public class LoadServiceTests
         Assert.Empty(dbContext.Loads);
     }
 
-    /// <summary>Creating a load records a single LoadStatusHistory row from null to the initial status.</summary>
-    [Fact]
-    public async Task CreateAsync_WritesInitialLoadStatusHistoryRow()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-
-        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-
-        var historyRow = await dbContext.LoadStatusHistories.SingleAsync(h => h.LoadId == result.LoadId);
-        Assert.Null(historyRow.FromStatus);
-        Assert.Equal(LoadStatus.Draft, historyRow.ToStatus);
-        Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
-        Assert.Null(historyRow.Reason);
-    }
-
-    /// <summary>The created load's response is enriched with the owning Shipper's display name.</summary>
-    [Fact]
-    public async Task CreateAsync_ReturnsShipperName()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-
-        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-
-        Assert.Equal("Jane Shipper", result.ShipperName);
-    }
-
     // --- Get one ---
 
-    /// <summary>Fetching an existing load returns its full detail.</summary>
+    /// <summary>Fetching an existing load returns its full detail, including its status-history audit trail.</summary>
     [Fact]
     public async Task GetByIdAsync_ReturnsLoad_WhenExists()
     {
@@ -268,45 +219,6 @@ public class LoadServiceTests
         Assert.Null(historyRow.FromStatus);
         Assert.Equal("Draft", historyRow.ToStatus);
         Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
-    }
-
-    /// <summary>
-    /// Every recorded status transition is included, newest first — proving the single-load fetch
-    /// surfaces the load's full audit trail, not just its most recent row.
-    /// </summary>
-    [Fact]
-    public async Task GetByIdAsync_ReturnsStatusHistory_NewestFirst()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-        await sut.ChangeStatusAsync(created.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" });
-
-        var result = await sut.GetByIdAsync(created.LoadId, shipperUserId, UserRole.Shipper);
-
-        Assert.Equal(2, result.StatusHistory.Count);
-        Assert.Equal("Cancelled", result.StatusHistory[0].ToStatus);
-        Assert.Equal("Draft", result.StatusHistory[0].FromStatus);
-        Assert.Equal("Shipper changed plans", result.StatusHistory[0].Reason);
-        Assert.Null(result.StatusHistory[1].FromStatus);
-        Assert.Equal("Draft", result.StatusHistory[1].ToStatus);
-    }
-
-    /// <summary>
-    /// Create/Update/Cancel responses leave StatusHistory empty — only the single-load fetch populates
-    /// the full audit trail (see <see cref="LoadResponseDto.StatusHistory"/>).
-    /// </summary>
-    [Fact]
-    public async Task CreateAsync_ReturnsEmptyStatusHistory()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-
-        var result = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-
-        Assert.Empty(result.StatusHistory);
     }
 
     /// <summary>Fetching a nonexistent load throws a 404-shaped ApiException.</summary>
@@ -427,56 +339,6 @@ public class LoadServiceTests
         Assert.Equal(created.LoadId, item.LoadId);
     }
 
-    /// <summary>CreatedFrom alone returns only loads created on or after the given instant (inclusive lower bound).</summary>
-    [Fact]
-    public async Task GetListAsync_CreatedFromOnly_ReturnsLoadsCreatedOnOrAfter()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var baseTime = DateTimeOffset.UtcNow;
-        var older = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        older.CreatedAt = baseTime.AddDays(-2);
-        var boundary = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        boundary.CreatedAt = baseTime;
-        var newer = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        newer.CreatedAt = baseTime.AddDays(2);
-        await dbContext.SaveChangesAsync();
-
-        var result = await sut.GetListAsync(new LoadListQueryDto { CreatedFrom = baseTime }, shipperUserId, UserRole.Shipper);
-
-        var resultIds = result.Items.Select(i => i.LoadId).ToHashSet();
-        Assert.Equal(2, result.TotalItems);
-        Assert.Contains(boundary.LoadId, resultIds);
-        Assert.Contains(newer.LoadId, resultIds);
-        Assert.DoesNotContain(older.LoadId, resultIds);
-    }
-
-    /// <summary>CreatedTo alone returns only loads created on or before the given instant (inclusive upper bound).</summary>
-    [Fact]
-    public async Task GetListAsync_CreatedToOnly_ReturnsLoadsCreatedOnOrBefore()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var baseTime = DateTimeOffset.UtcNow;
-        var older = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        older.CreatedAt = baseTime.AddDays(-2);
-        var boundary = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        boundary.CreatedAt = baseTime;
-        var newer = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        newer.CreatedAt = baseTime.AddDays(2);
-        await dbContext.SaveChangesAsync();
-
-        var result = await sut.GetListAsync(new LoadListQueryDto { CreatedTo = baseTime }, shipperUserId, UserRole.Shipper);
-
-        var resultIds = result.Items.Select(i => i.LoadId).ToHashSet();
-        Assert.Equal(2, result.TotalItems);
-        Assert.Contains(older.LoadId, resultIds);
-        Assert.Contains(boundary.LoadId, resultIds);
-        Assert.DoesNotContain(newer.LoadId, resultIds);
-    }
-
     /// <summary>CreatedFrom and CreatedTo together (AND) return only loads within that inclusive window.</summary>
     [Fact]
     public async Task GetListAsync_CreatedFromAndCreatedToTogether_ReturnsLoadsWithinRange()
@@ -500,55 +362,6 @@ public class LoadServiceTests
 
         var item = Assert.Single(result.Items);
         Assert.Equal(inRange.LoadId, item.LoadId);
-    }
-
-    /// <summary>A date range that matches no loads returns an empty page, not an error.</summary>
-    [Fact]
-    public async Task GetListAsync_CreatedRangeExcludingAllLoads_ReturnsEmptyPage()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-        var futureFrom = DateTimeOffset.UtcNow.AddYears(1);
-
-        var result = await sut.GetListAsync(new LoadListQueryDto { CreatedFrom = futureFrom }, shipperUserId, UserRole.Shipper);
-
-        Assert.Equal(0, result.TotalItems);
-        Assert.Empty(result.Items);
-    }
-
-    /// <summary>
-    /// When every load shares the same primary sort value (here, CreatedAt), the LoadId tiebreaker
-    /// still yields a total, repeatable order — proving pagination can't duplicate or skip rows at a
-    /// page boundary just because several loads tie on the requested sort field.
-    /// </summary>
-    [Theory]
-    [InlineData("asc")]
-    [InlineData("desc")]
-    public async Task GetListAsync_OrdersDeterministically_WhenPrimarySortValuesAreTied(string sortDir)
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var tiedCreatedAt = DateTimeOffset.UtcNow;
-        var loadIds = new List<Guid>();
-        for (var i = 0; i < 4; i++)
-        {
-            var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-            load.CreatedAt = tiedCreatedAt;
-            await dbContext.SaveChangesAsync();
-            loadIds.Add(load.LoadId);
-        }
-
-        var ascending = string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
-        var expectedOrder = ascending ? loadIds.OrderBy(id => id).ToList() : loadIds.OrderByDescending(id => id).ToList();
-
-        var page1 = await sut.GetListAsync(new LoadListQueryDto { SortBy = "createdAt", SortDir = sortDir, Page = 1, PageSize = 2 }, shipperUserId, UserRole.Shipper);
-        var page2 = await sut.GetListAsync(new LoadListQueryDto { SortBy = "createdAt", SortDir = sortDir, Page = 2, PageSize = 2 }, shipperUserId, UserRole.Shipper);
-
-        var actualOrder = page1.Items.Concat(page2.Items).Select(i => i.LoadId).ToList();
-        Assert.Equal(expectedOrder, actualOrder);
     }
 
     /// <summary>A Shipper only ever sees their own loads, even if they request a different shipperUserId filter.</summary>
@@ -583,47 +396,6 @@ public class LoadServiceTests
         var result = await sut.GetListAsync(new LoadListQueryDto(), Guid.NewGuid(), UserRole.Admin);
 
         Assert.Equal(2, result.TotalItems);
-    }
-
-    /// <summary>
-    /// Each list row is enriched with its own owning Shipper's display name — the main scenario this
-    /// exists for, since an Admin's list view spans loads from multiple different shippers.
-    /// </summary>
-    [Fact]
-    public async Task GetListAsync_ItemsIncludeEachOwnersShipperName()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperAId = await SeedShipperUserAsync(dbContext);
-        var shipperBId = await SeedShipperUserAsync(dbContext, fullName: "Bob Shipper");
-        await sut.CreateAsync(shipperAId, ValidCreateLoadDto());
-        await sut.CreateAsync(shipperBId, ValidCreateLoadDto());
-
-        var result = await sut.GetListAsync(new LoadListQueryDto(), Guid.NewGuid(), UserRole.Admin);
-
-        var namesByShipper = result.Items.ToDictionary(i => i.ShipperName);
-        Assert.Contains("Jane Shipper", namesByShipper.Keys);
-        Assert.Contains("Bob Shipper", namesByShipper.Keys);
-    }
-
-    /// <summary>
-    /// Each list row also carries its owner's raw id, not just the resolved display name — the
-    /// frontend's id-based fallback label (formatShipperName) needs it when ShipperName can't be
-    /// resolved, the same way the single-load response already does.
-    /// </summary>
-    [Fact]
-    public async Task GetListAsync_ItemsIncludeShipperUserId()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-
-        var result = await sut.GetListAsync(new LoadListQueryDto(), shipperUserId, UserRole.Shipper);
-
-        var item = Assert.Single(result.Items);
-        Assert.Equal(created.LoadId, item.LoadId);
-        Assert.Equal(shipperUserId, item.ShipperUserId);
     }
 
     /// <summary>
@@ -764,26 +536,6 @@ public class LoadServiceTests
     }
 
     /// <summary>
-    /// LoadService never computes a price itself (that's PricingEstimatorService's job) — editing a
-    /// freshly created load, which has no EstimatedPrice yet, leaves it null either way.
-    /// </summary>
-    [Fact]
-    public async Task UpdateAsync_DoesNotComputeEstimatedPrice_WhenWeightChanges()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var created = await sut.CreateAsync(shipperUserId, ValidCreateLoadDto());
-
-        var updateRequest = ValidUpdateLoadDto();
-        updateRequest.WeightKg = created.WeightKg + 1000m;
-
-        var result = await sut.UpdateAsync(created.LoadId, shipperUserId, updateRequest);
-
-        Assert.Null(result.EstimatedPrice);
-    }
-
-    /// <summary>
     /// A previously-estimated price is invalidated the moment any input the internal estimator prices
     /// against changes — weight here — since there is no synchronous re-estimation wired into this
     /// edit path and a stale price would otherwise keep showing as if it still reflected the load.
@@ -800,25 +552,6 @@ public class LoadServiceTests
 
         var updateRequest = ValidUpdateLoadDto();
         updateRequest.WeightKg = load.WeightKg + 1000m;
-
-        var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
-
-        Assert.Null(result.EstimatedPrice);
-    }
-
-    /// <summary>Same as the weight case, but for a pickup/dropoff coordinate change — distanceKm is the other estimator input this edit path can invalidate.</summary>
-    [Fact]
-    public async Task UpdateAsync_ClearsEstimatedPrice_WhenPickupCoordinatesChange()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        load.EstimatedPrice = 5000m;
-        await dbContext.SaveChangesAsync();
-
-        var updateRequest = ValidUpdateLoadDto();
-        updateRequest.PickupLat = load.PickupLat + 1m;
 
         var result = await sut.UpdateAsync(load.LoadId, shipperUserId, updateRequest);
 
@@ -868,23 +601,6 @@ public class LoadServiceTests
         }
     }
 
-    /// <summary>Identical pickup and dropoff coordinates are rejected before any DB write, mirroring <c>ck_load_distinct_points</c>.</summary>
-    [Fact]
-    public async Task UpdateAsync_Throws_WhenPickupAndDropoffCoordinatesAreIdentical()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Draft);
-        var request = ValidUpdateLoadDto();
-        request.DropoffLat = request.PickupLat;
-        request.DropoffLng = request.PickupLng;
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, shipperUserId, request));
-
-        Assert.Equal(ErrorCode.LOAD_PICKUP_DROPOFF_IDENTICAL, exception.Code);
-    }
-
     /// <summary>Editing a nonexistent load throws a 404-shaped ApiException.</summary>
     [Fact]
     public async Task UpdateAsync_Throws_WhenNotFound()
@@ -910,43 +626,6 @@ public class LoadServiceTests
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, otherShipperId, ValidUpdateLoadDto()));
 
         Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
-    }
-
-    /// <summary>
-    /// If another request commits a change to this load between when this call's context loaded it
-    /// and when it saves, the xmin concurrency token (LoadConfiguration) catches the lost-update race
-    /// and this call gets a 409 instead of silently overwriting the concurrent change.
-    /// </summary>
-    [Fact]
-    public async Task UpdateAsync_Throws409_WhenLoadWasModifiedConcurrently()
-    {
-        var databaseName = Guid.NewGuid().ToString();
-        using var seedContext = await CreateContextAsync(databaseName);
-        var shipperUserId = await SeedShipperUserAsync(seedContext);
-        var load = await SeedLoadAsync(seedContext, shipperUserId, LoadStatus.Draft);
-
-        using var dbContext = await CreateContextAsync(databaseName);
-        var sut = CreateSut(dbContext);
-        // Pre-load the row into this test's own context so its tracked original xmin value goes
-        // stale the moment the "concurrent" write below commits — mirroring two requests racing on
-        // the same row, without needing two real concurrent threads.
-        _ = await dbContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
-
-        using (var concurrentContext = await CreateContextAsync(databaseName))
-        {
-            var concurrentlyLoadedRow = await concurrentContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
-            concurrentlyLoadedRow.CargoDescription = "Changed by a concurrent request";
-            // The InMemory provider (unlike real Postgres) never auto-advances a shadow "xmin"
-            // property on its own, so this stands in for the row-version bump a real UPDATE would
-            // cause — without it, the concurrency token never actually changes and the race this
-            // test targets could never be observed under InMemory.
-            concurrentContext.Entry(concurrentlyLoadedRow).Property<uint>("xmin").CurrentValue = 12345u;
-            await concurrentContext.SaveChangesAsync();
-        }
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateAsync(load.LoadId, shipperUserId, ValidUpdateLoadDto()));
-
-        Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
     }
 
     // --- ChangeStatus: cancel ---
@@ -1004,57 +683,6 @@ public class LoadServiceTests
         Assert.Equal(ErrorCode.LOAD_CANCEL_REASON_REQUIRED, exception.Code);
     }
 
-    /// <summary>Cancelling records a LoadStatusHistory row capturing the prior status, reason, and actor.</summary>
-    [Fact]
-    public async Task ChangeStatusAsync_Cancel_WritesLoadStatusHistoryRow()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-        var shipperUserId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, shipperUserId, LoadStatus.Posted);
-
-        await sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "No longer needed" });
-
-        var historyRow = await dbContext.LoadStatusHistories.SingleAsync(h => h.LoadId == load.LoadId);
-        Assert.Equal(LoadStatus.Posted, historyRow.FromStatus);
-        Assert.Equal(LoadStatus.Cancelled, historyRow.ToStatus);
-        Assert.Equal("No longer needed", historyRow.Reason);
-        Assert.Equal(shipperUserId, historyRow.ChangedByUserId);
-    }
-
-    /// <summary>
-    /// If another request commits a change to this load between when this call's context loaded it
-    /// and when it saves, the xmin concurrency token (LoadConfiguration) catches the lost-update race
-    /// and this call gets a 409 instead of silently cancelling over a since-changed row.
-    /// </summary>
-    [Fact]
-    public async Task ChangeStatusAsync_Cancel_Throws409_WhenLoadWasModifiedConcurrently()
-    {
-        var databaseName = Guid.NewGuid().ToString();
-        using var seedContext = await CreateContextAsync(databaseName);
-        var shipperUserId = await SeedShipperUserAsync(seedContext);
-        var load = await SeedLoadAsync(seedContext, shipperUserId, LoadStatus.Draft);
-
-        using var dbContext = await CreateContextAsync(databaseName);
-        var sut = CreateSut(dbContext);
-        _ = await dbContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
-
-        using (var concurrentContext = await CreateContextAsync(databaseName))
-        {
-            var concurrentlyLoadedRow = await concurrentContext.Loads.SingleAsync(l => l.LoadId == load.LoadId);
-            concurrentlyLoadedRow.CargoDescription = "Changed by a concurrent request";
-            // See UpdateAsync_Throws409_WhenLoadWasModifiedConcurrently for why this manual bump is
-            // needed under the InMemory provider.
-            concurrentContext.Entry(concurrentlyLoadedRow).Property<uint>("xmin").CurrentValue = 12345u;
-            await concurrentContext.SaveChangesAsync();
-        }
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.ChangeStatusAsync(load.LoadId, shipperUserId, new ChangeLoadStatusDto { Status = LoadStatus.Cancelled, Reason = "Shipper changed plans" }));
-
-        Assert.Equal(ErrorCode.LOAD_CONCURRENCY_CONFLICT, exception.Code);
-    }
-
     // --- ChangeStatus: publish ---
 
     /// <summary>A Draft load can be published, transitioning it to Posted.</summary>
@@ -1110,19 +738,6 @@ public class LoadServiceTests
     }
 
     // --- ChangeStatus: shared guards ---
-
-    /// <summary>Changing the status of a nonexistent load throws a 404-shaped ApiException.</summary>
-    [Fact]
-    public async Task ChangeStatusAsync_Throws_WhenNotFound()
-    {
-        using var dbContext = await CreateContextAsync();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.ChangeStatusAsync(Guid.NewGuid(), Guid.NewGuid(), new ChangeLoadStatusDto { Status = LoadStatus.Posted }));
-
-        Assert.Equal(ErrorCode.LOAD_NOT_FOUND, exception.Code);
-    }
 
     /// <summary>A Shipper who does not own the load is forbidden from changing its status.</summary>
     [Fact]

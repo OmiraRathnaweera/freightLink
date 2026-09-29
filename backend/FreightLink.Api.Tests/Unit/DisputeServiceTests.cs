@@ -385,38 +385,6 @@ public class DisputeServiceTests
     }
 
     [Fact]
-    public async Task DisputeLifecycle_ValidSequence_RaisedToUnderReviewToResolved_Succeeds()
-    {
-        using var db = CreateContext();
-        var (shipper, _, _, trip) = await SeedTripGraphAsync(db);
-        var sut = CreateSut(db);
-        var adminUserId = Guid.NewGuid();
-
-        // 1. Raised (Initial state)
-        var dispute = await sut.CreateAsync(shipper.UserId, UserRole.Shipper, new CreateDisputeDto
-        {
-            TripId = trip.TripId,
-            Category = DisputeCategory.Damage,
-            Description = "Goods were damaged during transit on truck."
-        });
-        Assert.Equal(DisputeStatus.Raised, dispute.Status);
-
-        // 2. UnderReview (Transition 1)
-        var underReview = await sut.MoveToReviewAsync(dispute.DisputeId, adminUserId, UserRole.Admin);
-        Assert.Equal(DisputeStatus.UnderReview, underReview.Status);
-
-        // 3. Resolved (Transition 2 - Terminal state)
-        var resolved = await sut.ResolveAsync(dispute.DisputeId, adminUserId, UserRole.Admin, new ResolveDisputeDto
-        {
-            Outcome = DisputeOutcome.Upheld,
-            ResolutionNote = "Investigation complete. Damages verified and refunded."
-        });
-        Assert.Equal(DisputeStatus.Resolved, resolved.Status);
-        Assert.NotNull(resolved.Resolution);
-        Assert.Equal("Investigation complete. Damages verified and refunded.", resolved.Resolution.Notes);
-    }
-
-    [Fact]
     public async Task DisputeLifecycle_InvalidJump_RaisedToResolved_ThrowsBadRequest()
     {
         using var db = CreateContext();

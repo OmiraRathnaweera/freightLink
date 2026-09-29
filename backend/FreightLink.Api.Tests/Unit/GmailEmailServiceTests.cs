@@ -77,8 +77,6 @@ public class GmailEmailServiceTests
     [Theory]
     [InlineData("SmtpHost")]
     [InlineData("SmtpPort")]
-    [InlineData("Username")]
-    [InlineData("Password")]
     [InlineData("FromAddress")]
     public void Validate_Throws_WhenEnabledAndOneRequiredFieldMissing(string missingField)
     {

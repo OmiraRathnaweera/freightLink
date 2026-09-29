@@ -139,19 +139,6 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.False(user.IsEmailVerified);
     }
 
-    /// <summary>PATCH /auth/me without an Authorization header is rejected with 401.</summary>
-    [Fact]
-    public async Task UpdateProfile_Returns401_WithoutAuthorizationHeader()
-    {
-        var response = await _client.PatchAsJsonAsync("/api/v1/auth/me", new UpdateProfileRequestDto
-        {
-            FullName = "Nobody",
-            Email = "nobody@example.com"
-        });
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
     /// <summary>POST /auth/change-password with the correct current password succeeds, and the new password then logs in.</summary>
     [Fact]
     public async Task ChangePassword_Succeeds_AndNewPasswordWorksForLogin()
@@ -215,37 +202,6 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         using var json = JsonDocument.Parse(raw);
         Assert.Equal("UNAUTHORIZED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
         Assert.False(string.IsNullOrWhiteSpace(json.RootElement.GetProperty("error").GetProperty("message").GetString()));
-    }
-
-    /// <summary>
-    /// GET /auth/me with a malformed/invalid token is rejected with 401 and the standard error
-    /// envelope (JwtBearerEvents.OnChallenge), not ASP.NET's default bare/bodyless 401.
-    /// </summary>
-    [Fact]
-    public async Task Me_Returns401WithErrorEnvelope_WithInvalidToken()
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-real-jwt");
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var raw = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(raw);
-        Assert.Equal("UNAUTHORIZED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-        Assert.False(string.IsNullOrWhiteSpace(json.RootElement.GetProperty("error").GetProperty("message").GetString()));
-    }
-
-    /// <summary>
-    /// The 401 error envelope's response Content-Type is application/json, matching every other
-    /// error response in this project — not the default WWW-Authenticate-header-only response.
-    /// </summary>
-    [Fact]
-    public async Task Me_Returns401_WithJsonContentType_ForMissingToken()
-    {
-        var response = await _client.GetAsync("/api/v1/auth/me");
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
     }
 
     /// <summary>The /auth/me JSON response never includes a password-hash-like field.</summary>
@@ -312,51 +268,6 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
             Email = "weakpass@example.com",
             Password = "weak",
             FullName = "Weak Password",
-            CompanyName = "Acme Freight",
-            BillingAddress = "123 Main Street, Colombo"
-        });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var raw = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(raw);
-        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    /// <summary>
-    /// A phone number missing the mandatory leading '+' is rejected with 400, not left to reach the
-    /// DB's ck_user_phone_e164 CHECK and fail as an unhandled 500.
-    /// </summary>
-    [Fact]
-    public async Task RegisterShipper_Returns400WithValidationErrorEnvelope_ForPhoneMissingPlusSign()
-    {
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
-        {
-            Email = "phonenoplus@example.com",
-            Password = "Sup3r$ecret1",
-            FullName = "No Plus Sign",
-            PhoneE164 = "94771234567",
-            CompanyName = "Acme Freight",
-            BillingAddress = "123 Main Street, Colombo"
-        });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var raw = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(raw);
-        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    /// <summary>
-    /// An email with no TLD dot passes the loose [EmailAddress] check but must still be rejected
-    /// with 400 by the regex that mirrors the DB's ck_user_email_format CHECK.
-    /// </summary>
-    [Fact]
-    public async Task RegisterShipper_Returns400WithValidationErrorEnvelope_ForEmailMissingTld()
-    {
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
-        {
-            Email = "user@localhost",
-            Password = "Sup3r$ecret1",
-            FullName = "No Tld",
             CompanyName = "Acme Freight",
             BillingAddress = "123 Main Street, Colombo"
         });

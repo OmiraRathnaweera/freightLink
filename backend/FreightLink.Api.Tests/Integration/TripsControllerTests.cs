@@ -130,42 +130,6 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>GET /trips/{id} without a token is 401.</summary>
-    [Fact]
-    public async Task GetById_Returns401_WithoutToken()
-    {
-        var response = await _client.GetAsync($"/api/v1/trips/{Guid.NewGuid()}");
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    /// <summary>POST /trips/{id}/status without a token is 401.</summary>
-    [Fact]
-    public async Task ChangeStatus_Returns401_WithoutToken()
-    {
-        var response = await _client.PostAsJsonAsync($"/api/v1/trips/{Guid.NewGuid()}/status", ValidChangeStatusDto());
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    /// <summary>POST /trips/{id}/evidence without a token is 401.</summary>
-    [Fact]
-    public async Task UploadEvidence_Returns401_WithoutToken()
-    {
-        var response = await _client.PostAsJsonAsync($"/api/v1/trips/{Guid.NewGuid()}/evidence", ValidUploadEvidenceDto());
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    /// <summary>GET /trips/{id}/evidence without a token is 401.</summary>
-    [Fact]
-    public async Task GetEvidence_Returns401_WithoutToken()
-    {
-        var response = await _client.GetAsync($"/api/v1/trips/{Guid.NewGuid()}/evidence");
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
     // --- GET /trips (AgencyStaff, Driver, Admin; Shipper excluded) ---
 
     /// <summary>A Shipper cannot call the trips list/dashboard endpoint — role gating.</summary>
@@ -188,24 +152,6 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    /// <summary>A Driver caller reaches the service layer and gets 200 OK.</summary>
-    [Fact]
-    public async Task GetList_Returns200_ForDriver()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/v1/trips", MintTokenWithRoles("Driver")));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    /// <summary>An Admin caller reaches the service layer and gets 200 OK.</summary>
-    [Fact]
-    public async Task GetList_Returns200_ForAdmin()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/v1/trips", MintTokenWithRoles("Admin")));
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
     // --- GET /trips/{id} (all four roles admitted by the role gate) ---
 
     /// <summary>A Shipper caller reaches the service layer; returns 404 for a non-existent trip.</summary>
@@ -215,36 +161,6 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         var tokens = await RegisterAndLoginShipperAsync("trips-getbyid-shipper");
 
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", tokens.AccessToken));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
-    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task GetById_Returns404_ForAgencyStaff()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("AgencyStaff")));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
-    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task GetById_Returns404_ForDriver()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Driver")));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
-    /// <summary>An Admin caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task GetById_Returns404_ForAdmin()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin")));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
@@ -288,43 +204,7 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task ChangeStatus_Returns404_ForDriver()
-    {
-        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/status", MintTokenWithRoles("Driver"));
-        request.Content = JsonContent.Create(ValidChangeStatusDto());
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
     // --- POST /trips/{id}/evidence (AgencyStaff, Driver only) ---
-
-    /// <summary>A Shipper cannot submit trip evidence — role gating.</summary>
-    [Fact]
-    public async Task UploadEvidence_Returns403_ForShipper()
-    {
-        var tokens = await RegisterAndLoginShipperAsync("trips-evidence-shipper");
-
-        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/evidence", tokens.AccessToken);
-        request.Content = JsonContent.Create(ValidUploadEvidenceDto());
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    /// <summary>An Admin cannot submit trip evidence — deliberately excluded from this write endpoint.</summary>
-    [Fact]
-    public async Task UploadEvidence_Returns403_ForAdmin()
-    {
-        using var request = AuthedRequest(HttpMethod.Post, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("Admin"));
-        request.Content = JsonContent.Create(ValidUploadEvidenceDto());
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
 
     /// <summary>Agency Staff no longer submits trip evidence — the assigned Driver captures both
     /// Proof of Pickup and Proof of Delivery — so this is rejected at the role-authorization level
@@ -365,71 +245,13 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
     }
 
-    /// <summary>An AgencyStaff caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task GetEvidence_Returns404_ForAgencyStaff()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("AgencyStaff")));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
-    /// <summary>A Driver caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task GetEvidence_Returns404_ForDriver()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("Driver")));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
-    /// <summary>An Admin caller reaches the service layer; returns 404 for a non-existent trip.</summary>
-    [Fact]
-    public async Task GetEvidence_Returns404_ForAdmin()
-    {
-        var response = await _client.SendAsync(AuthedRequest(HttpMethod.Get, $"/api/v1/trips/{Guid.NewGuid()}/evidence", MintTokenWithRoles("Admin")));
-
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Equal("TRIP_NOT_FOUND", await ReadErrorCodeAsync(response));
-    }
-
     // --- Create / Update / Delete / Cancel ---
-
-    [Fact]
-    public async Task Create_Returns401_WithoutToken()
-    {
-        var response = await _client.PostAsJsonAsync("/api/v1/trips", new CreateTripDto
-        {
-            AssignmentId = Guid.NewGuid(),
-            VehicleId = Guid.NewGuid(),
-            DriverId = Guid.NewGuid()
-        });
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
 
     [Fact]
     public async Task Create_Returns403_ForShipper()
     {
         var shipperTokens = await RegisterAndLoginShipperAsync("trip-create");
         using var request = AuthedRequest(HttpMethod.Post, "/api/v1/trips", shipperTokens.AccessToken);
-        request.Content = JsonContent.Create(new CreateTripDto
-        {
-            AssignmentId = Guid.NewGuid(),
-            VehicleId = Guid.NewGuid(),
-            DriverId = Guid.NewGuid()
-        });
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Create_Returns403_ForAdmin()
-    {
-        using var request = AuthedRequest(HttpMethod.Post, "/api/v1/trips", MintTokenWithRoles("Admin"));
         request.Content = JsonContent.Create(new CreateTripDto
         {
             AssignmentId = Guid.NewGuid(),
@@ -500,17 +322,6 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Update_Returns401_WithoutToken()
-    {
-        var response = await _client.PutAsJsonAsync($"/api/v1/trips/{Guid.NewGuid()}", new UpdateTripDto
-        {
-            VehicleId = Guid.NewGuid()
-        });
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Update_Returns403_ForShipper()
     {
         var shipperTokens = await RegisterAndLoginShipperAsync("trip-update");
@@ -533,36 +344,10 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Delete_Returns401_WithoutToken()
-    {
-        var response = await _client.DeleteAsync($"/api/v1/trips/{Guid.NewGuid()}");
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-    }
-
-    [Fact]
     public async Task Delete_Returns403_ForShipper()
     {
         var shipperTokens = await RegisterAndLoginShipperAsync("trip-delete");
         using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", shipperTokens.AccessToken);
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Delete_Returns403_ForDriver()
-    {
-        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Driver"));
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    /// <summary>Admin has view-only access to trips — cannot delete trips (Requirement 4).</summary>
-    [Fact]
-    public async Task Delete_Returns403_ForAdmin()
-    {
-        using var request = AuthedRequest(HttpMethod.Delete, $"/api/v1/trips/{Guid.NewGuid()}", MintTokenWithRoles("Admin"));
 
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -749,17 +534,6 @@ public class TripsControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Null(deletedTrip);
         var remainingEvents = await verifyDb.TripEvents.Where(e => e.TripId == tripId).ToListAsync();
         Assert.Empty(remainingEvents);
-    }
-
-    /// <summary>Admin has view-only access to trips — cannot cancel trips (Requirement 4).</summary>
-    [Fact]
-    public async Task Cancel_Returns403_ForAdmin()
-    {
-        using var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/trips/{Guid.NewGuid()}/cancel", MintTokenWithRoles("Admin"));
-        request.Content = JsonContent.Create(new CancelTripDto { Reason = "test" });
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

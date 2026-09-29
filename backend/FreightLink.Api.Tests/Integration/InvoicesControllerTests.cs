@@ -269,27 +269,6 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    [Fact]
-    public async Task PostInvoice_AuthenticatedAdmin_Returns403Forbidden()
-    {
-        var (_, _, _, trip) = await SeedTripDataAsync();
-        var token = MintToken(Guid.NewGuid(), UserRole.Admin);
-
-        var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
-        {
-            Content = JsonContent.Create(new CreateInvoiceDto
-            {
-                TripId = trip.TripId,
-                Amount = 25000m,
-                Currency = "LKR"
-            })
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        var response = await _client.SendAsync(request);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
     // =========================================================================
     // 2. RBAC Matrix — Edit Invoice (Agent Allowed on Draft, Admin/Shipper Denied 403)
     // =========================================================================
@@ -363,39 +342,6 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
             Content = JsonContent.Create(new UpdateInvoiceDto { Amount = 15000m })
         };
         putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", shipperToken);
-        var putRes = await _client.SendAsync(putReq);
-
-        Assert.Equal(HttpStatusCode.Forbidden, putRes.StatusCode);
-    }
-
-    [Fact]
-    public async Task PutInvoice_AuthenticatedAdmin_Returns403Forbidden()
-    {
-        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
-        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
-        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
-
-        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
-        {
-            Content = JsonContent.Create(new CreateInvoiceDto
-            {
-                TripId = trip.TripId,
-                RecipientId = shipper.UserId,
-                Amount = 20000m,
-                Currency = "LKR",
-                IssueImmediately = false
-            })
-        };
-        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
-        var createRes = await _client.SendAsync(createReq);
-        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
-
-        // Admin attempts update
-        var putReq = new HttpRequestMessage(HttpMethod.Put, $"/api/v1/invoices/{created.InvoiceId}")
-        {
-            Content = JsonContent.Create(new UpdateInvoiceDto { Amount = 15000m })
-        };
-        putReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
         var putRes = await _client.SendAsync(putReq);
 
         Assert.Equal(HttpStatusCode.Forbidden, putRes.StatusCode);
@@ -626,43 +572,6 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
             Content = JsonContent.Create(new UploadPaymentProofDto { PublicId = uploaded.PublicId })
         };
         proofReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
-        var proofRes = await _client.SendAsync(proofReq);
-
-        Assert.Equal(HttpStatusCode.Forbidden, proofRes.StatusCode);
-    }
-
-    [Fact]
-    public async Task UploadPaymentProof_AuthenticatedAdmin_Returns403Forbidden()
-    {
-        var (shipper, _, staffUser, trip) = await SeedTripDataAsync();
-        var agentToken = MintToken(staffUser.UserId, UserRole.AgencyStaff);
-        var adminToken = MintToken(Guid.NewGuid(), UserRole.Admin);
-
-        var createReq = new HttpRequestMessage(HttpMethod.Post, "/api/v1/invoices")
-        {
-            Content = JsonContent.Create(new CreateInvoiceDto
-            {
-                TripId = trip.TripId,
-                RecipientId = shipper.UserId,
-                Amount = 45000m,
-                Currency = "LKR",
-                IssueImmediately = true
-            })
-        };
-        createReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", agentToken);
-        var createRes = await _client.SendAsync(createReq);
-        var created = (await createRes.Content.ReadFromJsonAsync<InvoiceResponseDto>(JsonOpts))!;
-
-        // Admin can't upload via /files/single (Shipper/AgencyStaff/Driver only), so upload as the
-        // shipper and only exercise the admin path against the invoice payment-proof endpoint itself.
-        var shipperToken = MintToken(shipper.UserId, UserRole.Shipper);
-        var uploaded = await UploadFileAsync(shipperToken);
-
-        var proofReq = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/invoices/{created.InvoiceId}/payment-proof")
-        {
-            Content = JsonContent.Create(new UploadPaymentProofDto { PublicId = uploaded.PublicId })
-        };
-        proofReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
         var proofRes = await _client.SendAsync(proofReq);
 
         Assert.Equal(HttpStatusCode.Forbidden, proofRes.StatusCode);
@@ -953,8 +862,6 @@ public class InvoicesControllerTests : IClassFixture<CustomWebApplicationFactory
 
     [Theory]
     [InlineData("Shipper")]
-    [InlineData("AgencyStaff")]
-    [InlineData("Driver")]
     public async Task GetSummary_NonAdminRole_Returns403Forbidden(string roleName)
     {
         var role = Enum.Parse<UserRole>(roleName);

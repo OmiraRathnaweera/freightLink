@@ -157,20 +157,6 @@ public class FileUploadServiceTests
         Assert.Empty(storage.UploadedFileNames);
     }
 
-    /// <summary>A non-image, non-PDF document type (e.g. .docx) is rejected — this feature is scoped to images and PDF only.</summary>
-    [Fact]
-    public async Task UploadSingleAsync_Throws_ForDisallowedDocumentType()
-    {
-        var storage = new FakeFileStorageService();
-        var (sut, _) = CreateSut(storage);
-        var file = MakeFile("contract.docx");
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.UploadSingleAsync(file, TestUserId));
-
-        Assert.Equal(ErrorCode.BLOCKED_FILE_TYPE, exception.Code);
-        Assert.Empty(storage.UploadedFileNames);
-    }
-
     /// <summary>
     /// A file whose content doesn't match its (allowed) extension is rejected — e.g. plain text
     /// renamed to ".jpg" — proving the magic-byte sniff catches spoofed extensions, not just

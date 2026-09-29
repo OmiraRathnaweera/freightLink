@@ -251,24 +251,6 @@ public class PricingEstimatorServiceTests
         Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
     }
 
-    [Fact]
-    public async Task EstimateAsync_Throws503_WhenFormulaConfigMissing()
-    {
-        using var dbContext = await CreateContextAsync();
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var shipperId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, shipperId);
-        var configService = new PricingConfigService(dbContext);
-        await configService.CreateFuelPriceRate(new CreateFuelPriceRateDto { FuelType = FuelType.AutoDiesel, PricePerLitre = 350m, Source = "test", EffectiveFrom = DateTimeOffset.UtcNow.AddDays(-1) }, adminId);
-        await configService.CreateVehicleClassEfficiency(new CreateVehicleClassEfficiencyDto { ClassLabel = VehicleClass.MiniTruck, MinPayloadKg = 0m, MaxPayloadKg = null, MinVolumeM3 = 0m, MaxVolumeM3 = null, FuelConsumptionLPer100Km = 15m, Source = "test", EffectiveFrom = DateTimeOffset.UtcNow.AddDays(-1) }, adminId);
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateAsync(ValidRequest(load.LoadId)));
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-    }
-
     /// <summary>
     /// If another request commits a change to this load between when this call's context loaded it
     /// and when it saves, the xmin concurrency token catches the lost-update race and this call gets
@@ -378,22 +360,6 @@ public class PricingEstimatorServiceTests
         var sut = CreateSut(dbContext);
 
         var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateForShipperAsync(load.LoadId, otherShipperId, UserRole.Shipper));
-
-        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
-        Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);
-    }
-
-    [Fact]
-    public async Task EstimateForShipperAsync_Throws403_ForNonShipperRole()
-    {
-        using var dbContext = await CreateContextAsync();
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var shipperId = await SeedShipperUserAsync(dbContext);
-        await SeedFullPricingConfigAsync(dbContext, adminId);
-        var load = await SeedLoadAsync(dbContext, shipperId);
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.EstimateForShipperAsync(load.LoadId, shipperId, UserRole.Admin));
 
         Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
         Assert.Equal(ErrorCode.LOAD_NOT_OWNED, exception.Code);

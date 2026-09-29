@@ -1,9 +1,6 @@
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text;
 using System.Text.Json;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Assignments;
@@ -13,7 +10,6 @@ using FreightLink.Api.Entities;
 using FreightLink.Api.Entities.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
 namespace FreightLink.Api.Tests.Integration;
@@ -494,14 +490,14 @@ public class MatchConfirmControllerTests
     }
 
     [Fact]
-    public async Task ConfirmMatch_ByAdmin_Returns200Ok_AndCompletesWorkflowRun()
+    public async Task ConfirmMatch_ByOwningShipper_Returns200Ok_AndCompletesWorkflowRun()
     {
         using var factory = new CustomWebApplicationFactory();
         var client = factory.CreateClient();
 
-        var tokens = await RegisterAndLoginShipperAsync(client, "shipper-admin-test");
+        var tokens = await RegisterAndLoginShipperAsync(client, "shipper-owning-test");
         var load = await SeedLoadAsync(client, tokens);
-        var agencyId = await SeedAgencyAsync(factory, "Admin Approved Carrier");
+        var agencyId = await SeedAgencyAsync(factory, "Owner Approved Carrier");
 
         var workflowRunId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
@@ -561,10 +557,9 @@ public class MatchConfirmControllerTests
             await db.SaveChangesAsync();
         }
 
-        // Admin confirms the match (not the owner shipper)
-        var adminToken = MintAdminToken();
+        // The owning Shipper confirms the match.
         using var confirmRequest = new HttpRequestMessage(HttpMethod.Post, $"/api/v1/loads/{load.LoadId}/match/confirm");
-        confirmRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+        confirmRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
         confirmRequest.Content = JsonContent.Create(new ConfirmMatchDto { AgencyId = agencyId });
 
         var response = await client.SendAsync(confirmRequest);
@@ -629,24 +624,4 @@ public class MatchConfirmControllerTests
         }
     }
 
-    private static string MintAdminToken()
-    {
-        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("integration-test-signing-key-that-is-long-enough-1234567890"));
-        var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
-
-        var token = new JwtSecurityToken(
-            issuer: "FreightLinkApi",
-            audience: "FreightLinkClient",
-            claims: new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.Role, "Admin")
-            },
-            notBefore: DateTime.UtcNow,
-            expires: DateTime.UtcNow.AddMinutes(15),
-            signingCredentials: credentials);
-
-        return new JwtSecurityTokenHandler().WriteToken(token);
-    }
 }

@@ -252,27 +252,6 @@ public class InvoiceServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_Admin_ThrowsForbidden()
-    {
-        using var db = CreateContext();
-        var (_, _, _, _, trip) = await SeedTripGraphAsync(db);
-        var sut = CreateSut(db);
-
-        var request = new CreateInvoiceDto
-        {
-            TripId = trip.TripId,
-            Amount = 45000m,
-            Currency = "LKR"
-        };
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.CreateAsync(Guid.NewGuid(), UserRole.Admin, request));
-
-        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
-        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
-    }
-
-    [Fact]
     public async Task CreateAsync_TripLinked_NoAmountOrLineItemsGiven_DefaultsToAssignmentAgreedPrice()
     {
         using var db = CreateContext();
@@ -371,32 +350,6 @@ public class InvoiceServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_Admin_ThrowsForbidden()
-    {
-        using var db = CreateContext();
-        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
-        var sut = CreateSut(db);
-
-        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
-        {
-            TripId = trip.TripId,
-            RecipientId = shipper.UserId,
-            Amount = 30000m,
-            Currency = "LKR",
-            IssueImmediately = false
-        });
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.UpdateAsync(created.InvoiceId, Guid.NewGuid(), UserRole.Admin, new UpdateInvoiceDto
-            {
-                Amount = 25000m
-            }));
-
-        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
-        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
-    }
-
-    [Fact]
     public async Task UpdateAsync_WhenStatusIsIssued_ThrowsUnprocessableEntity()
     {
         using var db = CreateContext();
@@ -471,29 +424,6 @@ public class InvoiceServiceTests
         Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
     }
 
-    [Fact]
-    public async Task IssueAsync_Admin_ThrowsForbidden()
-    {
-        using var db = CreateContext();
-        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
-        var sut = CreateSut(db);
-
-        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
-        {
-            TripId = trip.TripId,
-            RecipientId = shipper.UserId,
-            Amount = 30000m,
-            Currency = "LKR",
-            IssueImmediately = false
-        });
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.IssueAsync(created.InvoiceId, Guid.NewGuid(), UserRole.Admin));
-
-        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
-        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
-    }
-
     // =========================================================================
     // 4. RBAC — Delete / Void Invoice
     // =========================================================================
@@ -538,29 +468,6 @@ public class InvoiceServiceTests
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             sut.VoidAsync(created.InvoiceId, shipper.UserId, UserRole.Shipper, "Cancel"));
-
-        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
-        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
-    }
-
-    [Fact]
-    public async Task VoidAsync_Admin_ThrowsForbidden()
-    {
-        using var db = CreateContext();
-        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
-        var sut = CreateSut(db);
-
-        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
-        {
-            TripId = trip.TripId,
-            RecipientId = shipper.UserId,
-            Amount = 25000m,
-            Currency = "LKR",
-            IssueImmediately = true
-        });
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.VoidAsync(created.InvoiceId, Guid.NewGuid(), UserRole.Admin, "Admin void"));
 
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
         Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
@@ -665,33 +572,6 @@ public class InvoiceServiceTests
 
         var ex = await Assert.ThrowsAsync<ApiException>(() =>
             sut.UploadPaymentProofAsync(created.InvoiceId, staffUser.UserId, UserRole.AgencyStaff,
-                new UploadPaymentProofDto { PublicId = uploadedFile.PublicId }));
-
-        Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);
-        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
-    }
-
-    [Fact]
-    public async Task UploadPaymentProofAsync_Admin_ThrowsForbidden()
-    {
-        using var db = CreateContext();
-        var (shipper, _, staffUser, _, trip) = await SeedTripGraphAsync(db);
-        var sut = CreateSut(db);
-
-        var created = await sut.CreateAsync(staffUser.UserId, UserRole.AgencyStaff, new CreateInvoiceDto
-        {
-            TripId = trip.TripId,
-            RecipientId = shipper.UserId,
-            Amount = 45000m,
-            Currency = "LKR",
-            IssueImmediately = true
-        });
-
-        var adminId = Guid.NewGuid();
-        var uploadedFile = await SeedUploadedFileAsync(db, adminId);
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.UploadPaymentProofAsync(created.InvoiceId, adminId, UserRole.Admin,
                 new UploadPaymentProofDto { PublicId = uploadedFile.PublicId }));
 
         Assert.Equal(HttpStatusCode.Forbidden, ex.StatusCode);

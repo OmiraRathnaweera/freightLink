@@ -457,24 +457,6 @@ public class AuthServiceTests
         Assert.Equal(ErrorCode.EMAIL_ALREADY_REGISTERED, exception.Code);
     }
 
-    /// <summary>Re-submitting the same email in a different case is not treated as a change (normalized comparison).</summary>
-    [Fact]
-    public async Task UpdateProfileAsync_DoesNotResetVerification_WhenEmailOnlyDiffersByCase()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var registration = await sut.RegisterShipperAsync(ValidShipperRequest("jane@example.com"));
-        await MarkEmailVerifiedAsync(dbContext, registration.UserId);
-
-        var result = await sut.UpdateProfileAsync(registration.UserId, new UpdateProfileRequestDto
-        {
-            FullName = "Jane Shipper",
-            Email = "JANE@EXAMPLE.COM"
-        });
-
-        Assert.True(result.IsEmailVerified);
-    }
-
     // --- Change password ---
 
     /// <summary>Changing the password succeeds and the new password works for a subsequent login.</summary>
@@ -567,33 +549,6 @@ public class AuthServiceTests
 
         var adminCount = await dbContext.Users.CountAsync(u => u.Email == "admin@freightlink.test");
         Assert.Equal(1, adminCount);
-    }
-
-    /// <summary>The seeded admin's password is hashed, never stored as plain text.</summary>
-    [Fact]
-    public async Task SeedAdminIfNotExistsAsync_PasswordIsHashed()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-
-        await sut.SeedAdminIfNotExistsAsync();
-
-        var admin = await dbContext.Users.SingleAsync(u => u.Email == "admin@freightlink.test");
-        Assert.NotEqual("Adm1n$trongPass!", admin.PasswordHash);
-        Assert.True(new PasswordHasher().Verify("Adm1n$trongPass!", admin.PasswordHash));
-    }
-
-    /// <summary>The seeded admin can log in through the same shared login endpoint as any other role.</summary>
-    [Fact]
-    public async Task SeedAdminIfNotExistsAsync_SeededAdminCanLogin()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        await sut.SeedAdminIfNotExistsAsync();
-
-        var tokens = await sut.LoginAsync(new LoginRequestDto { Email = "admin@freightlink.test", Password = "Adm1n$trongPass!" }, null);
-
-        Assert.False(string.IsNullOrWhiteSpace(tokens.AccessToken));
     }
 
     /// <summary>

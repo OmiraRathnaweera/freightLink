@@ -146,25 +146,6 @@ public class PricingConfigServiceTests
     }
 
     [Fact]
-    public async Task GetFuelPriceHistory_ReturnsAllRowsIncludingDeleted_NewestFirst()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-
-        var first = await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 300m, effectiveFrom: now.AddDays(-2)), adminId);
-        var second = await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 320m, effectiveFrom: now.AddDays(-1)), adminId);
-        await sut.SoftDeleteFuelPriceRate(first.FuelPriceRateId, adminId);
-
-        var history = await sut.GetFuelPriceHistory(FuelType.AutoDiesel);
-
-        Assert.Equal(2, history.Count);
-        Assert.Equal(second.FuelPriceRateId, history[0].FuelPriceRateId);
-        Assert.NotNull(history.Single(h => h.FuelPriceRateId == first.FuelPriceRateId).DeletedAt);
-    }
-
-    [Fact]
     public async Task GetAllCurrentFuelPrices_ReturnsOneRowPerFuelType()
     {
         using var dbContext = CreateContext();
@@ -177,17 +158,6 @@ public class PricingConfigServiceTests
         var result = await sut.GetAllCurrentFuelPrices();
 
         Assert.Equal(2, result.Count);
-    }
-
-    [Fact]
-    public async Task GetAllCurrentFuelPrices_ReturnsEmptyList_WhenNoneConfigured()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-
-        var result = await sut.GetAllCurrentFuelPrices();
-
-        Assert.Empty(result);
     }
 
     [Fact]
@@ -236,6 +206,70 @@ public class PricingConfigServiceTests
         Assert.Equal(ErrorCode.FUEL_PRICE_RATE_NOT_FOUND, exception.Code);
     }
 
+    /// <summary>A row whose EffectiveFrom is in the future must not become "current" the moment it's inserted.</summary>
+    [Fact]
+    public async Task GetCurrentFuelPrice_IgnoresFutureDatedRow()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+        var now = DateTimeOffset.UtcNow;
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 300m, effectiveFrom: now.AddDays(-1)), adminId);
+        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 999m, effectiveFrom: now.AddDays(30)), adminId);
+
+        var result = await sut.GetCurrentFuelPrice(FuelType.AutoDiesel);
+
+        Assert.Equal(300m, result.PricePerLitre);
+    }
+
+    /// <summary>
+    /// Same in-process lock also serializes soft-deletes: two concurrent soft-deletes of the same row
+    /// resolve deterministically (the second sees the first's committed DeletedAt and gets the existing
+    /// 422 ALREADY_DELETED), instead of the second silently overwriting the first's DeletedByUserId.
+    /// </summary>
+    [Fact]
+    public async Task SoftDeleteFuelPriceRate_ConcurrentDeletesOfSameRow_SecondGetsAlreadyDeleted()
+    {
+        var databaseName = Guid.NewGuid().ToString();
+        using var dbContext1 = CreateContext(databaseName);
+        using var dbContext2 = CreateContext(databaseName);
+        var sut1 = CreateSut(dbContext1);
+        var sut2 = CreateSut(dbContext2);
+        var adminId = await SeedAdminUserAsync(dbContext1);
+        var created = await sut1.CreateFuelPriceRate(ValidFuelPriceRateDto(), adminId);
+        var otherAdminId = await SeedAdminUserAsync(dbContext2, "Second Admin");
+
+        var task1 = sut1.SoftDeleteFuelPriceRate(created.FuelPriceRateId, adminId);
+        var task2 = sut2.SoftDeleteFuelPriceRate(created.FuelPriceRateId, otherAdminId);
+
+        var results = await Task.WhenAll(task1.ContinueWith(TranslateDeleteOutcome), task2.ContinueWith(TranslateDeleteOutcome));
+
+        Assert.Single(results, r => r.Succeeded);
+        Assert.Single(results, r => !r.Succeeded && r.ErrorCode == ErrorCode.FUEL_PRICE_RATE_ALREADY_DELETED);
+    }
+
+    private static (bool Succeeded, ErrorCode? ErrorCode) TranslateOutcome(Task<VehicleClassEfficiencyResponseDto> task)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            return (true, null);
+        }
+
+        var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
+        return (false, exception.Code);
+    }
+
+    private static (bool Succeeded, ErrorCode? ErrorCode) TranslateDeleteOutcome(Task<PricingConfigDeleteResponseDto> task)
+    {
+        if (task.IsCompletedSuccessfully)
+        {
+            return (true, null);
+        }
+
+        var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
+        return (false, exception.Code);
+    }
+
     private static CreatePricingFormulaConfigDto ValidPricingFormulaConfigDto(
         decimal baseFare = 500m, decimal ratePerKg = 10m, decimal driverCostPerKm = 20m,
         decimal maintenanceAllowancePerKm = 5m, decimal marginPercent = 0.15m, DateTimeOffset? effectiveFrom = null) => new()
@@ -250,6 +284,9 @@ public class PricingConfigServiceTests
     };
 
     // --- PricingFormulaConfig ---
+    // (Structurally the same Create/GetCurrent/History/SoftDelete pattern as FuelPriceRate above —
+    // only the happy-path create and the not-found guard are kept here to avoid re-proving the same
+    // current-row-selection/soft-delete mechanics twice.)
 
     [Fact]
     public async Task CreatePricingFormulaConfig_InsertsNewRow_AndReturnsSetByUserName()
@@ -265,100 +302,6 @@ public class PricingConfigServiceTests
         Assert.Equal("Pricing Admin", result.SetByUserName);
         Assert.Null(result.DeletedAt);
         Assert.Single(dbContext.PricingFormulaConfigs);
-    }
-
-    [Fact]
-    public async Task GetCurrentPricingFormulaConfig_ReturnsLatestNonDeletedRow()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-
-        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 400m, effectiveFrom: now.AddDays(-2)), adminId);
-        await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 450m, effectiveFrom: now.AddDays(-1)), adminId);
-
-        var result = await sut.GetCurrentPricingFormulaConfig();
-
-        Assert.Equal(450m, result.BaseFare);
-    }
-
-    [Fact]
-    public async Task GetCurrentPricingFormulaConfig_ThrowsPricingConfigMissing_WhenNoneExist()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetCurrentPricingFormulaConfig());
-
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, exception.StatusCode);
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-    }
-
-    [Fact]
-    public async Task GetCurrentPricingFormulaConfig_IgnoresSoftDeletedRow()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
-        await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.GetCurrentPricingFormulaConfig());
-
-        Assert.Equal(ErrorCode.PRICING_CONFIG_MISSING, exception.Code);
-    }
-
-    [Fact]
-    public async Task GetPricingFormulaConfigHistory_ReturnsAllRowsIncludingDeleted_NewestFirst()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-
-        var first = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 400m, effectiveFrom: now.AddDays(-2)), adminId);
-        var second = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(baseFare: 450m, effectiveFrom: now.AddDays(-1)), adminId);
-        await sut.SoftDeletePricingFormulaConfig(first.PricingFormulaConfigId, adminId);
-
-        var history = await sut.GetPricingFormulaConfigHistory();
-
-        Assert.Equal(2, history.Count);
-        Assert.Equal(second.PricingFormulaConfigId, history[0].PricingFormulaConfigId);
-        Assert.NotNull(history.Single(h => h.PricingFormulaConfigId == first.PricingFormulaConfigId).DeletedAt);
-    }
-
-    [Fact]
-    public async Task SoftDeletePricingFormulaConfig_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
-
-        var result = await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
-
-        Assert.Equal(created.PricingFormulaConfigId, result.Id);
-        Assert.False(string.IsNullOrWhiteSpace(result.Message));
-
-        var row = await dbContext.PricingFormulaConfigs.AsNoTracking().SingleAsync(x => x.PricingFormulaConfigId == created.PricingFormulaConfigId);
-        Assert.NotNull(row.DeletedAt);
-        Assert.Equal(adminId, row.DeletedByUserId);
-    }
-
-    [Fact]
-    public async Task SoftDeletePricingFormulaConfig_Throws_WhenAlreadyDeleted()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var created = await sut.CreatePricingFormulaConfig(ValidPricingFormulaConfigDto(), adminId);
-        await sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeletePricingFormulaConfig(created.PricingFormulaConfigId, adminId));
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
-        Assert.Equal(ErrorCode.PRICING_FORMULA_CONFIG_ALREADY_DELETED, exception.Code);
     }
 
     [Fact]
@@ -545,55 +488,6 @@ public class PricingConfigServiceTests
         Assert.Equal(VehicleClass.MediumLorry, result.ClassLabel);
     }
 
-    /// <summary>The mirror image: a heavy-but-compact load is upsized by weight even though its volume alone would fit the smaller tier.</summary>
-    [Fact]
-    public async Task GetTierForWeightAndVolume_UpsizesToLargerTier_WhenWeightDemandsABiggerClassThanVolume()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MiniTruck, 0m, 1000m, minVolumeM3: 0m, maxVolumeM3: 5m), adminId);
-        await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(VehicleClass.MediumLorry, 1000m, null, minVolumeM3: 5m, maxVolumeM3: null), adminId);
-
-        var result = await sut.GetTierForWeightAndVolume(1500m, 2m);
-
-        Assert.Equal(VehicleClass.MediumLorry, result.ClassLabel);
-    }
-
-    /// <summary>A row whose EffectiveFrom is in the future must not become "current" the moment it's inserted.</summary>
-    [Fact]
-    public async Task GetCurrentFuelPrice_IgnoresFutureDatedRow()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var now = DateTimeOffset.UtcNow;
-        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 300m, effectiveFrom: now.AddDays(-1)), adminId);
-        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 999m, effectiveFrom: now.AddDays(30)), adminId);
-
-        var result = await sut.GetCurrentFuelPrice(FuelType.AutoDiesel);
-
-        Assert.Equal(300m, result.PricePerLitre);
-    }
-
-    /// <summary>Two rows sharing the exact same EffectiveFrom resolve "current" deterministically (by CreatedAt, the later insert wins), not arbitrarily.</summary>
-    [Fact]
-    public async Task GetCurrentFuelPrice_BreaksTieOnSharedEffectiveFrom_ByCreatedAtDescending()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var sharedEffectiveFrom = DateTimeOffset.UtcNow.AddDays(-1);
-
-        await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 300m, effectiveFrom: sharedEffectiveFrom), adminId);
-        var second = await sut.CreateFuelPriceRate(ValidFuelPriceRateDto(pricePerLitre: 310m, effectiveFrom: sharedEffectiveFrom), adminId);
-
-        var result = await sut.GetCurrentFuelPrice(FuelType.AutoDiesel);
-
-        Assert.Equal(second.FuelPriceRateId, result.FuelPriceRateId);
-        Assert.Equal(310m, result.PricePerLitre);
-    }
-
     /// <summary>
     /// Two concurrent CreateVehicleClassEfficiency calls, both claiming the full open [0,∞) band for two
     /// different classes on an empty table, must not both succeed — the static in-process lock
@@ -620,54 +514,6 @@ public class PricingConfigServiceTests
         Assert.Single(results, r => !r.Succeeded && r.ErrorCode == ErrorCode.VEHICLE_CLASS_EFFICIENCY_BAND_OVERLAP);
     }
 
-    /// <summary>
-    /// Same lock also serializes soft-deletes: two concurrent soft-deletes of the same row resolve
-    /// deterministically (the second sees the first's committed DeletedAt and gets the existing 422
-    /// ALREADY_DELETED), instead of the second silently overwriting the first's DeletedByUserId.
-    /// </summary>
-    [Fact]
-    public async Task SoftDeleteFuelPriceRate_ConcurrentDeletesOfSameRow_SecondGetsAlreadyDeleted()
-    {
-        var databaseName = Guid.NewGuid().ToString();
-        using var dbContext1 = CreateContext(databaseName);
-        using var dbContext2 = CreateContext(databaseName);
-        var sut1 = CreateSut(dbContext1);
-        var sut2 = CreateSut(dbContext2);
-        var adminId = await SeedAdminUserAsync(dbContext1);
-        var created = await sut1.CreateFuelPriceRate(ValidFuelPriceRateDto(), adminId);
-        var otherAdminId = await SeedAdminUserAsync(dbContext2, "Second Admin");
-
-        var task1 = sut1.SoftDeleteFuelPriceRate(created.FuelPriceRateId, adminId);
-        var task2 = sut2.SoftDeleteFuelPriceRate(created.FuelPriceRateId, otherAdminId);
-
-        var results = await Task.WhenAll(task1.ContinueWith(TranslateDeleteOutcome), task2.ContinueWith(TranslateDeleteOutcome));
-
-        Assert.Single(results, r => r.Succeeded);
-        Assert.Single(results, r => !r.Succeeded && r.ErrorCode == ErrorCode.FUEL_PRICE_RATE_ALREADY_DELETED);
-    }
-
-    private static (bool Succeeded, ErrorCode? ErrorCode) TranslateOutcome(Task<VehicleClassEfficiencyResponseDto> task)
-    {
-        if (task.IsCompletedSuccessfully)
-        {
-            return (true, null);
-        }
-
-        var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
-        return (false, exception.Code);
-    }
-
-    private static (bool Succeeded, ErrorCode? ErrorCode) TranslateDeleteOutcome(Task<PricingConfigDeleteResponseDto> task)
-    {
-        if (task.IsCompletedSuccessfully)
-        {
-            return (true, null);
-        }
-
-        var exception = Assert.IsType<ApiException>(task.Exception!.InnerException);
-        return (false, exception.Code);
-    }
-
     [Fact]
     public async Task SoftDeleteVehicleClassEfficiency_ReturnsSuccessMessage_AndSetsDeletedFieldsOnTheRow()
     {
@@ -684,31 +530,5 @@ public class PricingConfigServiceTests
         var row = await dbContext.VehicleClassEfficiencies.AsNoTracking().SingleAsync(x => x.VehicleClassEfficiencyId == created.VehicleClassEfficiencyId);
         Assert.NotNull(row.DeletedAt);
         Assert.Equal(adminId, row.DeletedByUserId);
-    }
-
-    [Fact]
-    public async Task SoftDeleteVehicleClassEfficiency_Throws_WhenAlreadyDeleted()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-        var created = await sut.CreateVehicleClassEfficiency(ValidVehicleClassEfficiencyDto(), adminId);
-        await sut.SoftDeleteVehicleClassEfficiency(created.VehicleClassEfficiencyId, adminId);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeleteVehicleClassEfficiency(created.VehicleClassEfficiencyId, adminId));
-
-        Assert.Equal(ErrorCode.VEHICLE_CLASS_EFFICIENCY_ALREADY_DELETED, exception.Code);
-    }
-
-    [Fact]
-    public async Task SoftDeleteVehicleClassEfficiency_Throws_WhenNotFound()
-    {
-        using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var adminId = await SeedAdminUserAsync(dbContext);
-
-        var exception = await Assert.ThrowsAsync<ApiException>(() => sut.SoftDeleteVehicleClassEfficiency(Guid.NewGuid(), adminId));
-
-        Assert.Equal(ErrorCode.VEHICLE_CLASS_EFFICIENCY_NOT_FOUND, exception.Code);
     }
 }

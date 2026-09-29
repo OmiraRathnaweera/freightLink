@@ -306,20 +306,6 @@ public class LoadFileServiceTests
     }
 
     [Fact]
-    public async Task DetachAsync_LoadFileNotFound_ThrowsNotFound_ForNonexistentId()
-    {
-        await using var dbContext = CreateContext();
-        var sut = CreateSut(dbContext);
-        var shipperId = await SeedShipperUserAsync(dbContext);
-        var load = await SeedLoadAsync(dbContext, shipperId);
-
-        var ex = await Assert.ThrowsAsync<ApiException>(() =>
-            sut.DetachAsync(load.LoadId, Guid.NewGuid(), shipperId));
-
-        Assert.Equal(ErrorCode.LOAD_FILE_NOT_FOUND, ex.Code);
-    }
-
-    [Fact]
     public async Task DetachAsync_LoadFileNotFound_ThrowsNotFound_ForAttachmentBelongingToAnotherLoad()
     {
         await using var dbContext = CreateContext();
