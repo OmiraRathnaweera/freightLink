@@ -63,7 +63,7 @@ public class LoadService : ILoadService
             Status = initialStatus,
             CreatedAt = now,
             UpdatedAt = now
-        };
+        }; 
 
         var historyRow = new LoadStatusHistory
         {
@@ -126,9 +126,36 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.LOAD_NOT_FOUND, "The requested load could not be found.");
         }
 
-        if (currentUserRole != UserRole.Admin && load.ShipperUserId != currentUserId)
+        if (currentUserRole == UserRole.Shipper)
         {
-            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
+            if (load.ShipperUserId != currentUserId)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load does not belong to the authenticated caller.");
+            }
+        }
+        else if (currentUserRole == UserRole.AgencyStaff)
+        {
+            var agencyStaff = await _dbContext.AgencyStaff.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+            if (agencyStaff == null)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "No agency staff record found for caller.");
+            }
+
+            var isAssignedToAgency = await _dbContext.Assignments.AsNoTracking()
+                .AnyAsync(a => a.LoadId == loadId && a.AgencyId == agencyStaff.AgencyId, cancellationToken);
+
+            // Requirement 5: Open marketplace loads (Posted) are visible to all agencies until accepted.
+            // Requirement 2: Loads assigned to this agency are visible.
+            if (load.Status != LoadStatus.Posted && !isAssignedToAgency)
+            {
+                throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "This load is not assigned to your agency.");
+            }
+        }
+        else if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.LOAD_NOT_OWNED, "You do not have permission to view this load.");
         }
 
         var statusHistory = load.StatusHistory
@@ -136,7 +163,36 @@ public class LoadService : ILoadService
             .Select(MapToStatusHistoryResponse)
             .ToList();
 
-        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory);
+        // If load.EstimatedPrice was not directly set on the load row, resolve it from the proposed assignment
+        var estimatedPrice = load.EstimatedPrice;
+        if (!estimatedPrice.HasValue)
+        {
+            var assignmentPrice = await _dbContext.Assignments
+                .Where(a => a.LoadId == loadId && a.ProposedPrice > 0)
+                .OrderByDescending(a => a.CreatedAt)
+                .Select(a => (decimal?)a.ProposedPrice)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (assignmentPrice.HasValue)
+            {
+                estimatedPrice = assignmentPrice.Value;
+            }
+        }
+
+        // Resolve workflow run id if one has been run for this load
+        var workflowRunId = await _dbContext.AgentWorkflowRuns
+            .Where(r => r.LoadId == loadId)
+            .OrderByDescending(r => r.CreatedAt)
+            .Select(r => (Guid?)r.WorkflowRunId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Resolve the dispatched trip id, if any, so a Shipper can look up trip-progress details.
+        var tripId = await _dbContext.Assignments
+            .Where(a => a.LoadId == loadId && a.Trip != null)
+            .Select(a => (Guid?)a.Trip!.TripId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return MapToResponse(load, ResolveShipperName(load.ShipperUser?.FullName), statusHistory, estimatedPrice, workflowRunId, tripId);
     }
 
     /// <inheritdoc />
@@ -157,23 +213,61 @@ public class LoadService : ILoadService
             throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.LOAD_PAGE_OUT_OF_RANGE, "The requested page/pageSize combination is out of range.");
         }
 
-        // A non-Admin caller is always scoped to their own loads, regardless of what the query
-        // requested — this is what prevents one Shipper from reading another's loads by simply
-        // passing a different shipperUserId filter.
-        var effectiveShipperUserId = currentUserRole == UserRole.Admin ? query.ShipperUserId : currentUserId;
-
         // Include (not per-row lookups) so the owner's FullName comes back in the same single query
         // as the page of loads — a plain SQL JOIN — rather than one extra round-trip per row.
         IQueryable<Load> loads = _dbContext.Loads.AsNoTracking().Include(l => l.ShipperUser);
 
-        if (effectiveShipperUserId is { } shipperUserId)
+        if (currentUserRole == UserRole.Shipper)
         {
-            loads = loads.Where(l => l.ShipperUserId == shipperUserId);
+            loads = loads.Where(l => l.ShipperUserId == currentUserId);
+            if (query.Status is { } shipperStatus)
+            {
+                loads = loads.Where(l => l.Status == shipperStatus);
+            }
         }
-
-        if (query.Status is { } status)
+        else if (currentUserRole == UserRole.AgencyStaff)
         {
-            loads = loads.Where(l => l.Status == status);
+            var agencyStaff = await _dbContext.AgencyStaff.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.UserId == currentUserId, cancellationToken);
+
+            var callerAgencyId = agencyStaff?.AgencyId ?? Guid.Empty;
+
+            // Requirement 5 & Requirement 2:
+            // If marketplace is requested or filtering for Posted loads:
+            // Show open marketplace loads (Posted and not accepted by any agency yet).
+            if (query.Marketplace == true || query.Status == LoadStatus.Posted)
+            {
+                loads = loads.Where(l => l.Status == LoadStatus.Posted && !l.Assignments.Any(a => a.Status == AssignmentStatus.Accepted));
+            }
+            else
+            {
+                // Show loads the caller's agency has actually accepted. A Proposed assignment
+                // (an AI-recommended match or manual proposal still awaiting this agency's
+                // accept/decline) deliberately does NOT appear here — surfacing it under "My
+                // Agency Shipments" before the agency has decided would make an unactioned
+                // proposal look like a confirmed shipment. Reviewing/acting on a Proposed
+                // assignment happens via the Flutter Job Proposals inbox or the proposal email.
+                loads = loads.Where(l => l.Assignments.Any(a => a.AgencyId == callerAgencyId && a.Status == AssignmentStatus.Accepted));
+                if (query.Status is { } agencyStatus)
+                {
+                    loads = loads.Where(l => l.Status == agencyStatus);
+                }
+            }
+        }
+        else if (currentUserRole == UserRole.Admin)
+        {
+            if (query.ShipperUserId is { } shipperUserId)
+            {
+                loads = loads.Where(l => l.ShipperUserId == shipperUserId);
+            }
+            if (query.Status is { } adminStatus)
+            {
+                loads = loads.Where(l => l.Status == adminStatus);
+            }
+        }
+        else
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Your role does not permit listing loads.");
         }
 
         if (!string.IsNullOrWhiteSpace(query.Search))
@@ -212,9 +306,17 @@ public class LoadService : ILoadService
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var pageOfLoadIds = pageOfLoads.Select(l => l.LoadId).ToList();
+        var loadIdsWithTrip = await _dbContext.Assignments
+            .Where(a => pageOfLoadIds.Contains(a.LoadId) && a.Trip != null)
+            .Select(a => a.LoadId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        var loadIdsWithTripSet = loadIdsWithTrip.ToHashSet();
+
         return new PagedLoadResponseDto
         {
-            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName))).ToList(),
+            Items = pageOfLoads.Select(l => MapToListItem(l, ResolveShipperName(l.ShipperUser?.FullName), loadIdsWithTripSet.Contains(l.LoadId))).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalItems = totalItems,
@@ -245,6 +347,20 @@ public class LoadService : ILoadService
         ValidatePickupWindow(request.PickupWindowStart, request.PickupWindowEnd);
         ValidateDistinctPoints(request.PickupLat!.Value, request.PickupLng!.Value, request.DropoffLat!.Value, request.DropoffLng!.Value);
 
+        // Every input the internal estimator (PricingEstimatorService) prices against —
+        // WeightKg/VolumeM3 (vehicle-class tier, ratePerKg) and the pickup/dropoff coordinates
+        // (distanceKm, computed by the caller) — invalidates any existing EstimatedPrice the moment
+        // it changes. There is no synchronous re-estimation wired into this edit path, so a stale
+        // price is cleared rather than silently left attached to a load whose dimensions/route it no
+        // longer reflects; the Agentic AI pipeline is expected to re-estimate separately.
+        var pricingInputsChanged =
+            load.WeightKg != request.WeightKg ||
+            load.VolumeM3 != request.VolumeM3 ||
+            load.PickupLat != request.PickupLat!.Value ||
+            load.PickupLng != request.PickupLng!.Value ||
+            load.DropoffLat != request.DropoffLat!.Value ||
+            load.DropoffLng != request.DropoffLng!.Value;
+
         load.CargoDescription = request.CargoDescription;
         load.WeightKg = request.WeightKg;
         load.VolumeM3 = request.VolumeM3;
@@ -256,6 +372,11 @@ public class LoadService : ILoadService
         load.DropoffLng = request.DropoffLng!.Value;
         load.PickupWindowStart = request.PickupWindowStart;
         load.PickupWindowEnd = request.PickupWindowEnd;
+
+        if (pricingInputsChanged)
+        {
+            load.EstimatedPrice = null;
+        }
 
         await SaveChangesWithConcurrencyCheckAsync(cancellationToken);
 
@@ -423,7 +544,13 @@ public class LoadService : ILoadService
     /// The load's status-change audit trail, newest first — only supplied by <see cref="GetByIdAsync"/>;
     /// every other caller leaves this as an empty list (see <see cref="LoadResponseDto.StatusHistory"/>).
     /// </param>
-    private static LoadResponseDto MapToResponse(Load load, string shipperName, List<LoadStatusHistoryResponseDto>? statusHistory = null) => new()
+    private static LoadResponseDto MapToResponse(
+        Load load,
+        string shipperName,
+        List<LoadStatusHistoryResponseDto>? statusHistory = null,
+        decimal? estimatedPrice = null,
+        Guid? workflowRunId = null,
+        Guid? tripId = null) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -440,11 +567,10 @@ public class LoadService : ILoadService
         DropoffLng = load.DropoffLng,
         PickupWindowStart = load.PickupWindowStart,
         PickupWindowEnd = load.PickupWindowEnd,
-        EstimatedPrice = load.EstimatedPrice,
+        EstimatedPrice = estimatedPrice ?? load.EstimatedPrice,
         Status = load.Status.ToString(),
-        // WorkflowRunId requires joining AgentWorkflowRun/Assignment, which belongs to a different
-        // component (Component D) — left null here rather than implemented out of scope.
-        WorkflowRunId = null,
+        WorkflowRunId = workflowRunId,
+        TripId = tripId,
         CreatedAt = load.CreatedAt,
         UpdatedAt = load.UpdatedAt,
         StatusHistory = statusHistory ?? new List<LoadStatusHistoryResponseDto>()
@@ -464,7 +590,8 @@ public class LoadService : ILoadService
     /// <summary>Maps a <see cref="Load"/> entity to its lightweight list-row representation.</summary>
     /// <param name="load">The load entity.</param>
     /// <param name="shipperName">The resolved display name of the load's owning Shipper.</param>
-    private static LoadListItemDto MapToListItem(Load load, string shipperName) => new()
+    /// <param name="hasTrip">Whether a Trip already exists for one of this load's assignments.</param>
+    private static LoadListItemDto MapToListItem(Load load, string shipperName, bool hasTrip) => new()
     {
         LoadId = load.LoadId,
         ShipperUserId = load.ShipperUserId,
@@ -478,6 +605,7 @@ public class LoadService : ILoadService
         PickupWindowEnd = load.PickupWindowEnd,
         EstimatedPrice = load.EstimatedPrice,
         Status = load.Status.ToString(),
+        HasTrip = hasTrip,
         CreatedAt = load.CreatedAt
     };
 }

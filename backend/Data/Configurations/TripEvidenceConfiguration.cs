@@ -17,7 +17,7 @@ public class TripEvidenceConfiguration : IEntityTypeConfiguration<TripEvidence>
         builder.HasOne(x => x.Trip)
             .WithMany(t => t.Evidence)
             .HasForeignKey(x => x.TripId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(x => x.CapturedByUser)
             .WithMany()

@@ -5,7 +5,8 @@ namespace FreightLink.Api.Services.Interfaces;
 
 /// <summary>
 /// Read/create/soft-delete operations on the ADR-019 pricing-config reference tables
-/// (<see cref="Entities.FuelPriceRate"/>, <see cref="Entities.VehicleClassEfficiency"/>). Both are
+/// (<see cref="Entities.FuelPriceRate"/>, <see cref="Entities.VehicleClassEfficiency"/>,
+/// <see cref="Entities.PricingFormulaConfig"/>). All three are
 /// append-only: "editing" a row means inserting a new one with a later <c>EffectiveFrom</c>; an existing
 /// row is only ever touched by a <c>SoftDelete*</c> method, which issues an ordinary <c>UPDATE</c>, never
 /// a raw <c>DELETE</c> (the database's <c>trg_deny_delete_*</c> triggers are a backstop, not the
@@ -91,4 +92,47 @@ public interface IPricingConfigService
     /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>DeletedByUserId</c>.</param>
     /// <exception cref="Common.Exceptions.ApiException">404 if no such row exists; 422 if it is already soft-deleted.</exception>
     Task<PricingConfigDeleteResponseDto> SoftDeleteVehicleClassEfficiency(Guid vehicleClassEfficiencyId, Guid actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The single current <see cref="Entities.PricingFormulaConfig"/> — the latest non-future-dated,
+    /// non-deleted <c>EffectiveFrom</c> row. There is only ever one "current" row, unlike the
+    /// per-fuel-type/per-vehicle-class lookups above.
+    /// </summary>
+    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if no current configuration exists.</exception>
+    Task<PricingFormulaConfigResponseDto> GetCurrentPricingFormulaConfig(CancellationToken cancellationToken = default);
+
+    /// <summary>Every <see cref="Entities.PricingFormulaConfig"/> row (including future-dated, superseded, and soft-deleted), newest <c>EffectiveFrom</c> first.</summary>
+    Task<List<PricingFormulaConfigResponseDto>> GetPricingFormulaConfigHistory(CancellationToken cancellationToken = default);
+
+    /// <summary>Inserts a new, current <see cref="Entities.PricingFormulaConfig"/> row. Never updates an existing row.</summary>
+    /// <param name="request">The new configuration's content.</param>
+    /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>SetByUserId</c>.</param>
+    Task<PricingFormulaConfigResponseDto> CreatePricingFormulaConfig(CreatePricingFormulaConfigDto request, Guid actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Soft-deletes a <see cref="Entities.PricingFormulaConfig"/> row via an ordinary <c>UPDATE</c>
+    /// (never a raw <c>DELETE</c>). Returns a plain success confirmation, not the soft-deleted row —
+    /// fetch <see cref="GetPricingFormulaConfigHistory"/> if the deleted values are still needed.
+    /// </summary>
+    /// <param name="pricingFormulaConfigId">The row's id.</param>
+    /// <param name="actingUserId">The authenticated Admin's id, recorded as <c>DeletedByUserId</c>.</param>
+    /// <exception cref="Common.Exceptions.ApiException">404 if no such row exists; 422 if it is already soft-deleted.</exception>
+    Task<PricingConfigDeleteResponseDto> SoftDeletePricingFormulaConfig(Guid pricingFormulaConfigId, Guid actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reads the current <see cref="Entities.VehicleClassEfficiency"/> (for <paramref name="classLabel"/>),
+    /// current <see cref="Entities.FuelPriceRate"/> (for <paramref name="fuelType"/>), and current
+    /// <see cref="Entities.PricingFormulaConfig"/> as one atomic snapshot, under the same lock every
+    /// pricing-config write is serialized by — so an Admin write landing mid-read can never combine a
+    /// value from before the write with a value from after it. This is what
+    /// <c>PricingEstimatorService</c> uses instead of three separate, individually-unlocked calls.
+    /// </summary>
+    /// <exception cref="Common.Exceptions.ApiException">503 <see cref="Common.Errors.ErrorCode.PRICING_CONFIG_MISSING"/> if any of the three current rows doesn't exist.</exception>
+    Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(VehicleClass classLabel, FuelType fuelType, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Seeds the default fuel prices, formula configuration, and vehicle class efficiencies
+    /// if they have not been configured yet, ensuring Agent 3 pricing calculation succeeds.
+    /// </summary>
+    Task SeedDefaultPricingConfigIfNotExistsAsync(CancellationToken cancellationToken = default);
 }

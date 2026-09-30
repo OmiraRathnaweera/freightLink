@@ -35,7 +35,19 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("JWT__REFRESHTOKENDAYS", "7");
         Environment.SetEnvironmentVariable("ADMIN_USER_EMAIL", null);
         Environment.SetEnvironmentVariable("ADMIN_USER_PASSWORD", null);
+
+        // A known, fixed value so InternalPricingControllerTests can exercise both the correct-key
+        // and wrong/missing-key paths against a predictable expectation.
+        Environment.SetEnvironmentVariable("INTERNAL_API_KEY", "integration-test-internal-api-key");
+
+        // Disabled so Program.cs's EmailOptions.Validate() fail-fast never fires during integration
+        // tests — no test here exercises real email sending, so no EMAIL__* settings are needed.
+        Environment.SetEnvironmentVariable("EMAIL__ENABLED", "false");
+        Environment.SetEnvironmentVariable("EMAIL__REQUIREEMAILVERIFICATION", "false");
     }
+
+    /// <summary>The known <c>INTERNAL_API_KEY</c> value set by this factory, for tests to send as <c>X-Internal-Api-Key</c>.</summary>
+    public const string ValidInternalApiKey = "integration-test-internal-api-key";
 
     /// <summary>Forces the Production environment and swaps in an InMemory <see cref="AppDbContext"/>.</summary>
     /// <param name="builder">The host builder to configure.</param>
@@ -68,11 +80,12 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     }
 
     /// <summary>
-    /// Seeds default pricing reference data (one current <see cref="FuelPriceRate"/> and one wide-open
-    /// <see cref="VehicleClassEfficiency"/> tier — wide-open on both payload and volume) into the InMemory
-    /// database right after the host is built. This data is not consumed by <c>LoadService</c> — Load
-    /// creation/editing does not depend on it — it exists so <c>AdminPricingControllerTests</c>' fuel-rate
-    /// and vehicle-efficiency endpoint tests have a baseline row to exercise against.
+    /// Seeds default pricing reference data (one current <see cref="FuelPriceRate"/>, one wide-open
+    /// <see cref="VehicleClassEfficiency"/> tier — wide-open on both payload and volume — and one
+    /// current <see cref="PricingFormulaConfig"/>) into the InMemory database right after the host is
+    /// built. This data is not consumed by <c>LoadService</c> — Load creation/editing does not depend
+    /// on it — it exists so <c>AdminPricingControllerTests</c>' and <c>InternalPricingControllerTests</c>'
+    /// endpoint tests have a baseline row to exercise against.
     /// </summary>
     protected override IHost CreateHost(IHostBuilder builder)
     {
@@ -122,6 +135,21 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
             MinVolumeM3 = 0m,
             MaxVolumeM3 = 100_000m,
             FuelConsumptionLPer100Km = 15m,
+            Source = "test-seed",
+            EffectiveFrom = now,
+            SetByUserId = pricingSeedUserId,
+            CreatedAt = now,
+            UpdatedAt = now
+        });
+
+        dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
+        {
+            PricingFormulaConfigId = Guid.NewGuid(),
+            BaseFare = 500m,
+            RatePerKg = 10m,
+            DriverCostPerKm = 20m,
+            MaintenanceAllowancePerKm = 5m,
+            MarginPercent = 0.15m,
             Source = "test-seed",
             EffectiveFrom = now,
             SetByUserId = pricingSeedUserId,

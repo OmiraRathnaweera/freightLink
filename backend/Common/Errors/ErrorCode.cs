@@ -17,11 +17,23 @@ public enum ErrorCode
     /// <summary>Credentials were correct but the account is marked inactive.</summary>
     ACCOUNT_INACTIVE,
 
+    /// <summary>Credentials were correct but the email address has not yet been verified.</summary>
+    EMAIL_NOT_VERIFIED,
+
+    /// <summary>An email-verification or password-reset token is unknown, expired, or already consumed.</summary>
+    INVALID_OR_EXPIRED_ACCOUNT_TOKEN,
+
     /// <summary>Registration was attempted with an email that already has an account.</summary>
     EMAIL_ALREADY_REGISTERED,
 
+    /// <summary>A change-password request's "current password" field didn't match the account's actual password.</summary>
+    INCORRECT_CURRENT_PASSWORD,
+
     /// <summary>Agency registration was attempted with a business registration number already on file.</summary>
     BUSINESS_REG_NO_ALREADY_REGISTERED,
+
+    /// <summary>Driver registration was attempted with a license number already on file.</summary>
+    LICENCE_ALREADY_REGISTERED,
 
     /// <summary>The supplied refresh token is unknown, revoked, or expired.</summary>
     INVALID_REFRESH_TOKEN,
@@ -32,6 +44,18 @@ public enum ErrorCode
     /// <summary>The authenticated caller's user record could not be found.</summary>
     USER_NOT_FOUND,
 
+    /// <summary>The requested agency could not be found.</summary>
+    AGENCY_NOT_FOUND,
+
+    /// <summary>The agency exists but does not belong to the authenticated caller.</summary>
+    AGENCY_NOT_OWNED,
+
+    /// <summary>No <c>ComplianceDoc</c> exists with the requested id under the given agency.</summary>
+    COMPLIANCE_DOC_NOT_FOUND,
+
+    /// <summary>An admin attempted to verify/reject a compliance document that is not currently Pending.</summary>
+    INVALID_COMPLIANCE_DOC_STATUS_TRANSITION,
+
     /// <summary>The requested load could not be found.</summary>
     LOAD_NOT_FOUND,
 
@@ -40,6 +64,16 @@ public enum ErrorCode
 
     /// <summary>An edit or cancel was attempted on a load whose current status doesn't allow it.</summary>
     INVALID_LOAD_STATUS_TRANSITION,
+
+    /// <summary>A state change was attempted on an agency whose current status doesn't allow it.</summary>
+    INVALID_AGENCY_STATUS_TRANSITION,
+
+    /// <summary>
+    /// An AgencyStaff caller attempted an operation other than compliance-document upload/read or
+    /// agency profile read while their agency's <c>Status</c> is not <c>Active</c>. Thrown by
+    /// <see cref="FreightLink.Api.Common.Domain.AgencyStatusGuard.EnsureActive"/>.
+    /// </summary>
+    AGENCY_NOT_ACTIVE,
 
     /// <summary>A load cancellation was attempted without a reason.</summary>
     LOAD_CANCEL_REASON_REQUIRED,
@@ -82,7 +116,59 @@ public enum ErrorCode
 
     /// <summary>A delete was attempted on a file still attached to a Load via <c>LoadFile</c>.</summary>
     FILE_IN_USE,
+    
+    /// <summary>Invoice generation on delivery requires the trip to be in Delivered status.</summary>
+    TRIP_NOT_DELIVERED,
 
+    /// <summary>The requested invoice could not be found.</summary>
+    INVOICE_NOT_FOUND,
+
+    /// <summary>The invoice exists but does not belong to the caller's organization/role.</summary>
+    INVOICE_NOT_OWNED,
+
+    /// <summary>An invoice already exists for this trip (1-to-1 relationship enforced).</summary>
+    INVOICE_ALREADY_EXISTS_FOR_TRIP,
+
+    /// <summary>An invoice transition or update was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_INVOICE_STATUS_TRANSITION,
+
+    /// <summary>An invalid invoice amount was supplied.</summary>
+    INVALID_INVOICE_AMOUNT,
+
+    /// <summary>The invoice is already settled and paid.</summary>
+    INVOICE_ALREADY_PAID,
+
+    /// <summary>A payment-proof upload referenced an UploadedFile publicId that does not exist, or one the caller did not upload.</summary>
+    INVOICE_PAYMENT_PROOF_FILE_NOT_FOUND,
+
+    /// <summary>An Agency attempted to confirm payment on an invoice with no payment receipt submitted yet.</summary>
+    INVOICE_PAYMENT_PROOF_REQUIRED,
+
+    /// <summary>
+    /// The supplied <c>DueDate</c> falls before the invoice's issuance date.
+    /// The database constraint <c>ck_invoice_due</c> requires
+    /// <c>DueDate &gt;= (IssuedAt AT TIME ZONE 'UTC')::date</c>.
+    /// </summary>
+    INVALID_INVOICE_DUE_DATE,
+
+    /// <summary>The requested dispute could not be found.</summary>
+    DISPUTE_NOT_FOUND,
+
+    /// <summary>The dispute exists but does not belong to the authenticated caller.</summary>
+    DISPUTE_NOT_OWNED,
+
+    /// <summary>A dispute mutation or resolution was attempted that violates allowed lifecycle rules.</summary>
+    INVALID_DISPUTE_STATUS_TRANSITION,
+
+    /// <summary>The dispute has already been resolved or rejected.</summary>
+    DISPUTE_ALREADY_RESOLVED,
+
+    /// <summary>
+    /// A dispute in status <c>Open</c> or <c>UnderReview</c> already exists for this
+    /// (TripId, Category) combination. The database unique partial index
+    /// <c>ux_dispute_open</c> enforces at most one live dispute per trip per category.
+    /// </summary>
+    DISPUTE_ALREADY_EXISTS_FOR_TRIP_AND_CATEGORY,
     /// <summary>An attach was attempted referencing an UploadedFile publicId that does not exist.</summary>
     LOAD_FILE_UPLOAD_NOT_FOUND,
 
@@ -101,6 +187,10 @@ public enum ErrorCode
     /// <summary>A soft delete was attempted on a <c>VehicleClassEfficiency</c> row that is already soft-deleted.</summary>
     VEHICLE_CLASS_EFFICIENCY_ALREADY_DELETED,
 
+    /// <summary>A fleet vehicle status change attempted to bypass trip-managed or terminal availability rules.</summary>
+    INVALID_VEHICLE_STATUS_TRANSITION,
+
+
     /// <summary>A <c>VehicleClassEfficiency</c> row's <c>MaxPayloadKg</c> was not strictly greater than its <c>MinPayloadKg</c> (mirrors <c>ck_vce_payload_bounds</c>).</summary>
     VEHICLE_CLASS_EFFICIENCY_INVALID_PAYLOAD_BAND,
 
@@ -114,11 +204,26 @@ public enum ErrorCode
     VEHICLE_CLASS_EFFICIENCY_INVALID_VOLUME_BAND,
 
     /// <summary>
-    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, or no <c>VehicleClassEfficiency</c>
-    /// tier covers the requested weight/volume. Thrown by <c>IPricingConfigService</c>'s current-value
-    /// lookups; not raised by <c>LoadService</c>, which does not depend on any pricing config existing.
+    /// No current <c>FuelPriceRate</c> exists for the requested fuel type, no <c>VehicleClassEfficiency</c>
+    /// tier covers the requested weight/volume, or no current <c>PricingFormulaConfig</c> exists.
+    /// Thrown by <c>IPricingConfigService</c>'s current-value lookups; not raised by <c>LoadService</c>,
+    /// which does not depend on any pricing config existing.
     /// </summary>
     PRICING_CONFIG_MISSING,
+
+    /// <summary>No <c>PricingFormulaConfig</c> exists with the requested id.</summary>
+    PRICING_FORMULA_CONFIG_NOT_FOUND,
+
+    /// <summary>A soft delete was attempted on a <c>PricingFormulaConfig</c> row that is already soft-deleted.</summary>
+    PRICING_FORMULA_CONFIG_ALREADY_DELETED,
+
+    /// <summary>
+    /// <c>POST /internal/pricing/estimate</c> was called with a missing or incorrect
+    /// <c>X-Internal-Api-Key</c> header. Thrown by <c>InternalApiKeyAuthFilter</c> — distinct from
+    /// <see cref="UNAUTHORIZED"/>, which is reserved for JWT failures written directly by the
+    /// JwtBearer handler, not thrown as an <c>ApiException</c>.
+    /// </summary>
+    INTERNAL_API_KEY_INVALID,
 
     /// <summary>
     /// A protected endpoint was called with no access token, or one that's missing, malformed,
@@ -135,5 +240,166 @@ public enum ErrorCode
     FORBIDDEN,
 
     /// <summary>An unhandled exception was caught by the global exception-handling middleware.</summary>
-    INTERNAL_SERVER_ERROR
+    INTERNAL_SERVER_ERROR,
+
+    /// <summary>The SMTP send failed (network/auth/provider failure, not a validation failure) — thrown by <c>GmailEmailService</c>.</summary>
+    EMAIL_SEND_FAILED,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>LoadId</c> that doesn't exist.
+    /// Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    LOAD_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>TriggeredByUserId</c> that
+    /// doesn't exist. Thrown by <c>AgentWorkflowService.CreateAsync</c>.
+    /// </summary>
+    USER_NOT_FOUND_FOR_WORKFLOW_RUN,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs</c> was called with a <c>(LoadId, AttemptNo)</c> pair
+    /// that already has a run (mirrors <c>uq_awr_load_attempt</c>). Each attempt number for a given
+    /// load must be started at most once.
+    /// </summary>
+    WORKFLOW_RUN_DUPLICATE_ATTEMPT,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called with a
+    /// <c>workflowRunId</c> that doesn't exist. Thrown by <c>AgentWorkflowService.ReportStepAsync</c>.
+    /// </summary>
+    WORKFLOW_RUN_NOT_FOUND,
+
+    /// <summary>
+    /// <c>POST /internal/agent-workflow-runs/{workflowRunId}/steps</c> was called twice for the same
+    /// <c>(WorkflowRunId, StepNo)</c> pair (mirrors <c>uq_agentstep_order</c>). Each step number for a
+    /// given run may be reported at most once.
+    /// </summary>
+    AGENT_STEP_DUPLICATE,
+
+    /// <summary>
+    /// The specified <c>AgentStep</c> could not be found under the given workflow run.
+    /// </summary>
+    AGENT_STEP_NOT_FOUND,
+
+    /// <summary>
+    /// A tool call with this attempt number already exists for this (AgentStep, ToolName) pair (mirrors <c>uq_toolcall_attempt</c>).
+    /// </summary>
+    TOOL_CALL_DUPLICATE_ATTEMPT,
+
+    /// <summary>The requested trip could not be found.</summary>
+    TRIP_NOT_FOUND,
+
+    /// <summary>The caller does not have access to the requested trip.</summary>
+    TRIP_ACCESS_DENIED,
+
+    /// <summary>The requested trip status transition is not permitted from its current status.</summary>
+    INVALID_TRIP_STATUS_TRANSITION,
+
+    /// <summary>Pickup or delivery evidence is required before transitioning to PickedUp or Delivered.</summary>
+    TRIP_EVIDENCE_REQUIRED,
+
+    /// <summary>Evidence of this type already exists for this trip.</summary>
+    TRIP_EVIDENCE_ALREADY_EXISTS,
+
+    /// <summary>The caller's role does not match the required role for this evidence type.</summary>
+    TRIP_EVIDENCE_ROLE_MISMATCH,
+
+    /// <summary>The requested assignment could not be found.</summary>
+    ASSIGNMENT_NOT_FOUND,
+
+    /// <summary>The assignment exists but does not belong to the caller's agency.</summary>
+    ASSIGNMENT_NOT_OWNED,
+
+    /// <summary>An assignment Accept/Decline email action token is unknown, expired, or already consumed.</summary>
+    INVALID_OR_EXPIRED_ASSIGNMENT_TOKEN,
+
+    /// <summary>The assignment an action token points to was already accepted/declined another way (e.g. via the app) since the email was sent.</summary>
+    ASSIGNMENT_NO_LONGER_ACTIONABLE,
+
+    /// <summary>A trip has already been created for this assignment.</summary>
+    TRIP_ALREADY_EXISTS,
+
+    /// <summary>The requested vehicle could not be found.</summary>
+    VEHICLE_NOT_FOUND,
+
+    /// <summary>A registration number already belongs to another vehicle in the agency's fleet.</summary>
+    VEHICLE_REGISTRATION_ALREADY_EXISTS,
+
+    /// <summary>An OnTrip or Retired vehicle's fleet details cannot be edited.</summary>
+    VEHICLE_CANNOT_BE_MODIFIED,
+
+    /// <summary>The vehicle does not belong to the executing agency.</summary>
+    VEHICLE_NOT_OWNED,
+
+    /// <summary>The vehicle is inactive or already committed to an active trip.</summary>
+    VEHICLE_UNAVAILABLE,
+
+    /// <summary>The requested driver could not be found.</summary>
+    DRIVER_NOT_FOUND,
+
+    /// <summary>The driver does not belong to the executing agency.</summary>
+    DRIVER_NOT_OWNED,
+
+    /// <summary>The driver is inactive or already committed to an active trip.</summary>
+    DRIVER_UNAVAILABLE,
+
+    /// <summary>The trip cannot be modified because it has already progressed past the Assigned state.</summary>
+    TRIP_CANNOT_BE_MODIFIED,
+
+    /// <summary>No eligible match candidate was found for the workflow run.</summary>
+    NO_ELIGIBLE_MATCH_CANDIDATE,
+
+    /// <summary>The workflow run has already been approved.</summary>
+    WORKFLOW_RUN_ALREADY_APPROVED,
+
+    /// <summary>Registration was attempted with a driving licence number already on file.</summary>
+    DRIVER_LICENCE_ALREADY_REGISTERED,
+
+    /// <summary>
+    /// A driver roster status change attempted to set/clear OnTrip directly, which is
+    /// trip-execution-owned, rather than the only staff-controllable transition (Active/Inactive).
+    /// </summary>
+    INVALID_DRIVER_STATUS_TRANSITION,
+
+    /// <summary>The requested load proposal could not be found.</summary>
+    LOAD_PROPOSAL_NOT_FOUND,
+
+    /// <summary>
+    /// An agency attempted to submit a second live (Pending) proposal on a load it already has one
+    /// on. Mirrors <c>ux_loadproposal_live_per_load_agency</c>.
+    /// </summary>
+    LOAD_PROPOSAL_ALREADY_EXISTS,
+
+    /// <summary>
+    /// A proposal was submitted, accepted, or rejected on a load that isn't <c>Posted</c>, or that
+    /// already has a live (Proposed/Accepted) <c>Assignment</c> — direct AI-matching and manual
+    /// agency proposals both compete for the same single live-assignment slot per load.
+    /// </summary>
+    LOAD_NOT_BIDDABLE,
+
+    /// <summary>A load-proposal mutation was attempted that violates allowed lifecycle rules (e.g. responding to a non-Pending proposal).</summary>
+    INVALID_LOAD_PROPOSAL_STATUS_TRANSITION,
+
+    /// <summary>
+    /// The Python Agentic AI pipeline could not be reached, timed out, or returned a non-success
+    /// response, or the AgentWorkflowRun it should have created isn't in our own database. Thrown
+    /// by <c>AssignmentService</c>'s trigger path - a real, honest failure, never a fabricated
+    /// success (plans/04-backend-integration.md §5).
+    /// </summary>
+    AGENT_SERVICE_UNAVAILABLE,
+
+    /// <summary>
+    /// The backend's own outbound API key for calling the Python agent service
+    /// (<c>AGENT_SERVICE_API_KEY</c>) is not configured. Fails closed rather than falling back to a
+    /// hardcoded default (plans/04-backend-integration.md §6).
+    /// </summary>
+    AGENT_SERVICE_NOT_CONFIGURED,
+
+    /// <summary>
+    /// The Shipper attempted to confirm a match for a load with no existing AgentWorkflowRun -
+    /// matching must be triggered first (<c>POST /loads/{loadId}/match/trigger</c>). Never
+    /// auto-created with a fabricated audit trail (plans/04-backend-integration.md §5).
+    /// </summary>
+    NO_MATCH_RUN_TO_CONFIRM
 }

@@ -1,0 +1,16 @@
+.env*
+**/.env*
+.git
+.gitignore
+.dockerignore
+Dockerfile*
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+tests
+scripts
+build
+dist

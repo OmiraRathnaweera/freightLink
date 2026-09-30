@@ -15,6 +15,12 @@ export function formatCurrency(amount) {
   return `LKR ${amount.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// marginPercent is stored as a fraction (0.15 = 15%), not a 0-100 percent.
+export function formatPercent(fraction) {
+  if (fraction == null) return '—'
+  return `${(fraction * 100).toFixed(1)}%`
+}
+
 // Converts a native <input type="datetime-local">'s value to a full ISO
 // datetime string for the API's effectiveFrom field.
 export function fromDateTimeLocalInput(localDateTime) {

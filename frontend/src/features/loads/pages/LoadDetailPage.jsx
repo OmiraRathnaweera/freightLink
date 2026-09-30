@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Sparkles, Truck } from 'lucide-react'
 import Card from '../../../components/Card.jsx'
 import Button from '../../../components/Button.jsx'
 import StatusBadge from '../../../components/StatusBadge.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
+import { UserRole } from '../../../lib/enums.js'
 import { useLoadDetailQuery } from '../api/loadsApi.js'
 import { getLoadStatusTone } from '../lib/statusTone.js'
 import { formatCurrency, formatDateTime, formatShipperName, formatWeight } from '../lib/format.js'
@@ -16,6 +17,8 @@ import RouteMapCard from '../components/RouteMapCard.jsx'
 import LoadFilesSection from '../components/LoadFilesSection.jsx'
 import LoadStatusHistoryCard from '../components/LoadStatusHistoryCard.jsx'
 import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
+import AcceptShipmentDialog from '../components/AcceptShipmentDialog.jsx'
+import PriceEstimateCard from '../components/PriceEstimateCard.jsx'
 
 // Load detail — GET /api/v1/loads/{id}, full LoadResponseDto
 // (docs/load-management-api.md Section 3.6). RateBreakdownCard/
@@ -28,6 +31,7 @@ import CancelLoadDialog from '../components/CancelLoadDialog.jsx'
 function LoadDetailPage() {
   const { loadId } = useParams()
   const [isCancelOpen, setIsCancelOpen] = useState(false)
+  const [isAcceptOpen, setIsAcceptOpen] = useState(false)
   const loadQuery = useLoadDetailQuery(loadId)
   const role = useAppSelector((state) => state.auth.role)
 
@@ -71,6 +75,39 @@ function LoadDetailPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {role === UserRole.AGENCY_STAFF && load.status === 'Matched' && (
+            <Button
+              as={Link}
+              to={`/trips?dispatch=${load.loadId}`}
+              variant="primary"
+              className="inline-flex items-center gap-1.5"
+            >
+              <Truck className="h-4 w-4" />
+              Dispatch Driver & Vehicle
+            </Button>
+          )}
+          {role === UserRole.SHIPPER && (load.status === 'Posted' || load.status === 'Matched') && (
+            <Button
+              as={Link}
+              to={`/agent-workflows?loadId=${load.loadId}`}
+              variant="primary"
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              <Sparkles className="h-4 w-4 text-amber-300" />
+              {load.status === 'Matched' ? 'View AI Match' : 'Review AI Match'}
+            </Button>
+          )}
+          {load.tripId && (role === UserRole.SHIPPER || role === UserRole.ADMIN) && (
+            <Button
+              as={Link}
+              to={`/trips/${load.tripId}`}
+              variant="secondary"
+              className="inline-flex items-center gap-1.5"
+            >
+              <Truck className="h-4 w-4" />
+              View Trip Status
+            </Button>
+          )}
           {canEditLoad(role, load.status) && (
             <Button as={Link} to={`/loads/${load.loadId}/edit`} variant="secondary">
               Edit Details
@@ -83,6 +120,36 @@ function LoadDetailPage() {
           )}
         </div>
       </div>
+
+      {role === UserRole.SHIPPER && (load.status === 'Posted' || load.status === 'Matched') && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/20 bg-gradient-to-r from-primary-fixed/40 via-surface-container-low to-surface-container p-4 shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white shadow-sm">
+              <Sparkles className="h-5 w-5 text-amber-300" />
+            </div>
+            <div>
+              <h3 className="font-heading text-sm font-bold text-primary">
+                {load.status === 'Matched'
+                  ? 'AI Carrier Match Approved & Dispatched'
+                  : 'AI Carrier Match Recommendation Ready'}
+              </h3>
+              <p className="text-xs text-on-surface-variant">
+                {load.status === 'Matched'
+                  ? 'An operational assignment has been proposed. View the 4-Agent LangGraph telemetry & carrier details.'
+                  : 'Agent 3 has ranked carriers, calculated positioning ETA, and computed dynamic pricing. Review and approve the match.'}
+              </p>
+            </div>
+          </div>
+          <Button
+            as={Link}
+            to={`/agent-workflows?loadId=${load.loadId}`}
+            variant="secondary"
+            className="border-primary/30 text-primary hover:bg-primary hover:text-white transition-colors"
+          >
+            <span>{load.status === 'Matched' ? 'Open Match Console' : 'Review & Approve Match'}</span>
+          </Button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -130,6 +197,8 @@ function LoadDetailPage() {
             destinationLat={load.dropoffLat}
             destinationLng={load.dropoffLng}
           />
+
+          {role === UserRole.SHIPPER && <PriceEstimateCard loadId={load.loadId} />}
 
           <LoadFilesSection loadId={load.loadId} role={role} />
         </div>
@@ -190,6 +259,13 @@ function LoadDetailPage() {
       </div>
 
       {isCancelOpen && <CancelLoadDialog loadId={load.loadId} onClose={() => setIsCancelOpen(false)} />}
+      {isAcceptOpen && (
+        <AcceptShipmentDialog
+          load={load}
+          onClose={() => setIsAcceptOpen(false)}
+          onAccepted={() => loadQuery.refetch()}
+        />
+      )}
     </div>
   )
 }

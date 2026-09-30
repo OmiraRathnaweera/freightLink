@@ -1,11 +1,13 @@
+import { useState } from 'react'
 import { Formik, Form } from 'formik'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { FormikTextField, FormikPasswordField, FormikSubmitButton } from '../../../components/form/index.js'
 import { loginSchema } from '../lib/validationSchemas.js'
 import { useAppDispatch } from '../../../hooks/useAppDispatch.js'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
-import { login, clearAuthError } from '../store/authSlice.js'
+import { login, logout, clearAuthError } from '../store/authSlice.js'
 import { getRoleHomePath } from '../lib/roleHome.js'
+import { UserRole } from '../../../lib/enums.js'
 
 // Cloned from the Stitch "Login — FreightLink LK" screen. Public route
 // (wrapped in PublicRoute — src/routes/PublicRoute.jsx — so a signed-in
@@ -19,6 +21,9 @@ function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const apiError = useAppSelector((state) => state.auth.error)
+  const [driverError, setDriverError] = useState(null)
+
+  const activeError = driverError || apiError
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -28,9 +33,9 @@ function LoginPage() {
           <p className="mt-2 text-body-md text-on-surface-variant">Secure Operations Portal</p>
         </div>
 
-        {apiError && (
+        {activeError && (
           <div className="mb-4 rounded-md border border-status-red-text bg-status-red-bg px-3 py-2 text-body-md text-status-red-text">
-            {apiError}
+            {activeError}
           </div>
         )}
 
@@ -39,8 +44,16 @@ function LoginPage() {
           validationSchema={loginSchema}
           onSubmit={async (values, { setSubmitting }) => {
             dispatch(clearAuthError())
+            setDriverError(null)
             try {
               const result = await dispatch(login(values)).unwrap()
+              if (result.user?.role === UserRole.DRIVER) {
+                dispatch(logout())
+                setDriverError(
+                  'Driver accounts can only access the FreightLink Mobile App. Web portal access is restricted to Shippers, Agencies, and Administrators.',
+                )
+                return
+              }
               const from = location.state?.from?.pathname
               navigate(from ?? getRoleHomePath(result.user?.role), { replace: true })
             } catch {
@@ -56,9 +69,9 @@ function LoginPage() {
             <div>
               <FormikPasswordField name="password" label="Password" placeholder="••••••••" />
               <div className="mt-2 flex justify-end">
-                <a href="#" className="text-body-md text-status-blue-text hover:underline">
+                <Link to="/forgot-password" className="text-body-md text-status-blue-text hover:underline">
                   Forgot Password?
-                </a>
+                </Link>
               </div>
             </div>
             <FormikSubmitButton className="w-full">Sign In</FormikSubmitButton>

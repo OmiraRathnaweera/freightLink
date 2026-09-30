@@ -27,6 +27,15 @@ export const LoadStatus = Object.freeze({
   CANCELLED: 'Cancelled',
 })
 
+// Lifecycle of a manual price proposal an Agency sends on a Posted load, alongside (not through)
+// the multi-agent matching pipeline.
+export const LoadProposalStatus = Object.freeze({
+  PENDING: 'Pending',
+  ACCEPTED: 'Accepted',
+  REJECTED: 'Rejected',
+  WITHDRAWN: 'Withdrawn',
+})
+
 // Kind of file attached to a load.
 export const FileType = Object.freeze({
   MANIFEST: 'Manifest',
@@ -52,6 +61,15 @@ export const VehicleStatus = Object.freeze({
   INACTIVE: 'Inactive',
 })
 
+// Physical body/chassis type of a fleet vehicle (matches backend VehicleType enum).
+export const VehicleType = Object.freeze({
+  LORRY: 'Lorry',
+  CONTAINER: 'Container',
+  REFRIGERATED: 'Refrigerated',
+  FLAT_BED: 'FlatBed',
+  TIPPER: 'Tipper',
+})
+
 // Employment/availability state of a driver.
 export const DriverStatus = Object.freeze({
   ACTIVE: 'Active',
@@ -59,11 +77,24 @@ export const DriverStatus = Object.freeze({
   SUSPENDED: 'Suspended',
 })
 
-// Validity state of a compliance document (license, insurance, etc.).
+// Review state of a compliance document (license, insurance, etc.), set by
+// the admin verification-queue workflow. Matches the backend's
+// ComplianceDocStatus enum exactly — this previously drifted (Valid/
+// Expiring/Expired) from what the API actually returns.
 export const ComplianceDocStatus = Object.freeze({
-  VALID: 'Valid',
-  EXPIRING: 'Expiring',
+  PENDING: 'Pending',
+  VERIFIED: 'Verified',
+  REJECTED: 'Rejected',
   EXPIRED: 'Expired',
+})
+
+// Kind of regulatory document an agency uploads for compliance review.
+export const ComplianceDocType = Object.freeze({
+  BUSINESS_REGISTRATION: 'BusinessRegistration',
+  VEHICLE_INSURANCE: 'VehicleInsurance',
+  REVENUE_LICENCE: 'RevenueLicence',
+  GOODS_TRANSPORT_PERMIT: 'GoodsTransportPermit',
+  OTHER: 'Other',
 })
 
 // --- Component C: Matching & Trip ---
@@ -91,14 +122,17 @@ export const EvidenceType = Object.freeze({
 })
 
 // --- Component D: Billing ---
-// Lifecycle of an invoice.
+// Lifecycle of an invoice. Matches the backend's InvoiceStatus enum exactly
+// (Draft -> Issued -> PaymentPending -> Paid, with Failed/Void reachable from
+// most non-terminal states) — see ADR-021. There is no Refunded or Overdue
+// status on the backend; do not reintroduce either here.
 export const InvoiceStatus = Object.freeze({
   DRAFT: 'Draft',
   ISSUED: 'Issued',
   PAYMENT_PENDING: 'PaymentPending',
   PAID: 'Paid',
   FAILED: 'Failed',
-  REFUNDED: 'Refunded',
+  VOID: 'Void',
 })
 
 // State of a payment attempt against an invoice.

@@ -1,0 +1,40 @@
+/// The signed-in user's profile, mirroring the backend's
+/// `CurrentUserResponseDto` (`GET /api/v1/auth/me`).
+class AuthUser {
+  const AuthUser({
+    required this.userId,
+    required this.email,
+    required this.fullName,
+    required this.role,
+    required this.isActive,
+    this.agencyId,
+    this.phoneE164,
+  });
+
+  factory AuthUser.fromJson(Map<String, dynamic> json) {
+    return AuthUser(
+      userId: json['userId'] as String,
+      email: json['email'] as String,
+      fullName: json['fullName'] as String,
+      role: json['role'] as String,
+      isActive: json['isActive'] as bool? ?? true,
+      agencyId: json['agencyId'] as String?,
+      phoneE164: json['phoneE164'] as String?,
+    );
+  }
+
+  final String userId;
+  final String email;
+  final String fullName;
+  final String? agencyId;
+  final String? phoneE164;
+
+  /// One of "Shipper", "AgencyStaff", "Driver", "Admin".
+  final String role;
+  final bool isActive;
+
+  bool get isAdmin => role == 'Admin';
+  bool get isShipper => role == 'Shipper';
+  bool get isAgencyStaff => role == 'AgencyStaff';
+  bool get isDriver => role == 'Driver';
+}

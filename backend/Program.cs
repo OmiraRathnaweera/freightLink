@@ -1,8 +1,10 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CloudinaryDotNet;
 using DotNetEnv;
 using FreightLink.Api.Common.Errors;
+using FreightLink.Api.Common.Filters;
 using FreightLink.Api.Common.Options;
 using FreightLink.Api.Data;
 using FreightLink.Api.DTOs.Common;
@@ -31,6 +33,14 @@ var builder = WebApplication.CreateBuilder(args);
 // Override MVC's default validation-failure response so DTO validation errors match the
 // project-wide error envelope shape instead of the default ValidationProblemDetails.
 builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Global fallback so every enum property serializes/deserializes as its string name
+        // (e.g. "Pending") rather than the default numeric value, matching the frontend/mobile
+        // clients' expectations everywhere — DTOs that already carry an explicit
+        // [JsonConverter(typeof(JsonStringEnumConverter))] attribute are unaffected either way.
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    })
     .ConfigureApiBehaviorOptions(options =>
     {
         options.InvalidModelStateResponseFactory = context =>
@@ -121,9 +131,25 @@ builder.Services.Configure<AdminSeedOptions>(options =>
     options.Password = builder.Configuration["ADMIN_USER_PASSWORD"];
 });
 
-// Cloudinary settings (Cloudinary:* / CLOUDINARY__* env vars). Same case-insensitive "__"-to-":"
-// mapping as the other sections above.
+// Shared secret for internal-only, non-JWT endpoints (e.g. POST /internal/pricing/estimate) —
+// same flat-key pattern as the admin-seed credentials above.
+builder.Services.Configure<InternalApiOptions>(options =>
+{
+    options.ApiKey = builder.Configuration["INTERNAL_API_KEY"];
+});
+
 builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
+
+// Email settings (Email:* / EMAIL__* env vars) for GmailEmailService. Only validated when
+// EMAIL__ENABLED is true — mirrors the JWT key-length fail-fast above, but is itself opt-in since
+// email sending (unlike JWT) is an optional feature that's allowed to be entirely unconfigured.
+var emailSection = builder.Configuration.GetSection("Email");
+builder.Services.Configure<EmailOptions>(emailSection);
+var emailOptions = emailSection.Get<EmailOptions>() ?? new EmailOptions();
+if (emailOptions.Enabled)
+{
+    emailOptions.Validate();
+}
 
 // The Cloudinary SDK client is stateless aside from its credentials, so it's built once as a
 // singleton rather than re-constructed per request/scope.
@@ -180,9 +206,30 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy(corsPolicyName, policy =>
     {
-        policy.WithOrigins(corsOrigins)
+        if (builder.Environment.IsDevelopment())
+        {
+            policy.SetIsOriginAllowed(origin =>
+            {
+                if (string.IsNullOrWhiteSpace(origin)) return false;
+                try
+                {
+                    var uri = new Uri(origin);
+                    return uri.Host == "localhost" || uri.Host == "127.0.0.1" || corsOrigins.Contains(origin);
+                }
+                catch
+                {
+                    return false;
+                }
+            })
             .AllowAnyHeader()
             .AllowAnyMethod();
+        }
+        else
+        {
+            policy.WithOrigins(corsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
     });
 });
 
@@ -192,12 +239,37 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<ITokenService, TokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPricingConfigService, PricingConfigService>();
+builder.Services.AddScoped<IPricingEstimatorService, PricingEstimatorService>();
+builder.Services.AddScoped<IAgentWorkflowService, AgentWorkflowService>();
 builder.Services.AddScoped<ILoadService, LoadService>();
+builder.Services.AddScoped<InternalApiKeyAuthFilter>();
 builder.Services.AddScoped<IFileStorageService, CloudinaryFileStorageService>();
 builder.Services.AddScoped<IFileUploadService, FileUploadService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+builder.Services.AddScoped<IDisputeService, DisputeService>();
+builder.Services.AddScoped<IEmailService, GmailEmailService>();
+builder.Services.AddScoped<IAgencyService, AgencyService>();
+builder.Services.AddScoped<IAssignmentService, AssignmentService>();
+builder.Services.AddScoped<IAssignmentActionTokenService, AssignmentActionTokenService>();
+builder.Services.AddScoped<ILoadProposalService, LoadProposalService>();
 builder.Services.AddScoped<ILoadFileService, LoadFileService>();
+builder.Services.AddScoped<ITripService, TripService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddMemoryCache();
+builder.Services.AddHttpClient<IRouteService, RouteService>();
 
 var app = builder.Build();
+
+// The maintenance container applies schema changes explicitly before a Production rollout.
+// Exit before startup seed operations and before opening the HTTP listener.
+if (builder.Configuration.GetValue<bool>("FREIGHTLINK_MIGRATE_ONLY"))
+{
+    using var migrationScope = app.Services.CreateScope();
+    var db = migrationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+    app.Logger.LogInformation("Database migrations completed.");
+    return;
+}
 
 // CORS_ORIGINS resolving to zero origins is a deliberate deny-all, not a bug — but it's also the
 // one CORS_ORIGINS outcome that produces no server-side signal at all: every symptom shows up only
@@ -229,29 +301,44 @@ if (!app.Environment.IsProduction())
     db.Database.Migrate();
 }
 
-// Seed the default Admin account (from ADMIN_USER_EMAIL/ADMIN_USER_PASSWORD) once per startup,
-// in every environment — there is no public admin registration endpoint.
+// Seed the default Admin account, active carrier agencies, and pricing configuration once per startup.
 using (var seedScope = app.Services.CreateScope())
 {
     var authService = seedScope.ServiceProvider.GetRequiredService<IAuthService>();
     await authService.SeedAdminIfNotExistsAsync();
+
+    var agencyService = seedScope.ServiceProvider.GetRequiredService<IAgencyService>();
+    await agencyService.SeedDefaultAgenciesIfNotExistsAsync();
+
+    var pricingConfigService = seedScope.ServiceProvider.GetRequiredService<IPricingConfigService>();
+    await pricingConfigService.SeedDefaultPricingConfigIfNotExistsAsync();
 }
 
 // Configure the HTTP request pipeline.
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-if (app.Environment.IsDevelopment())
+// The university deployment needs a public Swagger URL even when the API runs
+// in Production. Keep this opt-in for deployments outside the Compose stack.
+if (app.Environment.IsDevelopment() || builder.Configuration.GetValue<bool>("SWAGGER_ENABLED"))
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// Caddy terminates public HTTPS for the Docker deployment. Keep the container's
+// private HTTP listener from redirecting proxy requests back to the same URL.
+// Other Production deployments can retain the application's HTTPS redirect.
+if (!app.Environment.IsDevelopment() && !builder.Configuration.GetValue<bool>("BEHIND_HTTPS_PROXY"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseCors(corsPolicyName);
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "freightlink-backend" }));
 
 app.MapControllers();
 

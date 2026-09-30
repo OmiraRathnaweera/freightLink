@@ -1,6 +1,0 @@
-﻿services:
-  freightlink.api:
-    image: freightlink.api
-    build:
-      context: .
-      dockerfile: Dockerfile

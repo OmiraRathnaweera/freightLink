@@ -229,6 +229,9 @@ namespace FreightLink.Api.Migrations
                     b.Property<string>("PlanJson")
                         .HasColumnType("jsonb");
 
+                    b.Property<string>("ShipperMessage")
+                        .HasColumnType("text");
+
                     b.Property<DateTimeOffset>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -365,7 +368,8 @@ namespace FreightLink.Api.Migrations
 
                     b.HasIndex("LoadId", "AgencyId")
                         .IsUnique()
-                        .HasDatabaseName("ux_assignment_load_agency");
+                        .HasDatabaseName("ux_assignment_load_agency")
+                        .HasFilter("\"Status\" IN ('Proposed','Accepted')");
 
                     b.ToTable("Assignments", t =>
                         {
@@ -374,6 +378,56 @@ namespace FreightLink.Api.Migrations
                             t.HasCheckConstraint("ck_assignment_eta", "\"ProposedEtaMinutes\" IS NULL OR \"ProposedEtaMinutes\" > 0");
 
                             t.HasCheckConstraint("ck_assignment_price", "\"ProposedPrice\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("FreightLink.Api.Entities.AssignmentActionToken", b =>
+                {
+                    b.Property<Guid>("AssignmentActionTokenId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("ActingUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConsumedReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("AssignmentActionTokenId");
+
+                    b.HasIndex("ActingUserId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("uq_assignmentactiontoken_hash");
+
+                    b.HasIndex("AssignmentId", "ConsumedAt")
+                        .HasDatabaseName("ix_assignmentactiontoken_assignment_active");
+
+                    b.ToTable("AssignmentActionTokens", t =>
+                        {
+                            t.HasCheckConstraint("ck_assignmentactiontoken_expiry", "\"ExpiresAt\" > \"CreatedAt\"");
                         });
                 });
 
@@ -502,7 +556,7 @@ namespace FreightLink.Api.Migrations
                     b.HasIndex("TripId", "Category")
                         .IsUnique()
                         .HasDatabaseName("ux_dispute_open")
-                        .HasFilter("\"Status\" IN ('Open','UnderReview')");
+                        .HasFilter("\"Status\" IN ('Open','UnderReview','Raised')");
 
                     b.ToTable("Disputes", t =>
                         {
@@ -652,9 +706,18 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<decimal>("DiscountTotal")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m);
 
                     b.Property<DateOnly?>("DueDate")
                         .HasColumnType("date");
@@ -663,14 +726,55 @@ namespace FreightLink.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<DateTimeOffset>("IssuedAt")
+                    b.Property<DateTimeOffset?>("IssuedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaymentProofFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PaymentProofUploadedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PaymentProofUploadedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PaymentReference")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid?>("RecipientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RecipientRole")
+                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("TripId")
+                    b.Property<decimal>("Subtotal")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("TaxTotal")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid?>("TripId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("UpdatedAt")
@@ -678,22 +782,101 @@ namespace FreightLink.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
+                    b.Property<Guid?>("UpdatedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VoidReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("VoidedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("VoidedByUserId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("InvoiceId");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("InvoiceNumber")
                         .IsUnique()
                         .HasDatabaseName("uq_invoice_number");
 
+                    b.HasIndex("PaymentProofFileId");
+
+                    b.HasIndex("PaymentProofUploadedByUserId");
+
+                    b.HasIndex("RecipientId");
+
                     b.HasIndex("TripId")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("uq_invoice_trip_id")
+                        .HasFilter("\"TripId\" IS NOT NULL");
+
+                    b.HasIndex("UpdatedByUserId");
+
+                    b.HasIndex("VoidedByUserId");
 
                     b.ToTable("Invoices", t =>
                         {
-                            t.HasCheckConstraint("ck_invoice_amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("ck_invoice_amount", "\"Amount\" >= 0");
 
                             t.HasCheckConstraint("ck_invoice_currency", "\"Currency\" ~ '^[A-Z]{3}$'");
 
-                            t.HasCheckConstraint("ck_invoice_due", "\"DueDate\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
+                            t.HasCheckConstraint("ck_invoice_due", "\"DueDate\" IS NULL OR \"IssuedAt\" IS NULL OR \"DueDate\" >= (\"IssuedAt\" AT TIME ZONE 'UTC')::date");
+                        });
+                });
+
+            modelBuilder.Entity("FreightLink.Api.Entities.InvoiceLineItem", b =>
+                {
+                    b.Property<Guid>("InvoiceLineItemId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("InvoiceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<int>("SortOrder")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<decimal>("TaxRate")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.HasKey("InvoiceLineItemId");
+
+                    b.HasIndex("InvoiceId");
+
+                    b.ToTable("InvoiceLineItems", t =>
+                        {
+                            t.HasCheckConstraint("ck_invoice_line_item_amount", "\"Amount\" >= 0");
+
+                            t.HasCheckConstraint("ck_invoice_line_item_qty", "\"Quantity\" > 0");
+
+                            t.HasCheckConstraint("ck_invoice_line_item_tax_rate", "\"TaxRate\" >= 0");
+
+                            t.HasCheckConstraint("ck_invoice_line_item_unit_price", "\"UnitPrice\" >= 0");
                         });
                 });
 
@@ -840,6 +1023,68 @@ namespace FreightLink.Api.Migrations
                         .HasDatabaseName("uq_loadfile_uploadedfileid");
 
                     b.ToTable("LoadFiles", (string)null);
+                });
+
+            modelBuilder.Entity("FreightLink.Api.Entities.LoadProposal", b =>
+                {
+                    b.Property<Guid>("LoadProposalId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<Guid>("AgencyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<Guid>("LoadId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("ProposedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ProposedPrice")
+                        .HasPrecision(12, 2)
+                        .HasColumnType("numeric(12,2)");
+
+                    b.Property<DateTimeOffset?>("RespondedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResponseReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("LoadProposalId");
+
+                    b.HasIndex("AgencyId");
+
+                    b.HasIndex("ProposedByUserId");
+
+                    b.HasIndex("LoadId", "AgencyId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_loadproposal_live_per_load_agency")
+                        .HasFilter("\"Status\" = 'Pending'");
+
+                    b.ToTable("LoadProposals", t =>
+                        {
+                            t.HasCheckConstraint("ck_loadproposal_price", "\"ProposedPrice\" > 0");
+                        });
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>
@@ -999,97 +1244,73 @@ namespace FreightLink.Api.Migrations
                         });
                 });
 
-            modelBuilder.Entity("FreightLink.Api.Entities.Payment", b =>
+            modelBuilder.Entity("FreightLink.Api.Entities.PricingFormulaConfig", b =>
                 {
-                    b.Property<Guid>("PaymentId")
+                    b.Property<Guid>("PricingFormulaConfigId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(12, 2)
-                        .HasColumnType("numeric(12,2)");
-
-                    b.Property<int>("AttemptNo")
-                        .HasColumnType("integer");
+                    b.Property<decimal>("BaseFare")
+                        .HasColumnType("numeric");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("now()");
 
-                    b.Property<string>("GatewayRef")
-                        .HasColumnType("text");
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid>("InvoiceId")
+                    b.Property<Guid?>("DeletedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("ProcessedAt")
+                    b.Property<decimal>("DriverCostPerKm")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTimeOffset>("EffectiveFrom")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("Status")
+                    b.Property<decimal>("MaintenanceAllowancePerKm")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("MarginPercent")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("RatePerKg")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("SetByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Source")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.HasKey("PaymentId");
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("now()");
 
-                    b.HasIndex("GatewayRef")
-                        .IsUnique()
-                        .HasDatabaseName("uq_payment_gatewayref");
+                    b.HasKey("PricingFormulaConfigId");
 
-                    b.HasIndex("InvoiceId")
-                        .IsUnique()
-                        .HasDatabaseName("ux_payment_success")
-                        .HasFilter("\"Status\" = 'Success'");
+                    b.HasIndex("DeletedByUserId");
 
-                    b.HasIndex("InvoiceId", "AttemptNo")
-                        .IsUnique()
-                        .HasDatabaseName("uq_payment_attempt");
+                    b.HasIndex("EffectiveFrom");
 
-                    b.ToTable("Payments", t =>
+                    b.HasIndex("SetByUserId");
+
+                    b.ToTable("PricingFormulaConfigs", t =>
                         {
-                            t.HasCheckConstraint("ck_payment_amount", "\"Amount\" > 0");
+                            t.HasCheckConstraint("ck_pfc_base_fare_bounds", "\"BaseFare\" >= 0");
 
-                            t.HasCheckConstraint("ck_payment_attempt", "\"AttemptNo\" >= 1");
-                        });
-                });
+                            t.HasCheckConstraint("ck_pfc_driver_cost_bounds", "\"DriverCostPerKm\" >= 0");
 
-            modelBuilder.Entity("FreightLink.Api.Entities.PaymentWebhookEvent", b =>
-                {
-                    b.Property<Guid>("PaymentWebhookEventId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                            t.HasCheckConstraint("ck_pfc_maintenance_allowance_bounds", "\"MaintenanceAllowancePerKm\" >= 0");
 
-                    b.Property<string>("ErrorMessage")
-                        .HasColumnType("text");
+                            t.HasCheckConstraint("ck_pfc_margin_percent_bounds", "\"MarginPercent\" >= 0 AND \"MarginPercent\" <= 1");
 
-                    b.Property<string>("GatewayRef")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ProcessingStatus")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("RawPayloadHash")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("SignatureValid")
-                        .HasColumnType("boolean");
-
-                    b.HasKey("PaymentWebhookEventId");
-
-                    b.HasIndex("RawPayloadHash")
-                        .HasDatabaseName("ix_pwe_payloadhash");
-
-                    b.ToTable("PaymentWebhookEvents", t =>
-                        {
-                            t.HasCheckConstraint("ck_pwe_error", "\"ProcessingStatus\" <> 'Error' OR \"ErrorMessage\" IS NOT NULL");
+                            t.HasCheckConstraint("ck_pfc_rate_per_kg_bounds", "\"RatePerKg\" >= 0");
                         });
                 });
 
@@ -1224,7 +1445,7 @@ namespace FreightLink.Api.Migrations
 
                     b.ToTable("ToolCalls", t =>
                         {
-                            t.HasCheckConstraint("ck_toolcall_allowlist", "\"ToolName\" IN ('get_route_and_eta')");
+                            t.HasCheckConstraint("ck_toolcall_allowlist", "\"ToolName\" IN ('get_route_and_eta', 'estimate_price')");
 
                             t.HasCheckConstraint("ck_toolcall_attempt", "\"AttemptNo\" >= 1");
 
@@ -1442,6 +1663,16 @@ namespace FreightLink.Api.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<DateTimeOffset?>("EmailVerificationTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmailVerificationTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("EmailVerifiedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -1452,6 +1683,13 @@ namespace FreightLink.Api.Migrations
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("PasswordResetTokenExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.Property<string>("PhoneE164")
                         .HasColumnType("text");
@@ -1470,6 +1708,14 @@ namespace FreightLink.Api.Migrations
                     b.HasIndex("Email")
                         .IsUnique()
                         .HasDatabaseName("uq_user_email");
+
+                    b.HasIndex("EmailVerificationTokenHash", "EmailVerificationTokenExpiresAt")
+                        .HasDatabaseName("ix_user_email_verification_token")
+                        .HasFilter("\"EmailVerificationTokenHash\" IS NOT NULL");
+
+                    b.HasIndex("PasswordResetTokenHash", "PasswordResetTokenExpiresAt")
+                        .HasDatabaseName("ix_user_password_reset_token")
+                        .HasFilter("\"PasswordResetTokenHash\" IS NOT NULL");
 
                     b.ToTable("Users", t =>
                         {
@@ -1717,6 +1963,25 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("WorkflowRun");
                 });
 
+            modelBuilder.Entity("FreightLink.Api.Entities.AssignmentActionToken", b =>
+                {
+                    b.HasOne("FreightLink.Api.Entities.User", "ActingUser")
+                        .WithMany()
+                        .HasForeignKey("ActingUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FreightLink.Api.Entities.Assignment", "Assignment")
+                        .WithMany()
+                        .HasForeignKey("AssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ActingUser");
+
+                    b.Navigation("Assignment");
+                });
+
             modelBuilder.Entity("FreightLink.Api.Entities.AssignmentResponse", b =>
                 {
                     b.HasOne("FreightLink.Api.Entities.Assignment", "Assignment")
@@ -1824,13 +2089,65 @@ namespace FreightLink.Api.Migrations
 
             modelBuilder.Entity("FreightLink.Api.Entities.Invoice", b =>
                 {
+                    b.HasOne("FreightLink.Api.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FreightLink.Api.Entities.UploadedFile", "PaymentProofFile")
+                        .WithMany()
+                        .HasForeignKey("PaymentProofFileId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FreightLink.Api.Entities.User", "PaymentProofUploadedByUser")
+                        .WithMany()
+                        .HasForeignKey("PaymentProofUploadedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FreightLink.Api.Entities.User", "Recipient")
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("FreightLink.Api.Entities.Trip", "Trip")
                         .WithOne("Invoice")
                         .HasForeignKey("FreightLink.Api.Entities.Invoice", "TripId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("FreightLink.Api.Entities.User", "UpdatedByUser")
+                        .WithMany()
+                        .HasForeignKey("UpdatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FreightLink.Api.Entities.User", "VoidedByUser")
+                        .WithMany()
+                        .HasForeignKey("VoidedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("PaymentProofFile");
+
+                    b.Navigation("PaymentProofUploadedByUser");
+
+                    b.Navigation("Recipient");
 
                     b.Navigation("Trip");
+
+                    b.Navigation("UpdatedByUser");
+
+                    b.Navigation("VoidedByUser");
+                });
+
+            modelBuilder.Entity("FreightLink.Api.Entities.InvoiceLineItem", b =>
+                {
+                    b.HasOne("FreightLink.Api.Entities.Invoice", "Invoice")
+                        .WithMany("LineItems")
+                        .HasForeignKey("InvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Invoice");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.Load", b =>
@@ -1861,6 +2178,33 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("Load");
 
                     b.Navigation("UploadedFile");
+                });
+
+            modelBuilder.Entity("FreightLink.Api.Entities.LoadProposal", b =>
+                {
+                    b.HasOne("FreightLink.Api.Entities.Agency", "Agency")
+                        .WithMany()
+                        .HasForeignKey("AgencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FreightLink.Api.Entities.Load", "Load")
+                        .WithMany("Proposals")
+                        .HasForeignKey("LoadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FreightLink.Api.Entities.User", "ProposedByUser")
+                        .WithMany()
+                        .HasForeignKey("ProposedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Agency");
+
+                    b.Navigation("Load");
+
+                    b.Navigation("ProposedByUser");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.LoadStatusHistory", b =>
@@ -1920,15 +2264,22 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("RecipientUser");
                 });
 
-            modelBuilder.Entity("FreightLink.Api.Entities.Payment", b =>
+            modelBuilder.Entity("FreightLink.Api.Entities.PricingFormulaConfig", b =>
                 {
-                    b.HasOne("FreightLink.Api.Entities.Invoice", "Invoice")
-                        .WithMany("Payments")
-                        .HasForeignKey("InvoiceId")
+                    b.HasOne("FreightLink.Api.Entities.User", "DeletedByUser")
+                        .WithMany()
+                        .HasForeignKey("DeletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("FreightLink.Api.Entities.User", "SetByUser")
+                        .WithMany()
+                        .HasForeignKey("SetByUserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.Navigation("Invoice");
+                    b.Navigation("DeletedByUser");
+
+                    b.Navigation("SetByUser");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.RefreshToken", b =>
@@ -2002,7 +2353,7 @@ namespace FreightLink.Api.Migrations
                     b.HasOne("FreightLink.Api.Entities.Trip", "Trip")
                         .WithMany("Events")
                         .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("RecordedByUser");
@@ -2021,7 +2372,7 @@ namespace FreightLink.Api.Migrations
                     b.HasOne("FreightLink.Api.Entities.Trip", "Trip")
                         .WithMany("Evidence")
                         .HasForeignKey("TripId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("CapturedByUser");
@@ -2121,7 +2472,7 @@ namespace FreightLink.Api.Migrations
 
             modelBuilder.Entity("FreightLink.Api.Entities.Invoice", b =>
                 {
-                    b.Navigation("Payments");
+                    b.Navigation("LineItems");
                 });
 
             modelBuilder.Entity("FreightLink.Api.Entities.Load", b =>
@@ -2131,6 +2482,8 @@ namespace FreightLink.Api.Migrations
                     b.Navigation("Files");
 
                     b.Navigation("Notifications");
+
+                    b.Navigation("Proposals");
 
                     b.Navigation("StatusHistory");
 

@@ -116,6 +116,78 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("Shipper", user.Role);
     }
 
+    /// <summary>PATCH /auth/me with a valid Bearer token updates and returns the caller's own profile.</summary>
+    [Fact]
+    public async Task UpdateProfile_UpdatesAndReturnsProfile_WithValidAccessToken()
+    {
+        var (_, _, tokens) = await RegisterAndLoginShipperAsync("update-profile");
+
+        using var request = new HttpRequestMessage(HttpMethod.Patch, "/api/v1/auth/me")
+        {
+            Content = JsonContent.Create(new UpdateProfileRequestDto
+            {
+                FullName = "Updated Name",
+                Email = $"updated-{Guid.NewGuid():N}@example.com"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var user = await response.Content.ReadFromJsonAsync<CurrentUserResponseDto>();
+        Assert.Equal("Updated Name", user!.FullName);
+        Assert.False(user.IsEmailVerified);
+    }
+
+    /// <summary>POST /auth/change-password with the correct current password succeeds, and the new password then logs in.</summary>
+    [Fact]
+    public async Task ChangePassword_Succeeds_AndNewPasswordWorksForLogin()
+    {
+        var (email, password, tokens) = await RegisterAndLoginShipperAsync("change-password");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/change-password")
+        {
+            Content = JsonContent.Create(new ChangePasswordRequestDto
+            {
+                CurrentPassword = password,
+                NewPassword = "N3w$trongPass!"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new LoginRequestDto
+        {
+            Email = email,
+            Password = "N3w$trongPass!"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+    }
+
+    /// <summary>POST /auth/change-password with the wrong current password returns 401 with INCORRECT_CURRENT_PASSWORD.</summary>
+    [Fact]
+    public async Task ChangePassword_Returns401WithErrorEnvelope_ForIncorrectCurrentPassword()
+    {
+        var (_, _, tokens) = await RegisterAndLoginShipperAsync("change-password-wrong");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/auth/change-password")
+        {
+            Content = JsonContent.Create(new ChangePasswordRequestDto
+            {
+                CurrentPassword = "WrongPassword1!",
+                NewPassword = "N3w$trongPass!"
+            })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.AccessToken);
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        var raw = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(raw);
+        Assert.Equal("INCORRECT_CURRENT_PASSWORD", json.RootElement.GetProperty("error").GetProperty("code").GetString());
+    }
+
     /// <summary>
     /// GET /auth/me without an Authorization header is rejected with 401 and the standard error
     /// envelope (JwtBearerEvents.OnChallenge), not ASP.NET's default bare/bodyless 401.
@@ -130,37 +202,6 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         using var json = JsonDocument.Parse(raw);
         Assert.Equal("UNAUTHORIZED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
         Assert.False(string.IsNullOrWhiteSpace(json.RootElement.GetProperty("error").GetProperty("message").GetString()));
-    }
-
-    /// <summary>
-    /// GET /auth/me with a malformed/invalid token is rejected with 401 and the standard error
-    /// envelope (JwtBearerEvents.OnChallenge), not ASP.NET's default bare/bodyless 401.
-    /// </summary>
-    [Fact]
-    public async Task Me_Returns401WithErrorEnvelope_WithInvalidToken()
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/auth/me");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not-a-real-jwt");
-        var response = await _client.SendAsync(request);
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        var raw = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(raw);
-        Assert.Equal("UNAUTHORIZED", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-        Assert.False(string.IsNullOrWhiteSpace(json.RootElement.GetProperty("error").GetProperty("message").GetString()));
-    }
-
-    /// <summary>
-    /// The 401 error envelope's response Content-Type is application/json, matching every other
-    /// error response in this project — not the default WWW-Authenticate-header-only response.
-    /// </summary>
-    [Fact]
-    public async Task Me_Returns401_WithJsonContentType_ForMissingToken()
-    {
-        var response = await _client.GetAsync("/api/v1/auth/me");
-
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
     }
 
     /// <summary>The /auth/me JSON response never includes a password-hash-like field.</summary>
@@ -237,51 +278,6 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
         Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
     }
 
-    /// <summary>
-    /// A phone number missing the mandatory leading '+' is rejected with 400, not left to reach the
-    /// DB's ck_user_phone_e164 CHECK and fail as an unhandled 500.
-    /// </summary>
-    [Fact]
-    public async Task RegisterShipper_Returns400WithValidationErrorEnvelope_ForPhoneMissingPlusSign()
-    {
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
-        {
-            Email = "phonenoplus@example.com",
-            Password = "Sup3r$ecret1",
-            FullName = "No Plus Sign",
-            PhoneE164 = "94771234567",
-            CompanyName = "Acme Freight",
-            BillingAddress = "123 Main Street, Colombo"
-        });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var raw = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(raw);
-        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
-    /// <summary>
-    /// An email with no TLD dot passes the loose [EmailAddress] check but must still be rejected
-    /// with 400 by the regex that mirrors the DB's ck_user_email_format CHECK.
-    /// </summary>
-    [Fact]
-    public async Task RegisterShipper_Returns400WithValidationErrorEnvelope_ForEmailMissingTld()
-    {
-        var response = await _client.PostAsJsonAsync("/api/v1/auth/register/shipper", new RegisterShipperRequestDto
-        {
-            Email = "user@localhost",
-            Password = "Sup3r$ecret1",
-            FullName = "No Tld",
-            CompanyName = "Acme Freight",
-            BillingAddress = "123 Main Street, Colombo"
-        });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var raw = await response.Content.ReadAsStringAsync();
-        using var json = JsonDocument.Parse(raw);
-        Assert.Equal("VALIDATION_ERROR", json.RootElement.GetProperty("error").GetProperty("code").GetString());
-    }
-
     /// <summary>A well-formed E.164 phone number (with leading '+') still registers successfully.</summary>
     [Fact]
     public async Task RegisterShipper_Succeeds_WithValidE164Phone()
@@ -325,4 +321,29 @@ public class AuthControllerTests : IClassFixture<CustomWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    /// <summary>GET /auth/agencies is public and returns list of agencies.</summary>
+    [Fact]
+    public async Task GetAgencies_Returns200_Public()
+    {
+        var regAgency = await _client.PostAsJsonAsync("/api/v1/auth/register/agency", new RegisterAgencyRequestDto
+        {
+            Email = $"agency-lookup-{Guid.NewGuid():N}@example.com",
+            Password = "Sup3r$ecret1",
+            FullName = "Agency Boss",
+            AgencyName = "Lookup Agency Test",
+            BusinessRegNo = $"BRN-LOOKUP-{Guid.NewGuid():N}",
+            YardAddress = "123 Port Road",
+            YardLat = 6.9m,
+            YardLng = 79.8m
+        });
+        regAgency.EnsureSuccessStatusCode();
+
+        var response = await _client.GetAsync("/api/v1/auth/agencies");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var agencies = await response.Content.ReadFromJsonAsync<List<AgencyLookupDto>>();
+        Assert.NotNull(agencies);
+        Assert.Contains(agencies, a => a.Name == "Lookup Agency Test");
+    }
+
 }

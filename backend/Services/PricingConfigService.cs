@@ -14,12 +14,15 @@ namespace FreightLink.Api.Services;
 public class PricingConfigService : IPricingConfigService
 {
     /// <summary>
-    /// Serializes every pricing-config write (<c>Create*</c>/<c>SoftDelete*</c> across both tables)
-    /// within this process. This is what makes <see cref="CreateVehicleClassEfficiency"/>'s
+    /// Serializes every pricing-config write (<c>Create*</c>/<c>SoftDelete*</c> across all three
+    /// tables) and <see cref="GetPricingSnapshotForEstimate"/>'s combined read within this process.
+    /// This is what makes <see cref="CreateVehicleClassEfficiency"/>'s
     /// read-validate-insert sequence safe against a concurrent request racing the same stale snapshot,
-    /// and makes two concurrent soft-deletes of the same row resolve deterministically (the second sees
-    /// the first's committed state instead of silently overwriting <c>DeletedByUserId</c>). <c>static</c>
-    /// is required — a new
+    /// makes two concurrent soft-deletes of the same row resolve deterministically (the second sees
+    /// the first's committed state instead of silently overwriting <c>DeletedByUserId</c>), and keeps
+    /// <see cref="GetPricingSnapshotForEstimate"/>'s three reads from straddling a concurrent write
+    /// (which would otherwise let the internal price estimator combine a pre-write value from one
+    /// table with a post-write value from another). <c>static</c> is required — a new
     /// <see cref="PricingConfigService"/> instance is constructed per request (scoped DI), so only a
     /// process-wide field actually coordinates across concurrent requests. Deliberately a plain mutex,
     /// not a reader/writer lock — this app runs as a single instance (one <c>compose.yaml</c> service,
@@ -275,6 +278,122 @@ public class PricingConfigService : IPricingConfigService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<PricingFormulaConfigResponseDto> GetCurrentPricingFormulaConfig(CancellationToken cancellationToken = default)
+    {
+        var current = await GetCurrentPricingFormulaConfigEntityAsync(cancellationToken);
+        return MapToResponse(current, ResolveUserName(current.SetByUser?.FullName));
+    }
+
+    /// <inheritdoc />
+    public async Task<List<PricingFormulaConfigResponseDto>> GetPricingFormulaConfigHistory(CancellationToken cancellationToken = default)
+    {
+        var rows = await _dbContext.PricingFormulaConfigs.AsNoTracking()
+            .Include(x => x.SetByUser)
+            .OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.PricingFormulaConfigId)
+            .ToListAsync(cancellationToken);
+
+        return rows.Select(x => MapToResponse(x, ResolveUserName(x.SetByUser?.FullName))).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<PricingFormulaConfigResponseDto> CreatePricingFormulaConfig(CreatePricingFormulaConfigDto request, Guid actingUserId, CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var config = new PricingFormulaConfig
+            {
+                PricingFormulaConfigId = Guid.NewGuid(),
+                BaseFare = request.BaseFare!.Value,
+                RatePerKg = request.RatePerKg!.Value,
+                DriverCostPerKm = request.DriverCostPerKm!.Value,
+                MaintenanceAllowancePerKm = request.MaintenanceAllowancePerKm!.Value,
+                MarginPercent = request.MarginPercent!.Value,
+                Source = request.Source,
+                EffectiveFrom = request.EffectiveFrom,
+                SetByUserId = actingUserId,
+                CreatedAt = now,
+                UpdatedAt = now
+            };
+
+            _dbContext.PricingFormulaConfigs.Add(config);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            // config.SetByUser is never populated at this point (a freshly-added tracked entity has
+            // no navigation fix-up from the DB), so the setter's display name is resolved with a
+            // dedicated lookup rather than an Include on an entity that was just inserted, not queried.
+            var setByUserName = await _dbContext.Users.AsNoTracking()
+                .Where(u => u.UserId == actingUserId)
+                .Select(u => u.FullName)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            return MapToResponse(config, ResolveUserName(setByUserName));
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PricingConfigDeleteResponseDto> SoftDeletePricingFormulaConfig(Guid pricingFormulaConfigId, Guid actingUserId, CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            var config = await _dbContext.PricingFormulaConfigs
+                .FirstOrDefaultAsync(x => x.PricingFormulaConfigId == pricingFormulaConfigId, cancellationToken);
+
+            if (config is null)
+            {
+                throw new ApiException(HttpStatusCode.NotFound, ErrorCode.PRICING_FORMULA_CONFIG_NOT_FOUND, "The requested pricing formula configuration could not be found.");
+            }
+
+            if (config.DeletedAt is not null)
+            {
+                throw new ApiException(HttpStatusCode.UnprocessableEntity, ErrorCode.PRICING_FORMULA_CONFIG_ALREADY_DELETED, "This pricing formula configuration has already been soft-deleted.");
+            }
+
+            config.DeletedAt = DateTimeOffset.UtcNow;
+            config.DeletedByUserId = actingUserId;
+            await _dbContext.SaveChangesAsync(cancellationToken);
+
+            return new PricingConfigDeleteResponseDto { Message = "Pricing formula configuration deleted successfully.", Id = config.PricingFormulaConfigId };
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<PricingSnapshotDto> GetPricingSnapshotForEstimate(VehicleClass classLabel, FuelType fuelType, CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            // All three reads happen while holding the same lock every Create*/SoftDelete* write is
+            // serialized by, so a concurrent Admin write can't land between them — the estimator gets
+            // one internally-consistent snapshot, never a mix of a pre-write and post-write value.
+            var efficiency = await GetCurrentVehicleClassEfficiencyEntityAsync(classLabel, cancellationToken);
+            var fuelPrice = await GetCurrentFuelPriceEntityAsync(fuelType, cancellationToken);
+            var formulaConfig = await GetCurrentPricingFormulaConfigEntityAsync(cancellationToken);
+
+            return new PricingSnapshotDto
+            {
+                Efficiency = MapToResponse(efficiency, ResolveUserName(efficiency.SetByUser?.FullName)),
+                FuelPrice = MapToResponse(fuelPrice, ResolveUserName(fuelPrice.SetByUser?.FullName)),
+                FormulaConfig = MapToResponse(formulaConfig, ResolveUserName(formulaConfig.SetByUser?.FullName))
+            };
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
+
     /// <summary>The current (non-deleted, non-future-dated, latest-<c>EffectiveFrom</c>) row for <paramref name="fuelType"/>.</summary>
     private async Task<FuelPriceRate> GetCurrentFuelPriceEntityAsync(FuelType fuelType, CancellationToken cancellationToken)
     {
@@ -331,6 +450,25 @@ public class PricingConfigService : IPricingConfigService
             .GroupBy(x => x.ClassLabel)
             .Select(g => g.OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.VehicleClassEfficiencyId).First())
             .ToList();
+    }
+
+    /// <summary>The current (non-deleted, non-future-dated, latest-<c>EffectiveFrom</c>) <see cref="PricingFormulaConfig"/> row.</summary>
+    private async Task<PricingFormulaConfig> GetCurrentPricingFormulaConfigEntityAsync(CancellationToken cancellationToken)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var current = await _dbContext.PricingFormulaConfigs.AsNoTracking()
+            .Include(x => x.SetByUser)
+            .Where(x => x.DeletedAt == null && x.EffectiveFrom <= now)
+            .OrderByDescending(x => x.EffectiveFrom).ThenByDescending(x => x.CreatedAt).ThenByDescending(x => x.PricingFormulaConfigId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (current is null)
+        {
+            throw new ApiException(HttpStatusCode.ServiceUnavailable, ErrorCode.PRICING_CONFIG_MISSING,
+                "No current pricing formula configuration exists. An Admin must add one before loads can be priced.");
+        }
+
+        return current;
     }
 
     /// <summary>
@@ -454,4 +592,180 @@ public class PricingConfigService : IPricingConfigService
         DeletedAt = efficiency.DeletedAt,
         DeletedByUserId = efficiency.DeletedByUserId
     };
+
+    /// <summary>Maps a <see cref="PricingFormulaConfig"/> entity to its wire-facing representation.</summary>
+    private static PricingFormulaConfigResponseDto MapToResponse(PricingFormulaConfig config, string setByUserName) => new()
+    {
+        PricingFormulaConfigId = config.PricingFormulaConfigId,
+        BaseFare = config.BaseFare,
+        RatePerKg = config.RatePerKg,
+        DriverCostPerKm = config.DriverCostPerKm,
+        MaintenanceAllowancePerKm = config.MaintenanceAllowancePerKm,
+        MarginPercent = config.MarginPercent,
+        Source = config.Source,
+        EffectiveFrom = config.EffectiveFrom,
+        SetByUserId = config.SetByUserId,
+        SetByUserName = setByUserName,
+        CreatedAt = config.CreatedAt,
+        DeletedAt = config.DeletedAt,
+        DeletedByUserId = config.DeletedByUserId
+    };
+
+    /// <inheritdoc />
+    public async Task SeedDefaultPricingConfigIfNotExistsAsync(CancellationToken cancellationToken = default)
+    {
+        await _pricingConfigLock.WaitAsync(cancellationToken);
+        try
+        {
+            var now = DateTimeOffset.UtcNow;
+            var adminUser = await _dbContext.Users.AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Role == UserRole.Admin, cancellationToken);
+            var actingUserId = adminUser?.UserId ?? Guid.NewGuid();
+
+            // 1. Seed Fuel Price Rate (AutoDiesel)
+            var hasFuelPrice = await _dbContext.FuelPriceRates
+                .AnyAsync(f => f.DeletedAt == null && f.EffectiveFrom <= now, cancellationToken);
+
+            if (!hasFuelPrice)
+            {
+                _dbContext.FuelPriceRates.Add(new FuelPriceRate
+                {
+                    FuelPriceRateId = Guid.NewGuid(),
+                    FuelType = FuelType.AutoDiesel,
+                    PricePerLitre = 350m,
+                    Source = "CPC Market Reference Rate (Seeded)",
+                    EffectiveFrom = now,
+                    SetByUserId = actingUserId,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+
+            // 2. Seed Pricing Formula Config
+            var hasFormulaConfig = await _dbContext.PricingFormulaConfigs
+                .AnyAsync(f => f.DeletedAt == null && f.EffectiveFrom <= now, cancellationToken);
+
+            if (!hasFormulaConfig)
+            {
+                _dbContext.PricingFormulaConfigs.Add(new PricingFormulaConfig
+                {
+                    PricingFormulaConfigId = Guid.NewGuid(),
+                    BaseFare = 5000m,
+                    RatePerKg = 2m,
+                    DriverCostPerKm = 25m,
+                    MaintenanceAllowancePerKm = 15m,
+                    MarginPercent = 0.15m,
+                    Source = "ADR-015 Standard Rate Matrix (Seeded)",
+                    EffectiveFrom = now,
+                    SetByUserId = actingUserId,
+                    CreatedAt = now,
+                    UpdatedAt = now
+                });
+            }
+
+            // 3. Seed Vehicle Class Efficiencies (MiniTruck, MediumLorry, ContainerTruck)
+            var existingClasses = await _dbContext.VehicleClassEfficiencies
+                .Where(v => v.DeletedAt == null && v.EffectiveFrom <= now)
+                .Select(v => v.ClassLabel)
+                .ToListAsync(cancellationToken);
+
+            if (existingClasses.Count == 0)
+            {
+                _dbContext.VehicleClassEfficiencies.AddRange(
+                    new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.MiniTruck,
+                        MinPayloadKg = 0m,
+                        MaxPayloadKg = 1500m,
+                        MinVolumeM3 = 0m,
+                        MaxVolumeM3 = 6m,
+                        FuelConsumptionLPer100Km = 10m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    },
+                    new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.MediumLorry,
+                        MinPayloadKg = 1500m,
+                        MaxPayloadKg = 10000m,
+                        MinVolumeM3 = 6m,
+                        MaxVolumeM3 = 25m,
+                        FuelConsumptionLPer100Km = 18m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    },
+                    new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.ContainerTruck,
+                        MinPayloadKg = 10000m,
+                        MaxPayloadKg = null,
+                        MinVolumeM3 = 25m,
+                        MaxVolumeM3 = null,
+                        FuelConsumptionLPer100Km = 30m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    }
+                );
+            }
+            else
+            {
+                // If only partial classes exist, ensure MediumLorry and ContainerTruck are present
+                if (!existingClasses.Contains(VehicleClass.MediumLorry))
+                {
+                    _dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.MediumLorry,
+                        MinPayloadKg = 1500m,
+                        MaxPayloadKg = 10000m,
+                        MinVolumeM3 = 6m,
+                        MaxVolumeM3 = 25m,
+                        FuelConsumptionLPer100Km = 18m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    });
+                }
+
+                if (!existingClasses.Contains(VehicleClass.ContainerTruck))
+                {
+                    _dbContext.VehicleClassEfficiencies.Add(new VehicleClassEfficiency
+                    {
+                        VehicleClassEfficiencyId = Guid.NewGuid(),
+                        ClassLabel = VehicleClass.ContainerTruck,
+                        MinPayloadKg = 10000m,
+                        MaxPayloadKg = null,
+                        MinVolumeM3 = 25m,
+                        MaxVolumeM3 = null,
+                        FuelConsumptionLPer100Km = 30m,
+                        Source = "Sri Lanka Transport Efficiency Standards (Seeded)",
+                        EffectiveFrom = now,
+                        SetByUserId = actingUserId,
+                        CreatedAt = now,
+                        UpdatedAt = now
+                    });
+                }
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        finally
+        {
+            _pricingConfigLock.Release();
+        }
+    }
 }

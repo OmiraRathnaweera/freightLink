@@ -13,7 +13,7 @@ namespace FreightLink.Api.Controllers;
 
 /// <summary>
 /// Admin-only CRUD over the ADR-019 pricing-config reference tables (<c>FuelPriceRate</c>,
-/// <c>VehicleClassEfficiency</c>). Deliberately thin — every action just extracts the caller's
+/// <c>VehicleClassEfficiency</c>, <c>PricingFormulaConfig</c>). Deliberately thin — every action just extracts the caller's
 /// identity from the access token and delegates to <see cref="IPricingConfigService"/>, which owns all
 /// business rules including the append-only versioning and soft-delete semantics.
 /// </summary>
@@ -132,6 +132,52 @@ public class AdminPricingController : ControllerBase
     public async Task<ActionResult<PricingConfigDeleteResponseDto>> DeleteVehicleEfficiency(Guid id, CancellationToken cancellationToken)
     {
         var result = await _pricingConfigService.SoftDeleteVehicleClassEfficiency(id, GetCurrentUserId(), cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Returns the current (non-deleted, latest <c>EffectiveFrom</c>) pricing formula configuration.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the current configuration; 503 if none has been configured yet.</returns>
+    [HttpGet("formula-config")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<PricingFormulaConfigResponseDto>> GetCurrentFormulaConfig(CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.GetCurrentPricingFormulaConfig(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Lists every pricing formula configuration ever recorded, including superseded and soft-deleted rows, newest first.</summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with the full configuration history.</returns>
+    [HttpGet("formula-config/history")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<List<PricingFormulaConfigResponseDto>>> GetFormulaConfigHistory(CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.GetPricingFormulaConfigHistory(cancellationToken);
+        return Ok(result);
+    }
+
+    /// <summary>Records a new, current pricing formula configuration. Always inserts a new row — never updates an existing one.</summary>
+    /// <param name="request">The new configuration's content.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>201 with the created <see cref="PricingFormulaConfigResponseDto"/>.</returns>
+    [HttpPost("formula-config")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<PricingFormulaConfigResponseDto>> CreateFormulaConfig([FromBody] CreatePricingFormulaConfigDto request, CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.CreatePricingFormulaConfig(request, GetCurrentUserId(), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>Soft-deletes a pricing formula configuration (sets <c>DeletedAt</c>/<c>DeletedByUserId</c>). Never issues a hard delete.</summary>
+    /// <param name="id">The configuration's id.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>200 with a success message.</returns>
+    [HttpDelete("formula-config/{id:guid}")]
+    [Authorize(Roles = AdminRole)]
+    public async Task<ActionResult<PricingConfigDeleteResponseDto>> DeleteFormulaConfig(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _pricingConfigService.SoftDeletePricingFormulaConfig(id, GetCurrentUserId(), cancellationToken);
         return Ok(result);
     }
 

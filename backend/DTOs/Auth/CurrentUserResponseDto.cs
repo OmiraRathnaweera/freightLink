@@ -1,4 +1,4 @@
-namespace FreightLink.Api.DTOs.Auth;
+﻿namespace FreightLink.Api.DTOs.Auth;
 
 /// <summary>Response for <c>GET /api/v1/auth/me</c> — the authenticated caller's safe profile (no password hash).</summary>
 public class CurrentUserResponseDto
@@ -21,6 +21,12 @@ public class CurrentUserResponseDto
     /// <summary>Whether the account is active; inactive accounts cannot log in.</summary>
     public bool IsActive { get; set; }
 
+    /// <summary>Whether the account's email address has completed the one-time verification flow.</summary>
+    public bool IsEmailVerified { get; set; }
+
     /// <summary>When the account was created.</summary>
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The ID of the agency this user belongs to, if they are AgencyStaff.</summary>
+    public Guid? AgencyId { get; set; }
 }

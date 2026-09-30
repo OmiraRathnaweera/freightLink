@@ -27,14 +27,15 @@ public class AppDbContext : DbContext
     public DbSet<UploadedFile> UploadedFiles => Set<UploadedFile>();
 
     public DbSet<Assignment> Assignments => Set<Assignment>();
+    public DbSet<LoadProposal> LoadProposals => Set<LoadProposal>();
     public DbSet<AssignmentResponse> AssignmentResponses => Set<AssignmentResponse>();
+    public DbSet<AssignmentActionToken> AssignmentActionTokens => Set<AssignmentActionToken>();
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<TripEvent> TripEvents => Set<TripEvent>();
     public DbSet<TripEvidence> TripEvidences => Set<TripEvidence>();
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
-    public DbSet<Payment> Payments => Set<Payment>();
-    public DbSet<PaymentWebhookEvent> PaymentWebhookEvents => Set<PaymentWebhookEvent>();
+    public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
     public DbSet<Dispute> Disputes => Set<Dispute>();
     public DbSet<DisputeResolution> DisputeResolutions => Set<DisputeResolution>();
     public DbSet<Notification> Notifications => Set<Notification>();
@@ -46,6 +47,7 @@ public class AppDbContext : DbContext
 
     public DbSet<FuelPriceRate> FuelPriceRates => Set<FuelPriceRate>();
     public DbSet<VehicleClassEfficiency> VehicleClassEfficiencies => Set<VehicleClassEfficiency>();
+    public DbSet<PricingFormulaConfig> PricingFormulaConfigs => Set<PricingFormulaConfig>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
