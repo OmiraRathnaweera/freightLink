@@ -6,7 +6,9 @@ plugins {
 
 android {
     namespace = "lk.freightlink.freightlink_mobile"
-    compileSdk = 37
+    compileSdk {
+        version = release(37) { minorApiLevel = 0 }
+    }
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
