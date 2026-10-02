@@ -198,12 +198,13 @@ public class TripsController : ControllerBase
 
     /// <summary>
     /// Seeds complete example testing trips (Assigned, InTransit, Delivered) with full hierarchy
-    /// for Swagger testing and UI verification. AllowAnonymous for convenient local dev use.
+    /// for Swagger testing and UI verification. Admin-only: previously anonymous, which let any caller
+    /// write to the database (DEF-002).
     /// </summary>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>200 with the list of seeded trips.</returns>
     [HttpPost("seed-example")]
-    [AllowAnonymous]
+    [Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<ActionResult<List<TripResponseDto>>> SeedExample(CancellationToken cancellationToken)
     {
         var result = await _tripService.SeedExampleTripsAsync(cancellationToken);
