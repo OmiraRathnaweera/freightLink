@@ -139,6 +139,18 @@ public class AgenciesController : ControllerBase
         return Ok();
     }
 
+    /// <summary>
+    /// Admin-only: changes an agency's status to any status allowed from its current one (including
+    /// reactivating a Suspended agency). A reason is required and is recorded with the actor and time.
+    /// </summary>
+    [HttpPatch("{id:guid}/status")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<AgencyResponseDto>> UpdateAgencyStatus(Guid id, [FromBody] UpdateAgencyStatusDto request, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.UpdateStatusAsync(id, GetCurrentUserId(), GetCurrentUserRole(), request, cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("{id:guid}/compliance-docs")]
     [Authorize(Roles = nameof(UserRole.AgencyStaff))]
     public async Task<ActionResult<ComplianceDocResponseDto>> AddComplianceDoc(Guid id, [FromBody] ComplianceDocCreateDto request, CancellationToken cancellationToken)

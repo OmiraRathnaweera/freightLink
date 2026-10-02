@@ -54,6 +54,16 @@ export async function suspendAgency(agencyId) {
   return api.post(`/agencies/${agencyId}/suspend`)
 }
 
+/**
+ * PATCH /agencies/{id}/status
+ * Admin-only: moves an agency to any status allowed from its current one (e.g. Suspended -> Active
+ * to reactivate). `reason` is required and recorded in the agency's status history (issue #56).
+ * @param {{ agencyId: string, status: string, reason: string }} variables
+ */
+export async function updateAgencyStatus({ agencyId, status, reason }) {
+  return api.patch(`/agencies/${agencyId}/status`, { status, reason })
+}
+
 export function useAgenciesQuery(queryParams, options) {
   return useQuery({
     queryKey: agencyKeys.list(queryParams),
@@ -98,6 +108,18 @@ export function useSuspendAgencyMutation(options) {
   return useMutation({
     mutationFn: suspendAgency,
     ...options,
+  })
+}
+
+export function useUpdateAgencyStatusMutation(options) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: updateAgencyStatus,
+    ...options,
+    onSuccess: (...args) => {
+      queryClient.invalidateQueries({ queryKey: agencyKeys.all })
+      return options?.onSuccess?.(...args)
+    },
   })
 }
 
