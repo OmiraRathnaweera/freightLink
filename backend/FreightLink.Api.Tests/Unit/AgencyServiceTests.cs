@@ -152,6 +152,117 @@ public class AgencyServiceTests
     }
 
     [Fact]
+    public async Task ActivateAsync_OnSuspendedAgency_ReactivatesIt()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Suspended);
+        var sut = CreateSut(db);
+
+        await sut.ActivateAsync(agency.AgencyId, Guid.NewGuid(), UserRole.Admin);
+
+        var persisted = await db.Agencies.FindAsync(agency.AgencyId);
+        Assert.Equal(AgencyStatus.Active, persisted!.Status);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_SuspendedToActive_PersistsStatusAndWritesAuditRow()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Suspended);
+        var sut = CreateSut(db);
+        var adminId = Guid.NewGuid();
+        var before = DateTimeOffset.UtcNow;
+
+        var result = await sut.UpdateStatusAsync(agency.AgencyId, adminId, UserRole.Admin,
+            new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = "  Suspended in error  " });
+
+        Assert.Equal(AgencyStatus.Active, result.Status);
+        var audit = Assert.Single(await db.AgencyStatusHistories.Where(h => h.AgencyId == agency.AgencyId).ToListAsync());
+        Assert.Equal(AgencyStatus.Suspended, audit.FromStatus);
+        Assert.Equal(AgencyStatus.Active, audit.ToStatus);
+        Assert.Equal(adminId, audit.ChangedByUserId);
+        Assert.Equal("Suspended in error", audit.Reason);
+        Assert.True(audit.ChangedAt >= before);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ActiveToSuspendedAndBack_RecordsBothTransitions()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var sut = CreateSut(db);
+        var adminId = Guid.NewGuid();
+
+        await sut.UpdateStatusAsync(agency.AgencyId, adminId, UserRole.Admin, new UpdateAgencyStatusDto { Status = AgencyStatus.Suspended, Reason = "Audit" });
+        await sut.UpdateStatusAsync(agency.AgencyId, adminId, UserRole.Admin, new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = "Cleared" });
+
+        var persisted = await db.Agencies.FindAsync(agency.AgencyId);
+        Assert.Equal(AgencyStatus.Active, persisted!.Status);
+        Assert.Equal(2, await db.AgencyStatusHistories.CountAsync(h => h.AgencyId == agency.AgencyId));
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_InvalidTransition_ThrowsAndLeavesStatusUnchanged()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Pending);
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateStatusAsync(agency.AgencyId, Guid.NewGuid(), UserRole.Admin,
+            new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = "Skip verification" }));
+
+        Assert.Equal(ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, ex.Code);
+        var persisted = await db.Agencies.FindAsync(agency.AgencyId);
+        Assert.Equal(AgencyStatus.Pending, persisted!.Status);
+        Assert.Empty(await db.AgencyStatusHistories.Where(h => h.AgencyId == agency.AgencyId).ToListAsync());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task UpdateStatusAsync_BlankReason_ThrowsValidationError(string reason)
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Suspended);
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateStatusAsync(agency.AgencyId, Guid.NewGuid(), UserRole.Admin,
+            new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = reason }));
+
+        Assert.Equal(ErrorCode.VALIDATION_ERROR, ex.Code);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_ByOwningAgencyStaff_ThrowsForbidden_AndLeavesStatusUnchanged()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Suspended);
+        var staffUserId = Guid.NewGuid();
+        db.AgencyStaff.Add(new AgencyStaff { UserId = staffUserId, AgencyId = agency.AgencyId });
+        await db.SaveChangesAsync();
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateStatusAsync(agency.AgencyId, staffUserId, UserRole.AgencyStaff,
+            new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = "Reactivate myself" }));
+
+        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
+        var persisted = await db.Agencies.FindAsync(agency.AgencyId);
+        Assert.Equal(AgencyStatus.Suspended, persisted!.Status);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_UnknownAgency_ThrowsNotFound()
+    {
+        var db = CreateContext();
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateStatusAsync(Guid.NewGuid(), Guid.NewGuid(), UserRole.Admin,
+            new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = "x" }));
+
+        Assert.Equal(ErrorCode.AGENCY_NOT_FOUND, ex.Code);
+    }
+
+    [Fact]
     public async Task VerifyAsync_ByAgencyStaffFromADifferentAgency_ThrowsForbidden_AgencyNotOwned()
     {
         var db = CreateContext();

@@ -4,6 +4,7 @@ const AGENCY_ERROR_MESSAGES = {
   VALIDATION_ERROR: 'Please check the highlighted fields and try again.',
   AGENCY_NOT_ACTIVE: 'Your agency is not active yet. Compliance documents must be verified by an administrator before registering fleet vehicles.',
   AGENCY_NOT_FOUND: 'Agency organization could not be found.',
+  INVALID_AGENCY_STATUS_TRANSITION: 'This status change is not allowed from the agency\'s current status. Refresh the page and try again.',
   FORBIDDEN: 'You are not authorized to perform this fleet management action.',
   EMAIL_ALREADY_REGISTERED: 'An account with this email already exists.',
   DRIVER_LICENCE_ALREADY_REGISTERED: 'A driver with this driving licence number is already registered.',

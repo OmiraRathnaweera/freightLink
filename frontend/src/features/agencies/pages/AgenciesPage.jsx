@@ -19,7 +19,7 @@ import EmptyState from '../../../components/EmptyState.jsx'
 import ErrorState from '../../../components/ErrorState.jsx'
 import Skeleton from '../../../components/Skeleton.jsx'
 import { useAppSelector } from '../../../hooks/useAppSelector.js'
-import { UserRole } from '../../../lib/enums.js'
+import { AgencyStatus, UserRole } from '../../../lib/enums.js'
 import { cx } from '../../../lib/cx.js'
 import { useAgenciesQuery, useAgenciesSummaryQuery, useAgencyFleetQuery } from '../api/agencyApi.js'
 // Pagination and its debounce hook already live under features/loads and are reused here rather
@@ -28,6 +28,8 @@ import { useAgenciesQuery, useAgenciesSummaryQuery, useAgencyFleetQuery } from '
 // widgets like this one).
 import Pagination from '../../loads/components/Pagination.jsx'
 import { useDebouncedValue } from '../../loads/hooks/useDebouncedValue.js'
+import AgencyStatusDialog from '../components/AgencyStatusDialog.jsx'
+import { canTransitionAgency } from '../lib/agencyStatusTransitions.js'
 import AgencyProfilePage from './AgencyProfilePage.jsx'
 
 const DEFAULT_PAGE_SIZE = 20
@@ -63,6 +65,8 @@ function formatDate(isoString) {
 function AdminAgenciesDashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [selectedAgencyId, setSelectedAgencyId] = useState(null)
+  // { agency, targetStatus } while the suspend/reactivate dialog is open (issue #56).
+  const [statusChange, setStatusChange] = useState(null)
 
   const page = Number(searchParams.get('page') ?? '1')
   const pageSize = Number(searchParams.get('pageSize') ?? String(DEFAULT_PAGE_SIZE))
@@ -346,6 +350,27 @@ function AdminAgenciesDashboard() {
                       {formatDate(agency.createdAt)}
                     </td>
                     <td className="py-3 pr-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                      {canTransitionAgency(agency.status, AgencyStatus.SUSPENDED) && (
+                        <Button
+                          variant="status"
+                          status="red"
+                          onClick={() => setStatusChange({ agency, targetStatus: AgencyStatus.SUSPENDED })}
+                          className="text-xs px-2.5 py-1"
+                        >
+                          Suspend
+                        </Button>
+                      )}
+                      {agency.status === AgencyStatus.SUSPENDED && (
+                        <Button
+                          variant="status"
+                          status="green"
+                          onClick={() => setStatusChange({ agency, targetStatus: AgencyStatus.ACTIVE })}
+                          className="text-xs px-2.5 py-1"
+                        >
+                          Reactivate
+                        </Button>
+                      )}
                       <Button
                         variant="secondary"
                         onClick={() =>
@@ -355,6 +380,7 @@ function AdminAgenciesDashboard() {
                       >
                         {selectedAgencyId === agency.agencyId ? 'Close Fleet' : 'View Fleet'}
                       </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -468,6 +494,14 @@ function AdminAgenciesDashboard() {
             </div>
           )}
         </Card>
+      )}
+
+      {statusChange && (
+        <AgencyStatusDialog
+          agency={statusChange.agency}
+          targetStatus={statusChange.targetStatus}
+          onClose={() => setStatusChange(null)}
+        />
       )}
     </div>
   )

@@ -265,63 +265,46 @@ public class AgencyService : IAgencyService
 
     public async Task VerifyAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
-        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
-
-        var agency = await _dbContext.Agencies
-            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
-
-        if (agency == null)
-        {
-            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
-        }
-
-        if (agency.Status != AgencyStatus.Pending)
-        {
-            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Only pending agencies can be verified.");
-        }
-
-        agency.Status = AgencyStatus.Verified;
-        agency.StatusHistory.Add(new AgencyStatusHistory
-        {
-            ToStatus = AgencyStatus.Verified,
-            ChangedByUserId = currentUserId,
-            Reason = "Verified by admin"
-        });
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await ChangeStatusAsync(agencyId, AgencyStatus.Verified, "Verified by admin", currentUserId, currentUserRole, cancellationToken);
     }
 
     public async Task ActivateAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
-        await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
-
-        var agency = await _dbContext.Agencies
-            .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
-
-        if (agency == null)
-        {
-            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
-        }
-
-        if (agency.Status != AgencyStatus.Verified)
-        {
-            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Only verified agencies can be activated.");
-        }
-
-        agency.Status = AgencyStatus.Active;
-        agency.StatusHistory.Add(new AgencyStatusHistory
-        {
-            ToStatus = AgencyStatus.Active,
-            ChangedByUserId = currentUserId,
-            Reason = "Activated by admin"
-        });
-
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        await ChangeStatusAsync(agencyId, AgencyStatus.Active, "Activated by admin", currentUserId, currentUserRole, cancellationToken);
     }
 
     public async Task SuspendAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
     {
+        await ChangeStatusAsync(agencyId, AgencyStatus.Suspended, "Suspended by admin", currentUserId, currentUserRole, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<AgencyResponseDto> UpdateStatusAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, UpdateAgencyStatusDto request, CancellationToken cancellationToken = default)
+    {
+        var reason = request.Reason?.Trim();
+        if (string.IsNullOrEmpty(reason))
+        {
+            throw new ApiException(HttpStatusCode.BadRequest, ErrorCode.VALIDATION_ERROR, "A reason is required to change an agency's status.");
+        }
+
+        var agency = await ChangeStatusAsync(agencyId, request.Status, reason, currentUserId, currentUserRole, cancellationToken);
+        return MapToResponse(agency);
+    }
+
+    /// <summary>
+    /// Applies a status change after validating it against <see cref="AgencyStatusTransitionRules"/> and
+    /// appends the matching <see cref="AgencyStatusHistory"/> audit row (actor, from, to, reason, time).
+    /// </summary>
+    private async Task<Agency> ChangeStatusAsync(Guid agencyId, AgencyStatus newStatus, string reason, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken)
+    {
         await VerifyAgencyOwnershipAsync(agencyId, currentUserId, currentUserRole, cancellationToken);
+
+        // Ownership alone lets an agency's own staff through; status changes are Admin-only so a
+        // suspended agency can never reactivate itself, even if a controller attribute regresses.
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only an Admin can change an agency's status.");
+        }
 
         var agency = await _dbContext.Agencies
             .FirstOrDefaultAsync(a => a.AgencyId == agencyId, cancellationToken);
@@ -331,20 +314,23 @@ public class AgencyService : IAgencyService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
         }
 
-        if (agency.Status == AgencyStatus.Suspended)
-        {
-            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_AGENCY_STATUS_TRANSITION, "Agency is already suspended.");
-        }
+        AgencyStatusTransitionRules.ValidateTransition(agency.Status, newStatus);
 
-        agency.Status = AgencyStatus.Suspended;
+        var now = DateTimeOffset.UtcNow;
+        var oldStatus = agency.Status;
+        agency.Status = newStatus;
+        agency.UpdatedAt = now;
         agency.StatusHistory.Add(new AgencyStatusHistory
         {
-            ToStatus = AgencyStatus.Suspended,
+            FromStatus = oldStatus,
+            ToStatus = newStatus,
             ChangedByUserId = currentUserId,
-            Reason = "Suspended by admin"
+            Reason = reason,
+            ChangedAt = now
         });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+        return agency;
     }
 
     public async Task<ComplianceDocResponseDto> AddComplianceDocAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, ComplianceDocCreateDto request, CancellationToken cancellationToken = default)

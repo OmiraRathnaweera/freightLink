@@ -612,4 +612,66 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
         var response = await _client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    private HttpRequestMessage StatusRequest(Guid agencyId, string token, AgencyStatus status, string reason)
+    {
+        var request = AuthedRequest(HttpMethod.Patch, $"/api/v1/agencies/{agencyId}/status", token);
+        request.Content = JsonContent.Create(new UpdateAgencyStatusDto { Status = status, Reason = reason });
+        return request;
+    }
+
+    [Fact]
+    public async Task UpdateAgencyStatus_Returns200_AndReactivatesSuspendedAgency_ForAdmin()
+    {
+        var agencyId = (await SeedManyAgenciesAsync($"Reac{Guid.NewGuid():N}"[..12], 1, AgencyStatus.Suspended))[0];
+
+        using var request = StatusRequest(agencyId, MintAdminToken(), AgencyStatus.Active, "Suspended in error");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<AgencyResponseDto>(JsonOpts);
+        Assert.Equal(AgencyStatus.Active, body!.Status);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var audit = await db.AgencyStatusHistories.SingleAsync(h => h.AgencyId == agencyId);
+        Assert.Equal(AgencyStatus.Suspended, audit.FromStatus);
+        Assert.Equal(AgencyStatus.Active, audit.ToStatus);
+        Assert.Equal("Suspended in error", audit.Reason);
+    }
+
+    [Fact]
+    public async Task UpdateAgencyStatus_Returns400_ForInvalidTransition()
+    {
+        var agencyId = (await SeedManyAgenciesAsync($"Inv{Guid.NewGuid():N}"[..12], 1, AgencyStatus.Pending))[0];
+
+        using var request = StatusRequest(agencyId, MintAdminToken(), AgencyStatus.Active, "Skip verification");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Contains("INVALID_AGENCY_STATUS_TRANSITION", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task UpdateAgencyStatus_Returns400_WhenReasonMissing()
+    {
+        var agencyId = (await SeedManyAgenciesAsync($"NoRsn{Guid.NewGuid():N}"[..12], 1, AgencyStatus.Suspended))[0];
+
+        using var request = StatusRequest(agencyId, MintAdminToken(), AgencyStatus.Active, "");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateAgencyStatus_Returns403_ForAgencyStaff()
+    {
+        var tokens = await RegisterAndLoginAgencyAsync("status-fail", "STFAIL");
+        var agencyId = (await SeedManyAgenciesAsync($"Forb{Guid.NewGuid():N}"[..12], 1, AgencyStatus.Suspended))[0];
+
+        using var request = StatusRequest(agencyId, tokens.AccessToken, AgencyStatus.Active, "Self-reactivation attempt");
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
 }

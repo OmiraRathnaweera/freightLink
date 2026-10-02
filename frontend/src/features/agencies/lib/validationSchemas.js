@@ -153,3 +153,14 @@ export function updateVehicleSchema(originalRegistrationNo) {
       ),
   })
 }
+
+/**
+ * Validation schema for the admin agency status-change dialog (PATCH /agencies/{id}/status).
+ * Mirrors the backend's UpdateAgencyStatusDto: a reason is required, max 500 characters.
+ */
+export const agencyStatusChangeSchema = Yup.object({
+  reason: Yup.string()
+    .trim()
+    .max(500, 'Reason must be 500 characters or fewer')
+    .required('A reason is required'),
+})

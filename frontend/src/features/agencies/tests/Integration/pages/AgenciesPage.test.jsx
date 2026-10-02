@@ -13,6 +13,7 @@ vi.mock("../../../api/agencyApi.js", async (importOriginal) => {
     useAgenciesQuery: vi.fn(),
     useAgenciesSummaryQuery: vi.fn(),
     useAgencyFleetQuery: vi.fn(),
+    useUpdateAgencyStatusMutation: vi.fn(),
   };
 });
 
@@ -307,5 +308,74 @@ describe("AgenciesPage — AgencyStaff View", () => {
 
     expect(screen.getByText("Agency Profile Page")).toBeInTheDocument();
     expect(screen.queryByText("Registered Agencies & Fleet")).not.toBeInTheDocument();
+  });
+});
+
+describe("AgenciesPage — Admin status changes (issue #56)", () => {
+  function mockStatusMutation(mutateAsync = vi.fn().mockResolvedValue({})) {
+    agencyApi.useUpdateAgencyStatusMutation.mockReturnValue({ mutateAsync, isPending: false });
+    return mutateAsync;
+  }
+
+  it("offers Reactivate (not Suspend) for a suspended agency", () => {
+    mockStatusMutation();
+    mockDefaultQueries({ agenciesData: pagedResponse([sampleAgency({ status: "Suspended" })]) });
+    renderAgenciesPage(UserRole.ADMIN);
+
+    expect(screen.getByRole("button", { name: "Reactivate" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Suspend" })).not.toBeInTheDocument();
+  });
+
+  it("offers Suspend (not Reactivate) for an active agency", () => {
+    mockStatusMutation();
+    mockDefaultQueries({ agenciesData: pagedResponse([sampleAgency({ status: "Active" })]) });
+    renderAgenciesPage(UserRole.ADMIN);
+
+    expect(screen.getByRole("button", { name: "Suspend" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reactivate" })).not.toBeInTheDocument();
+  });
+
+  it("requires a reason, then reactivates the agency to Active", async () => {
+    const user = userEvent.setup();
+    const mutateAsync = mockStatusMutation();
+    const agency = sampleAgency({ status: "Suspended" });
+    mockDefaultQueries({ agenciesData: pagedResponse([agency]) });
+    renderAgenciesPage(UserRole.ADMIN);
+
+    await user.click(screen.getByRole("button", { name: "Reactivate" }));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("Reactivate this agency?");
+
+    await user.click(screen.getByRole("button", { name: "Reactivate agency" }));
+    expect(await screen.findByText("A reason is required")).toBeInTheDocument();
+    expect(mutateAsync).not.toHaveBeenCalled();
+
+    await user.type(screen.getByLabelText("Reactivation reason"), "Suspended in error");
+    await user.click(screen.getByRole("button", { name: "Reactivate agency" }));
+
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith({
+        agencyId: agency.agencyId,
+        status: "Active",
+        reason: "Suspended in error",
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("keeps the dialog open and shows the server error when the change is rejected", async () => {
+    const user = userEvent.setup();
+    mockStatusMutation(
+      vi.fn().mockRejectedValue(Object.assign(new Error("nope"), { code: "INVALID_AGENCY_STATUS_TRANSITION" })),
+    );
+    mockDefaultQueries({ agenciesData: pagedResponse([sampleAgency({ status: "Suspended" })]) });
+    renderAgenciesPage(UserRole.ADMIN);
+
+    await user.click(screen.getByRole("button", { name: "Reactivate" }));
+    await user.type(screen.getByLabelText("Reactivation reason"), "Retry");
+    await user.click(screen.getByRole("button", { name: "Reactivate agency" }));
+
+    expect(await screen.findByText(/status change is not allowed/i)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });

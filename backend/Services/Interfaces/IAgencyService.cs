@@ -60,6 +60,12 @@ public interface IAgencyService
     /// </summary>
     Task SuspendAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Admin-only: moves an agency to the requested status (validated by <c>AgencyStatusTransitionRules</c>), recording the reason, actor and time in the
+    /// agency's status history. This is the path that lets a Suspended agency be reactivated.
+    /// </summary>
+    Task<AgencyResponseDto> UpdateStatusAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, UpdateAgencyStatusDto request, CancellationToken cancellationToken = default);
+
     Task<ComplianceDocResponseDto> AddComplianceDocAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, ComplianceDocCreateDto request, CancellationToken cancellationToken = default);
     Task<IEnumerable<ComplianceDocResponseDto>> GetComplianceDocsAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
