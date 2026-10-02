@@ -27,6 +27,10 @@ vi.mock('../../../api/invoiceApi.js', async (importOriginal) => {
   }
 })
 
+// Relative to "now": BillingPage defaults to a 30-day date filter, so a hardcoded date silently ages
+// out of the list (and fails this suite) once it's more than 30 days old.
+const RECENT_ISO = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
 function sampleInvoice(overrides = {}) {
   return {
     invoiceId: 'inv-1',
@@ -37,8 +41,8 @@ function sampleInvoice(overrides = {}) {
     amount: 25000,
     currency: 'LKR',
     status: InvoiceStatus.ISSUED,
-    issuedAt: '2026-09-01T00:00:00.000Z',
-    createdAt: '2026-09-01T00:00:00.000Z',
+    issuedAt: RECENT_ISO,
+    createdAt: RECENT_ISO,
     ...overrides,
   }
 }
