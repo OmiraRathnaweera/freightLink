@@ -1,0 +1,178 @@
+{
+    "metrics": {
+        "http_req_sending": {
+            "p(95)": 0.05225,
+            "avg": 0.023296281471371815,
+            "min": 0.002,
+            "med": 0.008583,
+            "max": 14.099541,
+            "p(90)": 0.02975
+        },
+        "iteration_duration": {
+            "avg": 583.1746276388441,
+            "min": 510.591542,
+            "med": 570.3224375,
+            "max": 1092.795,
+            "p(90)": 669.4284252,
+            "p(95)": 719.35582585
+        },
+        "http_req_duration{expected_response:true}": {
+            "min": 1.40025,
+            "med": 9.01875,
+            "max": 498.74925,
+            "p(90)": 24.2924252,
+            "p(95)": 34.09570459999996,
+            "avg": 13.406073248911463
+        },
+        "http_req_tls_handshaking": {
+            "avg": 0,
+            "min": 0,
+            "med": 0,
+            "max": 0,
+            "p(90)": 0,
+            "p(95)": 0
+        },
+        "http_req_duration": {
+            "max": 498.74925,
+            "p(90)": 24.2924252,
+            "p(95)": 34.09570459999996,
+            "avg": 13.406073248911463,
+            "min": 1.40025,
+            "med": 9.01875
+        },
+        "vus_max": {
+            "min": 20,
+            "max": 20,
+            "value": 20
+        },
+        "data_received": {
+            "count": 6818269,
+            "rate": 48494.999128603115
+        },
+        "vus": {
+            "value": 1,
+            "min": 0,
+            "max": 20
+        },
+        "agent_workflow_failure_rate": {
+            "passes": 0,
+            "fails": 2564,
+            "thresholds": {
+                "rate<0.01": false
+            },
+            "value": 0
+        },
+        "http_req_connecting": {
+            "med": 0,
+            "max": 42.320167,
+            "p(90)": 0,
+            "p(95)": 0,
+            "avg": 0.007056102489114188,
+            "min": 0
+        },
+        "http_req_receiving": {
+            "avg": 0.05590250113732358,
+            "min": 0.004834,
+            "med": 0.0275,
+            "max": 6.797416,
+            "p(90)": 0.094292,
+            "p(95)": 0.145375
+        },
+        "http_reqs": {
+            "count": 15387,
+            "rate": 109.44017485843051
+        },
+        "http_req_waiting": {
+            "avg": 13.326874466302701,
+            "min": 1.380834,
+            "med": 8.952583,
+            "max": 498.004667,
+            "p(90)": 24.15958340000001,
+            "p(95)": 33.9256538
+        },
+        "data_sent": {
+            "count": 8398458,
+            "rate": 59734.10749731491
+        },
+        "agent_workflow_full_sequence_duration": {
+            "p(95)": 142,
+            "avg": 55.10101404056162,
+            "min": 8,
+            "med": 46,
+            "max": 286,
+            "p(90)": 87.70000000000006,
+            "thresholds": {
+                "p(95)<1500": false
+            }
+        },
+        "checks": {
+            "passes": 12820,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_failed": {
+            "passes": 0,
+            "fails": 15387,
+            "value": 0
+        },
+        "http_req_blocked": {
+            "med": 0.002125,
+            "max": 42.486458,
+            "p(90)": 0.008083,
+            "p(95)": 0.014167,
+            "avg": 0.013774475531292693,
+            "min": 0.0005
+        },
+        "iterations": {
+            "count": 2564,
+            "rate": 18.236472888608294
+        }
+    },
+    "setup_data": {
+        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4NWNkYzY2OC1lM2JjLTQ0ZDktODExYy05MzYwNGJhYzc4MjIiLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6Ijg1Y2RjNjY4LWUzYmMtNDRkOS04MTFjLTkzNjA0YmFjNzgyMiIsImVtYWlsIjoicGVyZi1hZ2VudC1zaGlwcGVyLTE3OTA5NTg3MDk0ODlAZXhhbXBsZS5jb20iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJTaGlwcGVyIiwianRpIjoiMWYwNWM4N2QtZTdlMC00NDgxLWFkY2ItZGY0MGEyODY4MTViIiwiaWF0IjoxNzkwOTU4NzA5LCJuYmYiOjE3OTA5NTg3MDksImV4cCI6MTc5MDk2MjMwOSwiaXNzIjoiRnJlaWdodExpbmtBcGkiLCJhdWQiOiJGcmVpZ2h0TGlua0NsaWVudCJ9.rhvmpEpBB1vAthOODaFQFUBeC6Cua07l78bG-Nnge3E",
+        "shipperUserId": "85cdc668-e3bc-44d9-811c-93604bac7822"
+    },
+    "root_group": {
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {},
+        "checks": {
+                "create workflow run: 2xx": {
+                    "id": "1288bf9fdd76adfa5e59efec0b1bc2ac",
+                    "passes": 2564,
+                    "fails": 0,
+                    "name": "create workflow run: 2xx",
+                    "path": "::create workflow run: 2xx"
+                },
+                "report step 1: 2xx": {
+                    "id": "6b8d3a048220ad6c80dfc4eac53a7b3d",
+                    "passes": 2564,
+                    "fails": 0,
+                    "name": "report step 1: 2xx",
+                    "path": "::report step 1: 2xx"
+                },
+                "report step 2: 2xx": {
+                    "fails": 0,
+                    "name": "report step 2: 2xx",
+                    "path": "::report step 2: 2xx",
+                    "id": "bb9f1503bb350659de793d4f12966058",
+                    "passes": 2564
+                },
+                "report step 3: 2xx": {
+                    "id": "07850c981c4575edddb712860f145f66",
+                    "passes": 2564,
+                    "fails": 0,
+                    "name": "report step 3: 2xx",
+                    "path": "::report step 3: 2xx"
+                },
+                "report step 4: 2xx": {
+                    "path": "::report step 4: 2xx",
+                    "id": "3939f51cf420ed4f57cb4b5398beec25",
+                    "passes": 2564,
+                    "fails": 0,
+                    "name": "report step 4: 2xx"
+                }
+            }
+    }
+}

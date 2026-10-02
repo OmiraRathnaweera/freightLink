@@ -1,0 +1,217 @@
+Resolving dependencies...
+Downloading packages...
+  cli_util 0.4.2 (0.6.0 available)
+  code_assets 1.0.0 (2.1.0 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  cupertino_icons 1.0.9 (2.0.0 available)
+  geolocator 14.0.1 (14.1.1 available)
+  geolocator_android 5.1.0 (5.1.1 available)
+  go_router 18.0.1 (18.0.2 available)
+  hooks 1.0.3 (2.2.0 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.4.0 (1.5.0 available)
+  native_toolchain_c 0.17.6 (0.19.5 available)
+  objective_c 9.3.0 (9.6.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  test_api 0.7.12 (0.7.14 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+15 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/core/routing/app_router_access_test.dart
+00:00 +0: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/models/dispute_test.dart: parses the backend detail payload including its read-only resolution
+00:00 +1: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/notifications/notification_provider_test.dart: NotificationProvider initial state has empty notifications and zero unread count
+00:00 +2: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/notifications/notification_provider_test.dart: NotificationProvider pushNotification adds notification, increments unread, and sets push banner
+00:00 +3: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/notifications/notification_provider_test.dart: NotificationProvider dismissPushBanner clears currentPushBanner without clearing notifications list
+00:00 +4: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/notifications/notification_provider_test.dart: NotificationProvider markAsRead marks specific notification as read and decrements unreadCount
+00:00 +5: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/notifications/notification_provider_test.dart: NotificationProvider markAllAsRead marks all notifications as read
+00:00 +6: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/notifications/notification_provider_test.dart: NotificationProvider clearAll removes all notifications and dismisses banner
+00:00 +7: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/providers/dispute_provider_test.dart: (setUpAll)
+00:00 +7: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/core/routing/app_router_access_test.dart: mobile role route policy Shipper owns Loads and Billing but not Agency workspace or driver execution
+00:00 +8: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/providers/dispute_provider_test.dart: loads status-filtered disputes into the claimant list state
+00:00 +9: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/providers/dispute_provider_test.dart: loads status-filtered disputes into the claimant list state
+00:00 +10: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/providers/dispute_provider_test.dart: loads status-filtered disputes into the claimant list state
+00:00 +11: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/core/routing/app_router_access_test.dart: mobile role route policy unknown and Admin roles are not granted a mobile route
+00:00 +12: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/providers/dispute_provider_test.dart: keeps a typed API error for a retryable claimant-list failure
+00:00 +13: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Unit/features/disputes/providers/dispute_provider_test.dart: (tearDownAll)
+00:01 +13: loading /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/shipper_dashboard_screen_test.dart
+00:02 +13: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/post_load_screen_test.dart: (setUpAll)
+00:02 +13: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/post_load_screen_test.dart: Post Load screen renders key fields and the submit button
+00:03 +14: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/shipper_dashboard_screen_test.dart: ShipperDashboardScreen renders KPIs and quick actions when loaded
+00:03 +15: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/post_load_screen_test.dart: Post Load screen shows validation messages when submitted blank
+00:03 +16: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/post_load_screen_test.dart: Post Load screen shows validation messages when submitted blank
+00:03 +17: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/post_load_screen_test.dart: Post Load screen shows validation messages when submitted blank
+00:03 +18: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/screens/login_screen_test.dart: renders one common login form with no registration link
+00:04 +19: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/my_loads_screen_test.dart: My Loads screen shows a loading skeleton while the list is fetching
+00:04 +20: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/my_loads_screen_test.dart: My Loads screen shows a loading skeleton while the list is fetching
+00:04 +21: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/post_load_screen_test.dart: Post Load screen shows the server error message on a failed submit
+00:04 +22: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/my_loads_screen_test.dart: My Loads screen shows the empty state when there are no loads
+00:04 +23: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/my_loads_screen_test.dart: My Loads screen renders a card per load with its reference code and status
+00:04 +24: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/my_loads_screen_test.dart: My Loads screen tapping a load card opens its detail screen
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:05 +25: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/loads/screens/my_loads_screen_test.dart: (tearDownAll)
+00:05 +25: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/cross_platform_auth_consistency_test.dart: (setUpAll)
+00:05 +25: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/cross_platform_auth_consistency_test.dart: Cross-Platform Auth & Session Consistency (Y3S01-103) 1. AuthUser JSON deserialization matches backend CurrentUserResponseDto contract
+00:06 +26: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/cross_platform_auth_consistency_test.dart: Cross-Platform Auth & Session Consistency (Y3S01-103) 2. Role getters evaluate correctly for all four system roles
+00:06 +27: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/cross_platform_auth_consistency_test.dart: Cross-Platform Auth & Session Consistency (Y3S01-103) 3. AppShell maps Shipper role to MyLoadsScreen and Loads tab
+00:07 +28: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/cross_platform_auth_consistency_test.dart: Cross-Platform Auth & Session Consistency (Y3S01-103) 3. AppShell maps Shipper role to MyLoadsScreen and Loads tab
+00:07 +29: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/disputes/screens/dispute_screens_test.dart: shows role-scoped dispute data and refreshes when status filter changes
+00:07 +30: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/disputes/screens/dispute_screens_test.dart: shows role-scoped dispute data and refreshes when status filter changes
+00:07 +31: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/disputes/screens/dispute_screens_test.dart: shows role-scoped dispute data and refreshes when status filter changes
+00:07 +32: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/disputes/screens/dispute_screens_test.dart: shows role-scoped dispute data and refreshes when status filter changes
+00:07 +33: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/disputes/screens/dispute_screens_test.dart: shows role-scoped dispute data and refreshes when status filter changes
+00:07 +34: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/screens/account_settings_screen_test.dart: AccountSettingsScreen — Profile section Save Changes calls updateProfile with the edited values
+00:07 +35: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders skeleton during initial loading state
+00:07 +36: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders skeleton during initial loading state
+00:07 +37: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders skeleton during initial loading state
+00:08 +38: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders skeleton during initial loading state
+00:08 +39: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders skeleton during initial loading state
+00:08 +40: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/auth/screens/account_settings_screen_test.dart: AccountSettingsScreen — Password section shows the backend error message when changePassword fails
+00:08 +41: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders KPIs, fleet utilization, and action tiles when loaded
+00:08 +42: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders ErrorState with retry button when error occurs
+00:08 +43: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/agencies/screens/agency_dashboard_screen_test.dart: AgencyDashboardScreen renders fallback greeting when agency profile is empty
+00:09 +44: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: (setUpAll)
+00:09 +44: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: DriverAssignedTripScreen shows loading indicator while fetching
+00:10 +45: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/job_proposals_screen_test.dart: JobProposalsScreen renders list of proposed assignments
+00:10 +46: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/job_proposals_screen_test.dart: JobProposalsScreen renders list of proposed assignments
+00:10 +47: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: DriverAssignedTripScreen displays active trip details (route, vehicle, cargo, status)
+00:10 +48: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/job_proposals_screen_test.dart: JobProposalsScreen handles filter chip switching
+00:11 +49: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: DriverAssignedTripScreen allows driver to advance status from PickedUp to InTransit
+00:11 +50: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/job_proposals_screen_test.dart: JobProposalsScreen displays empty state when no proposals exist
+00:11 +51: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: DriverAssignedTripScreen displays error banner on failure with try again button
+00:11 +52: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: DriverAssignedTripScreen displays capture delivery proof button when InTransit
+00:11 +53: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: DriverAssignedTripScreen updates from empty state to assigned trip when Check for Assignments is tapped (Y3S01-99)
+00:11 +54: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: Driver has zero authority or controls to cancel or delete trips across all lifecycle states
+00:11 +55: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_assigned_trip_screen_test.dart: (tearDownAll)
+00:12 +55: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: (setUpAll)
+00:12 +55: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen renders proposal details and fleet selectors
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:13 +56: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_dashboard_screen_test.dart: DriverDashboardScreen renders KPIs and quick actions when loaded
+00:13 +56: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen dispatches trip when submitted
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:13 +57: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_dashboard_screen_test.dart: DriverDashboardScreen renders KPIs and quick actions when loaded
+00:13 +58: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen displays 409 conflict error banner on race condition
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:13 +59: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/driver_dashboard_screen_test.dart: DriverDashboardScreen renders ErrorState with retry button when error occurs
+00:13 +60: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen allows declining proposal with reason
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:13 +61: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen allows declining proposal with reason
+00:14 +62: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen renders read-only state when proposal is already Accepted
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:14 +63: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen renders read-only state with reason when proposal is already Declined
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:14 +64: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: AcceptLoadAssignScreen displays error banner when declining fails
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:14 +65: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/accept_load_assign_screen_test.dart: (tearDownAll)
+00:15 +65: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_delivery_screen_test.dart: (setUpAll)
+00:15 +65: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_delivery_screen_test.dart: ProofOfDeliveryScreen renders trip details, dropoff address, policy alert, and capture buttons
+00:16 +66: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_pickup_screen_test.dart: ProofOfPickupScreen renders trip details, policy alert, and capture buttons
+00:16 +67: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/notifications/notification_widgets_test.dart: InAppPushBanner renders push banner when notification is active and dismisses on close button
+00:17 +68: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_delivery_screen_test.dart: ProofOfDeliveryScreen takes photo and displays preview and retake button
+00:17 +69: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_delivery_screen_test.dart: ProofOfDeliveryScreen takes photo and displays preview and retake button
+00:17 +70: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_pickup_screen_test.dart: ProofOfPickupScreen takes photo and displays preview and retake button
+00:17 +71: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/notifications/notification_widgets_test.dart: NotificationBellButton and NotificationCenterSheet tapping NotificationBellButton opens NotificationCenterSheet with items
+00:17 +72: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/notifications/notification_widgets_test.dart: NotificationBellButton and NotificationCenterSheet tapping NotificationBellButton opens NotificationCenterSheet with items
+00:17 +73: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_pickup_screen_test.dart: ProofOfPickupScreen executes full upload, evidence link, and status advance workflow
+00:17 +74: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_pickup_screen_test.dart: ProofOfPickupScreen executes full upload, evidence link, and status advance workflow
+00:17 +75: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/trips/screens/proof_of_delivery_screen_test.dart: ProofOfDeliveryScreen executes full upload, DeliveryProof evidence link, and status advance workflow
+00:17 +76: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form
+00:17 +77: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form
+00:18 +78: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form
+00:18 +79: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form
+00:18 +80: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form
+00:18 +81: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) shows an ErrorState with retry when the trip fails to load
+00:18 +82: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) pre-fills the amount from the trip’s agreed price and shows the shipper
+00:18 +83: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) rejects submission with a zero amount
+00:19 +84: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — create mode (trip-linked, single amount) submits {tripId, amount, notes, issueImmediately} with the pre-filled amount
+00:19 +85: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/create_invoice_screen_test.dart: CreateInvoiceScreen — edit mode pre-fills the amount from the existing invoice and never fetches a trip
+00:22 +86: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/invoice_detail_screen_test.dart: InvoiceDetailScreen — role x status action gating Agency Staff sees Edit/Issue/Void for a Draft invoice, no Confirm Payment
+00:24 +87: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:24 +88: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:24 +89: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:25 +90: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:25 +91: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:25 +92: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:26 +93: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:26 +94: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/raise_dispute_screen_test.dart: shows the duplicate-active-dispute message instead of a generic failure
+00:27 +95: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/payments_screen_test.dart: PaymentsScreen renders an empty message with no fabricated invoices
+00:27 +96: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/payments_screen_test.dart: PaymentsScreen renders a retry action on failure
+00:27 +97: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/features/billing/screens/payments_screen_test.dart: PaymentsScreen offers "View details" (not "Manage") to a Shipper
+00:27 +98: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/auth_flow_test.dart: Auth navigation login success lands on My Loads
+00:28 +99: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/auth_flow_test.dart: Auth navigation login success lands on My Loads
+00:31 +100: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/auth_flow_test.dart: Auth navigation driver login success lands on DriverAssignedTripScreen
+00:31 +101: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/auth_flow_test.dart: Auth navigation logging out from an authenticated session redirects to login
+00:31 +102: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/auth_flow_test.dart: (tearDownAll)
+00:33 +102: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: (setUpAll)
+00:33 +102: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/shared/widgets/auto_resize_text_test.dart: AutoResizeText Widget Tests renders text inside normal constraints
+00:33 +103: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: My Loads -> Load Detail -> back returns to the list
+00:34 +104: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: My Loads -> Load Detail -> back returns to the list
+00:34 +105: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: My Loads -> Load Detail -> back returns to the list
+00:34 +106: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: My Loads -> Load Detail -> back returns to the list
+00:34 +107: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: My Loads -> Load Detail -> back returns to the list
+  [1m[flutter_map][0m
+    We want to help keep OpenStreetMap available for everyone. Our examples
+    and demo app use the public tile servers, but they are NOT free to use by
+    everyone! Please review whether the OpenStreetMap tile servers are suitable
+    for your project.
+    See:
+      * https://operations.osmfoundation.org/policies/tiles (OSM Tile Usage Policy)
+      * https://docs.fleaflet.dev/osm-warn for more information about this warning
+00:35 +108: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/mobile/freightlink_mobile/test/Integration/navigation/loads_navigation_test.dart: (tearDownAll)
+00:37 +108: All tests passed!

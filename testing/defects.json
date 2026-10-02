@@ -1,0 +1,139 @@
+{
+ "defects": [
+  {
+   "id": "DEF-001",
+   "title": "Anonymous POST /api/v1/agencies/seed-defaults writes to the database",
+   "desc": "The endpoint was marked [AllowAnonymous]. Any unauthenticated caller could insert demo carrier agencies into a production database, polluting the agency list the AI matching pipeline chooses from.",
+   "severity": "High",
+   "priority": "High",
+   "area": "Security / API",
+   "found_by": "New SecurityTests (SEC-08)",
+   "steps": "1. Start the API. 2. `curl -X POST http://localhost:5159/api/v1/agencies/seed-defaults` with no Authorization header. 3. Observe HTTP 200 and seeded agencies.",
+   "evidence_before": "evidence/defects/security-tests-BEFORE-fix.log",
+   "evidence_after": "evidence/defects/security-tests-AFTER-fix.log",
+   "status": "Fixed and retested",
+   "fix": "AgenciesController.SeedDefaultAgencies now `[Authorize(Roles = Admin)]`. Commit message references DEF-001 (`git log --grep=DEF-001`).",
+   "retest": "SeedEndpoints_Return401_ForAnonymousCaller, SeedEndpoints_Return403_ForShipper and SeedDefaultAgencies_Succeeds_ForAdmin all pass (before: 8 of 47 SecurityTests failed, after: 0 of 47).",
+   "tests": [
+    "SecurityTests.SeedEndpoints_Return401_ForAnonymousCaller",
+    "SecurityTests.SeedEndpoints_Return403_ForShipper",
+    "SecurityTests.SeedDefaultAgencies_Succeeds_ForAdmin"
+   ]
+  },
+  {
+   "id": "DEF-002",
+   "title": "Anonymous POST /api/v1/trips/seed-example writes a full trip hierarchy",
+   "desc": "Same class of flaw as DEF-001 on the Trips controller: [AllowAnonymous] 'for convenient local dev use' creates users, loads, assignments and trips on whatever database the API points at.",
+   "severity": "High",
+   "priority": "High",
+   "area": "Security / API",
+   "found_by": "New SecurityTests (SEC-08)",
+   "steps": "1. `curl -X POST http://localhost:5159/api/v1/trips/seed-example` with no token. 2. Observe HTTP 200 and the seeded trips in the body.",
+   "evidence_before": "evidence/defects/security-tests-BEFORE-fix.log",
+   "evidence_after": "evidence/defects/security-tests-AFTER-fix.log",
+   "status": "Fixed and retested",
+   "fix": "TripsController.SeedExample now `[Authorize(Roles = Admin)]`. Commit message references DEF-002.",
+   "retest": "Same SeedEndpoints_* tests, parameterised over both URLs, pass.",
+   "tests": [
+    "SecurityTests.SeedEndpoints_Return401_ForAnonymousCaller",
+    "SecurityTests.SeedEndpoints_Return403_ForShipper"
+   ]
+  },
+  {
+   "id": "DEF-003",
+   "title": "Internal API key is checked after model validation",
+   "desc": "InternalApiKeyAuthFilter was an action filter, so a caller with no or a wrong X-Internal-Api-Key and an invalid body received HTTP 400 with validation details instead of 401. Unauthenticated callers could probe the request schema.",
+   "severity": "Low",
+   "priority": "Medium",
+   "area": "Security / API",
+   "found_by": "New SecurityTests (SEC-07)",
+   "steps": "1. POST `{}` to /internal/agent-workflow-runs with no X-Internal-Api-Key. 2. Observe 400 (expected 401).",
+   "evidence_before": "evidence/defects/security-tests-BEFORE-fix.log",
+   "evidence_after": "evidence/defects/security-tests-AFTER-fix.log",
+   "status": "Fixed and retested",
+   "fix": "Filter now implements IAsyncAuthorizationFilter, which runs before model binding. Commit message references DEF-003.",
+   "retest": "InternalEndpoints_RejectMissingOrWrongServiceKey (3 cases) and InternalEndpoints_RejectUserJwt_InPlaceOfServiceKey pass; the existing InternalPricing/AgentWorkflowRuns controller tests still pass.",
+   "tests": [
+    "SecurityTests.InternalEndpoints_RejectMissingOrWrongServiceKey",
+    "SecurityTests.InternalEndpoints_RejectUserJwt_InPlaceOfServiceKey"
+   ]
+  },
+  {
+   "id": "DEF-004",
+   "title": "API crashes on startup against real PostgreSQL when no Admin exists",
+   "desc": "SeedDefaultPricingConfigIfNotExistsAsync used a random Guid as SetByUserId when no Admin user existed. EF Core's InMemory provider ignores foreign keys, so the 560+ existing tests never noticed; on PostgreSQL the insert violates FK_FuelPriceRates_Users_SetByUserId (23503) and the host fails to start.",
+   "severity": "Medium",
+   "priority": "High",
+   "area": "Database / Startup",
+   "found_by": "New Postgres end-to-end workflow test (area E) on Testcontainers PostgreSQL",
+   "steps": "1. Start the API (Development) against an empty PostgreSQL with ADMIN_USER_EMAIL / ADMIN_USER_PASSWORD unset. 2. Startup throws DbUpdateException 23503.",
+   "evidence_before": "evidence/defects/DEF-004-BEFORE-fix.log",
+   "evidence_after": "evidence/defects/DEF-004-AFTER-fix.log",
+   "status": "Fixed and retested",
+   "fix": "Seed is skipped (with a warning) when no Admin exists; the next start after an Admin exists seeds the defaults. Commit message references DEF-004.",
+   "retest": "Before: 5 of 7 targeted tests failed. After: 7 of 7 pass, including 3 new unit tests (no-admin, with-admin, idempotent) and the 4 Postgres E2E tests.",
+   "tests": [
+    "SeedDefaultPricingConfig_WithNoAdminUser_SeedsNothing",
+    "SeedDefaultPricingConfig_WithAdminUser_SeedsDefaultsAttributedToAdmin",
+    "SeedDefaultPricingConfig_CalledTwice_IsIdempotent",
+    "FullWorkflow_ShipperPosts_AgentsRun_ShipperApproves_AgencyAccepts_TripPersistedInPostgres"
+   ]
+  },
+  {
+   "id": "DEF-005",
+   "title": "File endpoints return HTTP 500 when Cloudinary is not configured",
+   "desc": "OWASP ZAP reported 10 HTTP 500 responses (and 'Application Error Disclosure') on /api/v1/files/*. With no Cloudinary credentials the singleton Cloudinary client fails to build and every call becomes a generic 500. The response body is the standard error envelope (no stack trace), and .env.example already documents that uploads require Cloudinary, so this is a configuration-dependent robustness issue rather than a data exposure.",
+   "severity": "Low",
+   "priority": "Low",
+   "area": "Security scan / Robustness",
+   "found_by": "OWASP ZAP API scan",
+   "steps": "1. Run the API without CLOUDINARY_* settings. 2. GET /api/v1/files/content/x or POST /api/v1/files/single with a valid token. 3. Observe HTTP 500.",
+   "evidence_before": "evidence/zap/before-fix/zap-report.html",
+   "evidence_after": "evidence/zap/zap-report.html",
+   "status": "Open (not fixed)",
+   "fix": "Recommended: validate Cloudinary options at startup or return 503 from CloudinaryFileStorageService when unconfigured. Not changed: out of scope for the testing work and needs a team decision on fail-fast vs. 503.",
+   "retest": "Retest scan still reports the 10 x 500 alert (expected for an open defect). Production deployments set the Cloudinary variables.",
+   "tests": []
+  },
+  {
+   "id": "DEF-006",
+   "title": "Responses lack X-Content-Type-Options: nosniff",
+   "desc": "OWASP ZAP rule 10021: API, error and Swagger responses were served without X-Content-Type-Options, allowing MIME sniffing.",
+   "severity": "Low",
+   "priority": "Medium",
+   "area": "Security scan",
+   "found_by": "OWASP ZAP API scan",
+   "steps": "1. `curl -i http://localhost:5159/health`. 2. Header is absent.",
+   "evidence_before": "evidence/defects/DEF-006-BEFORE-fix.log (and evidence/zap/before-fix)",
+   "evidence_after": "evidence/defects/DEF-006-AFTER-fix.log (and evidence/zap)",
+   "status": "Fixed and retested",
+   "fix": "Small middleware in Program.cs adds the header to every response, including errors. Commit message references DEF-006.",
+   "retest": "Responses_CarryNosniffHeader_IncludingErrors (4 cases) pass: before 4 of 52 SecurityTests failed, after 0. ZAP retest: the X-Content-Type-Options alert is gone (WARN 6 -> 5, PASS 114 -> 115).",
+   "tests": [
+    "SecurityTests.Responses_CarryNosniffHeader_IncludingErrors"
+   ]
+  }
+ ],
+ "observations": [
+  {
+   "id": "OBS-01",
+   "text": "Marketplace accept bypasses the AI/Shipper approval step. AssignmentService.ApproveAsync lets any Agency Staff accept a Posted load directly (creating a stub 'Completed' workflow run). This looks deliberate (marketplace feature) so it is not logged as a defect, but the team should confirm it is intended, because it means an agency can take a load the Shipper never approved."
+  },
+  {
+   "id": "OBS-02",
+   "text": "Model-binding errors expose a framework type name, e.g. 'could not be converted to System.Decimal'. Low-impact information disclosure; fix by customising the model-state error messages."
+  },
+  {
+   "id": "OBS-03",
+   "text": "ZAP 'Cross-Origin-Resource-Policy missing' (Low) is intentionally not changed: the API is consumed cross-origin by the React and Flutter clients, so a restrictive CORP value could break them."
+  },
+  {
+   "id": "OBS-04",
+   "text": "ZAP 'Timestamp Disclosure - Unix' on /auth/me is a false positive (an id/creation value that merely looks like an epoch)."
+  },
+  {
+   "id": "OBS-05",
+   "text": "Backend branch coverage is about 52% against about 92% line coverage; most remaining gaps are error branches in services."
+  }
+ ]
+}
