@@ -30,15 +30,18 @@ public class PostgresWebApplicationFactory : WebApplicationFactory<Program>, IAs
         .Build();
 
     /// <summary>The known <c>INTERNAL_API_KEY</c> value set by this factory, mirroring <see cref="CustomWebApplicationFactory.ValidInternalApiKey"/>.</summary>
-    public const string ValidInternalApiKey = "postgres-integration-test-internal-api-key";
+    public const string ValidInternalApiKey = CustomWebApplicationFactory.ValidInternalApiKey;
 
     public async Task InitializeAsync()
     {
+        // JWT key and internal API key deliberately match CustomWebApplicationFactory's values: these
+        // are process-wide env vars, so identical values make the two factories safe to run in
+        // parallel (the host reads them when it is first built, not when this method runs).
         // Same rationale as CustomWebApplicationFactory: Program.cs reads JWT/admin-seed/internal-key
         // settings straight from process environment variables, so set them before the host builds.
         Environment.SetEnvironmentVariable("JWT__ISSUER", "FreightLinkApi");
         Environment.SetEnvironmentVariable("JWT__AUDIENCE", "FreightLinkClient");
-        Environment.SetEnvironmentVariable("JWT__KEY", "postgres-integration-test-signing-key-that-is-long-enough-1234567890");
+        Environment.SetEnvironmentVariable("JWT__KEY", "integration-test-signing-key-that-is-long-enough-1234567890");
         Environment.SetEnvironmentVariable("JWT__ACCESSTOKENMINUTES", "15");
         Environment.SetEnvironmentVariable("JWT__REFRESHTOKENDAYS", "7");
         // Left unset (unlike CustomWebApplicationFactory) so AuthService.SeedAdminIfNotExistsAsync
