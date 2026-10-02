@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FreightLink Test Dashboard</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --ink: #1b2330; --muted: #667085; --line: #e3e7ee;
+    --pass: #1a7f4b; --pass-bg: #e6f5ec; --fail: #c0392b; --fail-bg: #fbe9e7;
+    --warn: #b26a00; --warn-bg: #fff3dd; --run: #1d5fd6; --run-bg: #e5eefc; --accent: #1d5fd6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161d; --card: #1a202a; --ink: #e8ecf3; --muted: #93a0b4; --line: #2a3342;
+      --pass: #4cc38a; --pass-bg: #15332a; --fail: #ff7b6b; --fail-bg: #3a1d1b;
+      --warn: #f0b252; --warn-bg: #3a2c12; --run: #6ea1ff; --run-bg: #172a4a; --accent: #6ea1ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 60px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  h1 { margin: 0; font-size: 22px; }
+  .sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  h2 { font-size: 15px; margin: 26px 0 10px; letter-spacing: .02em; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); padding: 7px 13px; border-radius: 8px; cursor: pointer; font: inherit; }
+  .btn:hover { border-color: var(--accent); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile, .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .tile .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .tile .v { font-size: 26px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .v.pass { color: var(--pass); } .v.fail { color: var(--fail); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(262px, 1fr)); gap: 12px; }
+  .card h3 { margin: 0; font-size: 15px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .chip { font-size: 11.5px; padding: 2px 9px; border-radius: 99px; font-weight: 600; white-space: nowrap; }
+  .chip.passed { background: var(--pass-bg); color: var(--pass); }
+  .chip.failed { background: var(--fail-bg); color: var(--fail); }
+  .chip.running, .chip.queued { background: var(--run-bg); color: var(--run); }
+  .chip.none { background: var(--line); color: var(--muted); }
+  .nums { display: flex; gap: 14px; margin: 10px 0 8px; font-variant-numeric: tabular-nums; }
+  .nums b { display: block; font-size: 20px; }
+  .nums span { color: var(--muted); font-size: 11.5px; }
+  .bar { height: 7px; background: var(--line); border-radius: 99px; overflow: hidden; display: flex; }
+  .bar i { display: block; height: 100%; } .bar .p { background: var(--pass); } .bar .f { background: var(--fail); } .bar .s { background: var(--warn); }
+  .meta { color: var(--muted); font-size: 12px; margin: 8px 0; display: grid; gap: 1px; }
+  .meta b { color: var(--ink); font-weight: 600; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--run); border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; vertical-align: -1px; margin-right: 5px; }
+  @keyframes s { to { transform: rotate(360deg); } }
+  pre.log { background: #0e1219; color: #cfe0ff; border-radius: 10px; padding: 12px; margin: 0; max-height: 300px; overflow: auto; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .tab { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); cursor: pointer; }
+  .tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+  input[type=search], select { padding: 6px 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px; font: inherit; }
+  input[type=search] { min-width: 240px; }
+  .tblwrap { background: var(--card); border: 1px solid var(--line); border-radius: 12px; overflow: auto; max-height: 520px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12.8px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { position: sticky; top: 0; background: var(--card); z-index: 1; cursor: pointer; user-select: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.name { word-break: break-word; } td.grp { color: var(--muted); }
+  .res { font-weight: 600; } .res.Passed { color: var(--pass); } .res.Failed { color: var(--fail); } .res.NotExecuted { color: var(--warn); }
+  .msg { color: var(--fail); font: 11.5px ui-monospace, Menlo, monospace; white-space: pre-wrap; margin-top: 3px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+  .slow { margin: 0; padding-left: 18px; font-size: 12.5px; } .slow li { margin: 2px 0; } .slow span { color: var(--muted); }
+  .note { color: var(--muted); font-size: 12.5px; }
+  a { color: var(--accent); }
+  .hidden { display: none; }
+  .sev-High { color: var(--fail); font-weight: 600; } .sev-Medium { color: var(--warn); font-weight: 600; }
+  .err { background: var(--fail-bg); color: var(--fail); padding: 12px; border-radius: 10px; margin: 12px 0; }
+  @media print { .no-print, .btn { display: none !important; } body { background: #fff; } .tblwrap { max-height: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>FreightLink Test Dashboard</h1>
+      <div class="sub" id="sub">Loading…</div>
+    </div>
+    <div class="row no-print">
+      <button class="btn primary" id="runAll">▶ Run all functional tests</button>
+      <button class="btn" id="refresh">Refresh</button>
+    </div>
+  </header>
+
+  <div id="error" class="err hidden"></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <h2>Functional test suites</h2>
+  <div class="grid" id="suites"></div>
+
+  <div id="liveWrap" class="hidden">
+    <h2>Live output <span class="note" id="liveTitle"></span></h2>
+    <pre class="log" id="live"></pre>
+  </div>
+
+  <h2>Test results</h2>
+  <div class="tabs no-print" id="tabs"></div>
+  <div class="tools no-print">
+    <input type="search" id="q" placeholder="Search test name…">
+    <select id="flt"><option value="all">All results</option><option value="Passed">Passed</option><option value="Failed">Failed</option><option value="NotExecuted">Skipped</option></select>
+    <span class="note" id="count"></span>
+  </div>
+  <div class="two" style="margin-bottom:12px">
+    <div class="card"><b>Slowest 10 tests</b><ol class="slow" id="slowest"></ol></div>
+    <div class="card"><b>Time per test file / class</b> <span class="note">(top 10)</span><ol class="slow" id="groups"></ol></div>
+  </div>
+  <div class="tblwrap"><table>
+    <thead><tr><th data-k="idx" class="num">#</th><th data-k="name">Test</th><th data-k="grp">Class / file</th><th data-k="res">Result</th><th data-k="dur" class="num">Time</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table></div>
+
+  <h2>Non-functional tests</h2>
+  <div class="grid" id="nfr"></div>
+
+  <h2>Defects found and retested</h2>
+  <div class="tblwrap"><table><thead><tr><th>ID</th><th>Severity</th><th>Status</th><th>Title</th></tr></thead><tbody id="defects"></tbody></table></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDur = (s) => s == null ? '—' : s < 1 ? `${(s * 1000).toFixed(0)} ms` : s < 120 ? `${s.toFixed(1)} s` : `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`;
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleString() : '—';
+const SUITE_IDS = ['backend', 'frontend', 'mobile', 'agent'];
+
+let data = null, status = null, active = 'backend', sort = { k: 'grp', dir: 1 };
+let wasRunning = false;
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+  return r.json();
+}
+function showError(msg) { const e = $('error'); e.textContent = msg; e.classList.toggle('hidden', !msg); }
+
+async function loadResults() {
+  try { data = await api('/api/results'); showError(''); }
+  catch (e) { showError('Cannot reach the dashboard server. Start it with:  python3 testing/dashboard/server.py   then open http://127.0.0.1:8765  (' + e.message + ')'); return; }
+  render();
+}
+
+function suiteState(s) {
+  const st = status?.suites?.[s.id]?.status;
+  if (st === 'running' || st === 'queued') return st;
+  if (!s.has_results) return 'none';
+  return s.failed > 0 ? 'failed' : 'passed';
+}
+const chipText = { passed: 'Passed', failed: 'Failed', running: 'Running…', queued: 'Queued', none: 'No results yet' };
+
+function render() {
+  if (!data) return;
+  const S = data.suites;
+  const tot = S.reduce((a, s) => ({ total: a.total + (s.total || 0), passed: a.passed + (s.passed || 0), failed: a.failed + (s.failed || 0), skipped: a.skipped + (s.skipped || 0),
+    dur: a.dur + (s.meta?.duration_s ?? s.tool_duration_s ?? 0) }), { total: 0, passed: 0, failed: 0, skipped: 0, dur: 0 });
+  const rate = tot.total ? (tot.passed / tot.total * 100) : 0;
+  const cov = S.find((s) => s.id === 'backend')?.coverage;
+  $('sub').textContent = `${data.machine.host || 'local machine'} · ${data.machine.os} · generated ${fmtTime(data.now)}`;
+  $('tiles').innerHTML = [
+    ['Total tests', tot.total, ''], ['Passed', tot.passed, 'pass'], ['Failed', tot.failed, tot.failed ? 'fail' : ''],
+    ['Skipped', tot.skipped, ''], ['Pass rate', rate.toFixed(1) + '%', rate === 100 ? 'pass' : ''],
+    ['Total run time', fmtDur(tot.dur), ''], ['Backend line coverage', cov ? `${cov.line.toFixed(1)}%` : '—', ''],
+  ].map(([k, v, c]) => `<div class="tile"><div class="k">${k}</div><div class="v ${c}">${esc(v)}</div></div>`).join('');
+
+  $('suites').innerHTML = S.map((s) => {
+    const st = suiteState(s);
+    const n = s.total || 0;
+    const pct = (x) => n ? (x / n * 100) : 0;
+    const dur = s.meta?.duration_s ?? s.tool_duration_s;
+    const durLabel = s.meta ? 'Wall-clock' : 'Tool-reported';
+    const live = status?.suites?.[s.id];
+    return `<div class="card">
+      <h3>${esc(s.label)}<span class="chip ${st}">${st === 'running' ? '<span class="spin"></span>' : ''}${chipText[st]}</span></h3>
+      <div class="nums"><div><b>${n}</b><span>tests</span></div><div><b style="color:var(--pass)">${s.passed || 0}</b><span>passed</span></div>
+        <div><b style="color:${s.failed ? 'var(--fail)' : 'inherit'}">${s.failed || 0}</b><span>failed</span></div><div><b>${s.skipped || 0}</b><span>skipped</span></div></div>
+      <div class="bar"><i class="p" style="width:${pct(s.passed || 0)}%"></i><i class="f" style="width:${pct(s.failed || 0)}%"></i><i class="s" style="width:${pct(s.skipped || 0)}%"></i></div>
+      <div class="meta">
+        <div>${durLabel} duration: <b>${st === 'running' ? fmtDur(live.elapsed) : fmtDur(dur)}</b></div>
+        <div>Cumulative test time <span title="Tests run in parallel, so this is larger than the wall-clock time">(parallel)</span>: <b>${fmtDur(s.sum_test_s)}</b></div>
+        <div>Last result: <b>${fmtTime(s.meta?.started_at ?? s.finished_at)}</b></div>
+        ${s.coverage ? `<div>Coverage: <b>${s.coverage.line.toFixed(1)}% line / ${s.coverage.branch.toFixed(1)}% branch</b></div>` : ''}
+      </div>
+      <div class="row no-print"><button class="btn primary" data-run="${s.id}" ${live && (live.status === 'running' || live.status === 'queued') ? 'disabled' : ''}>▶ Run</button>
+        <button class="btn" data-view="${s.id}">View tests</button></div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('[data-run]').forEach((b) => b.onclick = () => run(b.dataset.run));
+  document.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => { active = b.dataset.view; renderTable(); $('tabs').scrollIntoView({ behavior: 'smooth' }); });
+
+  $('tabs').innerHTML = S.map((s) => `<div class="tab ${s.id === active ? 'on' : ''}" data-tab="${s.id}">${esc(s.label)} (${s.total || 0})</div>`).join('');
+  document.querySelectorAll('[data-tab]').forEach((t) => t.onclick = () => { active = t.dataset.tab; render(); });
+  renderTable();
+  renderNfr();
+  $('defects').innerHTML = data.defects.map((d) => `<tr><td>${esc(d.id)}</td><td class="sev-${esc(d.severity)}">${esc(d.severity)}</td><td>${esc(d.status)}</td><td>${esc(d.title)}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="note">No defects file found.</td></tr>';
+}
+
+function renderTable() {
+  const s = data.suites.find((x) => x.id === active);
+  if (!s || !s.has_results) { $('tbody').innerHTML = '<tr><td colspan="5" class="note">No results for this suite yet — press Run.</td></tr>'; $('count').textContent = ''; $('slowest').innerHTML = $('groups').innerHTML = ''; return; }
+  const q = $('q').value.toLowerCase(), f = $('flt').value;
+  let rows = s.tests.map((t, i) => ({ idx: i + 1, name: t[0], grp: t[1], res: t[2], dur: t[3], msg: t[4] }));
+  const slow = [...rows].sort((a, b) => b.dur - a.dur).slice(0, 10);
+  $('slowest').innerHTML = slow.map((r) => `<li>${esc(r.name.slice(0, 90))} <span>— ${fmtDur(r.dur)}</span></li>`).join('');
+  const g = {}; rows.forEach((r) => g[r.grp] = (g[r.grp] || 0) + r.dur);
+  $('groups').innerHTML = Object.entries(g).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => `<li>${esc(k.slice(-70))} <span>— ${fmtDur(v)}</span></li>`).join('');
+  rows = rows.filter((r) => (f === 'all' || r.res === f) && (!q || (r.name + r.grp).toLowerCase().includes(q)));
+  rows.sort((a, b) => (a[sort.k] > b[sort.k] ? 1 : a[sort.k] < b[sort.k] ? -1 : 0) * sort.dir);
+  $('count').textContent = `${rows.length} of ${s.tests.length} shown`;
+  const shown = rows.slice(0, 1500);
+  $('tbody').innerHTML = shown.map((r) => `<tr><td class="num">${r.idx}</td><td class="name">${esc(r.name)}${r.msg ? `<div class="msg">${esc(r.msg)}</div>` : ''}</td>
+    <td class="grp">${esc(r.grp)}</td><td class="res ${esc(r.res)}">${r.res === 'NotExecuted' ? 'Skipped' : esc(r.res)}</td><td class="num">${fmtDur(r.dur)}</td></tr>`).join('')
+    + (rows.length > shown.length ? `<tr><td colspan="5" class="note">Showing the first ${shown.length}; use search to narrow.</td></tr>` : '');
+}
+
+function renderNfr() {
+  const k6 = data.nfr.k6 || [], zap = data.nfr.zap, meta = data.nfr.meta || {};
+  const live = (id) => status?.suites?.[id]?.status;
+  const card = (title, id, body, when) => `<div class="card"><h3>${title}<span class="chip ${live(id) === 'running' ? 'running' : body ? 'passed' : 'none'}">${live(id) === 'running' ? '<span class="spin"></span>Running…' : body ? 'Saved result' : 'No results yet'}</span></h3>
+    ${body || ''}<div class="meta"><div>Last result: <b>${fmtTime(when)}</b> ${meta[id] ? `· wall-clock <b>${fmtDur(meta[id].duration_s)}</b>` : ''}</div></div>
+    <div class="row no-print"><button class="btn" data-run="${id}" ${live(id) === 'running' || live(id) === 'queued' ? 'disabled' : ''}>▶ Run (takes minutes, needs Docker)</button></div></div>`;
+  const k6Body = k6.length ? k6.map((k) => `<div class="meta"><div><b>${esc(k.script)}</b> — ${k.requests.toLocaleString()} requests, up to ${k.vus_max} VUs, failed ${k.failed_pct.toFixed(2)}%</div>
+      ${Object.entries(k.p95).map(([n, v]) => `<div>p95 ${esc(n)}: <b>${v.toFixed(1)} ms</b></div>`).join('')}
+      <div>Thresholds: <b style="color:${k.thresholds.every((t) => t[2]) ? 'var(--pass)' : 'var(--fail)'}">${k.thresholds.filter((t) => t[2]).length}/${k.thresholds.length} passed</b></div></div>`).join('') : '';
+  const zapBody = zap ? `<div class="meta"><div>Checks: <b style="color:var(--pass)">${zap.passed ?? '?'} passed</b>, <b>${zap.warn ?? '?'} warnings</b>, <b style="color:${zap.fail ? 'var(--fail)' : 'inherit'}">${zap.fail ?? '?'} failures</b></div>
+      ${zap.alerts.filter((a) => !a[0].startsWith('Informational')).map((a) => `<div>${esc(a[1])} ×${a[2]} <span class="note">(${esc(a[0])})</span></div>`).join('')}
+      <div><a href="${zap.report}" target="_blank">Open full ZAP report</a></div></div>` : '';
+  $('nfr').innerHTML = card('Performance — k6', 'k6', k6Body, k6[0]?.finished_at) + card('Security scan — OWASP ZAP', 'zap', zapBody, zap?.finished_at);
+  document.querySelectorAll('#nfr [data-run]').forEach((b) => b.onclick = () => run(b.dataset.run));
+}
+
+async function run(suite) {
+  try { await api('/api/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ suite }) }); }
+  catch (e) { showError(e.message); return; }
+  poll();
+}
+$('runAll').onclick = () => run('all');
+$('refresh').onclick = loadResults;
+$('q').oninput = renderTable; $('flt').onchange = renderTable;
+document.querySelectorAll('th[data-k]').forEach((th) => th.onclick = () => { sort = { k: th.dataset.k, dir: sort.k === th.dataset.k ? -sort.dir : 1 }; renderTable(); });
+
+async function poll() {
+  try { status = await api('/api/status'); } catch { return; }
+  const busy = status.current || status.queue.length;
+  if (busy) {
+    const id = status.current || status.queue[0];
+    $('liveWrap').classList.remove('hidden');
+    $('liveTitle').textContent = `— ${id}${status.queue.length ? ` (queued: ${status.queue.join(', ')})` : ''}`;
+    const el = $('live'); const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+    el.textContent = (status.suites[id]?.log || []).join('\n');
+    if (stick) el.scrollTop = el.scrollHeight;
+    render();
+    wasRunning = true;
+    setTimeout(poll, 1000);
+  } else if (wasRunning) {
+    wasRunning = false;
+    await loadResults();
+  }
+}
+
+loadResults().then(poll);
+</script>
+</body>
+</html>

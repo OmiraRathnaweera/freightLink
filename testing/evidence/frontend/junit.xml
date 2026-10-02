@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<testsuites name="vitest tests" tests="345" failures="0" errors="0" time="38.48909333">
-    <testsuite name="src/components/tests/Integration/Dropzone.test.jsx" timestamp="2026-10-02T16:34:43.492Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.145112833">
-        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; renders default dropzone prompt and formats message" time="0.085771209">
+<testsuites name="vitest tests" tests="345" failures="0" errors="0" time="37.091007047">
+    <testsuite name="src/components/tests/Integration/Dropzone.test.jsx" timestamp="2026-10-02T16:52:03.434Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.044010042">
+        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; renders default dropzone prompt and formats message" time="0.020487459">
         </testcase>
-        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; renders file preview and remove button when file is provided" time="0.024809334">
+        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; renders file preview and remove button when file is provided" time="0.004936792">
         </testcase>
-        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; calls onFileChange with null when remove button is clicked" time="0.009103875">
+        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; calls onFileChange with null when remove button is clicked" time="0.007858958">
         </testcase>
-        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; shows error message if file exceeds maxSizeMB" time="0.019236">
+        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; shows error message if file exceeds maxSizeMB" time="0.006392375">
         </testcase>
-        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; shows error message for unsupported file extensions" time="0.003880042">
+        <testcase classname="src/components/tests/Integration/Dropzone.test.jsx" name="Dropzone &gt; shows error message for unsupported file extensions" time="0.002765041">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" timestamp="2026-10-02T16:34:43.493Z" hostname="Nuwanthas-MacBook-Pro.local" tests="15" failures="0" errors="0" skipped="0" time="1.957802208">
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders loading skeletons while fetching agencies" time="0.070017625">
+    <testsuite name="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" timestamp="2026-10-02T16:52:03.434Z" hostname="Nuwanthas-MacBook-Pro.local" tests="15" failures="0" errors="0" skipped="0" time="2.154878584">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders loading skeletons while fetching agencies" time="0.0517085">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders ErrorState when agencies query fails" time="0.056090291">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders ErrorState when agencies query fails" time="0.067080542">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders empty state when no agencies are registered" time="0.028778375">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders empty state when no agencies are registered" time="0.019070917">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders registered agencies table with driver counts and details per Requirement 3" time="0.116966958">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders registered agencies table with driver counts and details per Requirement 3" time="0.111409875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; summary cards reflect system-wide totals distinct from the current page&apos;s row count" time="0.06155125">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; summary cards reflect system-wide totals distinct from the current page&apos;s row count" time="0.097394125">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; displays dispatch rule indicating trip dispatch authority belongs only to agencies" time="0.018735458">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; displays dispatch rule indicating trip dispatch authority belongs only to agencies" time="0.03455775">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; debounces search input before sending it to the API, and resets to page 1" time="0.278688375">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; debounces search input before sending it to the API, and resets to page 1" time="0.1805285">
             <system-err>
 An update to AdminAgenciesDashboard inside a test was not wrapped in act(...).
 
@@ -40,517 +40,517 @@ This ensures that you&apos;re testing the behavior the user would see in the bro
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; sends the selected status filter to the API and resets to page 1" time="0.063996958">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; sends the selected status filter to the API and resets to page 1" time="0.054076167">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders pagination controls and requests the next page on click" time="0.151892042">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; renders pagination controls and requests the next page on click" time="0.131690625">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; keeps the fleet inspection drawer open for the selected agency after the page changes" time="0.237680792">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin View &gt; keeps the fleet inspection drawer open for the selected agency after the page changes" time="0.154652459">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — AgencyStaff View &gt; routes AgencyStaff to AgencyProfilePage (compliance docs, vehicles, profile)" time="0.002318458">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — AgencyStaff View &gt; routes AgencyStaff to AgencyProfilePage (compliance docs, vehicles, profile)" time="0.003761458">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; offers Reactivate (not Suspend) for a suspended agency" time="0.057380958">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; offers Reactivate (not Suspend) for a suspended agency" time="0.045206875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; offers Suspend (not Reactivate) for an active agency" time="0.070267791">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; offers Suspend (not Reactivate) for an active agency" time="0.030440625">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; requires a reason, then reactivates the agency to Active" time="0.555463583">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; requires a reason, then reactivates the agency to Active" time="0.769825833">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; keeps the dialog open and shows the server error when the change is rejected" time="0.184347833">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" timestamp="2026-10-02T16:34:43.494Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.6913485">
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" name="AgencyProfilePage &gt; renders agency identity banner and compliance metrics" time="0.200878708">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" name="AgencyProfilePage &gt; renders all compliance document category cards instead of a dropdown" time="0.272375959">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" name="AgencyProfilePage &gt; opens upload modal when &quot;Upload Document&quot; button on an unuploaded card is clicked" time="0.215663208">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx" name="AgenciesPage — Admin status changes (issue #56) &gt; keeps the dialog open and shows the server error when the change is rejected" time="0.399599375">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" timestamp="2026-10-02T16:34:43.494Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.735454917">
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; redirects unauthorized non-admin user" time="0.034434083">
+    <testsuite name="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" timestamp="2026-10-02T16:52:03.435Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.4727595">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" name="AgencyProfilePage &gt; renders agency identity banner and compliance metrics" time="0.122402541">
+        </testcase>
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" name="AgencyProfilePage &gt; renders all compliance document category cards instead of a dropdown" time="0.182552209">
+        </testcase>
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx" name="AgencyProfilePage &gt; opens upload modal when &quot;Upload Document&quot; button on an unuploaded card is clicked" time="0.165581834">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" timestamp="2026-10-02T16:52:03.435Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.948850208">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; redirects unauthorized non-admin user" time="0.021348125">
             <system-err>
 No routes matched location &quot;/unauthorized&quot; 
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; renders pending agencies and compliance documents table" time="0.160330834">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; renders pending agencies and compliance documents table" time="0.458445333">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; hides all action buttons immediately when doc Verify button is clicked" time="0.224750416">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; hides all action buttons immediately when doc Verify button is clicked" time="0.224332875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; hides all action buttons immediately when doc Reject button is clicked" time="0.17478975">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; hides all action buttons immediately when doc Reject button is clicked" time="0.089314958">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; opens document with target=&quot;popup&quot; and window.open on click" time="0.1391805">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" timestamp="2026-10-02T16:34:43.495Z" hostname="Nuwanthas-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="2.35832175">
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; renders roster metrics and driver list correctly" time="0.285708834">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; filters drivers by search text query" time="0.239506958">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; renders empty state when no drivers are onboarded" time="0.071018042">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; opens add driver drawer when &quot;Add Driver&quot; is clicked" time="0.328413083">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; validates fields and prevents submit on empty fields" time="0.333927875">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; submits a valid new-driver form and calls addDriverMutation" time="0.939582458">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; removes an Active driver from the roster when its status is changed to Inactive" time="0.05937825">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; reinstates an Inactive driver when its status is changed to Active" time="0.065897166">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; disables the status action for a driver who is OnTrip" time="0.0294735">
+        <testcase classname="src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx" name="AgencyVerificationPage &gt; opens document with target=&quot;popup&quot; and window.open on click" time="0.1489715">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" timestamp="2026-10-02T16:34:43.495Z" hostname="Nuwanthas-MacBook-Pro.local" tests="16" failures="0" errors="0" skipped="0" time="5.949265792">
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; renders fleet metrics and vehicle list correctly" time="0.444436292">
+    <testsuite name="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" timestamp="2026-10-02T16:52:03.436Z" hostname="Nuwanthas-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="2.236302792">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; renders roster metrics and driver list correctly" time="0.255511042">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; filters vehicles by search text query" time="0.190237292">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; filters drivers by search text query" time="0.219123958">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; renders empty state when no vehicles are registered" time="0.145427125">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; renders empty state when no drivers are onboarded" time="0.076714709">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; opens add vehicle drawer when &quot;Add New Vehicle&quot; is clicked" time="0.379658458">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; opens add driver drawer when &quot;Add Driver&quot; is clicked" time="0.127884666">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; validates fields in advance using Formik and Yup and prevents submit on empty fields" time="0.442415292">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; validates fields and prevents submit on empty fields" time="0.212526459">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; enforces type-based capacity limits dynamically based on vehicle type selection" time="0.825933667">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; submits a valid new-driver form and calls addDriverMutation" time="0.790032084">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; rejects invalid non-Sri Lankan vehicle registration numbers and prevents submit" time="0.320955833">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; removes an Active driver from the roster when its status is changed to Inactive" time="0.316787833">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; submits valid form successfully and calls addVehicleMutation" time="0.392712625">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; reinstates an Inactive driver when its status is changed to Active" time="0.117741583">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; surfaces backend validation errors onto the specific form fields" time="0.493449375">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; displays top-level alert banner when backend throws non-validation error" time="0.598401208">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; displays user-friendly alert message when backend throws VehicleType conversion error" time="0.544446667">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; edits a vehicle using prefilled values and the update API" time="0.493444708">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; shows a registration conflict on the edit field" time="0.263947792">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; changes availability and confirms retirement before submitting" time="0.219312083">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; uses backend statuses in filters and locks OnTrip or Retired row actions" time="0.122869333">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; does not expose vehicle mutations to Admin web users" time="0.068130708">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx" name="FleetDriversPage &gt; disables the status action for a driver who is OnTrip" time="0.115560125">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agencies/tests/Unit/api/vehicleApi.test.js" timestamp="2026-10-02T16:34:43.496Z" hostname="Nuwanthas-MacBook-Pro.local" tests="2" failures="0" errors="0" skipped="0" time="0.001794541">
-        <testcase classname="src/features/agencies/tests/Unit/api/vehicleApi.test.js" name="vehicle management API &gt; updates editable details without sending vehicle status" time="0.00098825">
+    <testsuite name="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" timestamp="2026-10-02T16:52:03.436Z" hostname="Nuwanthas-MacBook-Pro.local" tests="16" failures="0" errors="0" skipped="0" time="6.329546917">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; renders fleet metrics and vehicle list correctly" time="0.321720875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/api/vehicleApi.test.js" name="vehicle management API &gt; uses the dedicated status endpoint with the backend wire value" time="0.00017975">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; filters vehicles by search text query" time="0.222373583">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" timestamp="2026-10-02T16:34:43.496Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.004160334">
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; lets a suspended agency be reactivated" time="0.000754875">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; renders empty state when no vehicles are registered" time="0.042452">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; lets an active agency be suspended" time="0.000081042">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; opens add vehicle drawer when &quot;Add New Vehicle&quot; is clicked" time="0.165943541">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; does not let a pending agency skip verification" time="0.000060083">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; validates fields in advance using Formik and Yup and prevents submit on empty fields" time="0.159727166">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; has no terminal status" time="0.000121291">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; enforces type-based capacity limits dynamically based on vehicle type selection" time="1.150848458">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; returns no transitions for an unknown status" time="0.000265875">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; rejects invalid non-Sri Lankan vehicle registration numbers and prevents submit" time="0.515082875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agencyStatusChangeSchema &gt; requires a non-blank reason" time="0.0012895">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; submits valid form successfully and calls addVehicleMutation" time="0.38526075">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agencyStatusChangeSchema &gt; rejects a reason over 500 characters" time="0.000468959">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; surfaces backend validation errors onto the specific form fields" time="0.568801875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agencyStatusChangeSchema &gt; accepts and trims a valid reason" time="0.000267958">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; displays top-level alert banner when backend throws non-validation error" time="1.215848667">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:34:43.497Z" hostname="Nuwanthas-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.059145792">
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; validates a correct vehicle registration payload" time="0.0372875">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; displays user-friendly alert message when backend throws VehicleType conversion error" time="0.411959875">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; rejects missing or invalid vehicleType" time="0.00239025">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; edits a vehicle using prefilled values and the update API" time="0.390489375">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; Sri Lankan vehicle registration number pattern &gt; accepts valid Sri Lankan registration patterns" time="0.001580833">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; shows a registration conflict on the edit field" time="0.1907">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; Sri Lankan vehicle registration number pattern &gt; rejects empty, malformed, or non-Sri Lankan registration numbers" time="0.003225583">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; changes availability and confirms retirement before submitting" time="0.414226917">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Lorry capacity limits (up to 10,000 kg)" time="0.003815834">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; uses backend statuses in filters and locks OnTrip or Retired row actions" time="0.1531555">
         </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Container capacity limits (10,000 – 100,000 kg)" time="0.0011795">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Refrigerated capacity limits (up to 25,000 kg)" time="0.0062965">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Flatbed capacity limits (up to 50,000 kg)" time="0.000367959">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Tipper capacity limits (up to 30,000 kg)" time="0.000530542">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; rejects volumeM3 that is non-numeric, zero, negative, or exceeds limit" time="0.00047775">
-        </testcase>
-        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="updateVehicleSchema &gt; accepts an unchanged legacy registration but validates a replacement plate" time="0.000427167">
+        <testcase classname="src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx" name="FleetVehiclesPage &gt; does not expose vehicle mutations to Admin web users" time="0.017786458">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" timestamp="2026-10-02T16:34:43.497Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.353278708">
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" name="AgentCallHistory &gt; does not fetch history until the section is opened" time="0.041917917">
+    <testsuite name="src/features/agencies/tests/Unit/api/vehicleApi.test.js" timestamp="2026-10-02T16:52:03.437Z" hostname="Nuwanthas-MacBook-Pro.local" tests="2" failures="0" errors="0" skipped="0" time="0.0018855">
+        <testcase classname="src/features/agencies/tests/Unit/api/vehicleApi.test.js" name="vehicle management API &gt; updates editable details without sending vehicle status" time="0.001055167">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" name="AgentCallHistory &gt; shows every past attempt with its steps and the rejected decision once opened" time="0.206542291">
-        </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" name="AgentCallHistory &gt; expands a step to reveal its individual tool calls" time="0.100534709">
+        <testcase classname="src/features/agencies/tests/Unit/api/vehicleApi.test.js" name="vehicle management API &gt; uses the dedicated status endpoint with the backend wire value" time="0.00017825">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" timestamp="2026-10-02T16:34:43.497Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.520338209">
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; renders recommendation details correctly" time="0.23902825">
+    <testsuite name="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" timestamp="2026-10-02T16:52:03.437Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.004146583">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; lets a suspended agency be reactivated" time="0.000785416">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; calls onApproveMatch when Approve Match button is clicked" time="0.046121708">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; lets an active agency be suspended" time="0.000085958">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; calls onRetryMatch when Retry Match button is clicked" time="0.056736542">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; does not let a pending agency skip verification" time="0.000068625">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; renders confirmed match state when load is already matched" time="0.024470291">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; has no terminal status" time="0.000126333">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; shows only a single Request Revision action once the recommendation has been rejected (Aborted)" time="0.043491875">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agency status transitions (issue #56) &gt; returns no transitions for an unknown status" time="0.000283416">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; calls onRetryMatch (a fresh trigger, not the decision endpoints) when Request Revision is clicked after rejection" time="0.074302959">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agencyStatusChangeSchema &gt; requires a non-blank reason" time="0.001177708">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; shows the single Request Revision action when no automatic match was found (Failed)" time="0.034185">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agencyStatusChangeSchema &gt; rejects a reason over 500 characters" time="0.000188958">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" timestamp="2026-10-02T16:34:43.498Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.1979025">
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="WorkflowStepper &gt; renders all 4 pipeline agents and their roles" time="0.056670541">
-        </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="WorkflowStepper &gt; never shows a step as Completed unless the backend actually reported it" time="0.010317375">
-        </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="ValidationChecklist &gt; renders recommendation status and checklist items" time="0.009989334">
-        </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="AlternateCandidatesList &gt; renders alternate candidates and triggers onSelectAgency" time="0.118697292">
+        <testcase classname="src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js" name="agencyStatusChangeSchema &gt; accepts and trims a valid reason" time="0.00010575">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" timestamp="2026-10-02T16:34:43.498Z" hostname="Nuwanthas-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.676322667">
-        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; renders page with workflow stepper, recommendation, and validation" time="0.151366583">
+    <testsuite name="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:52:03.437Z" hostname="Nuwanthas-MacBook-Pro.local" tests="11" failures="0" errors="0" skipped="0" time="0.039274917">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; validates a correct vehicle registration payload" time="0.026709625">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; triggers confirm match mutation when Approve button is clicked" time="0.348414708">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; rejects missing or invalid vehicleType" time="0.003700458">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; automatically triggers matching once when a load has no prior run, via an explicit command" time="0.074544416">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; Sri Lankan vehicle registration number pattern &gt; accepts valid Sri Lankan registration patterns" time="0.001092292">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; does not show an approvable recommendation card while matching has not actually run yet" time="0.035553625">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; Sri Lankan vehicle registration number pattern &gt; rejects empty, malformed, or non-Sri Lankan registration numbers" time="0.001028459">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; shows only the agent call history, not the live decision UI, once the load is already Matched" time="0.045675208">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Lorry capacity limits (up to 10,000 kg)" time="0.000367167">
         </testcase>
-        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; shows only the focused workflow run view when ?workflowRunId= is present, not the live UI or the history list" time="0.015341375">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Container capacity limits (10,000 – 100,000 kg)" time="0.000308583">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" timestamp="2026-10-02T16:34:43.498Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.178307541">
-        <testcase classname="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" name="AdminAnalyticsPage &gt; renders the summary once loaded" time="0.11719775">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Refrigerated capacity limits (up to 25,000 kg)" time="0.000156875">
         </testcase>
-        <testcase classname="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" name="AdminAnalyticsPage &gt; shows a loading skeleton while the query is pending" time="0.054507334">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Flatbed capacity limits (up to 50,000 kg)" time="0.002187584">
         </testcase>
-        <testcase classname="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" name="AdminAnalyticsPage &gt; shows an error state with a retry action when the query fails" time="0.004955209">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; vehicle type weight limitations &gt; enforces Tipper capacity limits (up to 30,000 kg)" time="0.00085625">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" timestamp="2026-10-02T16:34:43.498Z" hostname="Nuwanthas-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.361599625">
-        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — missing token &gt; shows a missing-token message and never calls the API when no token is present" time="0.036486083">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="addVehicleSchema &gt; rejects volumeM3 that is non-numeric, zero, negative, or exceeds limit" time="0.001150458">
         </testcase>
-        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — API integration &gt; does not call the API until the user clicks Confirm response" time="0.15934375">
-        </testcase>
-        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — API integration &gt; calls respondToAssignmentAction with the token and shows an Accepted success state with a trip-created note" time="0.066783292">
-        </testcase>
-        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — API integration &gt; shows a Declined success state without the trip-created note" time="0.0576685">
-        </testcase>
-        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — error state &gt; shows the backend error message when the token is invalid or expired" time="0.019773375">
-        </testcase>
-        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — error state &gt; falls back to a generic expired-link message when the rejected error has no message" time="0.016265625">
+        <testcase classname="src/features/agencies/tests/Unit/lib/validationSchemas.test.js" name="updateVehicleSchema &gt; accepts an unchanged legacy registration but validates a replacement plate" time="0.000405084">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" timestamp="2026-10-02T16:34:43.499Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.566949458">
-        <testcase classname="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" name="YardLocationPicker &gt; renders search input, address input, use current location button, and coordinate inputs" time="0.263178292">
+    <testsuite name="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" timestamp="2026-10-02T16:52:03.438Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.342403167">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" name="AgentCallHistory &gt; does not fetch history until the section is opened" time="0.069315666">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" name="YardLocationPicker &gt; triggers geolocation on &quot;Use Current Location&quot; button click and updates location" time="0.156893667">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" name="AgentCallHistory &gt; shows every past attempt with its steps and the rejected decision once opened" time="0.177013625">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" name="YardLocationPicker &gt; updates address when typing directly into the address input" time="0.144603792">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" timestamp="2026-10-02T16:34:43.499Z" hostname="Nuwanthas-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="1.789066625">
-        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Profile section &gt; pre-fills fields from the signed-in user" time="0.125960708">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Profile section &gt; saves the edited profile, updates Redux, and shows a success toast" time="0.476362167">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Profile section &gt; shows the backend error message when the update fails" time="0.056479">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Password section &gt; blocks submission and shows validation errors for empty fields" time="0.224548417">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Password section &gt; changes the password and signs the user out locally on success" time="0.62551525">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Password section &gt; shows the backend error message for an incorrect current password" time="0.276459291">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx" name="AgentCallHistory &gt; expands a step to reveal its individual tool calls" time="0.093905084">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" timestamp="2026-10-02T16:34:43.499Z" hostname="Nuwanthas-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="5.446936125">
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Role Selection &gt; renders account type options when no role is in the URL" time="0.30863425">
+    <testsuite name="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" timestamp="2026-10-02T16:52:03.438Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.416952958">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; renders recommendation details correctly" time="0.208298875">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; renders the shipper form with all expected fields" time="0.167979834">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; calls onApproveMatch when Approve Match button is clicked" time="0.047934459">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; validates every input in advance and blocks submission on empty fields" time="0.224613334">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; calls onRetryMatch when Retry Match button is clicked" time="0.058927542">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; validates password requirements and phone format in advance" time="0.591767959">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; renders confirmed match state when load is already matched" time="0.035152833">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; submits valid shipper payload successfully and shows success toast" time="1.244068791">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; shows only a single Request Revision action once the recommendation has been rejected (Aborted)" time="0.021596458">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; calls onRetryMatch (a fresh trigger, not the decision endpoints) when Request Revision is clicked after rejection" time="0.030788333">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx" name="MatchRecommendationCard &gt; shows the single Request Revision action when no automatic match was found (Failed)" time="0.011832208">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" timestamp="2026-10-02T16:52:03.438Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.184736834">
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="WorkflowStepper &gt; renders all 4 pipeline agents and their roles" time="0.041749084">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="WorkflowStepper &gt; never shows a step as Completed unless the backend actually reported it" time="0.005075083">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="ValidationChecklist &gt; renders recommendation status and checklist items" time="0.008005334">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx" name="AlternateCandidatesList &gt; renders alternate candidates and triggers onSelectAgency" time="0.126895917">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" timestamp="2026-10-02T16:52:03.439Z" hostname="Nuwanthas-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.61565975">
+        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; renders page with workflow stepper, recommendation, and validation" time="0.166799125">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; triggers confirm match mutation when Approve button is clicked" time="0.302728875">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; automatically triggers matching once when a load has no prior run, via an explicit command" time="0.028738166">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; does not show an approvable recommendation card while matching has not actually run yet" time="0.052931708">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; shows only the agent call history, not the live decision UI, once the load is already Matched" time="0.039070833">
+        </testcase>
+        <testcase classname="src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx" name="AgentWorkflowConsolePage &gt; shows only the focused workflow run view when ?workflowRunId= is present, not the live UI or the history list" time="0.020415709">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" timestamp="2026-10-02T16:52:03.439Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.069936208">
+        <testcase classname="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" name="AdminAnalyticsPage &gt; renders the summary once loaded" time="0.061704166">
+        </testcase>
+        <testcase classname="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" name="AdminAnalyticsPage &gt; shows a loading skeleton while the query is pending" time="0.003509709">
+        </testcase>
+        <testcase classname="src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx" name="AdminAnalyticsPage &gt; shows an error state with a retry action when the query fails" time="0.003470708">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" timestamp="2026-10-02T16:52:03.439Z" hostname="Nuwanthas-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="0.245207875">
+        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — missing token &gt; shows a missing-token message and never calls the API when no token is present" time="0.051225167">
+        </testcase>
+        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — API integration &gt; does not call the API until the user clicks Confirm response" time="0.102032667">
+        </testcase>
+        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — API integration &gt; calls respondToAssignmentAction with the token and shows an Accepted success state with a trip-created note" time="0.038488042">
+        </testcase>
+        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — API integration &gt; shows a Declined success state without the trip-created note" time="0.0179775">
+        </testcase>
+        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — error state &gt; shows the backend error message when the token is invalid or expired" time="0.015272292">
+        </testcase>
+        <testcase classname="src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx" name="AssignmentActionPage — error state &gt; falls back to a generic expired-link message when the rejected error has no message" time="0.01758575">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" timestamp="2026-10-02T16:52:03.440Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.4245365">
+        <testcase classname="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" name="YardLocationPicker &gt; renders search input, address input, use current location button, and coordinate inputs" time="0.199820042">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" name="YardLocationPicker &gt; triggers geolocation on &quot;Use Current Location&quot; button click and updates location" time="0.131837709">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx" name="YardLocationPicker &gt; updates address when typing directly into the address input" time="0.084314166">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" timestamp="2026-10-02T16:52:03.440Z" hostname="Nuwanthas-MacBook-Pro.local" tests="6" failures="0" errors="0" skipped="0" time="1.3326795">
+        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Profile section &gt; pre-fills fields from the signed-in user" time="0.058748583">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Profile section &gt; saves the edited profile, updates Redux, and shows a success toast" time="0.456003708">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Profile section &gt; shows the backend error message when the update fails" time="0.047865">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Password section &gt; blocks submission and shows validation errors for empty fields" time="0.102441208">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Password section &gt; changes the password and signs the user out locally on success" time="0.440240333">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx" name="AccountSettingsPage — Password section &gt; shows the backend error message for an incorrect current password" time="0.223938959">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" timestamp="2026-10-02T16:52:03.440Z" hostname="Nuwanthas-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="6.2337835">
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Role Selection &gt; renders account type options when no role is in the URL" time="0.232731333">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; renders the shipper form with all expected fields" time="0.160037042">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; validates every input in advance and blocks submission on empty fields" time="0.14758275">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; validates password requirements and phone format in advance" time="0.278915209">
+        </testcase>
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; submits valid shipper payload successfully and shows success toast" time="1.605687417">
             <system-err>
 No routes matched location &quot;/verify-email?email=undefined&quot; 
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; surfaces backend validation errors onto the specific form fields" time="0.552163083">
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Shipper Registration Form &gt; surfaces backend validation errors onto the specific form fields" time="0.543221083">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; renders all agency and yard inputs" time="0.105595458">
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; renders all agency and yard inputs" time="0.156508125">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; validates every agency input in advance" time="0.119994458">
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; validates every agency input in advance" time="0.206433542">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; validates yard coordinate limits in advance" time="0.197189417">
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; validates yard coordinate limits in advance" time="0.4437105">
         </testcase>
-        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; submits valid agency payload successfully and navigates" time="1.93104275">
+        <testcase classname="src/features/auth/tests/Integration/pages/RegisterPage.test.jsx" name="RegisterPage — Agency Registration Form &gt; submits valid agency payload successfully and navigates" time="2.45613575">
             <system-err>
 No routes matched location &quot;/verify-email?email=undefined&quot; 
 
             </system-err>
         </testcase>
     </testsuite>
-    <testsuite name="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" timestamp="2026-10-02T16:34:43.500Z" hostname="Nuwanthas-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.004130625">
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 1. Role Enum Parity with Backend &amp; Mobile &gt; defines exactly the 4 standard system roles with matching casing" time="0.000932083">
+    <testsuite name="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" timestamp="2026-10-02T16:52:03.441Z" hostname="Nuwanthas-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="0.004529542">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 1. Role Enum Parity with Backend &amp; Mobile &gt; defines exactly the 4 standard system roles with matching casing" time="0.00102925">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 2. Contract Parity: CurrentUserResponseDto to Redux State &gt; populates user, role, and isAuthenticated identical to mobile AuthUser" time="0.001170333">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 2. Contract Parity: CurrentUserResponseDto to Redux State &gt; populates user, role, and isAuthenticated identical to mobile AuthUser" time="0.001024333">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 2. Contract Parity: CurrentUserResponseDto to Redux State &gt; clears session when setUser(null) is dispatched" time="0.000170625">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 2. Contract Parity: CurrentUserResponseDto to Redux State &gt; clears session when setUser(null) is dispatched" time="0.000133875">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces Shipper permissions and role home (/loads)" time="0.000223709">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces Shipper permissions and role home (/loads)" time="0.000195125">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces AgencyStaff permissions and role home (/agencies)" time="0.000168209">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces AgencyStaff permissions and role home (/agencies)" time="0.000148458">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces Driver has no web UI per Requirement 1 (mobile application only)" time="0.000134458">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces Driver has no web UI per Requirement 1 (mobile application only)" time="0.000105375">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces Admin permissions across all management routes" time="0.000117875">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 3. Role-Based Route Gating Parity &gt; enforces Admin permissions across all management routes" time="0.00011075">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 4. Session &amp; Token Storage Cleanup on Logout/401 &gt; persists and clears refresh tokens in storage correctly" time="0.000224292">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 4. Session &amp; Token Storage Cleanup on Logout/401 &gt; persists and clears refresh tokens in storage correctly" time="0.000192875">
         </testcase>
-        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 4. Session &amp; Token Storage Cleanup on Logout/401 &gt; clearAuth synchronously resets auth state on 401 response interceptor trigger" time="0.000162291">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/features/auth/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:34:43.500Z" hostname="Nuwanthas-MacBook-Pro.local" tests="25" failures="0" errors="0" skipped="0" time="0.020936792">
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="loginSchema &gt; validates a valid login payload" time="0.001443625">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="loginSchema &gt; rejects an invalid email and short password" time="0.000564417">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates a fully valid shipper payload" time="0.000895">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; allows optional fields (phoneE164, businessRegNo) to be empty strings or undefined" time="0.000642666">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires fullName" time="0.000344167">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires email" time="0.000166">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires password" time="0.000735209">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires companyName" time="0.0003355">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires billingAddress" time="0.000179209">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; enforces strong password criteria" time="0.000782792">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates E.164 phone format when provided" time="0.000147333">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates fullName length and allowed characters" time="0.000154292">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates billingAddress minimum length" time="0.000194833">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; validates a fully valid agency payload" time="0.000298459">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; allows optional fields (phoneE164, jobTitle) to be empty strings" time="0.000523834">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires fullName" time="0.000553166">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires email" time="0.000260125">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires password" time="0.000355666">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires agencyName" time="0.000273709">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires businessRegNo" time="0.000337125">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires yardAddress" time="0.000275625">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires yardLat" time="0.000402625">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires yardLng" time="0.000135042">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; validates coordinate boundaries" time="0.009260042">
-        </testcase>
-        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; rejects non-numeric coordinates" time="0.000425125">
+        <testcase classname="src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js" name="Cross-Platform Auth &amp; Session Consistency (Y3S01-103) &gt; 4. Session &amp; Token Storage Cleanup on Logout/401 &gt; clearAuth synchronously resets auth state on 401 response interceptor trigger" time="0.000149166">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" timestamp="2026-10-02T16:34:43.501Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.231906542">
-        <testcase classname="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" name="invoice mutation hooks — cache invalidation &gt; useIssueInvoiceMutation invalidates the invoice list, its detail, and the summary" time="0.081740583">
+    <testsuite name="src/features/auth/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:52:03.441Z" hostname="Nuwanthas-MacBook-Pro.local" tests="25" failures="0" errors="0" skipped="0" time="0.009461042">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="loginSchema &gt; validates a valid login payload" time="0.003418167">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" name="invoice mutation hooks — cache invalidation &gt; useVoidInvoiceMutation invalidates the invoice list, its detail, and the summary" time="0.073133583">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="loginSchema &gt; rejects an invalid email and short password" time="0.000643084">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" name="invoice mutation hooks — cache invalidation &gt; useConfirmPaymentMutation invalidates the invoice list, its detail, and the summary" time="0.074662958">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates a fully valid shipper payload" time="0.00031025">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx" timestamp="2026-10-02T16:34:43.502Z" hostname="Nuwanthas-MacBook-Pro.local" tests="2" failures="0" errors="0" skipped="0" time="0.216443459">
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx" name="InvoiceCashflowDashboard &gt; renders an ErrorState with retry on failure — no fabricated totals" time="0.172698083">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; allows optional fields (phoneE164, businessRegNo) to be empty strings or undefined" time="0.000228834">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx" name="InvoiceCashflowDashboard &gt; renders totals, per-status counts, and recent activity with no action buttons anywhere" time="0.041428083">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires fullName" time="0.000241">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" timestamp="2026-10-02T16:34:43.502Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.543423958">
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; lists only the eligible (Delivered, uninvoiced) trips fetched via hasInvoice: false" time="0.122942292">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires email" time="0.000135125">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; rejects submission with no trip selected and no amount" time="0.045380583">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires password" time="0.000197167">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; pre-fills the amount from the selected trip’s agreed price and shows the shipper name" time="0.132389084">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires companyName" time="0.000144542">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; submits {tripId, amount, notes, issueImmediately} with no lineItems/currency/discount/dueDate" time="0.052746083">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; requires billingAddress" time="0.000154208">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; lets Agency Staff override the pre-filled amount before submitting" time="0.112876708">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; enforces strong password criteria" time="0.000487708">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — edit mode &gt; has no trip picker and pre-fills the amount from the existing invoice" time="0.035878709">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates E.164 phone format when provided" time="0.000122375">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — edit mode &gt; submits only {amount, notes} on save, scoped to the invoice id" time="0.038323166">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates fullName length and allowed characters" time="0.000106042">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" timestamp="2026-10-02T16:34:43.502Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.068598541">
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Draft&quot;" time="0.036914334">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="shipperRegisterSchema &gt; validates billingAddress minimum length" time="0.00010975">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Issued&quot;" time="0.007116833">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; validates a fully valid agency payload" time="0.000194208">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;PaymentPending&quot;" time="0.00380125">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; allows optional fields (phoneE164, jobTitle) to be empty strings" time="0.000094792">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Paid&quot;" time="0.010554125">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires fullName" time="0.000179416">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Failed&quot;" time="0.002631833">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires email" time="0.00012075">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Void&quot;" time="0.002837208">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires password" time="0.000142333">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; does not reference invented statuses that the backend never returns" time="0.001293458">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires agencyName" time="0.000096083">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; falls back to a neutral style for an unrecognized status rather than throwing" time="0.00159975">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires businessRegNo" time="0.000116459">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" timestamp="2026-10-02T16:34:43.502Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.8595525">
-        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — error state (no mock fallback) &gt; renders a real ErrorState, not fabricated invoices, when the query fails" time="0.091471292">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires yardAddress" time="0.000100917">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — empty state (no mock fallback) &gt; renders the real empty state, not fabricated invoices, on a genuinely empty list" time="0.066398625">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires yardLat" time="0.000110917">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — list rendering &amp; role gating &gt; renders invoice rows with their real status, and offers Create/Edit/Issue/Void for Agency Staff" time="0.333404916">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; requires yardLng" time="0.000083541">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — list rendering &amp; role gating &gt; hides Create Invoice for a Shipper and never shows a Draft invoice to them" time="0.061522875">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; validates coordinate boundaries" time="0.000359208">
         </testcase>
-        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — list rendering &amp; role gating &gt; renders the read-only cashflow dashboard for Admin with no action buttons, and no Create Invoice control" time="0.303604791">
+        <testcase classname="src/features/auth/tests/Unit/lib/validationSchemas.test.js" name="agencyRegisterSchema &gt; rejects non-numeric coordinates" time="0.000129917">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" timestamp="2026-10-02T16:34:43.503Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="2.638831">
-        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; renders the admin disputes table with all core columns and initial data" time="0.297471584">
+    <testsuite name="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" timestamp="2026-10-02T16:52:03.442Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.206829084">
+        <testcase classname="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" name="invoice mutation hooks — cache invalidation &gt; useIssueInvoiceMutation invalidates the invoice list, its detail, and the summary" time="0.087997708">
         </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; renders state-specific action buttons strictly adhering to lifecycle rules" time="0.36986075">
+        <testcase classname="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" name="invoice mutation hooks — cache invalidation &gt; useVoidInvoiceMutation invalidates the invoice list, its detail, and the summary" time="0.055509166">
         </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; triggers startReviewMutation when &quot;Start Review&quot; is clicked" time="0.254932375">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; opens Resolution Modal when &quot;Resolve Dispute&quot; is clicked and requires non-empty resolution note" time="1.393672833">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; opens read-only View Resolution modal when &quot;View Resolution&quot; is clicked on a resolved dispute" time="0.31878725">
+        <testcase classname="src/features/billing/tests/Integration/api/invoiceApi.test.jsx" name="invoice mutation hooks — cache invalidation &gt; useConfirmPaymentMutation invalidates the invoice list, its detail, and the summary" time="0.058546459">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" timestamp="2026-10-02T16:34:43.503Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="1.884231791">
-        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; renders only the role-scoped dispute response and its claimant/status context" time="0.185795">
+    <testsuite name="src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx" timestamp="2026-10-02T16:52:03.442Z" hostname="Nuwanthas-MacBook-Pro.local" tests="2" failures="0" errors="0" skipped="0" time="0.15458175">
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx" name="InvoiceCashflowDashboard &gt; renders an ErrorState with retry on failure — no fabricated totals" time="0.119954208">
         </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; validates a raise form and sends the fixed backend category and trip reference" time="0.962136916">
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx" name="InvoiceCashflowDashboard &gt; renders totals, per-status counts, and recent activity with no action buttons anywhere" time="0.033398584">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" timestamp="2026-10-02T16:52:03.443Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.474453542">
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; lists only the eligible (Delivered, uninvoiced) trips fetched via hasInvoice: false" time="0.161577417">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; rejects submission with no trip selected and no amount" time="0.07078875">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; pre-fills the amount from the selected trip’s agreed price and shows the shipper name" time="0.0583515">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; submits {tripId, amount, notes, issueImmediately} with no lineItems/currency/discount/dueDate" time="0.066092541">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — create mode (trip-linked, single amount) &gt; lets Agency Staff override the pre-filled amount before submitting" time="0.087476792">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — edit mode &gt; has no trip picker and pre-fills the amount from the existing invoice" time="0.00608025">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx" name="InvoiceFormModal — edit mode &gt; submits only {amount, notes} on save, scoped to the invoice id" time="0.020877042">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" timestamp="2026-10-02T16:52:03.443Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.021876292">
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Draft&quot;" time="0.013382541">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Issued&quot;" time="0.00152725">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;PaymentPending&quot;" time="0.000993334">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Paid&quot;" time="0.000837209">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Failed&quot;" time="0.000859042">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; renders the real backend status &quot;Void&quot;" time="0.000671334">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; does not reference invented statuses that the backend never returns" time="0.000508792">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx" name="InvoiceStatusBadge &gt; falls back to a neutral style for an unrecognized status rather than throwing" time="0.000664875">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" timestamp="2026-10-02T16:52:03.443Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="1.026449417">
+        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — error state (no mock fallback) &gt; renders a real ErrorState, not fabricated invoices, when the query fails" time="0.264720125">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — empty state (no mock fallback) &gt; renders the real empty state, not fabricated invoices, on a genuinely empty list" time="0.042505416">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — list rendering &amp; role gating &gt; renders invoice rows with their real status, and offers Create/Edit/Issue/Void for Agency Staff" time="0.45797475">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — list rendering &amp; role gating &gt; hides Create Invoice for a Shipper and never shows a Draft invoice to them" time="0.132177083">
+        </testcase>
+        <testcase classname="src/features/billing/tests/Integration/pages/BillingPage.test.jsx" name="BillingPage — list rendering &amp; role gating &gt; renders the read-only cashflow dashboard for Admin with no action buttons, and no Create Invoice control" time="0.125842208">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" timestamp="2026-10-02T16:52:03.444Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="2.480815375">
+        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; renders the admin disputes table with all core columns and initial data" time="0.231988375">
+        </testcase>
+        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; renders state-specific action buttons strictly adhering to lifecycle rules" time="0.303295458">
+        </testcase>
+        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; triggers startReviewMutation when &quot;Start Review&quot; is clicked" time="0.164150125">
+        </testcase>
+        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; opens Resolution Modal when &quot;Resolve Dispute&quot; is clicked and requires non-empty resolution note" time="1.238842917">
+        </testcase>
+        <testcase classname="src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx" name="AdminDisputesPage — Rendering &amp; Lifecycle Rules (Y3S01-81) &gt; opens read-only View Resolution modal when &quot;View Resolution&quot; is clicked on a resolved dispute" time="0.540616958">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" timestamp="2026-10-02T16:52:03.444Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="1.423179875">
+        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; renders only the role-scoped dispute response and its claimant/status context" time="0.092759417">
+        </testcase>
+        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; validates a raise form and sends the fixed backend category and trip reference" time="0.698759875">
             <system-err>
 No routes matched location &quot;/my-disputes/dispute-new&quot; 
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; shows the active-duplicate rejection as a claimant-friendly form error" time="0.701420958">
+        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; shows the active-duplicate rejection as a claimant-friendly form error" time="0.552918958">
         </testcase>
-        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; renders a final resolution without any Admin review or resolve controls" time="0.031533292">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/features/disputes/tests/Unit/lib/disputeRules.test.js" timestamp="2026-10-02T16:34:43.503Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.003029708">
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; canStartReview &gt; returns true only for Raised status" time="0.000776792">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; canResolveDispute &gt; returns true only for UnderReview status (strict sequential progression)" time="0.000120459">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; isDisputeResolved &gt; returns true only for Resolved status" time="0.000082417">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; getStatusTone &gt; maps statuses to the appropriate design system tones" time="0.000174042">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; getStatusLabel &gt; returns user-friendly labels" time="0.000265292">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; validateResolutionPayload &gt; fails when resolution note is empty or whitespace only" time="0.00022075">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; validateResolutionPayload &gt; fails when resolution note is too short" time="0.000192666">
-        </testcase>
-        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; validateResolutionPayload &gt; passes when a meaningful resolution note is supplied" time="0.000150042">
+        <testcase classname="src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx" name="claimant dispute views &gt; renders a final resolution without any Admin review or resolve controls" time="0.07710275">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" timestamp="2026-10-02T16:34:43.504Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.705350708">
-        <testcase classname="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" name="CancelLoadDialog — validation &gt; requires a cancellation reason before submitting" time="0.311860167">
+    <testsuite name="src/features/disputes/tests/Unit/lib/disputeRules.test.js" timestamp="2026-10-02T16:52:03.444Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.002320375">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; canStartReview &gt; returns true only for Raised status" time="0.000821583">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" name="CancelLoadDialog — API integration &gt; submits the reason and closes on success" time="0.180644334">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; canResolveDispute &gt; returns true only for UnderReview status (strict sequential progression)" time="0.000097292">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" name="CancelLoadDialog — API integration &gt; shows an inline error and does not close when the mutation fails" time="0.211143625">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; isDisputeResolved &gt; returns true only for Resolved status" time="0.000080667">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" timestamp="2026-10-02T16:34:43.504Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.591425375">
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; shows Edit and Cancel for a Draft load" time="0.233368417">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; getStatusTone &gt; maps statuses to the appropriate design system tones" time="0.000096541">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; shows Edit and Cancel (but not Publish) for a Posted load" time="0.081403917">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; getStatusLabel &gt; returns user-friendly labels" time="0.000116583">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; hides Edit, Cancel and Publish for a Matched load" time="0.031730458">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; validateResolutionPayload &gt; fails when resolution note is empty or whitespace only" time="0.000097708">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; hides Edit, Cancel and Publish for a Delivered load (only View remains)" time="0.033861542">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; validateResolutionPayload &gt; fails when resolution note is too short" time="0.000091375">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; hides Edit, Cancel and Publish for a Cancelled load" time="0.034826625">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — non-Shipper roles never see mutating actions &gt; hides Edit/Cancel/Publish for an Admin viewing a Draft load" time="0.020261917">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — opening a mutating item mounts its dialog &gt; opens CancelLoadDialog when Cancel is clicked" time="0.094237666">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — opening a mutating item mounts its dialog &gt; opens PublishLoadDialog when Publish is clicked" time="0.059243667">
+        <testcase classname="src/features/disputes/tests/Unit/lib/disputeRules.test.js" name="Dispute State Machine Rules (Y3S01-81) &gt; validateResolutionPayload &gt; passes when a meaningful resolution note is supplied" time="0.000064416">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" timestamp="2026-10-02T16:34:43.504Z" hostname="Nuwanthas-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="0.396545208">
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders skeletons while the load is loading" time="0.034256916">
+    <testsuite name="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" timestamp="2026-10-02T16:52:03.444Z" hostname="Nuwanthas-MacBook-Pro.local" tests="3" failures="0" errors="0" skipped="0" time="0.564752">
+        <testcase classname="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" name="CancelLoadDialog — validation &gt; requires a cancellation reason before submitting" time="0.233918959">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders ErrorState with retry when the load fails to fetch" time="0.188816042">
+        <testcase classname="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" name="CancelLoadDialog — API integration &gt; submits the reason and closes on success" time="0.196554125">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders an EmptyState instead of the form for a non-editable status" time="0.010407334">
+        <testcase classname="src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx" name="CancelLoadDialog — API integration &gt; shows an inline error and does not close when the mutation fails" time="0.132562334">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders a role-specific EmptyState message for a non-Shipper role" time="0.002005792">
+    </testsuite>
+    <testsuite name="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" timestamp="2026-10-02T16:52:03.445Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.521287583">
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; shows Edit and Cancel for a Draft load" time="0.183819625">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; pre-fills the form fields from the loaded record" time="0.014783334">
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; shows Edit and Cancel (but not Publish) for a Posted load" time="0.07808475">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; renders the submit button" time="0.023294459">
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; hides Edit, Cancel and Publish for a Matched load" time="0.048410042">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; shows a Publish button only when the load is publishable" time="0.018279709">
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; hides Edit, Cancel and Publish for a Delivered load (only View remains)" time="0.031096">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; hides the Publish button once the load is Posted" time="0.008397292">
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — per-status action visibility (Shipper) &gt; hides Edit, Cancel and Publish for a Cancelled load" time="0.036919333">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — API integration &gt; calls the update mutation and shows a success toast" time="0.052253708">
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — non-Shipper roles never see mutating actions &gt; hides Edit/Cancel/Publish for an Admin viewing a Draft load" time="0.034624834">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — opening a mutating item mounts its dialog &gt; opens CancelLoadDialog when Cancel is clicked" time="0.046719625">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx" name="RowActionsMenu — opening a mutating item mounts its dialog &gt; opens PublishLoadDialog when Publish is clicked" time="0.058502041">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" timestamp="2026-10-02T16:52:03.445Z" hostname="Nuwanthas-MacBook-Pro.local" tests="10" failures="0" errors="0" skipped="0" time="0.370086958">
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders skeletons while the load is loading" time="0.030470042">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders ErrorState with retry when the load fails to fetch" time="0.11223025">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders an EmptyState instead of the form for a non-editable status" time="0.005497125">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — loading and error states &gt; renders a role-specific EmptyState message for a non-Shipper role" time="0.007705042">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; pre-fills the form fields from the loaded record" time="0.024368167">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; renders the submit button" time="0.026086708">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; shows a Publish button only when the load is publishable" time="0.02602525">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — rendering with existing values &gt; hides the Publish button once the load is Posted" time="0.0208705">
+        </testcase>
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — API integration &gt; calls the update mutation and shows a success toast" time="0.081216709">
             <system-err>
 No routes matched location &quot;/loads/load-1&quot; 
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — API integration &gt; shows a banner error when the update mutation fails" time="0.042284917">
+        <testcase classname="src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx" name="EditLoadPage — API integration &gt; shows a banner error when the update mutation fails" time="0.0331295">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" timestamp="2026-10-02T16:34:43.505Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.876787333">
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — loading state &gt; renders skeleton rows while the query is loading" time="0.088772458">
+    <testsuite name="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" timestamp="2026-10-02T16:52:03.445Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.998495666">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — loading state &gt; renders skeleton rows while the query is loading" time="0.076417584">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — error state &gt; renders ErrorState with a retry action when the query fails" time="0.107047584">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — error state &gt; renders ErrorState with a retry action when the query fails" time="0.227539584">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — empty state &gt; renders EmptyState when there are no loads" time="0.012973667">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — empty state &gt; renders EmptyState when there are no loads" time="0.014982167">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — empty state &gt; offers a &quot;Post a Load&quot; action for a Shipper" time="0.058339458">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — empty state &gt; offers a &quot;Post a Load&quot; action for a Shipper" time="0.081780125">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — empty state &gt; does not offer &quot;Post a Load&quot; for a non-Shipper role" time="0.030348125">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — empty state &gt; does not offer &quot;Post a Load&quot; for a non-Shipper role" time="0.166066083">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — list rendering &gt; renders a row per load with its reference, cargo and status badge" time="0.191112709">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — list rendering &gt; renders a row per load with its reference, cargo and status badge" time="0.094731667">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — list rendering &gt; shows Edit and Cancel for a Draft row but hides both for a Matched row" time="0.385224125">
+        <testcase classname="src/features/loads/tests/Integration/pages/LoadsPage.test.jsx" name="LoadsPage — list rendering &gt; shows Edit and Cancel for a Draft row but hides both for a Matched row" time="0.334679417">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" timestamp="2026-10-02T16:34:43.505Z" hostname="Nuwanthas-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="2.54517475">
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; renders the required create-load fields" time="0.127923083">
+    <testsuite name="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" timestamp="2026-10-02T16:52:03.446Z" hostname="Nuwanthas-MacBook-Pro.local" tests="9" failures="0" errors="0" skipped="0" time="2.369735542">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; renders the required create-load fields" time="0.096113708">
             <system-err>
 An update to Formik inside a test was not wrapped in act(...).
 
@@ -675,7 +675,7 @@ This ensures that you&apos;re testing the behavior the user would see in the bro
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; renders the postImmediately control on the create form" time="0.025685292">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; renders the postImmediately control on the create form" time="0.01861575">
             <system-err>
 An update to Formik inside a test was not wrapped in act(...).
 
@@ -800,7 +800,7 @@ This ensures that you&apos;re testing the behavior the user would see in the bro
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; renders the submit button" time="0.250678542">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; renders the submit button" time="0.250828375">
             <system-err>
 An update to Formik inside a test was not wrapped in act(...).
 
@@ -925,263 +925,263 @@ This ensures that you&apos;re testing the behavior the user would see in the bro
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; shows an EmptyState instead of the form for a non-Shipper role" time="0.014569167">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — rendering &gt; shows an EmptyState instead of the form for a non-Shipper role" time="0.010669667">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — client-side validation &gt; shows field-level errors when required fields are left blank" time="0.22119425">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — client-side validation &gt; shows field-level errors when required fields are left blank" time="0.143090041">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; calls the create mutation and navigates away on success" time="0.992553875">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; calls the create mutation and navigates away on success" time="0.507142083">
             <system-err>
 No routes matched location &quot;/loads/new-load-id&quot; 
 
             </system-err>
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; shows a banner error when the create mutation fails with a non-validation error" time="0.452424958">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; shows a banner error when the create mutation fails with a non-validation error" time="0.688160375">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; maps a VALIDATION_ERROR response onto the matching form fields" time="0.457183958">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; maps a VALIDATION_ERROR response onto the matching form fields" time="0.650980209">
         </testcase>
-        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; makes no real network calls — the API layer is fully mocked" time="0.000781291">
-        </testcase>
-    </testsuite>
-    <testsuite name="src/features/loads/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:34:43.506Z" hostname="Nuwanthas-MacBook-Pro.local" tests="23" failures="0" errors="0" skipped="0" time="0.00608275">
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; passes for a fully valid payload" time="0.001657333">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires cargoDescription" time="0.000581042">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires pickupAddress" time="0.000209042">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires dropoffAddress" time="0.0001635">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires pickupWindowStart" time="0.000152792">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires pickupWindowEnd" time="0.000135583">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires weightKg (empty numeric field reports &quot;required&quot;, not &quot;must be a number&quot;)" time="0.000263167">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires volumeM3 (empty numeric field reports &quot;required&quot;, not &quot;must be a number&quot;)" time="0.000167375">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a weight below the minimum" time="0.00017025">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a weight above the maximum" time="0.000181375">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a volume below the minimum" time="0.000139042">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a volume above the maximum" time="0.000113916">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; accepts weight/volume exactly at their boundary values" time="0.000200958">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a pickupWindowEnd that is before pickupWindowStart" time="0.000130792">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a pickupWindowEnd equal to pickupWindowStart" time="0.000126583">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; accepts a pickupWindowEnd after pickupWindowStart" time="0.000104208">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects identical pickup/dropoff coordinates" time="0.000119125">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; accepts pickup/dropoff coordinates that differ" time="0.000093167">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="editLoadSchema &gt; has no postImmediately field but otherwise enforces the same rules" time="0.000216792">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="editLoadSchema &gt; rejects identical pickup/dropoff coordinates" time="0.000118292">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="cancelLoadSchema &gt; requires a reason" time="0.000081834">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="cancelLoadSchema &gt; rejects a reason over 500 characters" time="0.00006975">
-        </testcase>
-        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="cancelLoadSchema &gt; accepts a valid reason" time="0.0000585">
+        <testcase classname="src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx" name="PostLoadPage — API integration &gt; makes no real network calls — the API layer is fully mocked" time="0.000822459">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" timestamp="2026-10-02T16:34:43.507Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="1.93554425">
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — component / list rendering &gt; renders the current fuel rate list" time="0.195359916">
+    <testsuite name="src/features/loads/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:52:03.446Z" hostname="Nuwanthas-MacBook-Pro.local" tests="23" failures="0" errors="0" skipped="0" time="0.006068542">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; passes for a fully valid payload" time="0.001618625">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — component / list rendering &gt; renders an empty state when there are no fuel rates" time="0.012272792">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires cargoDescription" time="0.000561667">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — error state &gt; shows an error state with a retry action when the fuel rates fetch fails" time="0.219136042">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires pickupAddress" time="0.000209292">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — form validation &gt; shows validation errors and does not submit when the Add Fuel Rate form is empty" time="0.110455334">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires dropoffAddress" time="0.000162417">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — API integration &gt; submits a valid fuel rate and calls the create mutation with the mapped payload" time="0.646572708">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires pickupWindowStart" time="0.000148834">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — API integration &gt; maps a backend VALIDATION_ERROR onto the matching form field" time="0.433263333">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires pickupWindowEnd" time="0.00012875">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — API integration &gt; shows a top-level banner for a non-validation backend error" time="0.315500666">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires weightKg (empty numeric field reports &quot;required&quot;, not &quot;must be a number&quot;)" time="0.000228833">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:34:43.507Z" hostname="Nuwanthas-MacBook-Pro.local" tests="22" failures="0" errors="0" skipped="0" time="0.010861958">
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; passes for a fully valid payload" time="0.002911125">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; requires volumeM3 (empty numeric field reports &quot;required&quot;, not &quot;must be a number&quot;)" time="0.000167625">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires fuelType" time="0.000899209">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a weight below the minimum" time="0.000169167">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires source" time="0.000373834">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a weight above the maximum" time="0.000175584">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; rejects a source over 500 characters" time="0.000325791">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a volume below the minimum" time="0.000135292">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires effectiveFrom" time="0.000376333">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a volume above the maximum" time="0.000110667">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires pricePerLitre (empty numeric field reports &quot;required&quot;, not &quot;must be a number&quot;)" time="0.000724708">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; accepts weight/volume exactly at their boundary values" time="0.000197291">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; rejects a pricePerLitre of zero (below the 0.01 minimum)" time="0.000456542">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a pickupWindowEnd that is before pickupWindowStart" time="0.000124875">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; accepts pricePerLitre exactly at the 0.01 minimum" time="0.000273042">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects a pickupWindowEnd equal to pickupWindowStart" time="0.000117875">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; rejects a non-numeric pricePerLitre" time="0.000393583">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; accepts a pickupWindowEnd after pickupWindowStart" time="0.000106">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; passes for a fully valid payload" time="0.000477041">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; rejects identical pickup/dropoff coordinates" time="0.000154458">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; requires classLabel" time="0.000294875">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="createLoadSchema &gt; accepts pickup/dropoff coordinates that differ" time="0.000096792">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; allows maxPayloadKg to be left blank for an open-ended top tier" time="0.000197833">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="editLoadSchema &gt; has no postImmediately field but otherwise enforces the same rules" time="0.000243958">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; rejects a maxPayloadKg that is not greater than minPayloadKg" time="0.000232917">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="editLoadSchema &gt; rejects identical pickup/dropoff coordinates" time="0.0001175">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; accepts a maxPayloadKg greater than minPayloadKg" time="0.00016225">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="cancelLoadSchema &gt; requires a reason" time="0.000078708">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; allows maxVolumeM3 to be left blank for an open-ended top tier" time="0.000161125">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="cancelLoadSchema &gt; rejects a reason over 500 characters" time="0.0000625">
         </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; rejects a maxVolumeM3 that is not greater than minVolumeM3" time="0.00024775">
-        </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; requires fuelConsumptionLPer100Km to be at least 0.01" time="0.000148666">
-        </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; passes for a fully valid payload" time="0.00015125">
-        </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; rejects a marginPercent above 1 (100%) — the field is a fraction, not a 0-100 percent" time="0.000109333">
-        </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; accepts marginPercent exactly at the 1 (100%) boundary" time="0.000080333">
-        </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; rejects a negative baseFare" time="0.000088542">
-        </testcase>
-        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; requires source and effectiveFrom" time="0.000141416">
+        <testcase classname="src/features/loads/tests/Unit/lib/validationSchemas.test.js" name="cancelLoadSchema &gt; accepts a valid reason" time="0.000051875">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" timestamp="2026-10-02T16:34:43.508Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.682850833">
-        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; renders with available assignments, vehicles, and drivers in dropdowns" time="0.25946325">
+    <testsuite name="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" timestamp="2026-10-02T16:52:03.447Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="2.2465865">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — component / list rendering &gt; renders the current fuel rate list" time="0.187126791">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; shows load preview card when an assignment is selected" time="0.09112825">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — component / list rendering &gt; renders an empty state when there are no fuel rates" time="0.010198959">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; submits the form with selected assignment, vehicle, and driver" time="0.226416458">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — error state &gt; shows an error state with a retry action when the fuel rates fetch fails" time="0.17775625">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; never offers manual ID entry — only the dropdown selectors, even with empty lists" time="0.103308083">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — form validation &gt; shows validation errors and does not submit when the Add Fuel Rate form is empty" time="0.09171575">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" timestamp="2026-10-02T16:34:43.509Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.587825958">
-        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; renders dialog with title, trip identifier and permanent warning note" time="0.351919791">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — API integration &gt; submits a valid fuel rate and calls the create mutation with the mapped payload" time="0.448360958">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; submits permanent deletion when confirmed" time="0.134841875">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — API integration &gt; maps a backend VALIDATION_ERROR onto the matching form field" time="0.631615583">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; closes dialog when Keep Trip or close icon is clicked" time="0.0661355">
-        </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; displays loading state while deletion is pending" time="0.022504958">
-        </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; displays error message if deletion fails" time="0.0093705">
+        <testcase classname="src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx" name="FuelRatesPage — API integration &gt; shows a top-level banner for a non-validation backend error" time="0.694424667">
         </testcase>
     </testsuite>
-    <testsuite name="src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx" timestamp="2026-10-02T16:34:43.509Z" hostname="Nuwanthas-MacBook-Pro.local" tests="2" failures="0" errors="0" skipped="0" time="0.082738875">
-        <testcase classname="src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx" name="TripEvidenceCard &gt; renders pending state when evidence is empty" time="0.047852125">
+    <testsuite name="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" timestamp="2026-10-02T16:52:03.448Z" hostname="Nuwanthas-MacBook-Pro.local" tests="22" failures="0" errors="0" skipped="0" time="0.006041042">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; passes for a fully valid payload" time="0.00181175">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx" name="TripEvidenceCard &gt; renders verified status when evidence items are present" time="0.033350208">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires fuelType" time="0.00048225">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" timestamp="2026-10-02T16:34:43.509Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.688310875">
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; renders loading skeleton while fetching trip" time="0.027302458">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires source" time="0.000181042">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; renders error state when trip fetch fails" time="0.009492541">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; rejects a source over 500 characters" time="0.000157583">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; renders trip details, overview, timeline, and evidence cards" time="0.054219791">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires effectiveFrom" time="0.0001315">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens status dialog when Update Status is clicked" time="0.242635541">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; requires pricePerLitre (empty numeric field reports &quot;required&quot;, not &quot;must be a number&quot;)" time="0.000213125">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens edit dialog when Edit / Reassign is clicked" time="0.132540084">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; rejects a pricePerLitre of zero (below the 0.01 minimum)" time="0.00013075">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens cancel dialog when Cancel Trip is clicked" time="0.056992917">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; accepts pricePerLitre exactly at the 0.01 minimum" time="0.000132958">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens delete dialog when Delete Trip is clicked on a Cancelled trip" time="0.162959708">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="fuelRateSchema &gt; rejects a non-numeric pricePerLitre" time="0.00014125">
         </testcase>
-    </testsuite>
-    <testsuite name="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" timestamp="2026-10-02T16:34:43.509Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.722187542">
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loading state &gt; renders skeleton while loading" time="0.057308792">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; passes for a fully valid payload" time="0.000236917">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — error state &gt; renders ErrorState with retry button when query fails" time="0.181869042">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; requires classLabel" time="0.000145834">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — empty state &gt; renders EmptyState when no trips exist" time="0.014062792">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; allows maxPayloadKg to be left blank for an open-ended top tier" time="0.000119417">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; renders trips table and links to trip detail" time="0.097560917">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; rejects a maxPayloadKg that is not greater than minPayloadKg" time="0.000122666">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; renders delete button on active dispatched trip and opens DeleteTripDialog" time="0.07960025">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; accepts a maxPayloadKg greater than minPayloadKg" time="0.000104708">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; does not render delete button for trips in Delivered status, but allows deletion of Cancelled trips" time="0.054242542">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; allows maxVolumeM3 to be left blank for an open-ended top tier" time="0.0001065">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; renders Dispatch Trip button for AgencyStaff, but hides it for Admin per Requirement 3" time="0.193298708">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; rejects a maxVolumeM3 that is not greater than minVolumeM3" time="0.0001245">
         </testcase>
-        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; does not render delete button for Driver role per Requirement 4" time="0.041523084">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="vehicleEfficiencySchema &gt; requires fuelConsumptionLPer100Km to be at least 0.01" time="0.000141042">
         </testcase>
-    </testsuite>
-    <testsuite name="src/lib/api/tests/Unit/fileUrl.test.js" timestamp="2026-10-02T16:34:43.510Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.001704666">
-        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; returns empty string when input is falsy" time="0.000686833">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; passes for a fully valid payload" time="0.000129625">
         </testcase>
-        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; returns original URL when already absolute http or https" time="0.00008775">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; rejects a marginPercent above 1 (100%) — the field is a fraction, not a 0-100 percent" time="0.000109917">
         </testcase>
-        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; returns data or blob URLs as-is" time="0.000073459">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; accepts marginPercent exactly at the 1 (100%) boundary" time="0.000102875">
         </testcase>
-        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; prepends backend files content route when given a storageKey/publicId" time="0.000111916">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; rejects a negative baseFare" time="0.000109208">
         </testcase>
-        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; prepends backend origin when path starts with /" time="0.000096167">
+        <testcase classname="src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js" name="pricingFormulaSchema &gt; requires source and effectiveFrom" time="0.000158417">
         </testcase>
     </testsuite>
-    <testsuite name="src/routes/tests/Integration/ProtectedRoute.test.jsx" timestamp="2026-10-02T16:34:43.510Z" hostname="Nuwanthas-MacBook-Pro.local" tests="23" failures="0" errors="0" skipped="0" time="0.135055875">
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads to /login" time="0.065682">
+    <testsuite name="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" timestamp="2026-10-02T16:52:03.449Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.543842709">
+        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; renders with available assignments, vehicles, and drivers in dropdowns" time="0.241598083">
         </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads/new to /login" time="0.008105208">
+        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; shows load preview card when an assignment is selected" time="0.036079042">
         </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads/abc-123 to /login" time="0.006214">
+        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; submits the form with selected assignment, vehicle, and driver" time="0.2452785">
         </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads/abc-123/edit to /login" time="0.00166725">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads" time="0.009353459">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads/new" time="0.000962875">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads/abc-123" time="0.000751542">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads/abc-123/edit" time="0.000704083">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — role guard blocks roles without access &gt; redirects a Driver away from /loads to /unauthorized" time="0.000947">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — role guard blocks roles without access &gt; allows an Admin to reach /loads (Admin is granted /loads access)" time="0.000731584">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; allows AgencyStaff to reach /agencies" time="0.001710625">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; allows Admin to reach /agencies" time="0.002163208">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; redirects Shipper away from /agencies to /unauthorized" time="0.010718041">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; redirects Driver away from /agencies to /unauthorized" time="0.00251775">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; allows AgencyStaff to reach /trips" time="0.001558833">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; allows Admin to reach /trips" time="0.001492542">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; redirects Shipper away from bare /trips to /unauthorized" time="0.002023125">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; redirects Driver away from bare /trips to /unauthorized" time="0.007044042">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — a Shipper is granted trip-detail pages (&quot;/trips/&quot;, trailing slash) but not the bare list &gt; allows a Shipper to reach /trips/abc-123 (their own dispatched trip)" time="0.002855792">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; allows Shipper to reach /billing" time="0.001508458">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; allows AgencyStaff to reach /billing" time="0.001706792">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; allows Admin to reach /billing" time="0.000777583">
-        </testcase>
-        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; redirects a Driver away from /billing to /unauthorized (Requirement 1: Driver is mobile-only)" time="0.000899584">
+        <testcase classname="src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx" name="CreateTripDialog &gt; never offers manual ID entry — only the dropdown selectors, even with empty lists" time="0.019019709">
         </testcase>
     </testsuite>
-    <testsuite name="src/routes/tests/Integration/PublicRoute.test.jsx" timestamp="2026-10-02T16:34:43.511Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.056453333">
-        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — unauthenticated visitors see the guarded page &gt; renders the login form for an unauthenticated visitor" time="0.032556833">
+    <testsuite name="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" timestamp="2026-10-02T16:52:03.449Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.301090584">
+        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; renders dialog with title, trip identifier and permanent warning note" time="0.169013042">
         </testcase>
-        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — already-authenticated users are bounced to their role home &gt; redirects a signed-in Shipper from /login to /loads" time="0.006936375">
+        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; submits permanent deletion when confirmed" time="0.046110833">
         </testcase>
-        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — already-authenticated users are bounced to their role home &gt; redirects a signed-in Agency Staff user from /login to /agencies" time="0.00855575">
+        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; closes dialog when Keep Trip or close icon is clicked" time="0.046281291">
         </testcase>
-        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — already-authenticated users are bounced to their role home &gt; redirects a signed-in Driver from /login to /unauthorized (Driver has no web home)" time="0.004795667">
+        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; displays loading state while deletion is pending" time="0.021509459">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx" name="DeleteTripDialog &gt; displays error message if deletion fails" time="0.015425458">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx" timestamp="2026-10-02T16:52:03.449Z" hostname="Nuwanthas-MacBook-Pro.local" tests="2" failures="0" errors="0" skipped="0" time="0.057177333">
+        <testcase classname="src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx" name="TripEvidenceCard &gt; renders pending state when evidence is empty" time="0.032357042">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx" name="TripEvidenceCard &gt; renders verified status when evidence items are present" time="0.022904375">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" timestamp="2026-10-02T16:52:03.449Z" hostname="Nuwanthas-MacBook-Pro.local" tests="7" failures="0" errors="0" skipped="0" time="0.537498375">
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; renders loading skeleton while fetching trip" time="0.0282925">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; renders error state when trip fetch fails" time="0.011441666">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; renders trip details, overview, timeline, and evidence cards" time="0.068443625">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens status dialog when Update Status is clicked" time="0.180462584">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens edit dialog when Edit / Reassign is clicked" time="0.071405708">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens cancel dialog when Cancel Trip is clicked" time="0.068639208">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx" name="TripDetailPage — render states &gt; opens delete dialog when Delete Trip is clicked on a Cancelled trip" time="0.105651417">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" timestamp="2026-10-02T16:52:03.449Z" hostname="Nuwanthas-MacBook-Pro.local" tests="8" failures="0" errors="0" skipped="0" time="0.548852084">
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loading state &gt; renders skeleton while loading" time="0.049013125">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — error state &gt; renders ErrorState with retry button when query fails" time="0.134386416">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — empty state &gt; renders EmptyState when no trips exist" time="0.008506333">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; renders trips table and links to trip detail" time="0.066210375">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; renders delete button on active dispatched trip and opens DeleteTripDialog" time="0.129746917">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; does not render delete button for trips in Delivered status, but allows deletion of Cancelled trips" time="0.084121334">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; renders Dispatch Trip button for AgencyStaff, but hides it for Admin per Requirement 3" time="0.045457958">
+        </testcase>
+        <testcase classname="src/features/trips/tests/Integration/pages/TripsPage.test.jsx" name="TripsPage — loaded state with table &gt; does not render delete button for Driver role per Requirement 4" time="0.023170416">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/lib/api/tests/Unit/fileUrl.test.js" timestamp="2026-10-02T16:52:03.450Z" hostname="Nuwanthas-MacBook-Pro.local" tests="5" failures="0" errors="0" skipped="0" time="0.002528542">
+        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; returns empty string when input is falsy" time="0.000894833">
+        </testcase>
+        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; returns original URL when already absolute http or https" time="0.000091125">
+        </testcase>
+        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; returns data or blob URLs as-is" time="0.000076375">
+        </testcase>
+        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; prepends backend files content route when given a storageKey/publicId" time="0.000118834">
+        </testcase>
+        <testcase classname="src/lib/api/tests/Unit/fileUrl.test.js" name="getFileUrl &gt; prepends backend origin when path starts with /" time="0.000091709">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/routes/tests/Integration/ProtectedRoute.test.jsx" timestamp="2026-10-02T16:52:03.450Z" hostname="Nuwanthas-MacBook-Pro.local" tests="23" failures="0" errors="0" skipped="0" time="0.071268125">
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads to /login" time="0.02241125">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads/new to /login" time="0.002058166">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads/abc-123 to /login" time="0.003977458">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — unauthenticated users are redirected to login &gt; redirects an unauthenticated visitor to /loads/abc-123/edit to /login" time="0.004096625">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads" time="0.003108791">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads/new" time="0.003224125">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads/abc-123" time="0.001295083">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — authenticated Shipper can access load routes &gt; allows a Shipper to reach /loads/abc-123/edit" time="0.000851625">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — role guard blocks roles without access &gt; redirects a Driver away from /loads to /unauthorized" time="0.001077708">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — role guard blocks roles without access &gt; allows an Admin to reach /loads (Admin is granted /loads access)" time="0.001446041">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; allows AgencyStaff to reach /agencies" time="0.001808167">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; allows Admin to reach /agencies" time="0.001859125">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; redirects Shipper away from /agencies to /unauthorized" time="0.002720625">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /agencies is Agency Staff/Admin only &gt; redirects Driver away from /agencies to /unauthorized" time="0.002621375">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; allows AgencyStaff to reach /trips" time="0.0046325">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; allows Admin to reach /trips" time="0.001578292">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; redirects Shipper away from bare /trips to /unauthorized" time="0.0009635">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only &gt; redirects Driver away from bare /trips to /unauthorized" time="0.000752792">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — a Shipper is granted trip-detail pages (&quot;/trips/&quot;, trailing slash) but not the bare list &gt; allows a Shipper to reach /trips/abc-123 (their own dispatched trip)" time="0.002900375">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; allows Shipper to reach /billing" time="0.00118675">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; allows AgencyStaff to reach /billing" time="0.002132625">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; allows Admin to reach /billing" time="0.000866333">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/ProtectedRoute.test.jsx" name="ProtectedRoute — /billing is open to every web role except Driver &gt; redirects a Driver away from /billing to /unauthorized (Requirement 1: Driver is mobile-only)" time="0.000964708">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/routes/tests/Integration/PublicRoute.test.jsx" timestamp="2026-10-02T16:52:03.451Z" hostname="Nuwanthas-MacBook-Pro.local" tests="4" failures="0" errors="0" skipped="0" time="0.043647833">
+        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — unauthenticated visitors see the guarded page &gt; renders the login form for an unauthenticated visitor" time="0.024830583">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — already-authenticated users are bounced to their role home &gt; redirects a signed-in Shipper from /login to /loads" time="0.011960291">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — already-authenticated users are bounced to their role home &gt; redirects a signed-in Agency Staff user from /login to /agencies" time="0.004002667">
+        </testcase>
+        <testcase classname="src/routes/tests/Integration/PublicRoute.test.jsx" name="PublicRoute — already-authenticated users are bounced to their role home &gt; redirects a signed-in Driver from /login to /unauthorized (Driver has no web home)" time="0.001622083">
         </testcase>
     </testsuite>
 </testsuites>

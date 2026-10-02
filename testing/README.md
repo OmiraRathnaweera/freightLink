@@ -11,7 +11,15 @@
 | `scripts/run-nfr.sh` | Starts a throwaway API + PostgreSQL and runs k6 and ZAP |
 | `scripts/build_test_docs.py` | Rebuilds the generated documents from `evidence/` |
 
-## Run everything
+## Dashboard (run tests and see results/times in one page)
+
+```bash
+python3 testing/dashboard/server.py        # then open http://127.0.0.1:8765
+```
+
+One page with Run buttons for the backend, React, Flutter and agent suites (plus k6 and ZAP), live console output, pass/fail counts, wall-clock and per-test times, slowest tests, coverage, k6/ZAP results and the defect list. It needs no installs (Python standard library only), binds to localhost only and runs fixed commands. Running a suite overwrites that suite's files in `evidence/`, so the evidence always matches the screen. Use it for screenshots; press Run all, then `python3 testing/scripts/build_test_docs.py` to refresh the generated documents.
+
+## Run everything (command line)
 
 Prerequisites: Docker, .NET SDK 8+, Node 22+, Flutter stable, [uv](https://docs.astral.sh/uv/), Python 3.
 
