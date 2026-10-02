@@ -395,4 +395,33 @@ public class SecurityTests : IClassFixture<CustomWebApplicationFactory>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
+    // ---------- SEC-09: response hardening headers (DEF-006, found by the ZAP scan) ----------
+
+    [Theory]
+    [InlineData("/health", HttpStatusCode.OK)]
+    [InlineData("/api/v1/auth/agencies", HttpStatusCode.OK)]
+    [InlineData("/api/v1/loads", HttpStatusCode.Unauthorized)]
+    [InlineData("/api/v1/does-not-exist", HttpStatusCode.NotFound)]
+    public async Task Responses_CarryNosniffHeader_IncludingErrors(string url, HttpStatusCode expectedStatus)
+    {
+        var response = await _client.GetAsync(url);
+
+        Assert.Equal(expectedStatus, response.StatusCode);
+        Assert.True(response.Headers.TryGetValues("X-Content-Type-Options", out var values));
+        Assert.Contains("nosniff", values!);
+    }
+
+    [Fact]
+    public async Task ErrorBody_NeverLeaksStackTracesOrExceptionTypes()
+    {
+        // A request that reaches the controller with a body the model binder cannot read must not echo internals.
+        var shipper = await RegisterAndLoginShipperAsync();
+        var response = await _client.SendAsync(Request(HttpMethod.Post, "/api/v1/loads", shipper.AccessToken,
+            new StringContent("{\"weightKg\": \"not-a-number\"}", Encoding.UTF8, "application/json")));
+        var body = await response.Content.ReadAsStringAsync();
+
+        Assert.DoesNotContain("   at ", body);          // no stack frames
+        Assert.DoesNotContain("Exception", body);       // no exception type names
+        Assert.DoesNotContain("StackTrace", body, StringComparison.OrdinalIgnoreCase);
+    }
 }
