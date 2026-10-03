@@ -4,7 +4,7 @@ namespace FreightLink.Api.DTOs.Agency;
 
 /// <summary>
 /// Replaces an existing compliance document's file/number/dates in place (e.g. re-uploading after a
-/// rejection, or renewing an expiring document). <c>DocType</c> is not included here — it is fixed by
+/// rejection, or correcting a still-Pending upload). A Verified document is frozen and cannot be replaced. <c>DocType</c> is not included here — it is fixed by
 /// the target row's id and is never changed by a replace.
 /// </summary>
 public class ComplianceDocUpdateDto
