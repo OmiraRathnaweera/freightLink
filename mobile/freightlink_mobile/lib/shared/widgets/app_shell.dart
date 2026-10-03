@@ -13,7 +13,8 @@ import '../../features/notifications/widgets/in_app_push_banner.dart';
 /// The 2nd tab's icon/label is role-dependent (Driver: "My Trip", AgencyStaff:
 /// "Proposals", Shipper: "Loads") since each role sees a different screen at
 /// that branch's route — chosen by the branch's own `GoRoute.builder` in
-/// app_router.dart, not here; this widget only needs to know the label/icon./// The Payments tab is not shown to Drivers.
+/// app_router.dart, not here; this widget only needs to know the label/icon.
+/// The Payments tab is not shown to Drivers.
 class AppShell extends StatelessWidget {
   const AppShell({
     super.key,
