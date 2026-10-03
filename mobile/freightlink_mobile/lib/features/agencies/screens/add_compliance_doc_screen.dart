@@ -20,7 +20,7 @@ class AddComplianceDocScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) => ComplianceDocsProvider(context.read<AgenciesRepository>()),
+      create: (context) => ComplianceDocsProvider(context.read<AgenciesRepository>())..loadDocs(),
       child: const _AddComplianceDocForm(),
     );
   }
@@ -37,7 +37,27 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
   final _docNumberController = TextEditingController();
   final _issuedOnController = TextEditingController();
 
+  static const _docTypes = <String, String>{
+    'BusinessRegistration': 'Business Registration',
+    'VehicleInsurance': 'Vehicle Insurance',
+    'RevenueLicence': 'Revenue Licence',
+    'GoodsTransportPermit': 'Goods Transport Permit',
+    'Other': 'Other',
+  };
+
   String _selectedDocType = 'BusinessRegistration';
+
+  /// The chosen type, or the first still-uploadable one if the chosen type is locked (a Verified or
+  /// Pending document already exists for it), or null when every type is locked.
+  String? _effectiveDocType(ComplianceDocsProvider provider) {
+    if (!provider.isDocTypeLocked(_selectedDocType)) return _selectedDocType;
+    for (final type in _docTypes.keys) {
+      if (!provider.isDocTypeLocked(type)) return type;
+    }
+    return null;
+  }
+
+  String _lockedSuffix(String status) => status == 'Verified' ? ' (verified – locked)' : ' (pending review)';
   String? _selectedFileName;
   List<int>? _selectedFileBytes;
 
@@ -154,6 +174,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
   }
 
   Future<void> _submit(ComplianceDocsProvider provider) async {
+    final docType = _effectiveDocType(provider);
+    if (docType == null) return;
     setState(() {
       _hasAttemptedSubmit = true;
       _fieldErrors = _validate();
@@ -161,7 +183,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
     if (_fieldErrors.isNotEmpty) return;
 
     final success = await provider.uploadDoc(
-      _selectedDocType,
+      docType,
       _docNumberController.text.trim(),
       _issuedOnController.text.trim(),
       _selectedFileBytes!,
@@ -185,6 +207,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ComplianceDocsProvider>();
+    final effectiveDocType = _effectiveDocType(provider);
+    final allLocked = provider.state == ComplianceDocsState.loaded && effectiveDocType == null;
 
     return Scaffold(
       appBar: AppTopBar(
@@ -200,8 +224,18 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+                if (allLocked) ...[
+                  const Text(
+                    'Every document type already has a verified or pending document, so there is nothing left to upload.',
+                    style: TextStyle(color: AppColors.statusErrorFg),
+                  ),
+                  const SizedBox(height: AppConstants.spaceLg),
+                ],
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedDocType,
+                  // Re-created when the effective type changes (e.g. docs finish loading and the
+                  // default type turned out to be locked), since initialValue is only read once.
+                  key: ValueKey(effectiveDocType),
+                  initialValue: effectiveDocType,
                   decoration: InputDecoration(
                     labelText: 'Document Type',
                     prefixIcon: const Icon(Icons.description_outlined),
@@ -209,12 +243,15 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                       borderRadius: BorderRadius.circular(AppConstants.radiusMd),
                     ),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 'BusinessRegistration', child: Text('Business Registration')),
-                    DropdownMenuItem(value: 'VehicleInsurance', child: Text('Vehicle Insurance')),
-                    DropdownMenuItem(value: 'RevenueLicence', child: Text('Revenue Licence')),
-                    DropdownMenuItem(value: 'GoodsTransportPermit', child: Text('Goods Transport Permit')),
-                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                  items: [
+                    for (final entry in _docTypes.entries)
+                      DropdownMenuItem(
+                        value: entry.key,
+                        enabled: !provider.isDocTypeLocked(entry.key),
+                        child: Text(
+                          entry.value + (provider.isDocTypeLocked(entry.key) ? _lockedSuffix(provider.lockedDocTypes[entry.key]!) : ''),
+                        ),
+                      ),
                   ],
                   onChanged: (val) {
                     if (val != null) {
@@ -267,7 +304,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                   const Center(child: CircularProgressIndicator())
                 else
                   PrimaryButton(
-                    onPressed: () => _submit(provider),
+                    onPressed: effectiveDocType == null ? null : () => _submit(provider),
                     label: 'Upload Document',
                   ),
               ],
