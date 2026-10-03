@@ -377,6 +377,22 @@ export async function getAgencyFleet(agencyId) {
   return api.get('/agencies/my/fleet')
 }
 
+/**
+ * GET /agencies/{id}/status-history
+ * Admin-only: the agency's status audit trail (actor, from/to, reason, time), newest first.
+ */
+export async function getAgencyStatusHistory(agencyId) {
+  return api.get(`/agencies/${agencyId}/status-history`)
+}
+
+export function useAgencyStatusHistoryQuery(agencyId, options) {
+  return useQuery({
+    queryKey: ['agencies', agencyId, 'status-history'],
+    queryFn: () => getAgencyStatusHistory(agencyId),
+    ...options,
+  })
+}
+
 export function useAgencyFleetQuery(agencyId, options) {
   return useQuery({
     queryKey: ['agencies', agencyId ?? 'my', 'fleet'],

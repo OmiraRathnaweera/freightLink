@@ -52,6 +52,10 @@ class ComplianceDocsScreen extends StatelessWidget {
                       child: Icon(Icons.description, color: Colors.white),
                     ),
                     title: Text(doc['docType'] ?? 'Unknown Type', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    // An admin-verified document is frozen — it can't be replaced or edited.
+                    trailing: doc['status'] == 'Verified'
+                        ? const Tooltip(message: 'Verified – locked', child: Icon(Icons.lock_outline, color: Colors.green))
+                        : null,
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

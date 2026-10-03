@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Building2, CheckCircle2, Clock, ExternalLink, MapPin, UploadCloud } from 'lucide-react'
+import { Building2, CheckCircle2, Clock, ExternalLink, Lock, MapPin, UploadCloud } from 'lucide-react'
 import Button from '../../../components/Button.jsx'
 import Card from '../../../components/Card.jsx'
 import PageHeader from '../../../components/PageHeader.jsx'
@@ -13,12 +13,17 @@ import { COMPLIANCE_DOC_TYPES } from '../lib/complianceDocTypes.js'
 import { getFileUrl } from '../../../lib/api/fileUrl.js'
 import UploadComplianceDocModal from '../components/UploadComplianceDocModal.jsx'
 
+const STATUS_POLL_MS = 15_000
+
 export default function AgencyProfilePage() {
   const { data: user, isLoading: userLoading } = useCurrentUserQuery()
   const agencyId = user?.agencyId
 
+  // Verification happens in a different session (an Admin approves/rejects), so poll — otherwise this
+  // page keeps showing "Pending" until a full reload (issue #58). TanStack pauses polling in hidden tabs.
   const { data: agency } = useAgencyQuery(agencyId, {
     enabled: Boolean(agencyId),
+    refetchInterval: STATUS_POLL_MS,
   })
 
   const {
@@ -26,6 +31,7 @@ export default function AgencyProfilePage() {
     isLoading: docsLoading,
   } = useComplianceDocsQuery(agencyId, {
     enabled: Boolean(agencyId),
+    refetchInterval: STATUS_POLL_MS,
   })
 
   // State for upload document modal
@@ -295,16 +301,23 @@ export default function AgencyProfilePage() {
                     </div>
                   </div>
 
-                  {/* Card Action */}
+                  {/* Card Action — an admin-verified document is frozen (no replace/update). */}
                   <div className="border-t border-slate-border p-4 bg-slate-50/30">
-                    <Button
-                      variant={isUploaded ? 'secondary' : 'primary'}
-                      className="w-full inline-flex items-center justify-center gap-2 text-body-xs font-semibold"
-                      onClick={() => handleOpenUpload(docType, matchingDoc)}
-                    >
-                      <UploadCloud className="h-4 w-4" />
-                      <span>{isUploaded ? 'Replace / Update' : 'Upload Document'}</span>
-                    </Button>
+                    {matchingDoc?.status === 'Verified' ? (
+                      <p className="flex items-center justify-center gap-2 text-body-xs font-semibold text-status-green-text">
+                        <Lock className="h-4 w-4" />
+                        <span>Verified &amp; locked</span>
+                      </p>
+                    ) : (
+                      <Button
+                        variant={isUploaded ? 'secondary' : 'primary'}
+                        className="w-full inline-flex items-center justify-center gap-2 text-body-xs font-semibold"
+                        onClick={() => handleOpenUpload(docType, matchingDoc)}
+                      >
+                        <UploadCloud className="h-4 w-4" />
+                        <span>{isUploaded ? 'Replace / Update' : 'Upload Document'}</span>
+                      </Button>
+                    )}
                   </div>
                 </Card>
               )

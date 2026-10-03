@@ -70,12 +70,16 @@ public interface IAgencyService
     Task<IEnumerable<ComplianceDocResponseDto>> GetComplianceDocsAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Replaces an existing compliance document's file/number/dates in place and resets its
+    /// Replaces a non-Verified compliance document's file/number/dates in place (a Verified document
+    /// is frozen and rejected with 409) and resets its
     /// <c>Status</c> to <c>Pending</c> so it is re-verified, rather than inserting a new row — a plain
     /// re-<see cref="AddComplianceDocAsync"/> would collide with the <c>ux_compliancedoc_live</c>
     /// partial unique index while the existing document is still <c>Pending</c>/<c>Verified</c>.
     /// </summary>
     Task<ComplianceDocResponseDto> UpdateComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, ComplianceDocUpdateDto request, CancellationToken cancellationToken = default);
+
+    /// <summary>Admin-only: the agency's status audit trail, newest first.</summary>
+    Task<IReadOnlyList<AgencyStatusHistoryResponseDto>> GetStatusHistoryAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);
 
     /// <summary>Admin-only: marks a Pending compliance document as Verified.</summary>
     Task<ComplianceDocResponseDto> VerifyComplianceDocAsync(Guid agencyId, Guid complianceDocId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default);

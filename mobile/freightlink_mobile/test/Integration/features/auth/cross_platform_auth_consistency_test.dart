@@ -180,6 +180,7 @@ void main() {
 
       expect(find.byType(MyLoadsScreen), findsOneWidget);
       expect(find.text('Loads'), findsOneWidget);
+      expect(find.text('Payments'), findsOneWidget);
       expect(find.byType(JobProposalsScreen), findsNothing);
       expect(find.byType(DriverAssignedTripScreen), findsNothing);
     });
@@ -198,6 +199,7 @@ void main() {
 
       expect(find.byType(JobProposalsScreen), findsOneWidget);
       expect(find.text('Proposals'), findsOneWidget);
+      expect(find.text('Payments'), findsOneWidget);
       expect(find.byType(MyLoadsScreen), findsNothing);
       expect(find.byType(DriverAssignedTripScreen), findsNothing);
     });
@@ -216,6 +218,9 @@ void main() {
 
       expect(find.byType(DriverAssignedTripScreen), findsOneWidget);
       expect(find.text('My Trip'), findsOneWidget);
+      // Drivers have no billing: no Payments tab, and only Dashboard + My Trip remain.
+      expect(find.text('Payments'), findsNothing);
+      expect(find.text('Dashboard'), findsOneWidget);
       expect(find.byType(MyLoadsScreen), findsNothing);
       expect(find.byType(JobProposalsScreen), findsNothing);
     });

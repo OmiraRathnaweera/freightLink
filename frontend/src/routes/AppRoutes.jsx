@@ -20,6 +20,7 @@ import AgenciesPage from '../features/agencies/pages/AgenciesPage.jsx'
 import FleetVehiclesPage from '../features/agencies/pages/FleetVehiclesPage.jsx'
 import FleetDriversPage from '../features/agencies/pages/FleetDriversPage.jsx'
 import AgencyVerificationPage from '../features/agencies/pages/AgencyVerificationPage.jsx'
+import AgencyDetailPage from '../features/agencies/pages/AgencyDetailPage.jsx'
 import TripsPage from '../features/trips/pages/TripsPage.jsx'
 import TripDetailPage from '../features/trips/pages/TripDetailPage.jsx'
 import BillingPage from '../features/billing/pages/BillingPage.jsx'
@@ -80,6 +81,7 @@ const router = createBrowserRouter(
           <Route path="/agencies/vehicles" element={<FleetVehiclesPage />} />
           <Route path="/agencies/drivers" element={<FleetDriversPage />} />
           <Route path="/agencies/verification" element={<AgencyVerificationPage />} />
+          <Route path="/agencies/:agencyId" element={<AgencyDetailPage />} />
           <Route path="/trips" element={<TripsPage />} />
           <Route path="/trips/:tripId" element={<TripDetailPage />} />
           <Route path="/billing" element={<BillingPage />} />

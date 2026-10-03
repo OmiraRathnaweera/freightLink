@@ -339,6 +339,15 @@ public class AgencyService : IAgencyService
         var agency = await _dbContext.Agencies.FindAsync(new object[] { agencyId }, cancellationToken);
         if (agency == null) throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "Agency not found.");
 
+        var liveDocExists = await _dbContext.ComplianceDocs.AnyAsync(d =>
+            d.AgencyId == agencyId &&
+            d.DocType == request.DocType &&
+            (d.Status == ComplianceDocStatus.Pending || d.Status == ComplianceDocStatus.Verified), cancellationToken);
+        if (liveDocExists)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_COMPLIANCE_DOC_STATUS_TRANSITION, "A pending or verified document of this type already exists for this agency.");
+        }
+
         var doc = new ComplianceDoc
         {
             AgencyId = agencyId,
@@ -369,6 +378,12 @@ public class AgencyService : IAgencyService
             throw new ApiException(HttpStatusCode.NotFound, ErrorCode.COMPLIANCE_DOC_NOT_FOUND, "The requested compliance document could not be found.");
         }
 
+        // An admin-approved document is frozen: agency staff can no longer replace or edit it.
+        if (doc.Status == ComplianceDocStatus.Verified)
+        {
+            throw new ApiException(HttpStatusCode.Conflict, ErrorCode.INVALID_COMPLIANCE_DOC_STATUS_TRANSITION, "This document has been verified by an administrator and can no longer be changed or replaced.");
+        }
+
         doc.StorageKey = request.PublicId;
         doc.DocNumber = request.DocNumber;
         doc.IssuedOn = request.IssuedOn;
@@ -379,6 +394,35 @@ public class AgencyService : IAgencyService
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return MapToComplianceDocResponse(doc);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<AgencyStatusHistoryResponseDto>> GetStatusHistoryAsync(Guid agencyId, Guid currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
+    {
+        if (currentUserRole != UserRole.Admin)
+        {
+            throw new ApiException(HttpStatusCode.Forbidden, ErrorCode.FORBIDDEN, "Only administrators can view an agency's status history.");
+        }
+
+        if (!await _dbContext.Agencies.AnyAsync(a => a.AgencyId == agencyId, cancellationToken))
+        {
+            throw new ApiException(HttpStatusCode.NotFound, ErrorCode.AGENCY_NOT_FOUND, "The requested agency could not be found.");
+        }
+
+        return await _dbContext.AgencyStatusHistories.AsNoTracking()
+            .Where(h => h.AgencyId == agencyId)
+            .OrderByDescending(h => h.ChangedAt)
+            .Select(h => new AgencyStatusHistoryResponseDto
+            {
+                AgencyStatusHistoryId = h.AgencyStatusHistoryId,
+                FromStatus = h.FromStatus,
+                ToStatus = h.ToStatus,
+                Reason = h.Reason,
+                ChangedByUserId = h.ChangedByUserId,
+                ChangedByName = h.ChangedByUser.FullName,
+                ChangedAt = h.ChangedAt
+            })
+            .ToListAsync(cancellationToken);
     }
 
     /// <inheritdoc />
