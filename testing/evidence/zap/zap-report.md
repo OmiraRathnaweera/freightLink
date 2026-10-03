@@ -19,20 +19,17 @@ ZAP by [Checkmarx](https://checkmarx.com/).
 
 | Level | Reason | Site | Description | Statistic |
 | --- | --- | --- | --- | --- |
-| Medium | Exceeded Low |  | Percentage of memory used | 83    |
-| Low | Warning |  | ZAP warnings logged - see the zap.log file for details | 2    |
 | Low | Exceeded High | http://host.docker.internal:5188 | Percentage of responses with status code 4xx | 98 % |
-| Info | Informational |  | Percentage of network failures | 2 % |
-| Info | Informational | http://host.docker.internal:5188 | Percentage of responses with status code 2xx | 3 % |
+| Info | Informational |  | Percentage of network failures | 4 % |
+| Info | Informational | http://host.docker.internal:5188 | Percentage of responses with status code 2xx | 5 % |
 | Info | Informational | http://host.docker.internal:5188 | Percentage of responses with status code 5xx | 1 % |
-| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with content type application/json | 27 % |
+| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with content type application/json | 26 % |
 | Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method DELETE | 3 % |
-| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method GET | 52 % |
-| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method PATCH | 9 % |
-| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method POST | 30 % |
+| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method GET | 48 % |
+| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method PATCH | 10 % |
+| Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method POST | 32 % |
 | Info | Informational | http://host.docker.internal:5188 | Percentage of endpoints with method PUT | 4 % |
-| Info | Informational | http://host.docker.internal:5188 | Count of total endpoints | 385    |
-| Info | Informational | http://host.docker.internal:5188 | Percentage of slow responses | 6 % |
+| Info | Informational | http://host.docker.internal:5188 | Count of total endpoints | 417    |
 
 
 
@@ -49,7 +46,7 @@ ZAP by [Checkmarx](https://checkmarx.com/).
 | Cross-Origin-Resource-Policy Header Missing or Invalid | Low | Systemic |
 | Timestamp Disclosure - Unix | Low | 1 |
 | Unexpected Content-Type was returned | Low | 2 |
-| A Client Error response code was returned by the server | Informational | 371 |
+| A Client Error response code was returned by the server | Informational | 403 |
 | Authentication Request Identified | Informational | 1 |
 | Information Disclosure - Sensitive Information in URL | Informational | 1 |
 | Non-Storable Content | Informational | Systemic |
@@ -101,8 +98,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `500`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/files/content/2788767624816994454
-  * Node Name: `http://host.docker.internal:5188/api/v1/files/content/2788767624816994454`
+* URL: http://host.docker.internal:5188/api/v1/files/content/3573803705549419192
+  * Node Name: `http://host.docker.internal:5188/api/v1/files/content/3573803705549419192`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -296,8 +293,8 @@ A timestamp was disclosed by the application/web server. - Unix
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
-  * Evidence: `1790959115`
-  * Other Info: `1790959115, which evaluates to: 2026-10-02 16:38:35.`
+  * Evidence: `1791001816`
+  * Other Info: `1791001816, which evaluates to: 2026-10-03 04:30:16.`
 
 
 Instances: 1
@@ -379,8 +376,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/ ()({voidReason})`
+  * Method: `DELETE`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/id
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/id`
+  * Method: `DELETE`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/id/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/id/`
   * Method: `DELETE`
   * Parameter: ``
   * Attack: ``
@@ -393,8 +404,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/id/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/id/`
+  * Method: `DELETE`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/id
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/id`
+  * Method: `DELETE`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/id/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/id/`
   * Method: `DELETE`
   * Parameter: ``
   * Attack: ``
@@ -456,8 +481,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/987760468303718885
-  * Node Name: `http://host.docker.internal:5188/987760468303718885`
+* URL: http://host.docker.internal:5188/5915770773825691710
+  * Node Name: `http://host.docker.internal:5188/5915770773825691710`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -477,8 +502,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/1341691845460077625
-  * Node Name: `http://host.docker.internal:5188/api/1341691845460077625`
+* URL: http://host.docker.internal:5188/api/6392330707868380105
+  * Node Name: `http://host.docker.internal:5188/api/6392330707868380105`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -491,8 +516,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `400`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/disputes/3311673958633571875
-  * Node Name: `http://host.docker.internal:5188/api/disputes/3311673958633571875`
+* URL: http://host.docker.internal:5188/api/disputes/7426691963177025710
+  * Node Name: `http://host.docker.internal:5188/api/disputes/7426691963177025710`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -512,8 +537,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/disputes/id/7192531451207555591
-  * Node Name: `http://host.docker.internal:5188/api/disputes/id/7192531451207555591`
+* URL: http://host.docker.internal:5188/api/disputes/id/7336341693074924557
+  * Node Name: `http://host.docker.internal:5188/api/disputes/id/7336341693074924557`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -533,8 +558,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `400`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/invoices/1364111747355914208
-  * Node Name: `http://host.docker.internal:5188/api/invoices/1364111747355914208`
+* URL: http://host.docker.internal:5188/api/invoices/1416559210465374353
+  * Node Name: `http://host.docker.internal:5188/api/invoices/1416559210465374353`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -554,8 +579,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/invoices/delivery-event/3225679720472530758
-  * Node Name: `http://host.docker.internal:5188/api/invoices/delivery-event/3225679720472530758`
+* URL: http://host.docker.internal:5188/api/invoices/delivery-event/5027785071902279652
+  * Node Name: `http://host.docker.internal:5188/api/invoices/delivery-event/5027785071902279652`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -575,8 +600,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/invoices/id/3720433387435379001
-  * Node Name: `http://host.docker.internal:5188/api/invoices/id/3720433387435379001`
+* URL: http://host.docker.internal:5188/api/invoices/id/1008782566611982746
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/1008782566611982746`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -596,8 +621,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/invoices/on-delivery/8358180339116322604
-  * Node Name: `http://host.docker.internal:5188/api/invoices/on-delivery/8358180339116322604`
+* URL: http://host.docker.internal:5188/api/invoices/on-delivery/3154998787051147905
+  * Node Name: `http://host.docker.internal:5188/api/invoices/on-delivery/3154998787051147905`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -645,8 +670,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/8743954675352407998
-  * Node Name: `http://host.docker.internal:5188/api/v1/8743954675352407998`
+* URL: http://host.docker.internal:5188/api/v1/1040287228876112544
+  * Node Name: `http://host.docker.internal:5188/api/v1/1040287228876112544`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -666,8 +691,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/8107423127187167663
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/8107423127187167663`
+* URL: http://host.docker.internal:5188/api/v1/admin/6607365369885516264
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/6607365369885516264`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -687,8 +712,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/7413886092497644451
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/7413886092497644451`
+* URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/6446871392787747500
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/6446871392787747500`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -708,8 +733,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/7834444584205520992
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/7834444584205520992`
+* URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/5461773534958936427
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/5461773534958936427`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -729,8 +754,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/analytics/6556677733697797991
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/analytics/6556677733697797991`
+* URL: http://host.docker.internal:5188/api/v1/admin/analytics/433771611538669618
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/analytics/433771611538669618`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -764,8 +789,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/pricing/5050048219759179553
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/5050048219759179553`
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/7497027316162491343
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/7497027316162491343`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -785,8 +810,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/6436820274809183728
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/6436820274809183728`
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/5928055874197491558
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/5928055874197491558`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -820,8 +845,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/1906288128648575079
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/1906288128648575079`
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/6653133526733924414
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/6653133526733924414`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -855,8 +880,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/1646292237904593163
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/1646292237904593163`
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/5098072416110569263
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/5098072416110569263`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -897,8 +922,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/665632461787700543
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/665632461787700543`
+* URL: http://host.docker.internal:5188/api/v1/agencies/3745211044952765965
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/3745211044952765965`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -932,8 +957,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/8305280421368343141
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/8305280421368343141`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/2189029925854497100
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/2189029925854497100`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -953,8 +978,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/371424773755092441
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/371424773755092441`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/7974592160141362888
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/7974592160141362888`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -974,8 +999,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `405`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/8424593451207437666
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/8424593451207437666`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/1249140525866273204
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/1249140525866273204`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -995,8 +1020,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/2280641557848855750
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/2280641557848855750`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/2131024598367658831
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/2131024598367658831`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1016,8 +1041,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `405`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/4084844631283027646
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/4084844631283027646`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/7477262808719245412
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/7477262808719245412`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1051,8 +1076,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/vehicles/7254518382959559662
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/vehicles/7254518382959559662`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/vehicles/5599868387516355762
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/vehicles/5599868387516355762`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1072,8 +1097,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `405`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/7791964590987460335
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/7791964590987460335`
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/8568217173220753096
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/8568217173220753096`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1093,8 +1118,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/agencies/my/8892890871753187128
-  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/my/8892890871753187128`
+* URL: http://host.docker.internal:5188/api/v1/agencies/my/6220830945453988938
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/my/6220830945453988938`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1156,8 +1181,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/assignment-actions/6811139873797834457
-  * Node Name: `http://host.docker.internal:5188/api/v1/assignment-actions/6811139873797834457`
+* URL: http://host.docker.internal:5188/api/v1/assignment-actions/9163311789685514106
+  * Node Name: `http://host.docker.internal:5188/api/v1/assignment-actions/9163311789685514106`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1184,8 +1209,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/assignments/1564098355721595759
-  * Node Name: `http://host.docker.internal:5188/api/v1/assignments/1564098355721595759`
+* URL: http://host.docker.internal:5188/api/v1/assignments/5664500772671667966
+  * Node Name: `http://host.docker.internal:5188/api/v1/assignments/5664500772671667966`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1205,8 +1230,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/assignments/id/5597186725601554365
-  * Node Name: `http://host.docker.internal:5188/api/v1/assignments/id/5597186725601554365`
+* URL: http://host.docker.internal:5188/api/v1/assignments/id/4837416978738312554
+  * Node Name: `http://host.docker.internal:5188/api/v1/assignments/id/4837416978738312554`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1226,8 +1251,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/assignments/loadId/7928806833235785236
-  * Node Name: `http://host.docker.internal:5188/api/v1/assignments/loadId/7928806833235785236`
+* URL: http://host.docker.internal:5188/api/v1/assignments/loadId/584042255051144598
+  * Node Name: `http://host.docker.internal:5188/api/v1/assignments/loadId/584042255051144598`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1247,8 +1272,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/auth/2371814685459427248
-  * Node Name: `http://host.docker.internal:5188/api/v1/auth/2371814685459427248`
+* URL: http://host.docker.internal:5188/api/v1/auth/1845468062267619293
+  * Node Name: `http://host.docker.internal:5188/api/v1/auth/1845468062267619293`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1268,8 +1293,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/auth/register/873670511320827157
-  * Node Name: `http://host.docker.internal:5188/api/v1/auth/register/873670511320827157`
+* URL: http://host.docker.internal:5188/api/v1/auth/register/5926813144130788966
+  * Node Name: `http://host.docker.internal:5188/api/v1/auth/register/5926813144130788966`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1282,8 +1307,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `400`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/disputes/8132500010289239645
-  * Node Name: `http://host.docker.internal:5188/api/v1/disputes/8132500010289239645`
+* URL: http://host.docker.internal:5188/api/v1/disputes/972791363685860990
+  * Node Name: `http://host.docker.internal:5188/api/v1/disputes/972791363685860990`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1303,8 +1328,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/disputes/id/1538036331302240373
-  * Node Name: `http://host.docker.internal:5188/api/v1/disputes/id/1538036331302240373`
+* URL: http://host.docker.internal:5188/api/v1/disputes/id/9220917280634756045
+  * Node Name: `http://host.docker.internal:5188/api/v1/disputes/id/9220917280634756045`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1324,8 +1349,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `405`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/files/6005768219521626599
-  * Node Name: `http://host.docker.internal:5188/api/v1/files/6005768219521626599`
+* URL: http://host.docker.internal:5188/api/v1/files/7787767114608329877
+  * Node Name: `http://host.docker.internal:5188/api/v1/files/7787767114608329877`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1338,8 +1363,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `400`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/invoices/3146203977021293381
-  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/3146203977021293381`
+* URL: http://host.docker.internal:5188/api/v1/invoices/3354235362135206828
+  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/3354235362135206828`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1359,8 +1384,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/invoices/delivery-event/6185276585506929103
-  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/delivery-event/6185276585506929103`
+* URL: http://host.docker.internal:5188/api/v1/invoices/delivery-event/1136894711733199185
+  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/delivery-event/1136894711733199185`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1380,8 +1405,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/invoices/id/4104310442303657990
-  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/id/4104310442303657990`
+* URL: http://host.docker.internal:5188/api/v1/invoices/id/5032532619534569121
+  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/id/5032532619534569121`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1401,8 +1426,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/invoices/on-delivery/2102846032038521498
-  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/on-delivery/2102846032038521498`
+* URL: http://host.docker.internal:5188/api/v1/invoices/on-delivery/3659033463031675273
+  * Node Name: `http://host.docker.internal:5188/api/v1/invoices/on-delivery/3659033463031675273`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1443,8 +1468,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `400`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/6857622032250704508
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/6857622032250704508`
+* URL: http://host.docker.internal:5188/api/v1/loads/8807297916642709619
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/8807297916642709619`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1464,8 +1489,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/id/7269535786023074700
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/id/7269535786023074700`
+* URL: http://host.docker.internal:5188/api/v1/loads/id/3035523928504805143
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/id/3035523928504805143`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1485,8 +1510,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/loadId/3298844683997116996
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/3298844683997116996`
+* URL: http://host.docker.internal:5188/api/v1/loads/loadId/7708751657333710352
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/7708751657333710352`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1506,8 +1531,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/loadId/files/1437279372315839213
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/files/1437279372315839213`
+* URL: http://host.docker.internal:5188/api/v1/loads/loadId/files/3932613048004043851
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/files/3932613048004043851`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1527,8 +1552,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/loadId/match/3362919359132789318
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/match/3362919359132789318`
+* URL: http://host.docker.internal:5188/api/v1/loads/loadId/match/1879115560639360530
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/match/1879115560639360530`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1562,8 +1587,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/loadId/proposals/4554145796230101436
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/proposals/4554145796230101436`
+* URL: http://host.docker.internal:5188/api/v1/loads/loadId/proposals/8818978682061650067
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/proposals/8818978682061650067`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1583,8 +1608,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/3044931020122367197
-  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/3044931020122367197`
+* URL: http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/5551776443695739007
+  * Node Name: `http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/5551776443695739007`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1611,8 +1636,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/trips/418363376597147657
-  * Node Name: `http://host.docker.internal:5188/api/v1/trips/418363376597147657`
+* URL: http://host.docker.internal:5188/api/v1/trips/1512816179502471302
+  * Node Name: `http://host.docker.internal:5188/api/v1/trips/1512816179502471302`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1632,8 +1657,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/trips/id/5446205521391768658
-  * Node Name: `http://host.docker.internal:5188/api/v1/trips/id/5446205521391768658`
+* URL: http://host.docker.internal:5188/api/v1/trips/id/5091922009203568754
+  * Node Name: `http://host.docker.internal:5188/api/v1/trips/id/5091922009203568754`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1667,8 +1692,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/internal/8878918354465181420
-  * Node Name: `http://host.docker.internal:5188/internal/8878918354465181420`
+* URL: http://host.docker.internal:5188/internal/2203468246545195571
+  * Node Name: `http://host.docker.internal:5188/internal/2203468246545195571`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1688,8 +1713,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `405`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/internal/agent-workflow-runs/775982507428787400
-  * Node Name: `http://host.docker.internal:5188/internal/agent-workflow-runs/775982507428787400`
+* URL: http://host.docker.internal:5188/internal/agent-workflow-runs/6159381328720972463
+  * Node Name: `http://host.docker.internal:5188/internal/agent-workflow-runs/6159381328720972463`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1709,8 +1734,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/6470518800725959693
-  * Node Name: `http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/6470518800725959693`
+* URL: http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/8411506529203031080
+  * Node Name: `http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/8411506529203031080`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1730,8 +1755,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/internal/pricing/3466752255532983182
-  * Node Name: `http://host.docker.internal:5188/internal/pricing/3466752255532983182`
+* URL: http://host.docker.internal:5188/internal/pricing/5327145620933226991
+  * Node Name: `http://host.docker.internal:5188/internal/pricing/5327145620933226991`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1751,15 +1776,15 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/internal/routing/559974259936506061
-  * Node Name: `http://host.docker.internal:5188/internal/routing/559974259936506061`
+* URL: http://host.docker.internal:5188/internal/routing/688315644126265932
+  * Node Name: `http://host.docker.internal:5188/internal/routing/688315644126265932`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/swagger/700801825177514902
-  * Node Name: `http://host.docker.internal:5188/swagger/700801825177514902`
+* URL: http://host.docker.internal:5188/swagger/7115565931287022878
+  * Node Name: `http://host.docker.internal:5188/swagger/7115565931287022878`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1779,8 +1804,8 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
-* URL: http://host.docker.internal:5188/swagger/v1/2021266544458155276
-  * Node Name: `http://host.docker.internal:5188/swagger/v1/2021266544458155276`
+* URL: http://host.docker.internal:5188/swagger/v1/4923274423259759928
+  * Node Name: `http://host.docker.internal:5188/swagger/v1/4923274423259759928`
   * Method: `GET`
   * Parameter: ``
   * Attack: ``
@@ -1793,8 +1818,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/disputes/id/resolve/
+  * Node Name: `http://host.docker.internal:5188/api/disputes/id/resolve/ ()({outcome,resolutionNote,notes})`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/disputes/id/review
   * Node Name: `http://host.docker.internal:5188/api/disputes/id/review`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/disputes/id/review/
+  * Node Name: `http://host.docker.internal:5188/api/disputes/id/review/`
   * Method: `PATCH`
   * Parameter: ``
   * Attack: ``
@@ -1807,8 +1846,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/disputes/id/status/
+  * Node Name: `http://host.docker.internal:5188/api/disputes/id/status/ ()({status,resolutionNote,notes,outcome})`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/invoices/id/cancel
   * Node Name: `http://host.docker.internal:5188/api/invoices/id/cancel ()({voidReason})`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/cancel/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/cancel/ ()({voidReason})`
   * Method: `PATCH`
   * Parameter: ``
   * Attack: ``
@@ -1821,6 +1874,13 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/status/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/status/ ()({status})`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/invoices/id/void
   * Node Name: `http://host.docker.internal:5188/api/invoices/id/void ()({voidReason})`
   * Method: `PATCH`
@@ -1828,8 +1888,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/void/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/void/ ()({voidReason})`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/status
   * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/status ()({status})`
+  * Method: `PATCH`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/status/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/status/ ()({status})`
   * Method: `PATCH`
   * Parameter: ``
   * Attack: ``
@@ -2045,8 +2119,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `400`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/disputes/
+  * Node Name: `http://host.docker.internal:5188/api/disputes/ ()({tripId,category,description})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `400`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/disputes/id/resolve
   * Node Name: `http://host.docker.internal:5188/api/disputes/id/resolve ()({outcome,resolutionNote,notes})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/disputes/id/resolve/
+  * Node Name: `http://host.docker.internal:5188/api/disputes/id/resolve/ ()({outcome,resolutionNote,notes})`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2059,8 +2147,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/ ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes,status,issueImmediately})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `403`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/invoices/delivery-event/tripId
   * Node Name: `http://host.docker.internal:5188/api/invoices/delivery-event/tripId`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/delivery-event/tripId/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/delivery-event/tripId/`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2073,8 +2175,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/confirm-payment/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/confirm-payment/`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/invoices/id/issue
   * Node Name: `http://host.docker.internal:5188/api/invoices/id/issue`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/issue/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/issue/`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2087,8 +2203,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/payment-proof/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/payment-proof/ ()({publicId})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/invoices/id/void
   * Node Name: `http://host.docker.internal:5188/api/invoices/id/void ()({voidReason})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/void/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/void/ ()({voidReason})`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2101,8 +2231,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/on-delivery/tripId/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/on-delivery/tripId/`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve ()({agencyId,vehicleId,driverId,notes})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve/ ()({agencyId,vehicleId,driverId,notes})`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2115,6 +2259,13 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/ ()({baseFare,ratePerKg,driverCostPerKm,maintenanceAllowancePerKm,marginPercent,source,effectiveFrom})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `403`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates ()({fuelType,pricePerLitre,source,effectiveFrom})`
   * Method: `POST`
@@ -2122,8 +2273,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `403`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/ ()({fuelType,pricePerLitre,source,effectiveFrom})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `403`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency ()({classLabel,minPayloadKg,maxPayloadKg,minVolumeM3,maxVolumeM3,fuelConsumptionLPer100Km,source,effectiveFrom})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `403`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/ ()({classLabel,minPayloadKg,maxPayloadKg,minVolumeM3,maxVolumeM3,fuelConsumptionLPer100Km,source,effectiveFrom})`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2150,8 +2315,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/activate/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/activate/`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs
   * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs ()({publicId,docType,docNumber,issuedOn,expiresOn})`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/ ()({publicId,docType,docNumber,issuedOn,expiresOn})`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2164,8 +2343,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/reject/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/reject/`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/verify
   * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/verify`
+  * Method: `POST`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/verify/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/verify/`
   * Method: `POST`
   * Parameter: ``
   * Attack: ``
@@ -2864,8 +3057,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/disputes/id/
+  * Node Name: `http://host.docker.internal:5188/api/disputes/id/ ()({category,description})`
+  * Method: `PUT`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/invoices/id
   * Node Name: `http://host.docker.internal:5188/api/invoices/id ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes})`
+  * Method: `PUT`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/invoices/id/
+  * Node Name: `http://host.docker.internal:5188/api/invoices/id/ ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes})`
   * Method: `PUT`
   * Parameter: ``
   * Attack: ``
@@ -2892,8 +3099,22 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Attack: ``
   * Evidence: `404`
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/ ()({publicId,docNumber,issuedOn,expiresOn})`
+  * Method: `PUT`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId
   * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId ()({fullName,licenceNo,licenceExpiry})`
+  * Method: `PUT`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `404`
+  * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/
+  * Node Name: `http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/ ()({fullName,licenceNo,licenceExpiry})`
   * Method: `PUT`
   * Parameter: ``
   * Attack: ``
@@ -2971,7 +3192,7 @@ Raised by the 'Alert on HTTP Response Code Error' script
   * Other Info: ``
 
 
-Instances: 371
+Instances: 403
 
 ### Solution
 
@@ -3078,6 +3299,13 @@ The response contents are not storable by caching components such as proxy serve
   * Attack: ``
   * Evidence: `DELETE `
   * Other Info: ``
+* URL: http://host.docker.internal:5188/api/v1/admin/analytics/summary
+  * Node Name: `http://host.docker.internal:5188/api/v1/admin/analytics/summary`
+  * Method: `GET`
+  * Parameter: ``
+  * Attack: ``
+  * Evidence: `authorization:`
+  * Other Info: ``
 * URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates`
   * Method: `GET`
@@ -3088,13 +3316,6 @@ The response contents are not storable by caching components such as proxy serve
 * URL: http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/history%3FfuelType=AutoDiesel
   * Node Name: `http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/history (fuelType)`
   * Method: `GET`
-  * Parameter: ``
-  * Attack: ``
-  * Evidence: `authorization:`
-  * Other Info: ``
-* URL: http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve
-  * Node Name: `http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve ()({agencyId,vehicleId,driverId,notes})`
-  * Method: `POST`
   * Parameter: ``
   * Attack: ``
   * Evidence: `authorization:`

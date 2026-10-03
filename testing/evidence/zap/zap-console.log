@@ -1,6 +1,6 @@
-2026-10-02 16:39:11,944 Using override, new target: http://host.docker.internal:5188
-2026-10-02 16:39:11,945 Number of Imported URLs: 154
-Total of 355 URLs
+2026-10-03 04:30:52,869 Using override, new target: http://host.docker.internal:5188
+2026-10-03 04:30:52,869 Number of Imported URLs: 154
+Total of 376 URLs
 PASS: Directory Browsing [0]
 PASS: Vulnerable JS Library (Powered by Retire.js) [10003]
 PASS: In Page Banner Information Leak [10009]
@@ -120,7 +120,7 @@ WARN-NEW: A Server Error response code was returned by the server [100000] x 10
 	http://host.docker.internal:5188/api/v1/files/single (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/publicId (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/content/publicId (500 Internal Server Error)
-	http://host.docker.internal:5188/api/v1/files/content/2788767624816994454 (500 Internal Server Error)
+	http://host.docker.internal:5188/api/v1/files/content/3573803705549419192 (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/content (500 Internal Server Error)
 WARN-NEW: Unexpected Content-Type was returned [100001] x 2 
 	http://host.docker.internal:5188/swagger/index.html (200 OK)
@@ -129,12 +129,12 @@ WARN-NEW: Timestamp Disclosure - Unix [10096] x 1
 	http://host.docker.internal:5188/api/v1/auth/me (200 OK)
 WARN-NEW: Cross-Origin-Resource-Policy Header Missing or Invalid [90004] x 7 
 	http://host.docker.internal:5188/swagger/v1/swagger.json (200 OK)
-	http://host.docker.internal:5188/api/v1/auth/agencies (200 OK)
-	http://host.docker.internal:5188/api/v1/auth/resend-verification (202 Accepted)
 	http://host.docker.internal:5188/api/v1/auth/forgot-password (202 Accepted)
+	http://host.docker.internal:5188/api/v1/auth/resend-verification (202 Accepted)
 	http://host.docker.internal:5188/api/v1/auth/me (200 OK)
+	http://host.docker.internal:5188/api/v1/auth/agencies (200 OK)
 WARN-NEW: Application Error Disclosure [90022] x 3 
-	http://host.docker.internal:5188/api/v1/files/publicId (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/single (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/content/publicId (500 Internal Server Error)
+	http://host.docker.internal:5188/api/v1/files/publicId (500 Internal Server Error)
 FAIL-NEW: 0	FAIL-INPROG: 0	WARN-NEW: 5	WARN-INPROG: 0	INFO: 0	IGNORE: 0	PASS: 115

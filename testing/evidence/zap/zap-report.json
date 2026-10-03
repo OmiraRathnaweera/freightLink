@@ -1,25 +1,9 @@
 {
 	"@programName": "ZAP",
 	"@version": "2.17.0",
-	"@generated": "Fri, 2 Oct 2026 16:40:05",
-	"created": "2026-10-02T16:40:05.341998972Z",
+	"@generated": "Sat, 3 Oct 2026 04:31:43",
+	"created": "2026-10-03T04:31:43.381455634Z",
 	"insights":[
-		{
-			"level": "Medium",
-			"reason": "Exceeded Low",
-			"site": "",
-			"key": "insight.memory.usage",
-			"description": "Percentage of memory used",
-			"statistic": "83"
-		},
-		{
-			"level": "Low",
-			"reason": "Warning",
-			"site": "",
-			"key": "insight.log.warn",
-			"description": "ZAP warnings logged - see the zap.log file for details",
-			"statistic": "2"
-		},
 		{
 			"level": "Low",
 			"reason": "Exceeded High",
@@ -34,7 +18,7 @@
 			"site": "",
 			"key": "insight.network.failure",
 			"description": "Percentage of network failures",
-			"statistic": "2"
+			"statistic": "4"
 		},
 		{
 			"level": "Info",
@@ -42,7 +26,7 @@
 			"site": "http://host.docker.internal:5188",
 			"key": "insight.code.2xx",
 			"description": "Percentage of responses with status code 2xx",
-			"statistic": "3"
+			"statistic": "5"
 		},
 		{
 			"level": "Info",
@@ -58,7 +42,7 @@
 			"site": "http://host.docker.internal:5188",
 			"key": "insight.endpoint.ctype.application/json",
 			"description": "Percentage of endpoints with content type application/json",
-			"statistic": "27"
+			"statistic": "26"
 		},
 		{
 			"level": "Info",
@@ -74,7 +58,7 @@
 			"site": "http://host.docker.internal:5188",
 			"key": "insight.endpoint.method.GET",
 			"description": "Percentage of endpoints with method GET",
-			"statistic": "52"
+			"statistic": "48"
 		},
 		{
 			"level": "Info",
@@ -82,7 +66,7 @@
 			"site": "http://host.docker.internal:5188",
 			"key": "insight.endpoint.method.PATCH",
 			"description": "Percentage of endpoints with method PATCH",
-			"statistic": "9"
+			"statistic": "10"
 		},
 		{
 			"level": "Info",
@@ -90,7 +74,7 @@
 			"site": "http://host.docker.internal:5188",
 			"key": "insight.endpoint.method.POST",
 			"description": "Percentage of endpoints with method POST",
-			"statistic": "30"
+			"statistic": "32"
 		},
 		{
 			"level": "Info",
@@ -106,15 +90,7 @@
 			"site": "http://host.docker.internal:5188",
 			"key": "insight.endpoint.total",
 			"description": "Count of total endpoints",
-			"statistic": "385"
-		},
-		{
-			"level": "Info",
-			"reason": "Informational",
-			"site": "http://host.docker.internal:5188",
-			"key": "insight.response.slow",
-			"description": "Percentage of slow responses",
-			"statistic": "6"
+			"statistic": "417"
 		}
 	],
 	"site":[ 
@@ -145,7 +121,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36291",
+							"id": "34821",
 							"uri": "http://host.docker.internal:5188/api/v1/files/publicId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/publicId\/",
 							"method": "DELETE",
@@ -155,7 +131,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3173",
+							"id": "3305",
 							"uri": "http://host.docker.internal:5188/api/v1/files/content",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/content",
 							"method": "GET",
@@ -165,7 +141,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36397",
+							"id": "34933",
 							"uri": "http://host.docker.internal:5188/api/v1/files/content/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/content\/",
 							"method": "GET",
@@ -175,9 +151,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "197",
-							"uri": "http://host.docker.internal:5188/api/v1/files/content/2788767624816994454",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/content\/2788767624816994454",
+							"id": "190",
+							"uri": "http://host.docker.internal:5188/api/v1/files/content/3573803705549419192",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/content\/3573803705549419192",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -195,7 +171,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36398",
+							"id": "34934",
 							"uri": "http://host.docker.internal:5188/api/v1/files/content/publicId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/content\/publicId\/",
 							"method": "GET",
@@ -215,7 +191,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "40780",
+							"id": "39999",
 							"uri": "http://host.docker.internal:5188/api/v1/files/single",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/single ()(multipart:rtobject)",
 							"method": "POST",
@@ -225,7 +201,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36289",
+							"id": "34833",
 							"uri": "http://host.docker.internal:5188/api/v1/files/single/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/single\/ ()(multipart:file)",
 							"method": "POST",
@@ -255,7 +231,7 @@
 					"desc": "<p>This page contains an error/warning message that may disclose sensitive information like the location of the file that produced the unhandled exception. This information can be used to launch further attacks against the web application. The alert could be a false positive if the error message is found inside a documentation page.</p>",
 					"instances":[ 
 						{
-							"id": "207",
+							"id": "368",
 							"uri": "http://host.docker.internal:5188/api/v1/files/publicId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/publicId",
 							"method": "DELETE",
@@ -265,7 +241,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "220",
+							"id": "335",
 							"uri": "http://host.docker.internal:5188/api/v1/files/content/publicId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/content\/publicId",
 							"method": "GET",
@@ -275,7 +251,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "210",
+							"id": "325",
 							"uri": "http://host.docker.internal:5188/api/v1/files/single",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/single ()(multipart:file)",
 							"method": "POST",
@@ -305,7 +281,7 @@
 					"desc": "<p>Cross-Origin-Resource-Policy header is an opt-in header designed to counter side-channels attacks like Spectre. Resource should be specifically set as shareable amongst different origins.</p>",
 					"instances":[ 
 						{
-							"id": "180",
+							"id": "269",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/agencies",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/agencies",
 							"method": "GET",
@@ -315,7 +291,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "191",
+							"id": "261",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/me",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/me",
 							"method": "GET",
@@ -325,7 +301,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "96",
+							"id": "244",
 							"uri": "http://host.docker.internal:5188/swagger/v1/swagger.json",
 							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/v1\/swagger.json",
 							"method": "GET",
@@ -335,7 +311,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "187",
+							"id": "247",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/forgot-password",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/forgot-password ()({email})",
 							"method": "POST",
@@ -345,7 +321,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "183",
+							"id": "251",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/resend-verification",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/resend-verification ()({email})",
 							"method": "POST",
@@ -375,20 +351,20 @@
 					"desc": "<p>A timestamp was disclosed by the application/web server. - Unix</p>",
 					"instances":[ 
 						{
-							"id": "190",
+							"id": "258",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/me",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/me",
 							"method": "GET",
 							"param": "",
 							"attack": "",
-							"evidence": "1790959115",
-							"otherinfo": "1790959115, which evaluates to: 2026-10-02 16:38:35."
+							"evidence": "1791001816",
+							"otherinfo": "1791001816, which evaluates to: 2026-10-03 04:30:16."
 						}
 					],
 					"count": "1",
 					"systemic": false,
 					"solution": "<p>Manually confirm that the timestamp data is not sensitive, and that the data cannot be aggregated to disclose exploitable patterns.</p>",
-					"otherinfo": "<p>1790959115, which evaluates to: 2026-10-02 16:38:35.</p>",
+					"otherinfo": "<p>1791001816, which evaluates to: 2026-10-03 04:30:16.</p>",
 					"reference": "<p>https://cwe.mitre.org/data/definitions/200.html</p>",
 					"cweid": "497",
 					"wascid": "13",
@@ -405,7 +381,7 @@
 					"desc": "<p>A Content-Type of text/html was returned by the server.</p><p>This is not one of the types expected to be returned by an API.</p><p>Raised by the 'Alert on Unexpected Content Types' script</p>",
 					"instances":[ 
 						{
-							"id": "36433",
+							"id": "34969",
 							"uri": "http://host.docker.internal:5188/swagger/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/",
 							"method": "GET",
@@ -415,7 +391,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36432",
+							"id": "34968",
 							"uri": "http://host.docker.internal:5188/swagger/index.html",
 							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/index.html",
 							"method": "GET",
@@ -432,7 +408,7 @@
 					"reference": "",
 					"cweid": "-1",
 					"wascid": "-1",
-					"sourceid": "36768"
+					"sourceid": "35323"
 				},
 				{
 					"pluginid": "100000",
@@ -445,9 +421,19 @@
 					"desc": "<p>A response code of 404 was returned by the server.</p><p>This may indicate that the application is failing to handle unexpected input correctly.</p><p>Raised by the 'Alert on HTTP Response Code Error' script</p>",
 					"instances":[ 
 						{
-							"id": "103",
+							"id": "94",
 							"uri": "http://host.docker.internal:5188/api/invoices/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id ()({voidReason})",
+							"method": "DELETE",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34778",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/ ()({voidReason})",
 							"method": "DELETE",
 							"param": "",
 							"attack": "",
@@ -465,9 +451,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34789",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/id/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config\/id\/",
+							"method": "DELETE",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "5",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/id",
+							"method": "DELETE",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34791",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/id/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/id\/",
 							"method": "DELETE",
 							"param": "",
 							"attack": "",
@@ -485,7 +491,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "106",
+							"id": "34790",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/id/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency\/id\/",
+							"method": "DELETE",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "97",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id ()({voidReason})",
 							"method": "DELETE",
@@ -495,7 +511,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36298",
+							"id": "34834",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/ ()({voidReason})",
 							"method": "DELETE",
@@ -505,7 +521,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "124",
+							"id": "114",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files/fileId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files\/fileId",
 							"method": "DELETE",
@@ -515,7 +531,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36299",
+							"id": "34851",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files/fileId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files\/fileId\/",
 							"method": "DELETE",
@@ -525,7 +541,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "150",
+							"id": "137",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id",
 							"method": "DELETE",
@@ -535,7 +551,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36315",
+							"id": "34853",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/",
 							"method": "DELETE",
@@ -545,7 +561,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2438",
+							"id": "2385",
 							"uri": "http://host.docker.internal:5188",
 							"nodeName": "http:\/\/host.docker.internal:5188",
 							"method": "GET",
@@ -555,7 +571,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36332",
+							"id": "34868",
 							"uri": "http://host.docker.internal:5188/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/",
 							"method": "GET",
@@ -565,9 +581,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "156",
-							"uri": "http://host.docker.internal:5188/987760468303718885",
-							"nodeName": "http:\/\/host.docker.internal:5188\/987760468303718885",
+							"id": "148",
+							"uri": "http://host.docker.internal:5188/5915770773825691710",
+							"nodeName": "http:\/\/host.docker.internal:5188\/5915770773825691710",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -575,7 +591,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2453",
+							"id": "2418",
 							"uri": "http://host.docker.internal:5188/api",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api",
 							"method": "GET",
@@ -585,7 +601,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36333",
+							"id": "34869",
 							"uri": "http://host.docker.internal:5188/api/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/",
 							"method": "GET",
@@ -595,9 +611,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "157",
-							"uri": "http://host.docker.internal:5188/api/1341691845460077625",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/1341691845460077625",
+							"id": "149",
+							"uri": "http://host.docker.internal:5188/api/6392330707868380105",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/6392330707868380105",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -615,9 +631,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "158",
-							"uri": "http://host.docker.internal:5188/api/disputes/3311673958633571875",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/3311673958633571875",
+							"id": "150",
+							"uri": "http://host.docker.internal:5188/api/disputes/7426691963177025710",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/7426691963177025710",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -635,7 +651,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36334",
+							"id": "34870",
 							"uri": "http://host.docker.internal:5188/api/disputes/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/",
 							"method": "GET",
@@ -645,9 +661,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "159",
-							"uri": "http://host.docker.internal:5188/api/disputes/id/7192531451207555591",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/7192531451207555591",
+							"id": "151",
+							"uri": "http://host.docker.internal:5188/api/disputes/id/7336341693074924557",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/7336341693074924557",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -655,7 +671,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "40112",
+							"id": "39372",
 							"uri": "http://host.docker.internal:5188/api/disputes/id/actuator/health",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/actuator\/health",
 							"method": "GET",
@@ -665,7 +681,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "87",
+							"id": "80",
 							"uri": "http://host.docker.internal:5188/api/invoices?Page=10&PageSize=10&Status=Draft&TripId=TripId&RecipientId=RecipientId&StartDate=StartDate&EndDate=EndDate&Search=ZAP&SortOrder=SortOrder",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices (EndDate,Page,PageSize,RecipientId,Search,SortOrder,StartDate,Status,TripId)",
 							"method": "GET",
@@ -675,9 +691,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "160",
-							"uri": "http://host.docker.internal:5188/api/invoices/1364111747355914208",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/1364111747355914208",
+							"id": "152",
+							"uri": "http://host.docker.internal:5188/api/invoices/1416559210465374353",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/1416559210465374353",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -685,7 +701,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2694",
+							"id": "2588",
 							"uri": "http://host.docker.internal:5188/api/invoices/delivery-event",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/delivery-event",
 							"method": "GET",
@@ -695,7 +711,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36336",
+							"id": "34872",
 							"uri": "http://host.docker.internal:5188/api/invoices/delivery-event/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/delivery-event\/",
 							"method": "GET",
@@ -705,9 +721,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "161",
-							"uri": "http://host.docker.internal:5188/api/invoices/delivery-event/3225679720472530758",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/delivery-event\/3225679720472530758",
+							"id": "153",
+							"uri": "http://host.docker.internal:5188/api/invoices/delivery-event/5027785071902279652",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/delivery-event\/5027785071902279652",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -715,7 +731,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "101",
+							"id": "92",
 							"uri": "http://host.docker.internal:5188/api/invoices/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id",
 							"method": "GET",
@@ -725,7 +741,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36337",
+							"id": "34874",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/",
 							"method": "GET",
@@ -735,9 +751,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "162",
-							"uri": "http://host.docker.internal:5188/api/invoices/id/3720433387435379001",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/3720433387435379001",
+							"id": "154",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/1008782566611982746",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/1008782566611982746",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -745,7 +761,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2702",
+							"id": "2612",
 							"uri": "http://host.docker.internal:5188/api/invoices/on-delivery",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/on-delivery",
 							"method": "GET",
@@ -755,7 +771,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36339",
+							"id": "34876",
 							"uri": "http://host.docker.internal:5188/api/invoices/on-delivery/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/on-delivery\/",
 							"method": "GET",
@@ -765,9 +781,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "163",
-							"uri": "http://host.docker.internal:5188/api/invoices/on-delivery/8358180339116322604",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/on-delivery\/8358180339116322604",
+							"id": "155",
+							"uri": "http://host.docker.internal:5188/api/invoices/on-delivery/3154998787051147905",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/on-delivery\/3154998787051147905",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -775,7 +791,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "91",
+							"id": "84",
 							"uri": "http://host.docker.internal:5188/api/invoices/recipients",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/recipients",
 							"method": "GET",
@@ -785,7 +801,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36340",
+							"id": "34878",
 							"uri": "http://host.docker.internal:5188/api/invoices/recipients/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/recipients\/",
 							"method": "GET",
@@ -795,7 +811,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "93",
+							"id": "86",
 							"uri": "http://host.docker.internal:5188/api/invoices/summary",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/summary",
 							"method": "GET",
@@ -805,7 +821,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36341",
+							"id": "34875",
 							"uri": "http://host.docker.internal:5188/api/invoices/summary/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/summary\/",
 							"method": "GET",
@@ -815,7 +831,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2719",
+							"id": "2645",
 							"uri": "http://host.docker.internal:5188/api/v1",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1",
 							"method": "GET",
@@ -825,7 +841,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36346",
+							"id": "34882",
 							"uri": "http://host.docker.internal:5188/api/v1/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/",
 							"method": "GET",
@@ -835,9 +851,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "164",
-							"uri": "http://host.docker.internal:5188/api/v1/8743954675352407998",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/8743954675352407998",
+							"id": "156",
+							"uri": "http://host.docker.internal:5188/api/v1/1040287228876112544",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/1040287228876112544",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -845,7 +861,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2738",
+							"id": "2658",
 							"uri": "http://host.docker.internal:5188/api/v1/admin",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin",
 							"method": "GET",
@@ -855,7 +871,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36344",
+							"id": "34881",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/",
 							"method": "GET",
@@ -865,9 +881,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "165",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/8107423127187167663",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/8107423127187167663",
+							"id": "158",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/6607365369885516264",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/6607365369885516264",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -875,7 +891,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2745",
+							"id": "2685",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows",
 							"method": "GET",
@@ -885,7 +901,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36347",
+							"id": "34883",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/",
 							"method": "GET",
@@ -895,9 +911,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "166",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/7413886092497644451",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/7413886092497644451",
+							"id": "159",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/6446871392787747500",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/6446871392787747500",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -905,7 +921,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2756",
+							"id": "2708",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/workflowRunId",
 							"method": "GET",
@@ -915,7 +931,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36350",
+							"id": "34885",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/workflowRunId\/",
 							"method": "GET",
@@ -925,9 +941,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "167",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/7834444584205520992",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/workflowRunId\/7834444584205520992",
+							"id": "160",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/5461773534958936427",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/workflowRunId\/5461773534958936427",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -935,7 +951,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2762",
+							"id": "2735",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/analytics",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/analytics",
 							"method": "GET",
@@ -945,7 +961,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36351",
+							"id": "34887",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/analytics/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/analytics\/",
 							"method": "GET",
@@ -955,9 +971,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "168",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/analytics/6556677733697797991",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/analytics\/6556677733697797991",
+							"id": "162",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/analytics/433771611538669618",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/analytics\/433771611538669618",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -975,7 +991,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36352",
+							"id": "34889",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/analytics/summary/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/analytics\/summary\/",
 							"method": "GET",
@@ -985,7 +1001,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2777",
+							"id": "2760",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing",
 							"method": "GET",
@@ -995,7 +1011,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36354",
+							"id": "34891",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/",
 							"method": "GET",
@@ -1005,9 +1021,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "169",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/5050048219759179553",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/5050048219759179553",
+							"id": "163",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/7497027316162491343",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/7497027316162491343",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1025,7 +1041,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36355",
+							"id": "34896",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config\/",
 							"method": "GET",
@@ -1035,9 +1051,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "170",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/6436820274809183728",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config\/6436820274809183728",
+							"id": "168",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/5928055874197491558",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config\/5928055874197491558",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1055,7 +1071,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36356",
+							"id": "34890",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/history/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config\/history\/",
 							"method": "GET",
@@ -1075,7 +1091,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36358",
+							"id": "34894",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/",
 							"method": "GET",
@@ -1085,9 +1101,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "171",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/1906288128648575079",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/1906288128648575079",
+							"id": "170",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/6653133526733924414",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/6653133526733924414",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1105,7 +1121,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36361",
+							"id": "34892",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/history/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/history\/",
 							"method": "GET",
@@ -1125,7 +1141,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36360",
+							"id": "34897",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency\/",
 							"method": "GET",
@@ -1135,9 +1151,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "172",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/1646292237904593163",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency\/1646292237904593163",
+							"id": "171",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/5098072416110569263",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency\/5098072416110569263",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1155,7 +1171,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36357",
+							"id": "34895",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/history/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency\/history\/",
 							"method": "GET",
@@ -1165,7 +1181,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2800",
+							"id": "2778",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies",
 							"method": "GET",
@@ -1185,7 +1201,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36363",
+							"id": "34899",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/",
 							"method": "GET",
@@ -1195,9 +1211,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "173",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/665632461787700543",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/665632461787700543",
+							"id": "172",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/3745211044952765965",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/3745211044952765965",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1215,7 +1231,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36366",
+							"id": "34902",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/expiring-compliance/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/expiring-compliance\/",
 							"method": "GET",
@@ -1235,7 +1251,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36362",
+							"id": "34903",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/",
 							"method": "GET",
@@ -1245,9 +1261,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "174",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/8305280421368343141",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/8305280421368343141",
+							"id": "173",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/2189029925854497100",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/2189029925854497100",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1265,7 +1281,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36364",
+							"id": "34900",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/",
 							"method": "GET",
@@ -1275,9 +1291,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "176",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/371424773755092441",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/371424773755092441",
+							"id": "174",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/7974592160141362888",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/7974592160141362888",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1285,7 +1301,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2827",
+							"id": "3183",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId",
 							"method": "GET",
@@ -1295,7 +1311,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36368",
+							"id": "34901",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/",
 							"method": "GET",
@@ -1305,9 +1321,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "177",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/8424593451207437666",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/8424593451207437666",
+							"id": "175",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/1249140525866273204",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/1249140525866273204",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1325,7 +1341,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36367",
+							"id": "34904",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/",
 							"method": "GET",
@@ -1335,9 +1351,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "178",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/2280641557848855750",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/2280641557848855750",
+							"id": "176",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/2131024598367658831",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/2131024598367658831",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1345,7 +1361,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2838",
+							"id": "3192",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId",
 							"method": "GET",
@@ -1355,7 +1371,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36370",
+							"id": "34908",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId\/",
 							"method": "GET",
@@ -1365,9 +1381,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "179",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/4084844631283027646",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId\/4084844631283027646",
+							"id": "177",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/7477262808719245412",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId\/7477262808719245412",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1385,7 +1401,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36372",
+							"id": "34907",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/fleet/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/fleet\/",
 							"method": "GET",
@@ -1405,7 +1421,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36371",
+							"id": "34906",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/",
 							"method": "GET",
@@ -1415,9 +1431,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "181",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/7254518382959559662",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/7254518382959559662",
+							"id": "178",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/5599868387516355762",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/5599868387516355762",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1425,7 +1441,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2848",
+							"id": "3204",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/vehicleId",
 							"method": "GET",
@@ -1435,7 +1451,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36374",
+							"id": "34911",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/vehicleId\/",
 							"method": "GET",
@@ -1445,9 +1461,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "182",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/7791964590987460335",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/vehicleId\/7791964590987460335",
+							"id": "179",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/8568217173220753096",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/vehicleId\/8568217173220753096",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1455,7 +1471,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "2864",
+							"id": "3216",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/my",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/my",
 							"method": "GET",
@@ -1465,7 +1481,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36376",
+							"id": "34912",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/my/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/my\/",
 							"method": "GET",
@@ -1475,9 +1491,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "184",
-							"uri": "http://host.docker.internal:5188/api/v1/agencies/my/8892890871753187128",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/my\/8892890871753187128",
+							"id": "180",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/my/6220830945453988938",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/my\/6220830945453988938",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1495,7 +1511,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36379",
+							"id": "34916",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/my/fleet/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/my\/fleet\/",
 							"method": "GET",
@@ -1515,7 +1531,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36377",
+							"id": "34915",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/summary/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/summary\/",
 							"method": "GET",
@@ -1535,7 +1551,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36378",
+							"id": "34914",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/verification-queue/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/verification-queue\/",
 							"method": "GET",
@@ -1545,7 +1561,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3079",
+							"id": "3230",
 							"uri": "http://host.docker.internal:5188/api/v1/assignment-actions",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignment-actions",
 							"method": "GET",
@@ -1555,7 +1571,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36383",
+							"id": "34919",
 							"uri": "http://host.docker.internal:5188/api/v1/assignment-actions/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignment-actions\/",
 							"method": "GET",
@@ -1565,9 +1581,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "185",
-							"uri": "http://host.docker.internal:5188/api/v1/assignment-actions/6811139873797834457",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignment-actions\/6811139873797834457",
+							"id": "181",
+							"uri": "http://host.docker.internal:5188/api/v1/assignment-actions/9163311789685514106",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignment-actions\/9163311789685514106",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1575,7 +1591,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3088",
+							"id": "3235",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments",
 							"method": "GET",
@@ -1595,7 +1611,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36385",
+							"id": "34923",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/",
 							"method": "GET",
@@ -1605,9 +1621,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "186",
-							"uri": "http://host.docker.internal:5188/api/v1/assignments/1564098355721595759",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/1564098355721595759",
+							"id": "182",
+							"uri": "http://host.docker.internal:5188/api/v1/assignments/5664500772671667966",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/5664500772671667966",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1625,7 +1641,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36384",
+							"id": "34922",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/id\/",
 							"method": "GET",
@@ -1635,9 +1651,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "188",
-							"uri": "http://host.docker.internal:5188/api/v1/assignments/id/5597186725601554365",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/id\/5597186725601554365",
+							"id": "183",
+							"uri": "http://host.docker.internal:5188/api/v1/assignments/id/4837416978738312554",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/id\/4837416978738312554",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1645,7 +1661,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3092",
+							"id": "3243",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/loadId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/loadId",
 							"method": "GET",
@@ -1655,7 +1671,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36388",
+							"id": "34921",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/loadId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/loadId\/",
 							"method": "GET",
@@ -1665,9 +1681,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "189",
-							"uri": "http://host.docker.internal:5188/api/v1/assignments/loadId/7928806833235785236",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/loadId\/7928806833235785236",
+							"id": "184",
+							"uri": "http://host.docker.internal:5188/api/v1/assignments/loadId/584042255051144598",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/loadId\/584042255051144598",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1675,7 +1691,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3102",
+							"id": "3260",
 							"uri": "http://host.docker.internal:5188/api/v1/auth",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth",
 							"method": "GET",
@@ -1685,7 +1701,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36390",
+							"id": "34926",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/",
 							"method": "GET",
@@ -1695,9 +1711,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "192",
-							"uri": "http://host.docker.internal:5188/api/v1/auth/2371814685459427248",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/2371814685459427248",
+							"id": "185",
+							"uri": "http://host.docker.internal:5188/api/v1/auth/1845468062267619293",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/1845468062267619293",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1705,7 +1721,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3114",
+							"id": "3268",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/register",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/register",
 							"method": "GET",
@@ -1715,7 +1731,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36392",
+							"id": "34928",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/register/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/register\/",
 							"method": "GET",
@@ -1725,9 +1741,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "193",
-							"uri": "http://host.docker.internal:5188/api/v1/auth/register/873670511320827157",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/register\/873670511320827157",
+							"id": "186",
+							"uri": "http://host.docker.internal:5188/api/v1/auth/register/5926813144130788966",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/register\/5926813144130788966",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1745,9 +1761,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "194",
-							"uri": "http://host.docker.internal:5188/api/v1/disputes/8132500010289239645",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/8132500010289239645",
+							"id": "187",
+							"uri": "http://host.docker.internal:5188/api/v1/disputes/972791363685860990",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/972791363685860990",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1765,7 +1781,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36393",
+							"id": "34929",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/",
 							"method": "GET",
@@ -1775,9 +1791,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "195",
-							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/1538036331302240373",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/1538036331302240373",
+							"id": "188",
+							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/9220917280634756045",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/9220917280634756045",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1785,7 +1801,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3160",
+							"id": "3293",
 							"uri": "http://host.docker.internal:5188/api/v1/files",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files",
 							"method": "GET",
@@ -1795,7 +1811,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36395",
+							"id": "34931",
 							"uri": "http://host.docker.internal:5188/api/v1/files/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/",
 							"method": "GET",
@@ -1805,9 +1821,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "196",
-							"uri": "http://host.docker.internal:5188/api/v1/files/6005768219521626599",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/6005768219521626599",
+							"id": "189",
+							"uri": "http://host.docker.internal:5188/api/v1/files/7787767114608329877",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/files\/7787767114608329877",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1815,7 +1831,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "89",
+							"id": "82",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices?Page=10&PageSize=10&Status=Draft&TripId=TripId&RecipientId=RecipientId&StartDate=StartDate&EndDate=EndDate&Search=ZAP&SortOrder=SortOrder",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices (EndDate,Page,PageSize,RecipientId,Search,SortOrder,StartDate,Status,TripId)",
 							"method": "GET",
@@ -1825,9 +1841,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "198",
-							"uri": "http://host.docker.internal:5188/api/v1/invoices/3146203977021293381",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/3146203977021293381",
+							"id": "191",
+							"uri": "http://host.docker.internal:5188/api/v1/invoices/3354235362135206828",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/3354235362135206828",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1835,7 +1851,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3199",
+							"id": "3328",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/delivery-event",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/delivery-event",
 							"method": "GET",
@@ -1845,7 +1861,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36400",
+							"id": "34936",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/delivery-event/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/delivery-event\/",
 							"method": "GET",
@@ -1855,9 +1871,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "199",
-							"uri": "http://host.docker.internal:5188/api/v1/invoices/delivery-event/6185276585506929103",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/delivery-event\/6185276585506929103",
+							"id": "192",
+							"uri": "http://host.docker.internal:5188/api/v1/invoices/delivery-event/1136894711733199185",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/delivery-event\/1136894711733199185",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1865,7 +1881,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "104",
+							"id": "95",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id",
 							"method": "GET",
@@ -1875,7 +1891,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36402",
+							"id": "34937",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/",
 							"method": "GET",
@@ -1885,9 +1901,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "200",
-							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/4104310442303657990",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/4104310442303657990",
+							"id": "193",
+							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/5032532619534569121",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/5032532619534569121",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1895,7 +1911,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3209",
+							"id": "3333",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/on-delivery",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/on-delivery",
 							"method": "GET",
@@ -1905,7 +1921,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36403",
+							"id": "34939",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/on-delivery/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/on-delivery\/",
 							"method": "GET",
@@ -1915,9 +1931,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "201",
-							"uri": "http://host.docker.internal:5188/api/v1/invoices/on-delivery/2102846032038521498",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/on-delivery\/2102846032038521498",
+							"id": "194",
+							"uri": "http://host.docker.internal:5188/api/v1/invoices/on-delivery/3659033463031675273",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/on-delivery\/3659033463031675273",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1925,7 +1941,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "92",
+							"id": "85",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/recipients",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/recipients",
 							"method": "GET",
@@ -1935,7 +1951,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36405",
+							"id": "34940",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/recipients/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/recipients\/",
 							"method": "GET",
@@ -1945,7 +1961,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "94",
+							"id": "87",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/summary",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/summary",
 							"method": "GET",
@@ -1955,7 +1971,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36404",
+							"id": "34941",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/summary/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/summary\/",
 							"method": "GET",
@@ -1965,7 +1981,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "133",
+							"id": "120",
 							"uri": "http://host.docker.internal:5188/api/v1/loads?Page=10&PageSize=10&SortBy=SortBy&SortDir=SortDir&Search=ZAP&Status=Draft&ShipperUserId=ShipperUserId&CreatedFrom=CreatedFrom&CreatedTo=CreatedTo&Marketplace=true",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads (CreatedFrom,CreatedTo,Marketplace,Page,PageSize,Search,ShipperUserId,SortBy,SortDir,Status)",
 							"method": "GET",
@@ -1975,9 +1991,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "202",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/6857622032250704508",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/6857622032250704508",
+							"id": "195",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/8807297916642709619",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/8807297916642709619",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -1985,7 +2001,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "135",
+							"id": "122",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id",
 							"method": "GET",
@@ -1995,7 +2011,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36407",
+							"id": "34942",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/",
 							"method": "GET",
@@ -2005,9 +2021,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "203",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/id/7269535786023074700",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/7269535786023074700",
+							"id": "196",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/id/3035523928504805143",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/3035523928504805143",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2015,7 +2031,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3298",
+							"id": "3410",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId",
 							"method": "GET",
@@ -2025,7 +2041,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36412",
+							"id": "34944",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/",
 							"method": "GET",
@@ -2035,9 +2051,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "204",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/3298844683997116996",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/3298844683997116996",
+							"id": "197",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/7708751657333710352",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/7708751657333710352",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2045,7 +2061,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "121",
+							"id": "112",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files",
 							"method": "GET",
@@ -2055,7 +2071,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36409",
+							"id": "34945",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files\/",
 							"method": "GET",
@@ -2065,9 +2081,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "205",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files/1437279372315839213",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files\/1437279372315839213",
+							"id": "198",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files/3932613048004043851",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files\/3932613048004043851",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2075,7 +2091,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "139",
+							"id": "126",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match",
 							"method": "GET",
@@ -2085,7 +2101,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36408",
+							"id": "34947",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/",
 							"method": "GET",
@@ -2095,9 +2111,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "206",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/3362919359132789318",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/3362919359132789318",
+							"id": "199",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/1879115560639360530",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/1879115560639360530",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2105,7 +2121,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "140",
+							"id": "127",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/history",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/history",
 							"method": "GET",
@@ -2115,7 +2131,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36411",
+							"id": "34948",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/history/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/history\/",
 							"method": "GET",
@@ -2125,7 +2141,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "125",
+							"id": "115",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals",
 							"method": "GET",
@@ -2135,7 +2151,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36413",
+							"id": "34946",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/",
 							"method": "GET",
@@ -2145,9 +2161,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "208",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/4554145796230101436",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/4554145796230101436",
+							"id": "200",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/8818978682061650067",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/8818978682061650067",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2155,7 +2171,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3302",
+							"id": "3420",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId",
 							"method": "GET",
@@ -2165,7 +2181,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36415",
+							"id": "34950",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/",
 							"method": "GET",
@@ -2175,9 +2191,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "209",
-							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/3044931020122367197",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/3044931020122367197",
+							"id": "201",
+							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/5551776443695739007",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/5551776443695739007",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2185,7 +2201,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3310",
+							"id": "3429",
 							"uri": "http://host.docker.internal:5188/api/v1/trips",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips",
 							"method": "GET",
@@ -2195,7 +2211,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "146",
+							"id": "133",
 							"uri": "http://host.docker.internal:5188/api/v1/trips?Page=10&PageSize=10&SortBy=SortBy&SortDir=SortDir&Status=Assigned&AgencyId=AgencyId&DriverId=DriverId&HasInvoice=true",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips (AgencyId,DriverId,HasInvoice,Page,PageSize,SortBy,SortDir,Status)",
 							"method": "GET",
@@ -2205,7 +2221,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36418",
+							"id": "34952",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/",
 							"method": "GET",
@@ -2215,9 +2231,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "211",
-							"uri": "http://host.docker.internal:5188/api/v1/trips/418363376597147657",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/418363376597147657",
+							"id": "202",
+							"uri": "http://host.docker.internal:5188/api/v1/trips/1512816179502471302",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/1512816179502471302",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2225,7 +2241,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "148",
+							"id": "135",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id",
 							"method": "GET",
@@ -2235,7 +2251,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36416",
+							"id": "34955",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/",
 							"method": "GET",
@@ -2245,9 +2261,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "212",
-							"uri": "http://host.docker.internal:5188/api/v1/trips/id/5446205521391768658",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/5446205521391768658",
+							"id": "203",
+							"uri": "http://host.docker.internal:5188/api/v1/trips/id/5091922009203568754",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/5091922009203568754",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2255,7 +2271,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "153",
+							"id": "140",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/evidence",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/evidence",
 							"method": "GET",
@@ -2265,7 +2281,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36417",
+							"id": "34954",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/evidence/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/evidence\/",
 							"method": "GET",
@@ -2275,7 +2291,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3327",
+							"id": "3439",
 							"uri": "http://host.docker.internal:5188/internal",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal",
 							"method": "GET",
@@ -2285,7 +2301,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36421",
+							"id": "34959",
 							"uri": "http://host.docker.internal:5188/internal/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/",
 							"method": "GET",
@@ -2295,9 +2311,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "213",
-							"uri": "http://host.docker.internal:5188/internal/8878918354465181420",
-							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/8878918354465181420",
+							"id": "204",
+							"uri": "http://host.docker.internal:5188/internal/2203468246545195571",
+							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/2203468246545195571",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2305,7 +2321,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3335",
+							"id": "3445",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs",
 							"method": "GET",
@@ -2315,7 +2331,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36424",
+							"id": "34960",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/",
 							"method": "GET",
@@ -2325,9 +2341,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "214",
-							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/775982507428787400",
-							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/775982507428787400",
+							"id": "205",
+							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/6159381328720972463",
+							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/6159381328720972463",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2335,7 +2351,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3349",
+							"id": "3454",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId",
 							"method": "GET",
@@ -2345,7 +2361,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36426",
+							"id": "34962",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId\/",
 							"method": "GET",
@@ -2355,9 +2371,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "216",
-							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/6470518800725959693",
-							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId\/6470518800725959693",
+							"id": "206",
+							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/8411506529203031080",
+							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId\/8411506529203031080",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2365,7 +2381,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3355",
+							"id": "3459",
 							"uri": "http://host.docker.internal:5188/internal/pricing",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/pricing",
 							"method": "GET",
@@ -2375,7 +2391,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36427",
+							"id": "34964",
 							"uri": "http://host.docker.internal:5188/internal/pricing/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/pricing\/",
 							"method": "GET",
@@ -2385,9 +2401,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "217",
-							"uri": "http://host.docker.internal:5188/internal/pricing/3466752255532983182",
-							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/pricing\/3466752255532983182",
+							"id": "207",
+							"uri": "http://host.docker.internal:5188/internal/pricing/5327145620933226991",
+							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/pricing\/5327145620933226991",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2395,7 +2411,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3368",
+							"id": "3464",
 							"uri": "http://host.docker.internal:5188/internal/routing",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/routing",
 							"method": "GET",
@@ -2405,7 +2421,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36429",
+							"id": "34965",
 							"uri": "http://host.docker.internal:5188/internal/routing/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/routing\/",
 							"method": "GET",
@@ -2415,9 +2431,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "218",
-							"uri": "http://host.docker.internal:5188/internal/routing/559974259936506061",
-							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/routing\/559974259936506061",
+							"id": "208",
+							"uri": "http://host.docker.internal:5188/internal/routing/688315644126265932",
+							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/routing\/688315644126265932",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2425,9 +2441,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "219",
-							"uri": "http://host.docker.internal:5188/swagger/700801825177514902",
-							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/700801825177514902",
+							"id": "209",
+							"uri": "http://host.docker.internal:5188/swagger/7115565931287022878",
+							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/7115565931287022878",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2435,7 +2451,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "3393",
+							"id": "3481",
 							"uri": "http://host.docker.internal:5188/swagger/v1",
 							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/v1",
 							"method": "GET",
@@ -2445,7 +2461,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36431",
+							"id": "34967",
 							"uri": "http://host.docker.internal:5188/swagger/v1/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/v1\/",
 							"method": "GET",
@@ -2455,9 +2471,9 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "221",
-							"uri": "http://host.docker.internal:5188/swagger/v1/2021266544458155276",
-							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/v1\/2021266544458155276",
+							"id": "210",
+							"uri": "http://host.docker.internal:5188/swagger/v1/4923274423259759928",
+							"nodeName": "http:\/\/host.docker.internal:5188\/swagger\/v1\/4923274423259759928",
 							"method": "GET",
 							"param": "",
 							"attack": "",
@@ -2475,9 +2491,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34769",
+							"uri": "http://host.docker.internal:5188/api/disputes/id/resolve/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/resolve\/ ()({outcome,resolutionNote,notes})",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "69",
 							"uri": "http://host.docker.internal:5188/api/disputes/id/review",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/review",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34772",
+							"uri": "http://host.docker.internal:5188/api/disputes/id/review/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/review\/",
 							"method": "PATCH",
 							"param": "",
 							"attack": "",
@@ -2495,7 +2531,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "119",
+							"id": "34764",
+							"uri": "http://host.docker.internal:5188/api/disputes/id/status/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/status\/ ()({status,resolutionNote,notes,outcome})",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "110",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/cancel",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/cancel ()({voidReason})",
 							"method": "PATCH",
@@ -2505,7 +2551,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "113",
+							"id": "34768",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/cancel/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/cancel\/ ()({voidReason})",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "104",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/status",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/status ()({status})",
 							"method": "PATCH",
@@ -2515,9 +2571,29 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "116",
+							"id": "34775",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/status/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/status\/ ()({status})",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "107",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/void",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/void ()({voidReason})",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34776",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/void/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/void\/ ()({voidReason})",
 							"method": "PATCH",
 							"param": "",
 							"attack": "",
@@ -2535,6 +2611,16 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34792",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/status/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId\/status\/ ()({status})",
+							"method": "PATCH",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "24",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/status",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/status ()({status,reason})",
@@ -2545,7 +2631,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36260",
+							"id": "34798",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/status/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/status\/ ()({status,reason})",
 							"method": "PATCH",
@@ -2565,7 +2651,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36264",
+							"id": "34799",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/status/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/vehicleId\/status\/ ()({status})",
 							"method": "PATCH",
@@ -2585,7 +2671,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36275",
+							"id": "34810",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/me/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/me\/ ()({fullName,email,phoneE164})",
 							"method": "PATCH",
@@ -2605,7 +2691,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36285",
+							"id": "34820",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/resolve/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/resolve\/ ()({outcome,resolutionNote,notes})",
 							"method": "PATCH",
@@ -2625,7 +2711,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36284",
+							"id": "34828",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/review/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/review\/",
 							"method": "PATCH",
@@ -2645,7 +2731,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36288",
+							"id": "34818",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/status/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/status\/ ()({status,resolutionNote,notes,outcome})",
 							"method": "PATCH",
@@ -2655,7 +2741,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "120",
+							"id": "111",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/cancel",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/cancel ()({voidReason})",
 							"method": "PATCH",
@@ -2665,7 +2751,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36292",
+							"id": "34822",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/cancel/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/cancel\/ ()({voidReason})",
 							"method": "PATCH",
@@ -2675,7 +2761,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "114",
+							"id": "105",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/status",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/status ()({status})",
 							"method": "PATCH",
@@ -2685,7 +2771,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36300",
+							"id": "34832",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/status/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/status\/ ()({status})",
 							"method": "PATCH",
@@ -2695,7 +2781,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "118",
+							"id": "109",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/void",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/void ()({voidReason})",
 							"method": "PATCH",
@@ -2705,7 +2791,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36296",
+							"id": "34831",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/void/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/void\/ ()({voidReason})",
 							"method": "PATCH",
@@ -2715,7 +2801,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "137",
+							"id": "124",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id/status",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/status ()({status,reason})",
 							"method": "PATCH",
@@ -2725,7 +2811,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36305",
+							"id": "34840",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id/status/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/status\/ ()({status,reason})",
 							"method": "PATCH",
@@ -2735,7 +2821,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "152",
+							"id": "139",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/cancel",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/cancel ()({reason})",
 							"method": "PATCH",
@@ -2745,7 +2831,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36316",
+							"id": "34854",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/cancel/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/cancel\/ ()({reason})",
 							"method": "PATCH",
@@ -2775,7 +2861,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "27364",
+							"id": "27367",
 							"uri": "http://host.docker.internal:5188/metadata/instance",
 							"nodeName": "http:\/\/host.docker.internal:5188\/metadata\/instance ()({outcome,resolutionNote,notes})",
 							"method": "PATCH",
@@ -2785,7 +2871,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "27386",
+							"id": "27382",
 							"uri": "http://host.docker.internal:5188/metadata/v1",
 							"nodeName": "http:\/\/host.docker.internal:5188\/metadata\/v1 ()({outcome,resolutionNote,notes})",
 							"method": "PATCH",
@@ -2795,7 +2881,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "27273",
+							"id": "27278",
 							"uri": "http://host.docker.internal:5188/opc/v1/instance/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/opc\/v1\/instance\/ ()({outcome,resolutionNote,notes})",
 							"method": "PATCH",
@@ -2805,7 +2891,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "27306",
+							"id": "27315",
 							"uri": "http://host.docker.internal:5188/opc/v2/instance/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/opc\/v2\/instance\/ ()({outcome,resolutionNote,notes})",
 							"method": "PATCH",
@@ -2815,7 +2901,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "27415",
+							"id": "27400",
 							"uri": "http://host.docker.internal:5188/openstack/latest/meta_data.json",
 							"nodeName": "http:\/\/host.docker.internal:5188\/openstack\/latest\/meta_data.json ()({outcome,resolutionNote,notes})",
 							"method": "PATCH",
@@ -2835,6 +2921,16 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34771",
+							"uri": "http://host.docker.internal:5188/api/disputes/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/ ()({tripId,category,description})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "400",
+							"otherinfo": ""
+						},
+						{
 							"id": "72",
 							"uri": "http://host.docker.internal:5188/api/disputes/id/resolve",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/resolve ()({outcome,resolutionNote,notes})",
@@ -2845,7 +2941,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "88",
+							"id": "34770",
+							"uri": "http://host.docker.internal:5188/api/disputes/id/resolve/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/resolve\/ ()({outcome,resolutionNote,notes})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "81",
 							"uri": "http://host.docker.internal:5188/api/invoices",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes,status,issueImmediately})",
 							"method": "POST",
@@ -2855,7 +2961,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "99",
+							"id": "34781",
+							"uri": "http://host.docker.internal:5188/api/invoices/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/ ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes,status,issueImmediately})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "403",
+							"otherinfo": ""
+						},
+						{
+							"id": "90",
 							"uri": "http://host.docker.internal:5188/api/invoices/delivery-event/tripId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/delivery-event\/tripId",
 							"method": "POST",
@@ -2865,7 +2981,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "111",
+							"id": "34767",
+							"uri": "http://host.docker.internal:5188/api/invoices/delivery-event/tripId/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/delivery-event\/tripId\/",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "102",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/confirm-payment",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/confirm-payment",
 							"method": "POST",
@@ -2875,7 +3001,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "107",
+							"id": "34766",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/confirm-payment/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/confirm-payment\/",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "98",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/issue",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/issue",
 							"method": "POST",
@@ -2885,7 +3021,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "109",
+							"id": "34765",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/issue/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/issue\/",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "100",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/payment-proof",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/payment-proof ()({publicId})",
 							"method": "POST",
@@ -2895,7 +3041,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "115",
+							"id": "34774",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/payment-proof/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/payment-proof\/ ()({publicId})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "106",
 							"uri": "http://host.docker.internal:5188/api/invoices/id/void",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/void ()({voidReason})",
 							"method": "POST",
@@ -2905,9 +3061,29 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "97",
+							"id": "34779",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/void/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/void\/ ()({voidReason})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "88",
 							"uri": "http://host.docker.internal:5188/api/invoices/on-delivery/tripId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/on-delivery\/tripId",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34782",
+							"uri": "http://host.docker.internal:5188/api/invoices/on-delivery/tripId/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/on-delivery\/tripId\/",
 							"method": "POST",
 							"param": "",
 							"attack": "",
@@ -2925,9 +3101,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34780",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/workflowRunId\/approve\/ ()({agencyId,vehicleId,driverId,notes})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "11",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config ()({baseFare,ratePerKg,driverCostPerKm,maintenanceAllowancePerKm,marginPercent,source,effectiveFrom})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "403",
+							"otherinfo": ""
+						},
+						{
+							"id": "34788",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/formula-config/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/formula-config\/ ()({baseFare,ratePerKg,driverCostPerKm,maintenanceAllowancePerKm,marginPercent,source,effectiveFrom})",
 							"method": "POST",
 							"param": "",
 							"attack": "",
@@ -2945,9 +3141,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34786",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/ ()({fuelType,pricePerLitre,source,effectiveFrom})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "403",
+							"otherinfo": ""
+						},
+						{
 							"id": "7",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency ()({classLabel,minPayloadKg,maxPayloadKg,minVolumeM3,maxVolumeM3,fuelConsumptionLPer100Km,source,effectiveFrom})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "403",
+							"otherinfo": ""
+						},
+						{
+							"id": "34785",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/vehicle-efficiency/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/vehicle-efficiency\/ ()({classLabel,minPayloadKg,maxPayloadKg,minVolumeM3,maxVolumeM3,fuelConsumptionLPer100Km,source,effectiveFrom})",
 							"method": "POST",
 							"param": "",
 							"attack": "",
@@ -2965,7 +3181,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36274",
+							"id": "34802",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/ ()({name,businessRegNo,yardAddress,yardLat,yardLng})",
 							"method": "POST",
@@ -2985,9 +3201,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34787",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/activate/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/activate\/",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "26",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs ()({publicId,docType,docNumber,issuedOn,expiresOn})",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34783",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/ ()({publicId,docType,docNumber,issuedOn,expiresOn})",
 							"method": "POST",
 							"param": "",
 							"attack": "",
@@ -3005,9 +3241,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34784",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/reject/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/reject\/",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "28",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/verify",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/verify",
+							"method": "POST",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34796",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/verify/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/verify\/",
 							"method": "POST",
 							"param": "",
 							"attack": "",
@@ -3025,7 +3281,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36267",
+							"id": "34795",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/ ()({email,fullName,phoneE164,licenceNo,licenceExpiry})",
 							"method": "POST",
@@ -3045,7 +3301,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36262",
+							"id": "34797",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/suspend/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/suspend\/",
 							"method": "POST",
@@ -3065,7 +3321,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36266",
+							"id": "34800",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/ ()({registrationNo,vehicleType,capacityKg,volumeM3})",
 							"method": "POST",
@@ -3085,7 +3341,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36265",
+							"id": "34805",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/verify/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/verify\/",
 							"method": "POST",
@@ -3105,7 +3361,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36273",
+							"id": "34803",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/seed-defaults/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/seed-defaults\/",
 							"method": "POST",
@@ -3125,7 +3381,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36272",
+							"id": "34815",
 							"uri": "http://host.docker.internal:5188/api/v1/assignment-actions/respond/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignment-actions\/respond\/ ()({token})",
 							"method": "POST",
@@ -3145,7 +3401,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36270",
+							"id": "34804",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/id/approve/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/id\/approve\/ ()({vehicleId,driverId,notes})",
 							"method": "POST",
@@ -3165,7 +3421,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36271",
+							"id": "34807",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/loadId/accept/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/loadId\/accept\/ ()({vehicleId,driverId,notes})",
 							"method": "POST",
@@ -3185,7 +3441,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36269",
+							"id": "34811",
 							"uri": "http://host.docker.internal:5188/api/v1/assignments/loadId/decline/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/assignments\/loadId\/decline\/ ()({reason})",
 							"method": "POST",
@@ -3205,7 +3461,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "1421",
+							"id": "1495",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/change-password",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/change-password ()({currentPassword,newPassword})",
 							"method": "POST",
@@ -3215,7 +3471,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36268",
+							"id": "34812",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/change-password/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/change-password\/ ()({currentPassword,newPassword})",
 							"method": "POST",
@@ -3225,7 +3481,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "1028",
+							"id": "1054",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/forgot-password",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/forgot-password ()({email})",
 							"method": "POST",
@@ -3235,7 +3491,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "1259",
+							"id": "1072",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/login",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/login ()({email,password})",
 							"method": "POST",
@@ -3255,7 +3511,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36277",
+							"id": "34814",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/login/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/login\/ ()({email,password})",
 							"method": "POST",
@@ -3275,7 +3531,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36278",
+							"id": "34816",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/logout/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/logout\/ ()({refreshToken})",
 							"method": "POST",
@@ -3295,7 +3551,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36276",
+							"id": "34813",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/refresh/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/refresh\/ ()({refreshToken})",
 							"method": "POST",
@@ -3315,7 +3571,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36279",
+							"id": "34809",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/register/agency/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/register\/agency\/ ()({email,password,fullName,phoneE164,jobTitle,agencyName,businessRegNo,yardAddress,yardLat,yardLng})",
 							"method": "POST",
@@ -3335,7 +3591,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36280",
+							"id": "34808",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/register/shipper/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/register\/shipper\/ ()({email,password,fullName,phoneE164,companyName,businessRegNo,billingAddress})",
 							"method": "POST",
@@ -3345,7 +3601,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "1261",
+							"id": "1277",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/resend-verification",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/resend-verification ()({email})",
 							"method": "POST",
@@ -3365,7 +3621,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36282",
+							"id": "34819",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/reset-password/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/reset-password\/ ()({token,newPassword})",
 							"method": "POST",
@@ -3385,7 +3641,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36281",
+							"id": "34825",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/verify-email/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/verify-email\/ ()({token})",
 							"method": "POST",
@@ -3405,7 +3661,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36287",
+							"id": "34826",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/ ()({tripId,category,description})",
 							"method": "POST",
@@ -3425,7 +3681,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36283",
+							"id": "34817",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/resolve/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/resolve\/ ()({outcome,resolutionNote,notes})",
 							"method": "POST",
@@ -3435,7 +3691,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "90",
+							"id": "83",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes,status,issueImmediately})",
 							"method": "POST",
@@ -3445,7 +3701,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36306",
+							"id": "34848",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/ ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes,status,issueImmediately})",
 							"method": "POST",
@@ -3455,7 +3711,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "100",
+							"id": "91",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/delivery-event/tripId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/delivery-event\/tripId",
 							"method": "POST",
@@ -3465,7 +3721,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36286",
+							"id": "34823",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/delivery-event/tripId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/delivery-event\/tripId\/",
 							"method": "POST",
@@ -3475,7 +3731,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "112",
+							"id": "103",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/confirm-payment",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/confirm-payment",
 							"method": "POST",
@@ -3485,7 +3741,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36294",
+							"id": "34824",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/confirm-payment/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/confirm-payment\/",
 							"method": "POST",
@@ -3495,7 +3751,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "108",
+							"id": "99",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/issue",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/issue",
 							"method": "POST",
@@ -3505,7 +3761,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36293",
+							"id": "34829",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/issue/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/issue\/",
 							"method": "POST",
@@ -3515,7 +3771,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "110",
+							"id": "101",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/payment-proof",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/payment-proof ()({publicId})",
 							"method": "POST",
@@ -3525,7 +3781,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36301",
+							"id": "34830",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/payment-proof/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/payment-proof\/ ()({publicId})",
 							"method": "POST",
@@ -3535,7 +3791,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "117",
+							"id": "108",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/void",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/void ()({voidReason})",
 							"method": "POST",
@@ -3545,7 +3801,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36297",
+							"id": "34837",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/void/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/void\/ ()({voidReason})",
 							"method": "POST",
@@ -3555,7 +3811,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "98",
+							"id": "89",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/on-delivery/tripId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/on-delivery\/tripId",
 							"method": "POST",
@@ -3565,7 +3821,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36302",
+							"id": "34835",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/on-delivery/tripId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/on-delivery\/tripId\/",
 							"method": "POST",
@@ -3575,7 +3831,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "134",
+							"id": "121",
 							"uri": "http://host.docker.internal:5188/api/v1/loads",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads ()({cargoDescription,weightKg,volumeM3,pickupAddress,pickupLat,pickupLng,dropoffAddress,dropoffLat,dropoffLng,pickupWindowStart,pickupWindowEnd,postImmediately})",
 							"method": "POST",
@@ -3585,7 +3841,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36324",
+							"id": "34852",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/ ()({cargoDescription,weightKg,volumeM3,pickupAddress,pickupLat,pickupLng,dropoffAddress,dropoffLat,dropoffLng,pickupWindowStart,pickupWindowEnd,postImmediately})",
 							"method": "POST",
@@ -3595,7 +3851,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "138",
+							"id": "125",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id/estimate",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/estimate",
 							"method": "POST",
@@ -3605,7 +3861,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36308",
+							"id": "34838",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id/estimate/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/estimate\/",
 							"method": "POST",
@@ -3615,7 +3871,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "122",
+							"id": "113",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files ()({publicId,fileType})",
 							"method": "POST",
@@ -3625,7 +3881,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36310",
+							"id": "34850",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/files/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/files\/ ()({publicId,fileType})",
 							"method": "POST",
@@ -3635,7 +3891,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "142",
+							"id": "129",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/confirm",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/confirm ()({agencyId})",
 							"method": "POST",
@@ -3645,7 +3901,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36309",
+							"id": "34839",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/confirm/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/confirm\/ ()({agencyId})",
 							"method": "POST",
@@ -3655,7 +3911,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "143",
+							"id": "130",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/reject",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/reject ()({reason})",
 							"method": "POST",
@@ -3665,7 +3921,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36303",
+							"id": "34849",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/reject/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/reject\/ ()({reason})",
 							"method": "POST",
@@ -3675,7 +3931,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "144",
+							"id": "131",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/revise",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/revise ()({reason})",
 							"method": "POST",
@@ -3685,7 +3941,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36304",
+							"id": "34842",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/revise/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/revise\/ ()({reason})",
 							"method": "POST",
@@ -3695,7 +3951,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "141",
+							"id": "128",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/trigger",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/trigger",
 							"method": "POST",
@@ -3705,7 +3961,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36312",
+							"id": "34845",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/match/trigger/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/match\/trigger\/",
 							"method": "POST",
@@ -3715,7 +3971,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "128",
+							"id": "116",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals ()({proposedPrice,message})",
 							"method": "POST",
@@ -3725,7 +3981,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36328",
+							"id": "34843",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/ ()({proposedPrice,message})",
 							"method": "POST",
@@ -3735,7 +3991,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "130",
+							"id": "117",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/accept",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/accept",
 							"method": "POST",
@@ -3745,7 +4001,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36311",
+							"id": "34846",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/accept/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/accept\/",
 							"method": "POST",
@@ -3755,7 +4011,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "131",
+							"id": "118",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/reject",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/reject ()({reason})",
 							"method": "POST",
@@ -3765,7 +4021,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36314",
+							"id": "34844",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/reject/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/reject\/ ()({reason})",
 							"method": "POST",
@@ -3775,7 +4031,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "132",
+							"id": "119",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/withdraw",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/withdraw",
 							"method": "POST",
@@ -3785,7 +4041,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36313",
+							"id": "34847",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/loadId/proposals/proposalId/withdraw/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/loadId\/proposals\/proposalId\/withdraw\/",
 							"method": "POST",
@@ -3795,7 +4051,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "147",
+							"id": "134",
 							"uri": "http://host.docker.internal:5188/api/v1/trips",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips ()({assignmentId,vehicleId,driverId,notes})",
 							"method": "POST",
@@ -3805,7 +4061,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36329",
+							"id": "34855",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/ ()({assignmentId,vehicleId,driverId,notes})",
 							"method": "POST",
@@ -3815,7 +4071,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "154",
+							"id": "141",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/evidence",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/evidence ()({publicId,evidenceType,capturedLat,capturedLng})",
 							"method": "POST",
@@ -3825,7 +4081,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36317",
+							"id": "34859",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/evidence/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/evidence\/ ()({publicId,evidenceType,capturedLat,capturedLng})",
 							"method": "POST",
@@ -3835,7 +4091,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "151",
+							"id": "138",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/status",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/status ()({targetStatus,notes,snapshotLat,snapshotLng})",
 							"method": "POST",
@@ -3845,7 +4101,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36318",
+							"id": "34860",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/status/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/status\/ ()({targetStatus,notes,snapshotLat,snapshotLng})",
 							"method": "POST",
@@ -3855,7 +4111,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "155",
+							"id": "142",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/seed-example",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/seed-example",
 							"method": "POST",
@@ -3865,7 +4121,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36319",
+							"id": "34857",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/seed-example/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/seed-example\/",
 							"method": "POST",
@@ -3885,7 +4141,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36322",
+							"id": "34865",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/ ()({loadId,triggeredByUserId,attemptNo})",
 							"method": "POST",
@@ -3905,7 +4161,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36330",
+							"id": "34862",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/candidates/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId\/candidates\/ ()([{agencyId,rank,eligible,eligibilityScore,rejectionReason}..])",
 							"method": "POST",
@@ -3925,7 +4181,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36321",
+							"id": "34861",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/steps/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId\/steps\/ ()({stepNo,agentRole,status,inputJson,outputJson,errorMessage,durationMs,startedAt,completedAt})",
 							"method": "POST",
@@ -3945,7 +4201,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36323",
+							"id": "34863",
 							"uri": "http://host.docker.internal:5188/internal/agent-workflow-runs/workflowRunId/tool-calls/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/agent-workflow-runs\/workflowRunId\/tool-calls\/ ()({agentStepId,toolName,attemptNo,requestJson,responseJson,success,httpStatusCode,durationMs,errorMessage,calledAt})",
 							"method": "POST",
@@ -3965,7 +4221,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36325",
+							"id": "34864",
 							"uri": "http://host.docker.internal:5188/internal/pricing/estimate/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/pricing\/estimate\/ ()({loadId,suggestedVehicleClass,distanceKm})",
 							"method": "POST",
@@ -3975,7 +4231,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "145",
+							"id": "132",
 							"uri": "http://host.docker.internal:5188/internal/routing/route-eta",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/routing\/route-eta ()({originLat,originLng,destinationLat,destinationLng})",
 							"method": "POST",
@@ -3985,7 +4241,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36326",
+							"id": "34866",
 							"uri": "http://host.docker.internal:5188/internal/routing/route-eta/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/internal\/routing\/route-eta\/ ()({originLat,originLng,destinationLat,destinationLng})",
 							"method": "POST",
@@ -4005,9 +4261,29 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "102",
+							"id": "34773",
+							"uri": "http://host.docker.internal:5188/api/disputes/id/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/disputes\/id\/ ()({category,description})",
+							"method": "PUT",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "93",
 							"uri": "http://host.docker.internal:5188/api/invoices/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes})",
+							"method": "PUT",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34777",
+							"uri": "http://host.docker.internal:5188/api/invoices/id/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/invoices\/id\/ ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes})",
 							"method": "PUT",
 							"param": "",
 							"attack": "",
@@ -4025,7 +4301,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36261",
+							"id": "34806",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/ ()({name,yardAddress,yardLat,yardLng})",
 							"method": "PUT",
@@ -4045,9 +4321,29 @@
 							"otherinfo": ""
 						},
 						{
+							"id": "34794",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/compliance-docs/docId/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/compliance-docs\/docId\/ ()({publicId,docNumber,issuedOn,expiresOn})",
+							"method": "PUT",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
 							"id": "36",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId ()({fullName,licenceNo,licenceExpiry})",
+							"method": "PUT",
+							"param": "",
+							"attack": "",
+							"evidence": "404",
+							"otherinfo": ""
+						},
+						{
+							"id": "34793",
+							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/drivers/driverId/",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/drivers\/driverId\/ ()({fullName,licenceNo,licenceExpiry})",
 							"method": "PUT",
 							"param": "",
 							"attack": "",
@@ -4065,7 +4361,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36263",
+							"id": "34801",
 							"uri": "http://host.docker.internal:5188/api/v1/agencies/id/vehicles/vehicleId/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/agencies\/id\/vehicles\/vehicleId\/ ()({registrationNo,vehicleType,capacityKg,volumeM3})",
 							"method": "PUT",
@@ -4085,7 +4381,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36290",
+							"id": "34827",
 							"uri": "http://host.docker.internal:5188/api/v1/disputes/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/disputes\/id\/ ()({category,description})",
 							"method": "PUT",
@@ -4095,7 +4391,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "105",
+							"id": "96",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes})",
 							"method": "PUT",
@@ -4105,7 +4401,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36295",
+							"id": "34836",
 							"uri": "http://host.docker.internal:5188/api/v1/invoices/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/invoices\/id\/ ()({tripId,linkedEntityId,recipientId,recipientRole,lineItems:[{invoiceLineItemId,description,quantity,unitPrice,taxRate,amount}],amount,discountTotal,currency,dueDate,notes})",
 							"method": "PUT",
@@ -4115,7 +4411,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "136",
+							"id": "123",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id ()({cargoDescription,weightKg,volumeM3,pickupAddress,pickupLat,pickupLng,dropoffAddress,dropoffLat,dropoffLng,pickupWindowStart,pickupWindowEnd})",
 							"method": "PUT",
@@ -4125,7 +4421,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36307",
+							"id": "34841",
 							"uri": "http://host.docker.internal:5188/api/v1/loads/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads\/id\/ ()({cargoDescription,weightKg,volumeM3,pickupAddress,pickupLat,pickupLng,dropoffAddress,dropoffLat,dropoffLng,pickupWindowStart,pickupWindowEnd})",
 							"method": "PUT",
@@ -4135,7 +4431,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "149",
+							"id": "136",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id ()({vehicleId,driverId,notes})",
 							"method": "PUT",
@@ -4145,7 +4441,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "36320",
+							"id": "34858",
 							"uri": "http://host.docker.internal:5188/api/v1/trips/id/",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/trips\/id\/ ()({vehicleId,driverId,notes})",
 							"method": "PUT",
@@ -4155,7 +4451,7 @@
 							"otherinfo": ""
 						}
 					],
-					"count": "371",
+					"count": "403",
 					"systemic": false,
 					"solution": "",
 					"otherinfo": "",
@@ -4175,7 +4471,7 @@
 					"desc": "<p>The given request has been identified as an authentication request. The 'Other Info' field contains a set of key=value lines which identify any relevant fields. If the request is in a context which has an Authentication Method set to \"Auto-Detect\" then this rule will change the authentication to match the request identified.</p>",
 					"instances":[ 
 						{
-							"id": "175",
+							"id": "220",
 							"uri": "http://host.docker.internal:5188/api/v1/auth/login",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/auth\/login ()({email,password})",
 							"method": "POST",
@@ -4205,7 +4501,7 @@
 					"desc": "<p>The request appeared to contain sensitive information leaked in the URL. This can violate PCI and most organizational compliance policies. You can configure the list of strings for this check to add or remove values specific to your environment.</p>",
 					"instances":[ 
 						{
-							"id": "282",
+							"id": "518",
 							"uri": "http://host.docker.internal:5188/api/v1/loads?Page=10&PageSize=10&SortBy=SortBy&SortDir=SortDir&Search=ZAP&Status=Draft&ShipperUserId=ShipperUserId&CreatedFrom=CreatedFrom&CreatedTo=CreatedTo&Marketplace=true",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/loads (CreatedFrom,CreatedTo,Marketplace,Page,PageSize,Search,ShipperUserId,SortBy,SortDir,Status)",
 							"method": "GET",
@@ -4235,7 +4531,7 @@
 					"desc": "<p>The response contents are not storable by caching components such as proxy servers. If the response does not contain sensitive, personal or user-specific information, it may benefit from being stored and cached, to improve performance.</p>",
 					"instances":[ 
 						{
-							"id": "85",
+							"id": "143",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/id",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/id",
 							"method": "DELETE",
@@ -4245,7 +4541,17 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "86",
+							"id": "146",
+							"uri": "http://host.docker.internal:5188/api/v1/admin/analytics/summary",
+							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/analytics\/summary",
+							"method": "GET",
+							"param": "",
+							"attack": "",
+							"evidence": "authorization:",
+							"otherinfo": ""
+						},
+						{
+							"id": "144",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates",
 							"method": "GET",
@@ -4255,7 +4561,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "84",
+							"id": "147",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates/history?fuelType=AutoDiesel",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates\/history (fuelType)",
 							"method": "GET",
@@ -4265,17 +4571,7 @@
 							"otherinfo": ""
 						},
 						{
-							"id": "83",
-							"uri": "http://host.docker.internal:5188/api/v1/admin/agent-workflows/workflowRunId/approve",
-							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/agent-workflows\/workflowRunId\/approve ()({agencyId,vehicleId,driverId,notes})",
-							"method": "POST",
-							"param": "",
-							"attack": "",
-							"evidence": "authorization:",
-							"otherinfo": ""
-						},
-						{
-							"id": "82",
+							"id": "145",
 							"uri": "http://host.docker.internal:5188/api/v1/admin/pricing/fuel-rates",
 							"nodeName": "http:\/\/host.docker.internal:5188\/api\/v1\/admin\/pricing\/fuel-rates ()({fuelType,pricePerLitre,source,effectiveFrom})",
 							"method": "POST",
