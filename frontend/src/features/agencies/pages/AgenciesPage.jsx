@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import {
   Building2,
   CheckCircle2,
@@ -371,6 +371,12 @@ function AdminAgenciesDashboard() {
                           Reactivate
                         </Button>
                       )}
+                      <Link
+                        to={`/agencies/${agency.agencyId}`}
+                        className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-on-surface hover:bg-slate-50"
+                      >
+                        View Profile
+                      </Link>
                       <Button
                         variant="secondary"
                         onClick={() =>
