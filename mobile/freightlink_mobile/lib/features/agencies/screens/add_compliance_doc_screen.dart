@@ -57,7 +57,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
     return null;
   }
 
-  String _lockedSuffix(String status) => status == 'Verified' ? ' (verified – locked)' : ' (pending review)';
+  String _lockedSuffix(String status) => status == 'Verified' ? ' (verified)' : ' (pending)';
   String? _selectedFileName;
   List<int>? _selectedFileBytes;
 
@@ -236,6 +236,8 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                   // default type turned out to be locked), since initialValue is only read once.
                   key: ValueKey(effectiveDocType),
                   initialValue: effectiveDocType,
+                  // Fill the field's width so long labels ellipsize instead of overflowing the row.
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Document Type',
                     prefixIcon: const Icon(Icons.description_outlined),
@@ -250,6 +252,7 @@ class _AddComplianceDocFormState extends State<_AddComplianceDocForm> {
                         enabled: !provider.isDocTypeLocked(entry.key),
                         child: Text(
                           entry.value + (provider.isDocTypeLocked(entry.key) ? _lockedSuffix(provider.lockedDocTypes[entry.key]!) : ''),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                   ],

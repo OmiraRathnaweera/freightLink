@@ -13,7 +13,7 @@ import '../../features/notifications/widgets/in_app_push_banner.dart';
 /// The 2nd tab's icon/label is role-dependent (Driver: "My Trip", AgencyStaff:
 /// "Proposals", Shipper: "Loads") since each role sees a different screen at
 /// that branch's route — chosen by the branch's own `GoRoute.builder` in
-/// app_router.dart, not here; this widget only needs to know the label/icon.
+/// app_router.dart, not here; this widget only needs to know the label/icon./// The Payments tab is not shown to Drivers.
 class AppShell extends StatelessWidget {
   const AppShell({
     super.key,
@@ -67,10 +67,14 @@ class AppShell extends StatelessWidget {
             icon: Icon(operationalTabIcon),
             label: operationalTabLabel,
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.payments_outlined),
-            label: 'Payments',
-          ),
+          // Drivers don't handle billing, and app_router.dart already rejects /payments for them,
+          // so the tab is hidden rather than shown as a dead end. The Payments branch stays last, so
+          // dropping its item doesn't shift the Dashboard/operational branch indexes.
+          if (!isDriver)
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.payments_outlined),
+              label: 'Payments',
+            ),
         ],
       ),
     );
