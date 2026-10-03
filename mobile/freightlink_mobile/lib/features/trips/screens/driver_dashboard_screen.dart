@@ -15,7 +15,8 @@ import '../providers/driver_dashboard_provider.dart';
 /// Driver Dashboard screen — the Driver counterpart to [AgencyDashboardScreen]
 /// and `ShipperDashboardScreen`: a hero banner and trip-pipeline KPIs (most
 /// notably completed rides), drawn from [DriverDashboardProvider]'s
-/// per-status trip counts.
+/// per-status trip counts. Completed / Cancelled / Total open the Trip History screen with the
+/// matching filter; Active Trip goes to My Trip, the live screen where the driver acts on the trip.
 class DriverDashboardScreen extends StatelessWidget {
   const DriverDashboardScreen({super.key});
 
@@ -95,6 +96,13 @@ class _DriverDashboardView extends StatelessWidget {
                         : null,
                     isHighlight: true,
                     onTap: () => context.go('/loads'),
+                  ),
+                  const SizedBox(height: AppConstants.spaceMd),
+                  DashboardActionTile(
+                    title: 'Trip History',
+                    subtitle: 'Browse your completed, cancelled and past trips',
+                    icon: Icons.history_rounded,
+                    onTap: () => context.push('/dashboard/trip-history'),
                   ),
                   const SizedBox(height: AppConstants.spaceXl),
                 ],
@@ -234,7 +242,7 @@ class _KpiGrid extends StatelessWidget {
           label: 'Rides Completed',
           footer: 'All-time deliveries',
           footerColor: AppColors.statusSuccessFg,
-          onTap: () => context.go('/loads'),
+          onTap: () => context.push('/dashboard/trip-history?filter=completed'),
         ),
         DashboardKpiCard(
           icon: Icons.navigation_outlined,
@@ -254,7 +262,7 @@ class _KpiGrid extends StatelessWidget {
           label: 'Cancelled',
           footer: cancelled > 0 ? 'Review history' : 'None cancelled',
           footerColor: cancelled > 0 ? AppColors.statusErrorFg : AppColors.inkMuted,
-          onTap: () => context.go('/loads'),
+          onTap: () => context.push('/dashboard/trip-history?filter=cancelled'),
         ),
         DashboardKpiCard(
           icon: Icons.local_shipping_outlined,
@@ -264,7 +272,7 @@ class _KpiGrid extends StatelessWidget {
           label: 'Total Trips',
           footer: 'Since joining',
           footerColor: AppColors.statusMatchedFg,
-          onTap: () => context.go('/loads'),
+          onTap: () => context.push('/dashboard/trip-history'),
         ),
       ],
     );

@@ -44,7 +44,11 @@ class _AgencyTripDetailScreenState extends State<AgencyTripDetailScreen> {
     return context.read<TripsRepository>().getTripById(widget.tripId);
   }
 
-  void _refresh() => setState(() => _trip = _loadTrip());
+  void _refresh() {
+    setState(() {
+      _trip = _loadTrip();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
