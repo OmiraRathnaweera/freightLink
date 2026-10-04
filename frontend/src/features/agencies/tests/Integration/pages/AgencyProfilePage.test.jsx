@@ -172,4 +172,46 @@ describe('AgencyProfilePage', () => {
     expect(screen.getByPlaceholderText(/e\.g\. BR-2024-9901/i)).toBeInTheDocument()
     expect(screen.getByText(/drag and drop your file here/i)).toBeInTheDocument()
   })
+
+  it('freezes a verified document: shows "Verified & locked" with no replace action', () => {
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useAgencyQuery.mockReturnValue({ data: MOCK_AGENCY, isLoading: false })
+    agencyApi.useComplianceDocsQuery.mockReturnValue({ data: MOCK_DOCS, isLoading: false })
+
+    renderPage()
+
+    expect(screen.getAllByText('Verified & locked')).toHaveLength(1)
+    // Only the still-Pending insurance doc can be replaced; the Verified business registration cannot.
+    expect(screen.getAllByRole('button', { name: /replace \/ update/i })).toHaveLength(1)
+  })
+
+  it('polls the document and agency queries so an admin approval shows up without a reload (issue #58)', () => {
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useAgencyQuery.mockReturnValue({ data: MOCK_AGENCY, isLoading: false })
+    agencyApi.useComplianceDocsQuery.mockReturnValue({ data: MOCK_DOCS, isLoading: false })
+
+    renderPage()
+
+    expect(agencyApi.useComplianceDocsQuery).toHaveBeenCalledWith(
+      MOCK_USER.agencyId,
+      expect.objectContaining({ refetchInterval: expect.any(Number) }),
+    )
+    expect(agencyApi.useAgencyQuery).toHaveBeenCalledWith(
+      MOCK_USER.agencyId,
+      expect.objectContaining({ refetchInterval: expect.any(Number) }),
+    )
+  })
+
+  it('counts a document as verified once the refetched data reports it Verified', () => {
+    authApi.useCurrentUserQuery.mockReturnValue({ data: MOCK_USER, isLoading: false })
+    agencyApi.useAgencyQuery.mockReturnValue({ data: MOCK_AGENCY, isLoading: false })
+    agencyApi.useComplianceDocsQuery.mockReturnValue({
+      data: [{ ...MOCK_DOCS[1], status: 'Verified' }],
+      isLoading: false,
+    })
+
+    renderPage()
+
+    expect(screen.getByText('Verified Documents').parentElement).toHaveTextContent('1 / 4')
+  })
 })

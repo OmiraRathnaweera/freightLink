@@ -151,6 +151,15 @@ public class AgenciesController : ControllerBase
         return Ok(result);
     }
 
+    /// <summary>Admin-only: the agency's status audit trail (who changed it, from/to, reason, when), newest first.</summary>
+    [HttpGet("{id:guid}/status-history")]
+    [Authorize(Roles = nameof(UserRole.Admin))]
+    public async Task<ActionResult<IReadOnlyList<AgencyStatusHistoryResponseDto>>> GetStatusHistory(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await _agencyService.GetStatusHistoryAsync(id, GetCurrentUserId(), GetCurrentUserRole(), cancellationToken);
+        return Ok(result);
+    }
+
     [HttpPost("{id:guid}/compliance-docs")]
     [Authorize(Roles = nameof(UserRole.AgencyStaff))]
     public async Task<ActionResult<ComplianceDocResponseDto>> AddComplianceDoc(Guid id, [FromBody] ComplianceDocCreateDto request, CancellationToken cancellationToken)
@@ -169,7 +178,7 @@ public class AgenciesController : ControllerBase
 
     /// <summary>
     /// Replaces an existing compliance document's file/number/dates in place (e.g. re-uploading after
-    /// a rejection, or renewing an expiring document). Resets the document back to Pending for
+    /// a rejection). A Verified document is frozen and rejected with 409. Resets the document back to Pending for
     /// re-verification. Distinct from <see cref="AddComplianceDoc"/>, which always inserts a new row
     /// and would collide with the one-live-document-per-type constraint if reused for replacement.
     /// </summary>

@@ -58,6 +58,11 @@ void main() {
         expect(isMobileRouteAllowed('Driver', '/loads'), isTrue);
         expect(isMobileRouteAllowed('Driver', '/dashboard'), isTrue);
         expect(isMobileRouteAllowed('Driver', '/dashboard/profile'), isFalse);
+        // Trip history is Driver-only; the Agency trips list stays Agency-only.
+        expect(isMobileRouteAllowed('Driver', '/dashboard/trip-history'), isTrue);
+        expect(isMobileRouteAllowed('Driver', '/dashboard/trips'), isFalse);
+        expect(isMobileRouteAllowed('AgencyStaff', '/dashboard/trip-history'), isFalse);
+        expect(isMobileRouteAllowed('Shipper', '/dashboard/trip-history'), isFalse);
         expect(isMobileRouteAllowed('Driver', '/payments'), isFalse);
         expect(isMobileRouteAllowed('Driver', '/payments/disputes'), isFalse);
         expect(isMobileRouteAllowed('Driver', '/reports'), isFalse);

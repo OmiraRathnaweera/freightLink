@@ -674,4 +674,46 @@ public class AgenciesControllerTests : IClassFixture<CustomWebApplicationFactory
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task UpdateComplianceDoc_Returns409_WhenDocIsVerified_ForOwningAgencyStaff()
+    {
+        var tokens = await RegisterAndLoginAgencyAsync("frozen-doc", "FROZEN");
+        using var fleetReq = AuthedRequest(HttpMethod.Get, "/api/v1/agencies/my/fleet", tokens.AccessToken);
+        var fleet = await (await _client.SendAsync(fleetReq)).Content.ReadFromJsonAsync<AgencyFleetResponseDto>(JsonOpts);
+        var agencyId = fleet!.AgencyId;
+
+        Guid docId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            docId = Guid.NewGuid();
+            db.ComplianceDocs.Add(new ComplianceDoc
+            {
+                ComplianceDocId = docId, AgencyId = agencyId, DocType = ComplianceDocType.BusinessRegistration, DocNumber = "BR-1",
+                StorageKey = "orig", IssuedOn = new DateOnly(2026, 1, 1), ExpiresOn = new DateOnly(2030, 1, 1), Status = ComplianceDocStatus.Verified
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var request = AuthedRequest(HttpMethod.Put, $"/api/v1/agencies/{agencyId}/compliance-docs/{docId}", tokens.AccessToken);
+        request.Content = JsonContent.Create(new ComplianceDocUpdateDto { PublicId = "new", DocNumber = "BR-2", IssuedOn = new DateOnly(2026, 6, 1) });
+        var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Contains("INVALID_COMPLIANCE_DOC_STATUS_TRANSITION", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task GetStatusHistory_Returns200_ForAdmin_AndForbidden_ForAgencyStaff()
+    {
+        var agencyId = (await SeedManyAgenciesAsync($"Hist{Guid.NewGuid():N}"[..12], 1, AgencyStatus.Active))[0];
+        var staff = await RegisterAndLoginAgencyAsync("hist-fail", "HISTFAIL");
+
+        using var adminReq = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies/{agencyId}/status-history", MintAdminToken());
+        Assert.Equal(HttpStatusCode.OK, (await _client.SendAsync(adminReq)).StatusCode);
+
+        using var staffReq = AuthedRequest(HttpMethod.Get, $"/api/v1/agencies/{agencyId}/status-history", staff.AccessToken);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendAsync(staffReq)).StatusCode);
+    }
 }

@@ -22,6 +22,7 @@ import '../../features/agencies/screens/driver_onboarding_screen.dart';
 import '../../features/agencies/screens/add_driver_screen.dart';
 import '../../features/agencies/screens/compliance_docs_screen.dart';
 import '../../features/agencies/screens/add_compliance_doc_screen.dart';
+import '../../features/trips/screens/driver_trip_history_screen.dart';
 import '../../features/billing/screens/payments_screen.dart';
 import '../../features/billing/screens/raise_dispute_screen.dart';
 import '../../features/disputes/screens/dispute_detail_screen.dart';
@@ -62,7 +63,7 @@ const _roleAllowedNestedPrefixes = <String, List<String>>{
     '/dashboard/trips',
     '/payments/',
   ],
-  'Driver': [],
+  'Driver': ['/dashboard/trip-history'],
 };
 
 String mobileRoleHome(String? role) => _roleHomes[role] ?? '/login';
@@ -175,6 +176,16 @@ GoRouter createAppRouter(AuthProvider authProvider) {
                             const AddComplianceDocScreen(),
                       ),
                     ],
+                  ),
+                  GoRoute(
+                    // Driver-only (see _roleAllowedNestedPrefixes): all of a driver's trips, past and
+                    // present, e.g. /dashboard/trip-history?filter=completed from the dashboard KPI cards.
+                    path: 'trip-history',
+                    builder: (context, state) => DriverTripHistoryScreen(
+                      initialFilter: DriverTripFilter.fromQuery(
+                        state.uri.queryParameters['filter'],
+                      ),
+                    ),
                   ),
                   GoRoute(
                     path: 'trips',

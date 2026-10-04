@@ -262,6 +262,150 @@ public class AgencyServiceTests
         Assert.Equal(ErrorCode.AGENCY_NOT_FOUND, ex.Code);
     }
 
+    private static async Task<ComplianceDoc> SeedDocAsync(AppDbContext db, Guid agencyId, ComplianceDocStatus status, ComplianceDocType type = ComplianceDocType.BusinessRegistration)
+    {
+        var doc = new ComplianceDoc
+        {
+            ComplianceDocId = Guid.NewGuid(), AgencyId = agencyId, DocType = type, DocNumber = "DOC-1", StorageKey = "orig-key",
+            IssuedOn = new DateOnly(2026, 1, 1), ExpiresOn = new DateOnly(2030, 1, 1), Status = status
+        };
+        db.ComplianceDocs.Add(doc);
+        await db.SaveChangesAsync();
+        return doc;
+    }
+
+    private static ComplianceDocUpdateDto ReplacementDto() => new()
+    {
+        PublicId = "new-key", DocNumber = "DOC-2", IssuedOn = new DateOnly(2026, 6, 1), ExpiresOn = new DateOnly(2031, 6, 1)
+    };
+
+    private static async Task<Guid> SeedStaffAsync(AppDbContext db, Guid agencyId)
+    {
+        var userId = Guid.NewGuid();
+        db.AgencyStaff.Add(new AgencyStaff { UserId = userId, AgencyId = agencyId });
+        await db.SaveChangesAsync();
+        return userId;
+    }
+
+    [Fact]
+    public async Task UpdateComplianceDocAsync_OnVerifiedDoc_ThrowsConflict_AndLeavesDocUntouched()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var staffId = await SeedStaffAsync(db, agency.AgencyId);
+        var doc = await SeedDocAsync(db, agency.AgencyId, ComplianceDocStatus.Verified);
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateComplianceDocAsync(agency.AgencyId, doc.ComplianceDocId, staffId, UserRole.AgencyStaff, ReplacementDto()));
+
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, ex.StatusCode);
+        Assert.Equal(ErrorCode.INVALID_COMPLIANCE_DOC_STATUS_TRANSITION, ex.Code);
+        var persisted = await db.ComplianceDocs.FindAsync(doc.ComplianceDocId);
+        Assert.Equal(ComplianceDocStatus.Verified, persisted!.Status);
+        Assert.Equal("orig-key", persisted.StorageKey);
+        Assert.Equal("DOC-1", persisted.DocNumber);
+    }
+
+    [Theory]
+    [InlineData(ComplianceDocStatus.Pending)]
+    [InlineData(ComplianceDocStatus.Rejected)]
+    public async Task UpdateComplianceDocAsync_OnNonVerifiedDoc_ReplacesItAndResetsToPending(ComplianceDocStatus status)
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var staffId = await SeedStaffAsync(db, agency.AgencyId);
+        var doc = await SeedDocAsync(db, agency.AgencyId, status);
+        var sut = CreateSut(db);
+
+        var result = await sut.UpdateComplianceDocAsync(agency.AgencyId, doc.ComplianceDocId, staffId, UserRole.AgencyStaff, ReplacementDto());
+
+        Assert.Equal(ComplianceDocStatus.Pending, result.Status);
+        Assert.Equal("new-key", result.StorageKey);
+    }
+
+    [Fact]
+    public async Task VerifyComplianceDocAsync_ThenAgencyUpdate_IsBlocked()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var staffId = await SeedStaffAsync(db, agency.AgencyId);
+        var doc = await SeedDocAsync(db, agency.AgencyId, ComplianceDocStatus.Pending);
+        var sut = CreateSut(db);
+
+        await sut.VerifyComplianceDocAsync(agency.AgencyId, doc.ComplianceDocId, Guid.NewGuid(), UserRole.Admin);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.UpdateComplianceDocAsync(agency.AgencyId, doc.ComplianceDocId, staffId, UserRole.AgencyStaff, ReplacementDto()));
+        Assert.Equal(ErrorCode.INVALID_COMPLIANCE_DOC_STATUS_TRANSITION, ex.Code);
+    }
+
+    [Theory]
+    [InlineData(ComplianceDocStatus.Pending)]
+    [InlineData(ComplianceDocStatus.Verified)]
+    public async Task AddComplianceDocAsync_WhenLiveDocOfSameTypeExists_ThrowsConflict(ComplianceDocStatus existing)
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var staffId = await SeedStaffAsync(db, agency.AgencyId);
+        await SeedDocAsync(db, agency.AgencyId, existing);
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.AddComplianceDocAsync(agency.AgencyId, staffId, UserRole.AgencyStaff,
+            new ComplianceDocCreateDto { PublicId = "k", DocType = ComplianceDocType.BusinessRegistration, DocNumber = "N", IssuedOn = new DateOnly(2026, 1, 1) }));
+
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, ex.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddComplianceDocAsync_AfterRejection_AllowsNewDocOfSameType()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var staffId = await SeedStaffAsync(db, agency.AgencyId);
+        await SeedDocAsync(db, agency.AgencyId, ComplianceDocStatus.Rejected);
+        var sut = CreateSut(db);
+
+        var result = await sut.AddComplianceDocAsync(agency.AgencyId, staffId, UserRole.AgencyStaff,
+            new ComplianceDocCreateDto { PublicId = "k", DocType = ComplianceDocType.BusinessRegistration, DocNumber = "N", IssuedOn = new DateOnly(2026, 1, 1) });
+
+        Assert.Equal(ComplianceDocStatus.Pending, result.Status);
+    }
+
+    [Fact]
+    public async Task GetStatusHistoryAsync_ReturnsEntriesNewestFirst_ForAdmin()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var adminId = Guid.NewGuid();
+        // History rows join their (FK-guaranteed in Postgres) ChangedByUser, so the actor must exist here.
+        db.Users.Add(new User { UserId = adminId, Role = UserRole.Admin, Email = "admin@example.com", PasswordHash = "x", FullName = "Admin One" });
+        await db.SaveChangesAsync();
+        var sut = CreateSut(db);
+        await sut.SuspendAsync(agency.AgencyId, adminId, UserRole.Admin);
+        await Task.Delay(5);
+        await sut.UpdateStatusAsync(agency.AgencyId, adminId, UserRole.Admin, new UpdateAgencyStatusDto { Status = AgencyStatus.Active, Reason = "Cleared" });
+
+        var history = await sut.GetStatusHistoryAsync(agency.AgencyId, adminId, UserRole.Admin);
+
+        Assert.Equal(2, history.Count);
+        Assert.Equal(AgencyStatus.Active, history[0].ToStatus);
+        Assert.Equal("Cleared", history[0].Reason);
+        Assert.Equal("Admin One", history[0].ChangedByName);
+        Assert.Equal(AgencyStatus.Suspended, history[1].ToStatus);
+    }
+
+    [Fact]
+    public async Task GetStatusHistoryAsync_ByAgencyStaff_ThrowsForbidden()
+    {
+        var db = CreateContext();
+        var agency = await SeedAgencyAsync(db, AgencyStatus.Active);
+        var staffId = await SeedStaffAsync(db, agency.AgencyId);
+        var sut = CreateSut(db);
+
+        var ex = await Assert.ThrowsAsync<ApiException>(() => sut.GetStatusHistoryAsync(agency.AgencyId, staffId, UserRole.AgencyStaff));
+
+        Assert.Equal(ErrorCode.FORBIDDEN, ex.Code);
+    }
+
     [Fact]
     public async Task VerifyAsync_ByAgencyStaffFromADifferentAgency_ThrowsForbidden_AgencyNotOwned()
     {

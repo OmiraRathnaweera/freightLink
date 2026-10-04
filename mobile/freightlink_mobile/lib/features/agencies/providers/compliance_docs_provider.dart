@@ -21,6 +21,17 @@ class ComplianceDocsProvider extends ChangeNotifier {
   bool _isUploading = false;
   bool get isUploading => _isUploading;
 
+  /// Document types that already have a live (Pending or Verified) document, mapped to that status.
+  /// The server allows one live document per type and freezes a Verified one, and this app has no
+  /// replace flow, so such types can't be uploaded again.
+  Map<String, String> get lockedDocTypes => {
+        for (final doc in _docs)
+          if (doc['status'] == 'Pending' || doc['status'] == 'Verified')
+            doc['docType'] as String: doc['status'] as String,
+      };
+
+  bool isDocTypeLocked(String docType) => lockedDocTypes.containsKey(docType);
+
   Future<void> loadDocs() async {
     _state = ComplianceDocsState.loading;
     _errorMessage = null;
@@ -40,6 +51,14 @@ class ComplianceDocsProvider extends ChangeNotifier {
   }
 
   Future<bool> uploadDoc(String docType, String docNumber, String issuedOn, List<int> fileBytes, String fileName) async {
+    if (isDocTypeLocked(docType)) {
+      _errorMessage = lockedDocTypes[docType] == 'Verified'
+          ? 'This document has been verified by an administrator and can no longer be changed or replaced.'
+          : 'A document of this type is already awaiting review.';
+      notifyListeners();
+      return false;
+    }
+
     _isUploading = true;
     notifyListeners();
 
