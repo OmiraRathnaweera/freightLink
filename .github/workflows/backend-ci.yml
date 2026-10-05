@@ -50,4 +50,15 @@ jobs:
       - name: Run tests
         env:
           TESTCONTAINERS_RYUK_DISABLED: 'true'
-        run: dotnet test backend.sln --no-build --configuration Release --blame-hang-timeout 90s --blame-hang-dump-type mini
+        run: >
+          dotnet test backend.sln --no-build --configuration Release
+          --blame-hang-timeout 90s --blame-hang-dump-type mini
+          --collect:"XPlat Code Coverage" --results-directory TestResults
+          --logger "trx;LogFileName=backend.trx"
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend/TestResults

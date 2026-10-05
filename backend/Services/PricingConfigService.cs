@@ -33,11 +33,13 @@ public class PricingConfigService : IPricingConfigService
     private static readonly SemaphoreSlim _pricingConfigLock = new(1, 1);
 
     private readonly AppDbContext _dbContext;
+    private readonly ILogger<PricingConfigService>? _logger;
 
-    /// <summary>Creates the pricing config service with its DB context.</summary>
-    public PricingConfigService(AppDbContext dbContext)
+    /// <summary>Creates the pricing config service with its DB context (and an optional logger for startup-seed diagnostics).</summary>
+    public PricingConfigService(AppDbContext dbContext, ILogger<PricingConfigService>? logger = null)
     {
         _dbContext = dbContext;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -620,7 +622,17 @@ public class PricingConfigService : IPricingConfigService
             var now = DateTimeOffset.UtcNow;
             var adminUser = await _dbContext.Users.AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Role == UserRole.Admin, cancellationToken);
-            var actingUserId = adminUser?.UserId ?? Guid.NewGuid();
+
+            // SetByUserId is a real foreign key to Users. Seeding with a made-up id only "worked" on the
+            // InMemory provider; on PostgreSQL it crashed application startup (DEF-004). With no Admin yet,
+            // skip: the next startup after an Admin exists will seed the defaults.
+            if (adminUser is null)
+            {
+                _logger?.LogWarning("Default pricing config seed skipped: no Admin user exists yet (set ADMIN_USER_EMAIL / ADMIN_USER_PASSWORD and restart).");
+                return;
+            }
+
+            var actingUserId = adminUser.UserId;
 
             // 1. Seed Fuel Price Rate (AutoDiesel)
             var hasFuelPrice = await _dbContext.FuelPriceRates

@@ -40,4 +40,13 @@ jobs:
         run: flutter analyze
 
       - name: Run tests
-        run: flutter test
+        run: flutter test --coverage --file-reporter json:test-results/flutter-tests.json
+
+      - name: Upload test results and coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-test-results
+          path: |
+            mobile/freightlink_mobile/test-results
+            mobile/freightlink_mobile/coverage/lcov.info

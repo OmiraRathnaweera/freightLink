@@ -325,9 +325,10 @@ public class AgenciesController : ControllerBase
 
     /// <summary>
     /// Seeds default active carrier agencies across Sri Lanka for testing and demonstration.
+    /// Admin-only: previously anonymous, which let any caller write to the database (DEF-001).
     /// </summary>
     [HttpPost("seed-defaults")]
-    [AllowAnonymous]
+    [Authorize(Roles = nameof(UserRole.Admin))]
     public async Task<ActionResult> SeedDefaultAgencies(CancellationToken cancellationToken)
     {
         await _agencyService.SeedDefaultAgenciesIfNotExistsAsync(cancellationToken);
