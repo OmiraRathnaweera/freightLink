@@ -1,3 +1,14 @@
 {$API_DOMAIN} {
-	reverse_proxy api:8080
+	# Database web UI. Basic auth sits in front of Adminer's own login. compose.yaml supplies a
+	# fallback hash of a discarded random password when ADMINER_AUTH_HASH is not set.
+	handle_path /adminer/* {
+		basic_auth {
+			{$ADMINER_AUTH_USER:admin} {$ADMINER_AUTH_HASH}
+		}
+		reverse_proxy adminer:8080
+	}
+
+	handle {
+		reverse_proxy api:8080
+	}
 }

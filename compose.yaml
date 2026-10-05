@@ -130,11 +130,30 @@ services:
     networks:
       - database
 
+  # Web UI for browsing the database tables. It has no published port: Caddy serves it at
+  # https://<API_DOMAIN>/adminer/ behind basic auth (see deploy/Caddyfile). It needs the `database`
+  # network to reach `db` and `public_api` so Caddy can reach it.
+  adminer:
+    image: adminer:4
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - database
+      - public_api
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     environment:
       API_DOMAIN: ${API_DOMAIN:-localhost}
+      ADMINER_AUTH_USER: ${ADMINER_AUTH_USER:-admin}
+      # Unset or empty falls back to the hash of a discarded random password, so nobody can log in.
+      # An empty value would otherwise make Caddy refuse its whole config.
+      ADMINER_AUTH_HASH: ${ADMINER_AUTH_HASH:-$$2a$$14$$669RbDx9VRysdf.kt1SbaeKQMbW0dQ.NjVjfSXnyK8u7n5Kl8S01O}
     ports:
       - "${HTTP_PORT:-80}:80"
       - "${HTTPS_PORT:-443}:443"
