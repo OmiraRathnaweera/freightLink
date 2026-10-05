@@ -1,5 +1,5 @@
-2026-10-03 04:30:52,869 Using override, new target: http://host.docker.internal:5188
-2026-10-03 04:30:52,869 Number of Imported URLs: 154
+2026-10-05 12:58:04,317 Using override, new target: http://host.docker.internal:5188
+2026-10-05 12:58:04,489 Number of Imported URLs: 154
 Total of 376 URLs
 PASS: Directory Browsing [0]
 PASS: Vulnerable JS Library (Powered by Retire.js) [10003]
@@ -120,7 +120,7 @@ WARN-NEW: A Server Error response code was returned by the server [100000] x 10
 	http://host.docker.internal:5188/api/v1/files/single (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/publicId (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/content/publicId (500 Internal Server Error)
-	http://host.docker.internal:5188/api/v1/files/content/3573803705549419192 (500 Internal Server Error)
+	http://host.docker.internal:5188/api/v1/files/content/5818981865958220281 (500 Internal Server Error)
 	http://host.docker.internal:5188/api/v1/files/content (500 Internal Server Error)
 WARN-NEW: Unexpected Content-Type was returned [100001] x 2 
 	http://host.docker.internal:5188/swagger/index.html (200 OK)
@@ -129,8 +129,8 @@ WARN-NEW: Timestamp Disclosure - Unix [10096] x 1
 	http://host.docker.internal:5188/api/v1/auth/me (200 OK)
 WARN-NEW: Cross-Origin-Resource-Policy Header Missing or Invalid [90004] x 7 
 	http://host.docker.internal:5188/swagger/v1/swagger.json (200 OK)
-	http://host.docker.internal:5188/api/v1/auth/forgot-password (202 Accepted)
 	http://host.docker.internal:5188/api/v1/auth/resend-verification (202 Accepted)
+	http://host.docker.internal:5188/api/v1/auth/forgot-password (202 Accepted)
 	http://host.docker.internal:5188/api/v1/auth/me (200 OK)
 	http://host.docker.internal:5188/api/v1/auth/agencies (200 OK)
 WARN-NEW: Application Error Disclosure [90022] x 3 
