@@ -1,4 +1,5 @@
 import { Bot, CheckCircle2, Clock, AlertCircle, Sparkles, ShieldCheck } from 'lucide-react'
+import { explainStepFailure } from '../lib/workflowFailure.js'
 
 const AGENT_METADATA = [
   {
@@ -42,6 +43,7 @@ export default function WorkflowStepper({ steps = [], workflowStatus = 'PendingR
         status: recorded.status || 'Pending',
         durationMs: recorded.durationMs,
         errorMessage: recorded.errorMessage,
+        failure: explainStepFailure(recorded),
       }
     }
     return { status: 'Pending', durationMs: null }
@@ -121,9 +123,18 @@ export default function WorkflowStepper({ steps = [], workflowStatus = 'PendingR
                 </div>
               </div>
 
-              <p className="mt-2 text-xs text-on-surface-variant line-clamp-2">
-                {meta.description}
-              </p>
+              {isFailed && stepData.failure ? (
+                <p
+                  data-testid={`workflow-step-${meta.stepNo}-failure`}
+                  className="mt-2 text-xs font-medium text-status-red-text"
+                >
+                  {stepData.failure.title}
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-on-surface-variant line-clamp-2">
+                  {meta.description}
+                </p>
+              )}
 
               <div className="mt-3 flex items-center justify-between border-t border-slate-200/60 pt-2 text-[11px] text-on-surface-variant">
                 <span className="font-medium text-slate-600">
