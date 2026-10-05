@@ -96,7 +96,7 @@ Each component has its own sequence diagram. Click an image to view it at full s
 
 ![Component D: Billing and Admin Oversight sequence diagram](https://dl.dropbox.com/scl/fi/5c2mpkl4u70ti6ckxce5m/Component-D-Billing-and-Admin-Oversight-Sequence-as-implemented.png?rlkey=6rp6561saoek6d07574rymhcb&st=fqntf6x3&dl=0)
 
-Further design documents are in `docs/`: the architecture decision records (`Architecture-Decision-Records .md`), the API contract (`api-contract-openapi-skeleton.md`), the role and feature audit, and the implementation baseline. The editable diagrams are in the Eraser file "Y3 SEM-01 FreightLink" (Nuwantha's Team).
+
 
 ### 2.2 Agentic AI architecture
 
@@ -150,23 +150,67 @@ Status machines (allowed transitions are table-driven in `backend/Common/Domain`
 
 ```text
 freightLink/
-├── backend/                 ASP.NET Core 8 API
-│   ├── Controllers/         thin HTTP layer (role checks)
-│   ├── Services/            business rules, ownership checks, status transitions
-│   ├── Entities/ DTOs/      domain model and request/response contracts
-│   ├── Data/ Migrations/    EF Core context, configurations, migrations
-│   ├── Common/ Middleware/  errors, validation, status rules, exception handling
-│   ├── FreightLink.Api.Tests/   xUnit unit, integration and end-to-end tests
-│   └── PerformanceTests/    k6 load scripts
-├── frontend/                React 19 + Vite web app (src/features/<feature>/)
-├── mobile/freightlink_mobile/   Flutter app (lib/features/<feature>/)
-├── agent/                   Python FastAPI + LangGraph agent service
-│   ├── src/freightlink_agent/   agents/, graph/, tools/, core/, schemas/
-│   └── tests/               pytest suites
-├── deploy/                  Caddyfile
-├── compose.yaml             Docker Compose stack (db, agent, migrate, api, caddy)
-├── postman/                 Postman collection and environments
-└── .github/workflows/       CI for backend, frontend, mobile and agent
+├── .github/workflows/        CI pipelines: agent-ci, backend-ci, frontend-ci, mobile-ci
+├── backend/                  ASP.NET Core 8 Web API (FreightLink.Api)
+│   ├── Controllers/          thin HTTP layer: reads the JWT role, calls a service
+│   ├── Services/             business rules, ownership checks, status transitions
+│   │   └── Interfaces/
+│   ├── Entities/             EF Core entities (and Enums/)
+│   ├── DTOs/                 request and response contracts, grouped by module
+│   ├── Data/                 AppDbContext and Configurations/ (one per entity)
+│   ├── Migrations/           EF Core migrations
+│   ├── Common/               Domain/ (status rules), Errors/, Exceptions/, Filters/,
+│   │                         Options/, Security/, Validation/, Email/
+│   ├── Middleware/           global exception handling (error envelope)
+│   ├── FreightLink.Api.Tests/    xUnit: Unit/, Integration/, EndToEnd/
+│   ├── PerformanceTests/     k6 scripts (loads API, agent workflow latency)
+│   ├── Program.cs            startup, DI, JWT, CORS, seeding
+│   ├── Dockerfile
+│   └── .env.example
+├── frontend/                 React 19 + Vite web app
+│   ├── src/
+│   │   ├── features/         agencies, agent-workflows, analytics, assignmentActions, auth,
+│   │   │                     billing, disputes, loads, marketing, pricingConfig, trips
+│   │   │                     (features use api/, components/, pages/, lib/, tests/ as needed)
+│   │   ├── components/       shared UI
+│   │   ├── hooks/ layouts/ lib/ routes/ store/ test/ assets/
+│   │   └── App.jsx, main.jsx, index.css
+│   ├── public/
+│   ├── vercel.json, vite.config.js, package.json
+│   └── .env.example
+├── mobile/freightlink_mobile/    Flutter app
+│   ├── lib/
+│   │   ├── core/             constants, models, network, routing, storage, theme, utils
+│   │   ├── features/         agencies, auth, billing, disputes, loads, notifications, trips
+│   │   ├── shared/widgets/
+│   │   └── main.dart
+│   ├── test/
+│   ├── android/ ios/ web/ linux/ macos/ windows/    platform folders
+│   └── pubspec.yaml, .env.example
+├── agent/                    Python FastAPI + LangGraph agent service
+│   ├── src/freightlink_agent/
+│   │   ├── agents/           planner, domain_analysis, matching_pricing, validation_safety
+│   │   ├── graph/            pipeline (LangGraph wiring), state, step_reporter
+│   │   ├── tools/            matching_tools, pricing, routing
+│   │   ├── core/             config, llm (OpenAI + fallbacks), backend_client
+│   │   ├── schemas/
+│   │   └── main.py           FastAPI app
+│   ├── tests/                Unit/, Integration/, EndToEnd/, Performance/ (pytest)
+│   ├── scripts/              demo_matching.py
+│   ├── Dockerfile, pyproject.toml, uv.lock
+│   └── .env.example
+├── deploy/
+│   └── Caddyfile             HTTPS reverse proxy configuration
+├── testing/                  test plan, test cases, execution summary, defect report,
+│   │                         AI usage declaration
+│   ├── dashboard/            local page that runs the suites
+│   ├── evidence/             raw test, coverage, k6 and ZAP output
+│   └── scripts/              run-nfr.sh, build_test_docs.py
+├── postman/                  collection, Local and Azure environments, samples/
+├── compose.yaml              Docker Compose stack (db, agent, migrate, api, caddy)
+├── .env.example              variables for compose.yaml
+├── pyrefly.toml
+└── README.md
 ```
 
 ---
