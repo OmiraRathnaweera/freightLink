@@ -48,5 +48,9 @@ Thumbs.db
 .DS_Store
 *.md
 !AGENTS.md
+!testing/**/*.md
 docs/
 AGENTS.md
+test-results/
+TestResults/
+coverage/

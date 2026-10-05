@@ -1,0 +1,16 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  FreightLink.Api -> /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/backend/bin/Release/net8.0/FreightLink.Api.dll
+/Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/backend/FreightLink.Api.Tests/Integration/PostgresWebApplicationFactory.cs(25,55): warning CS0618: 'PostgreSqlBuilder.PostgreSqlBuilder()' is obsolete: 'This parameterless constructor is obsolete and will be removed. Use the constructor with the image parameter instead: https://github.com/testcontainers/testcontainers-dotnet/discussions/1470#discussioncomment-15185721.' [/Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/backend/FreightLink.Api.Tests/FreightLink.Api.Tests.csproj]
+  FreightLink.Api.Tests -> /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/backend/FreightLink.Api.Tests/bin/Release/net8.0/FreightLink.Api.Tests.dll
+Test run for /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/backend/FreightLink.Api.Tests/bin/Release/net8.0/FreightLink.Api.Tests.dll (.NETCoreApp,Version=v8.0)
+VSTest version 17.11.1 (arm64)
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+Results File: /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/testing/evidence/backend/raw/backend.trx
+
+Passed!  - Failed:     0, Passed:   572, Skipped:     0, Total:   572, Duration: 25 s - FreightLink.Api.Tests.dll (net8.0)
+
+Attachments:
+  /Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/testing/evidence/backend/raw/e6230282-6ebb-44b7-a87c-70b1596683ae/coverage.cobertura.xml

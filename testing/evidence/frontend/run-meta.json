@@ -1,0 +1,1 @@
+{"started_at": "2026-10-02T17:05:52+00:00", "duration_s": 10.43, "exit_code": 0, "command": "npx vitest run --reporter=default --reporter=junit --outputFile.junit=/Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/testing/evidence/frontend/junit.xml"}

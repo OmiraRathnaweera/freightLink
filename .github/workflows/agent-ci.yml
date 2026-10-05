@@ -38,4 +38,11 @@ jobs:
         run: uv sync --locked
 
       - name: Run tests
-        run: uv run pytest tests
+        run: uv run pytest tests --junitxml=test-results/junit.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-test-results
+          path: agent/test-results

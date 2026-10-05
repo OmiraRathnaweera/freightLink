@@ -19,7 +19,7 @@ namespace FreightLink.Api.Common.Filters;
 /// <c>ExceptionHandlingMiddleware</c> through the exact same error envelope as every other
 /// <c>ApiException</c> in this codebase.
 /// </summary>
-public class InternalApiKeyAuthFilter : IAsyncActionFilter
+public class InternalApiKeyAuthFilter : IAsyncAuthorizationFilter
 {
     private const string HeaderName = "X-Internal-Api-Key";
 
@@ -32,7 +32,11 @@ public class InternalApiKeyAuthFilter : IAsyncActionFilter
     }
 
     /// <inheritdoc />
-    public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
+    /// <remarks>
+    /// An authorization filter (not an action filter) so the key is checked before model binding and
+    /// validation: an unauthenticated caller must get 401, never a 400 that leaks validation rules (DEF-003).
+    /// </remarks>
+    public Task OnAuthorizationAsync(AuthorizationFilterContext context)
     {
         var expectedKey = _options.ApiKey;
         var suppliedKey = context.HttpContext.Request.Headers[HeaderName].ToString();
@@ -43,7 +47,7 @@ public class InternalApiKeyAuthFilter : IAsyncActionFilter
                 $"A valid {HeaderName} header is required for this internal endpoint.");
         }
 
-        await next();
+        return Task.CompletedTask;
     }
 
     /// <summary>
