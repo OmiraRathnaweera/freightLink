@@ -315,6 +315,14 @@ using (var seedScope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+// Baseline hardening headers on every response, including errors and Swagger (DEF-006, found by the
+// OWASP ZAP scan): stops browsers MIME-sniffing a JSON/error body into something executable.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    await next();
+});
+
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // The university deployment needs a public Swagger URL even when the API runs

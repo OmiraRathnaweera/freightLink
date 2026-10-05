@@ -531,4 +531,50 @@ public class PricingConfigServiceTests
         Assert.NotNull(row.DeletedAt);
         Assert.Equal(adminId, row.DeletedByUserId);
     }
+    // ---- DEF-004: startup default-pricing seed must never reference a non-existent Admin ----
+
+    /// <summary>With no Admin user the seed must skip entirely - a made-up SetByUserId violates the real FK on PostgreSQL and crashed startup.</summary>
+    [Fact]
+    public async Task SeedDefaultPricingConfig_WithNoAdminUser_SeedsNothing()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+
+        await sut.SeedDefaultPricingConfigIfNotExistsAsync();
+
+        Assert.Empty(await dbContext.FuelPriceRates.ToListAsync());
+        Assert.Empty(await dbContext.PricingFormulaConfigs.ToListAsync());
+        Assert.Empty(await dbContext.VehicleClassEfficiencies.ToListAsync());
+    }
+
+    /// <summary>With an Admin present, defaults are seeded and attributed to that real Admin.</summary>
+    [Fact]
+    public async Task SeedDefaultPricingConfig_WithAdminUser_SeedsDefaultsAttributedToAdmin()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        var adminId = await SeedAdminUserAsync(dbContext);
+
+        await sut.SeedDefaultPricingConfigIfNotExistsAsync();
+
+        Assert.All(await dbContext.FuelPriceRates.ToListAsync(), x => Assert.Equal(adminId, x.SetByUserId));
+        Assert.All(await dbContext.PricingFormulaConfigs.ToListAsync(), x => Assert.Equal(adminId, x.SetByUserId));
+        Assert.Equal(3, await dbContext.VehicleClassEfficiencies.CountAsync());
+    }
+
+    /// <summary>Running the seed twice must not duplicate rows (idempotent boundary case).</summary>
+    [Fact]
+    public async Task SeedDefaultPricingConfig_CalledTwice_IsIdempotent()
+    {
+        using var dbContext = CreateContext();
+        var sut = CreateSut(dbContext);
+        await SeedAdminUserAsync(dbContext);
+
+        await sut.SeedDefaultPricingConfigIfNotExistsAsync();
+        await sut.SeedDefaultPricingConfigIfNotExistsAsync();
+
+        Assert.Single(await dbContext.FuelPriceRates.ToListAsync());
+        Assert.Single(await dbContext.PricingFormulaConfigs.ToListAsync());
+        Assert.Equal(3, await dbContext.VehicleClassEfficiencies.CountAsync());
+    }
 }
