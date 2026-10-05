@@ -23,6 +23,17 @@ describe('WorkflowStepper', () => {
     expect(screen.getByText('380 ms')).toBeInTheDocument()
   })
 
+  it('shows the reason on a failed agent card', () => {
+    const steps = [
+      { stepNo: 1, agentRole: 'Planner', status: 'Succeeded', durationMs: 120 },
+      { stepNo: 2, agentRole: 'DomainAnalysis', status: 'Failed', errorMessage: 'zero_eligible_agencies' },
+    ]
+
+    render(<WorkflowStepper steps={steps} workflowStatus="Failed" />)
+
+    expect(screen.getByTestId('workflow-step-2-failure')).toHaveTextContent('No suitable carrier available')
+  })
+
   it('never shows a step as Completed unless the backend actually reported it', () => {
     // Regression test: getStepData used to default an unreported step to "Completed" with a
     // fabricated duration whenever workflowStatus looked done - showing a step as passed when no
