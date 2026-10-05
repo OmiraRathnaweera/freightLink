@@ -70,7 +70,7 @@ Each component has its own sequence diagram, shown in [section 2.1](#21-system-a
 
 ### 2.1 System architecture
 
-![High-level system architecture](https://dl.dropbox.com/scl/fi/4yjqnd29v31x13gsnuw8k/system-architecture.png?rlkey=zm04gx0w08q4rbzfpnuvpwpdc&st=dbjcj745&dl=0)
+![High-level system architecture](https://dl.dropbox.com/scl/fi/b96m8olmhb9236e98skbq/FreightLink-High-Level-System-Architecture-as-implemented.png?rlkey=5yhjsotkohi39toh8wmycd6m0&st=ht5jbtie&dl=0)
 
 - Only React and Flutter call the API. The agent service has no public port and is called only by the API.
 - The database is on an internal Docker network with no published port.
@@ -82,11 +82,11 @@ Each component has its own sequence diagram. Click an image to view it at full s
 
 **Component A: Load Management** (Agent 1, Planner)
 
-![Component A: Load Management sequence diagram](https://dl.dropbox.com/scl/fi/ril3y9cvkgg5wp4uz09g7/component-a-load-management.png?rlkey=kbhq221mvuwi6chonbniaxwnm&st=kdrtam3i&dl=0)
+![Component A: Load Management sequence diagram](https://dl.dropbox.com/scl/fi/bpzs4esbxxjr5g4l5xsxj/Component-A-Load-Management-Sequence-as-implemented.png?rlkey=8e3mxoufb0kfps3zt61g1asxj&st=rra7kgwh&dl=0)
 
 **Component B: Agency and Fleet Management** (Agent 2, Domain Analysis)
 
-![Component B: Agency and Fleet Management sequence diagram](https://dl.dropbox.com/scl/fi/5e0sy00woubffqiq7fpps/component-b-agency-fleet.png?rlkey=05wfa0ysccq7bfzij9o9yzr80&st=avx8k6kq&dl=0)
+![Component B: Agency and Fleet Management sequence diagram](https://dl.dropbox.com/scl/fi/vjn66qp35oa9kphegbe6q/Component-B-Agency-and-Fleet-Management-Sequence-as-implemented.png?rlkey=4m2re22nui4wmnqoybov2q2oj&st=1lllxvds&dl=0)
 
 **Component C: Matching and Trip Execution** (Agent 3, Matching and Pricing)
 
@@ -94,7 +94,7 @@ Each component has its own sequence diagram. Click an image to view it at full s
 
 **Component D: Billing and Admin Oversight** (Agent 4, Validation and Safety)
 
-![Component D: Billing and Admin Oversight sequence diagram](https://dl.dropbox.com/scl/fi/g1bz00ti2uncn0755h80g/component-d-billing-admin.png?rlkey=d0z8dk18zuy8fpawvzvefpvmg&st=8bpkodqg&dl=0)
+![Component D: Billing and Admin Oversight sequence diagram](https://dl.dropbox.com/scl/fi/5c2mpkl4u70ti6ckxce5m/Component-D-Billing-and-Admin-Oversight-Sequence-as-implemented.png?rlkey=6rp6561saoek6d07574rymhcb&st=fqntf6x3&dl=0)
 
 Further design documents are in `docs/`: the architecture decision records (`Architecture-Decision-Records .md`), the API contract (`api-contract-openapi-skeleton.md`), the role and feature audit, and the implementation baseline. The editable diagrams are in the Eraser file "Y3 SEM-01 FreightLink" (Nuwantha's Team).
 
@@ -102,16 +102,7 @@ Further design documents are in `docs/`: the architecture decision records (`Arc
 
 The pipeline is a **role-based sequential multi-agent system** built with LangGraph (`agent/src/freightlink_agent/graph/pipeline.py`). Four specialised agents share one persisted `WorkflowState`, and each step is reported back to the API and stored for audit.
 
-```mermaid
-flowchart LR
-    P["Agent 1<br/>Planner"] --> D["Agent 2<br/>Domain Analysis"]
-    D --> M["Agent 3<br/>Matching and Pricing"]
-    M --> V["Agent 4<br/>Validation and Safety"]
-    V --> H{{"Shipper approves<br/>Agency accepts or declines"}}
-    P -. failure .-> X(["Stop"])
-    D -. "no eligible agency" .-> X
-    M -. "routing or pricing failed" .-> X
-```
+![AI Agent architecture diagram](https://dl.dropbox.com/scl/fi/6n8unqc0zbjkigc8pagk6/FreightLink-Agentic-Matching-Workflow-as-implemented-1.png?rlkey=31l6gyofn63yw9q7o6pnxe34k&st=ixuu1qfw&dl=0)
 
 | Agent | Responsibility |
 | --- | --- |
@@ -174,10 +165,7 @@ freightLink/
 │   └── tests/               pytest suites
 ├── deploy/                  Caddyfile
 ├── compose.yaml             Docker Compose stack (db, agent, migrate, api, caddy)
-├── docs/                    ADRs, API contract, audits, design notes
-├── plans/                   engineering plans for the agent and integration work
 ├── postman/                 Postman collection and environments
-├── testing/                 test plan, evidence and scripts (see section 4.2)
 └── .github/workflows/       CI for backend, frontend, mobile and agent
 ```
 
@@ -335,7 +323,7 @@ For a PostgreSQL backup, run `docker compose exec -T db pg_dump -U freightlink -
 | API base | https://freightlink.centralindia.cloudapp.azure.com/api/v1 |
 | Health check | https://freightlink.centralindia.cloudapp.azure.com/health |
 | Swagger UI | https://freightlink.centralindia.cloudapp.azure.com/swagger |
-| Web app (Vercel) | `TODO: add the Vercel production URL` |
+| Web app (Vercel) | https://freight-link-six.vercel.app/ |
 | Source repository | https://github.com/OmiraRathnaweera/freightLink |
 
 ### 4.5 Test accounts
@@ -405,16 +393,3 @@ Commit totals per author: `git shortlog -sne --all`.
 - The seeded demo accounts share one password (see section 4.5).
 - Some low-severity ZAP alerts remain.
 - JWT lifetimes: the design target is 5 minutes (access) and 30 days (refresh), while the Compose default is 15 minutes and 7 days.
-
-### 5.4 AI usage declaration
-
-This project used AI assistance. The team's own declaration is in [`testing/AI_USAGE_DECLARATION.md`](testing/AI_USAGE_DECLARATION.md), which each member must review, complete and sign.
-
-| Where AI was used | Tool | Human verification |
-| --- | --- | --- |
-| **Inside the product:** the Planner, Matching and Pricing and Validation agents call OpenAI `gpt-4o-mini`. | OpenAI | Deterministic tools produce all numbers, Agent 4 validates, and a human approves every match. |
-| **Testing work:** security test cases, a PostgreSQL end-to-end workflow test, agent safety tests, defect fixes DEF-001 to DEF-004 and DEF-006, the NFR runner and the generated test documents. | Claude Code (Anthropic) | Tests were run against the real system, and failures were reproduced before each fix. |
-| **Documentation and diagrams:** the executive summary, requirements, DTO class diagrams, architecture and sequence diagrams, component descriptions, deployment notes, this README, and a frontend change that explains failed AI runs. | Claude Code (Anthropic) | Checked against the controllers, services and ADRs. Where documents and code disagreed, the code was followed. |
-| **Operations:** deployment configuration and troubleshooting. | Claude Code (Anthropic) | Changes were tested locally before deployment. |
-
-Each member remains responsible for explaining and reproducing everything submitted under their name. AI-generated tests do not prove the absence of defects.
