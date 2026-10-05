@@ -90,7 +90,7 @@ Each component has its own sequence diagram. Click an image to view it at full s
 
 **Component C: Matching and Trip Execution** (Agent 3, Matching and Pricing)
 
-![Component C: Matching and Trip Execution sequence diagram](https://dl.dropbox.com/scl/fi/3assfcbo6f5ry8d75mlge/component-c-matching-trip-execution.png?rlkey=eaq47mdr2zd6fxhuexlxcum4w&st=9wwafhw4&dl=0)
+![Component C: Matching and Trip Execution sequence diagram](https://dl.dropbox.com/scl/fi/s1ww7jezcr5lpuor5lv56/Component-C-Matching-and-Trip-Execution-Sequence-as-implemented.png?rlkey=1dka7exqgjxcko1e6lbcv2x37&st=7u484m07&dl=0)
 
 **Component D: Billing and Admin Oversight** (Agent 4, Validation and Safety)
 
