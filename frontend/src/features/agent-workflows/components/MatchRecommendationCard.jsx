@@ -30,6 +30,7 @@ export default function MatchRecommendationCard({
   loadId,
   loadStatus,
   workflowStatus,
+  failure,
   recommendedAgency,
   selectedAgencyId,
   alternateCandidates = [],
@@ -44,6 +45,50 @@ export default function MatchRecommendationCard({
   isRejecting,
   isRevising,
 }) {
+  // A failed run never produces a recommendation, so it lands here too. Showing the "evaluating"
+  // spinner for it made a failure look like work in progress, with no reason given.
+  if (!recommendedAgency && workflowStatus === 'Failed') {
+    return (
+      <div
+        role="alert"
+        data-testid="match-failure-panel"
+        className="rounded-lg border border-status-red-text/30 bg-status-red-bg/30 p-8 text-center shadow-soft"
+      >
+        <AlertTriangle className="mx-auto mb-2 h-8 w-8 text-status-red-text" />
+        <h3 className="font-heading text-title-md font-semibold text-status-red-text">
+          {failure?.title || 'No automatic match found'}
+        </h3>
+        {failure?.agentTitle && (
+          <p className="mt-0.5 text-xs font-semibold uppercase tracking-wider text-on-surface-variant">
+            Stopped at {failure.agentTitle}
+          </p>
+        )}
+        <p className="mx-auto mt-2 max-w-md text-body-sm text-on-surface">
+          {failure?.message || 'The matching pipeline stopped before it produced a recommendation.'}
+        </p>
+        {failure?.hint && (
+          <p className="mx-auto mt-1 max-w-md text-body-sm text-on-surface-variant">{failure.hint}</p>
+        )}
+        {failure?.technicalDetail && (
+          <p className="mt-2 font-mono text-[11px] text-on-surface-variant">
+            Reference: {failure.technicalDetail}
+          </p>
+        )}
+        <div className="mt-4">
+          <Button
+            variant="secondary"
+            data-testid="retry-failed-match-btn"
+            onClick={onRetryMatch}
+            disabled={isRetrying}
+          >
+            <RotateCcw className={`h-4 w-4 mr-2 ${isRetrying ? 'animate-spin' : ''}`} />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (!recommendedAgency) {
     return (
       <div className="rounded-lg border border-slate-border bg-surface-container-lowest p-8 text-center shadow-soft">
@@ -288,7 +333,7 @@ export default function MatchRecommendationCard({
               </h4>
               <p className="text-xs text-on-surface-variant">
                 {workflowStatus === 'Failed'
-                  ? "Agent 3 couldn't find a suitable carrier for this load. Request a new recommendation to try again."
+                  ? `${failure?.message || "We couldn't find a suitable carrier for this load."} Request a new recommendation to try again.`
                   : 'This recommendation has been rejected and can no longer be approved or revised as-is. Request a new recommendation below.'}
               </p>
             </div>

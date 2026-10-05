@@ -26,6 +26,7 @@ import AlternateCandidatesList from '../components/AlternateCandidatesList.jsx'
 import LoadSelectorBar from '../components/LoadSelectorBar.jsx'
 import FormattedAiText from '../components/FormattedAiText.jsx'
 import AgentCallHistory from '../components/AgentCallHistory.jsx'
+import { explainWorkflowFailure } from '../lib/workflowFailure.js'
 
 export default function AgentWorkflowConsolePage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -307,6 +308,7 @@ export default function AgentWorkflowConsolePage() {
             loadId={activeLoadId}
             loadStatus={matchData.loadStatus}
             workflowStatus={matchData.workflowStatus}
+            failure={explainWorkflowFailure(matchData.steps, matchData.workflowStatus)}
             recommendedAgency={hasRealRecommendation ? matchData.recommendedAgency : null}
             selectedAgencyId={activeSelectedAgencyId}
             alternateCandidates={hasRealRecommendation ? matchData.alternateCandidates : []}

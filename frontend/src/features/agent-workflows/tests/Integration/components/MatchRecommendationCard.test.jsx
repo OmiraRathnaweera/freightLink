@@ -188,4 +188,55 @@ describe('MatchRecommendationCard', () => {
     expect(screen.getByRole('button', { name: /Request Revision/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Retry Match$/i })).not.toBeInTheDocument()
   })
+  it('shows why matching failed instead of the evaluating spinner when a run Failed', async () => {
+    const user = userEvent.setup()
+    const handleRetry = vi.fn()
+
+    render(
+      <MatchRecommendationCard
+        loadId="load-1"
+        loadStatus="Posted"
+        workflowStatus="Failed"
+        failure={{
+          title: 'No suitable carrier available',
+          message: "None of the active carriers has an available vehicle and driver that can carry this load's weight and volume.",
+          hint: 'Check the load weight.',
+          agentTitle: 'Agent 2: Domain Analysis',
+          technicalDetail: 'zero_eligible_agencies',
+        }}
+        recommendedAgency={null}
+        onApproveMatch={vi.fn()}
+        onRetryMatch={handleRetry}
+        isApproving={false}
+        isRetrying={false}
+      />
+    )
+
+    expect(screen.getByTestId('match-failure-panel')).toBeInTheDocument()
+    expect(screen.getByText('No suitable carrier available')).toBeInTheDocument()
+    expect(screen.getByText(/Stopped at Agent 2: Domain Analysis/)).toBeInTheDocument()
+    expect(screen.getByText(/zero_eligible_agencies/)).toBeInTheDocument()
+    expect(screen.queryByText(/Evaluating Optimal Carrier Matches/i)).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Try Again/i }))
+    expect(handleRetry).toHaveBeenCalled()
+  })
+
+  it('still shows the evaluating state while a run is in progress', () => {
+    render(
+      <MatchRecommendationCard
+        loadId="load-1"
+        loadStatus="Posted"
+        workflowStatus="Running"
+        recommendedAgency={null}
+        onApproveMatch={vi.fn()}
+        onRetryMatch={vi.fn()}
+        isApproving={false}
+        isRetrying={false}
+      />
+    )
+
+    expect(screen.getByText(/Evaluating Optimal Carrier Matches/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('match-failure-panel')).not.toBeInTheDocument()
+  })
 })
