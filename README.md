@@ -370,24 +370,27 @@ For a PostgreSQL backup, run `docker compose exec -T db pg_dump -U freightlink -
 | Web app (Vercel) | https://freight-link-six.vercel.app/ |
 | Source repository | https://github.com/OmiraRathnaweera/freightLink |
 
-### 4.5 Test accounts
+### 4.5 Test accounts (Prod Acc)
+
+The API seeds these accounts on startup so each role can be tried without manual setup.
+
+| Role | Email | Password | Notes |
+| --- | --- | --- | --- |
+| Admin | `it24101003@my.sliit.lk` | `Password@123` | Created on first start. There is no public admin registration. |
+| Shipper | `hnpkdias@gmail.com` | `Qwe123##123` | - |
+| Agency Staff | `pasindhukavishan@gmail.com` | `Qwe123##123` | - |
+| Driver | `nuwanthadias@gmail.com` | `Qwe123##123` | Drivers can log in only through the mobile app. |
+
+
+---
+
+### Test accounts (Dev Acc)
 
 The API seeds these accounts on startup so each role can be tried without manual setup.
 
 | Role | Email | Password | Notes |
 | --- | --- | --- | --- |
 | Admin | the value of `ADMIN_USER_EMAIL` on the server | the value of `ADMIN_USER_PASSWORD` on the server | Created on first start. There is no public admin registration. |
-| Agency Staff | `agency@freightlink.lk` | `Password123!` | Samagi Express Logistics (Active, 4 vehicles, 2 drivers) |
-| Agency Staff | `lanka.staff@freightlink.lk` | `Password123!` | Lanka Freight and Cargo Hub |
-| Agency Staff | `southern.staff@freightlink.lk` | `Password123!` | Southern Coastal Haulage |
-| Agency Staff | `kandy.staff@freightlink.lk` | `Password123!` | Central Highlands Express |
-| Agency Staff | `wayamba.staff@freightlink.lk` | `Password123!` | Wayamba Regional Transporters |
-| Agency Staff | `kelani.staff@freightlink.lk` | `Password123!` | Kelani Valley Logistics Hub |
-| Driver | `suneth.driver@samagi.lk`, `kamal.driver@samagi.lk` | `Password123!` | Drivers of the first agency. Each seeded agency has two drivers (for example `priyantha.driver@lankafreight.lk`). |
-| Shipper | register a new account on the web app | your choice | Shipper registration is web-only and has no seeded account. |
-
-> **Security note:** the seeded agency and driver accounts share one well-known password and are created on every start, including in production. Use them for demonstration only, and change the password or remove the seeding before any real use. Share the admin credentials with the markers privately rather than in this file.
-
 ---
 
 ## 5. Team and project reflection
