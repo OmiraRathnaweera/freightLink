@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, screen, waitFor } from '@testing-library/react'
+import { cleanup, screen} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import AdminDisputesPage from '../../../pages/AdminDisputesPage.jsx'
 import ResolutionModal from '../../../components/ResolutionModal.jsx'
 import { UserRole } from '../../../../../lib/enums.js'
 import { renderWithProviders } from '../../../../../test/testUtils.jsx'
 import * as disputesApi from '../../../api/disputesApi.js'
-import { validateResolutionPayload, DisputeStatus } from '../../../lib/disputeRules.js'
+import { validateResolutionPayload} from '../../../lib/disputeRules.js'
 
 vi.mock('../../../api/disputesApi.js', async (importOriginal) => {
   const actual = await importOriginal()
