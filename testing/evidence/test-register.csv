@@ -608,331 +608,357 @@ FE-0017,FE,AgenciesPage — Admin status changes (issue #56) > offers Reactivate (
 FE-0018,FE,AgenciesPage — Admin status changes (issue #56) > offers Suspend (not Reactivate) for an active agency,src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx,Passed
 FE-0019,FE,"AgenciesPage — Admin status changes (issue #56) > requires a reason, then reactivates the agency to Active",src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx,Passed
 FE-0020,FE,AgenciesPage — Admin status changes (issue #56) > keeps the dialog open and shows the server error when the change is rejected,src/features/agencies/tests/Integration/pages/AgenciesPage.test.jsx,Passed
-FE-0021,FE,AgencyProfilePage > renders agency identity banner and compliance metrics,src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
-FE-0022,FE,AgencyProfilePage > renders all compliance document category cards instead of a dropdown,src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
-FE-0023,FE,"AgencyProfilePage > opens upload modal when ""Upload Document"" button on an unuploaded card is clicked",src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
-FE-0024,FE,AgencyVerificationPage > redirects unauthorized non-admin user,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
-FE-0025,FE,AgencyVerificationPage > renders pending agencies and compliance documents table,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
-FE-0026,FE,AgencyVerificationPage > hides all action buttons immediately when doc Verify button is clicked,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
-FE-0027,FE,AgencyVerificationPage > hides all action buttons immediately when doc Reject button is clicked,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
-FE-0028,FE,"AgencyVerificationPage > opens document with target=""popup"" and window.open on click",src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
-FE-0029,FE,FleetDriversPage > renders roster metrics and driver list correctly,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0030,FE,FleetDriversPage > filters drivers by search text query,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0031,FE,FleetDriversPage > renders empty state when no drivers are onboarded,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0032,FE,"FleetDriversPage > opens add driver drawer when ""Add Driver"" is clicked",src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0033,FE,FleetDriversPage > validates fields and prevents submit on empty fields,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0034,FE,FleetDriversPage > submits a valid new-driver form and calls addDriverMutation,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0035,FE,FleetDriversPage > removes an Active driver from the roster when its status is changed to Inactive,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0036,FE,FleetDriversPage > reinstates an Inactive driver when its status is changed to Active,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0037,FE,FleetDriversPage > disables the status action for a driver who is OnTrip,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
-FE-0038,FE,FleetVehiclesPage > renders fleet metrics and vehicle list correctly,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0039,FE,FleetVehiclesPage > filters vehicles by search text query,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0040,FE,FleetVehiclesPage > renders empty state when no vehicles are registered,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0041,FE,"FleetVehiclesPage > opens add vehicle drawer when ""Add New Vehicle"" is clicked",src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0042,FE,FleetVehiclesPage > validates fields in advance using Formik and Yup and prevents submit on empty fields,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0043,FE,FleetVehiclesPage > enforces type-based capacity limits dynamically based on vehicle type selection,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0044,FE,FleetVehiclesPage > rejects invalid non-Sri Lankan vehicle registration numbers and prevents submit,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0045,FE,FleetVehiclesPage > submits valid form successfully and calls addVehicleMutation,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0046,FE,FleetVehiclesPage > surfaces backend validation errors onto the specific form fields,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0047,FE,FleetVehiclesPage > displays top-level alert banner when backend throws non-validation error,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0048,FE,FleetVehiclesPage > displays user-friendly alert message when backend throws VehicleType conversion error,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0049,FE,FleetVehiclesPage > edits a vehicle using prefilled values and the update API,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0050,FE,FleetVehiclesPage > shows a registration conflict on the edit field,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0051,FE,FleetVehiclesPage > changes availability and confirms retirement before submitting,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0052,FE,FleetVehiclesPage > uses backend statuses in filters and locks OnTrip or Retired row actions,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0053,FE,FleetVehiclesPage > does not expose vehicle mutations to Admin web users,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
-FE-0054,FE,vehicle management API > updates editable details without sending vehicle status,src/features/agencies/tests/Unit/api/vehicleApi.test.js,Passed
-FE-0055,FE,vehicle management API > uses the dedicated status endpoint with the backend wire value,src/features/agencies/tests/Unit/api/vehicleApi.test.js,Passed
-FE-0056,FE,agency status transitions (issue #56) > lets a suspended agency be reactivated,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0057,FE,agency status transitions (issue #56) > lets an active agency be suspended,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0058,FE,agency status transitions (issue #56) > does not let a pending agency skip verification,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0059,FE,agency status transitions (issue #56) > has no terminal status,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0060,FE,agency status transitions (issue #56) > returns no transitions for an unknown status,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0061,FE,agencyStatusChangeSchema > requires a non-blank reason,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0062,FE,agencyStatusChangeSchema > rejects a reason over 500 characters,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0063,FE,agencyStatusChangeSchema > accepts and trims a valid reason,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
-FE-0064,FE,addVehicleSchema > validates a correct vehicle registration payload,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0065,FE,addVehicleSchema > rejects missing or invalid vehicleType,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0066,FE,addVehicleSchema > Sri Lankan vehicle registration number pattern > accepts valid Sri Lankan registration patterns,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0067,FE,"addVehicleSchema > Sri Lankan vehicle registration number pattern > rejects empty, malformed, or non-Sri Lankan registration numbers",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0068,FE,"addVehicleSchema > vehicle type weight limitations > enforces Lorry capacity limits (up to 10,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0069,FE,"addVehicleSchema > vehicle type weight limitations > enforces Container capacity limits (10,000 – 100,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0070,FE,"addVehicleSchema > vehicle type weight limitations > enforces Refrigerated capacity limits (up to 25,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0071,FE,"addVehicleSchema > vehicle type weight limitations > enforces Flatbed capacity limits (up to 50,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0072,FE,"addVehicleSchema > vehicle type weight limitations > enforces Tipper capacity limits (up to 30,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0073,FE,"addVehicleSchema > rejects volumeM3 that is non-numeric, zero, negative, or exceeds limit",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0074,FE,updateVehicleSchema > accepts an unchanged legacy registration but validates a replacement plate,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0075,FE,AgentCallHistory > does not fetch history until the section is opened,src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx,Passed
-FE-0076,FE,AgentCallHistory > shows every past attempt with its steps and the rejected decision once opened,src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx,Passed
-FE-0077,FE,AgentCallHistory > expands a step to reveal its individual tool calls,src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx,Passed
-FE-0078,FE,MatchRecommendationCard > renders recommendation details correctly,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0079,FE,MatchRecommendationCard > calls onApproveMatch when Approve Match button is clicked,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0080,FE,MatchRecommendationCard > calls onRetryMatch when Retry Match button is clicked,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0081,FE,MatchRecommendationCard > renders confirmed match state when load is already matched,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0082,FE,MatchRecommendationCard > shows only a single Request Revision action once the recommendation has been rejected (Aborted),src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0083,FE,"MatchRecommendationCard > calls onRetryMatch (a fresh trigger, not the decision endpoints) when Request Revision is clicked after rejection",src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0084,FE,MatchRecommendationCard > shows the single Request Revision action when no automatic match was found (Failed),src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
-FE-0085,FE,WorkflowStepper > renders all 4 pipeline agents and their roles,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
-FE-0086,FE,WorkflowStepper > never shows a step as Completed unless the backend actually reported it,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
-FE-0087,FE,ValidationChecklist > renders recommendation status and checklist items,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
-FE-0088,FE,AlternateCandidatesList > renders alternate candidates and triggers onSelectAgency,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
-FE-0089,FE,"AgentWorkflowConsolePage > renders page with workflow stepper, recommendation, and validation",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
-FE-0090,FE,AgentWorkflowConsolePage > triggers confirm match mutation when Approve button is clicked,src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
-FE-0091,FE,"AgentWorkflowConsolePage > automatically triggers matching once when a load has no prior run, via an explicit command",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
-FE-0092,FE,AgentWorkflowConsolePage > does not show an approvable recommendation card while matching has not actually run yet,src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
-FE-0093,FE,"AgentWorkflowConsolePage > shows only the agent call history, not the live decision UI, once the load is already Matched",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
-FE-0094,FE,"AgentWorkflowConsolePage > shows only the focused workflow run view when ?workflowRunId= is present, not the live UI or the history list",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
-FE-0095,FE,AdminAnalyticsPage > renders the summary once loaded,src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx,Passed
-FE-0096,FE,AdminAnalyticsPage > shows a loading skeleton while the query is pending,src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx,Passed
-FE-0097,FE,AdminAnalyticsPage > shows an error state with a retry action when the query fails,src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx,Passed
-FE-0098,FE,AssignmentActionPage — missing token > shows a missing-token message and never calls the API when no token is present,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
-FE-0099,FE,AssignmentActionPage — API integration > does not call the API until the user clicks Confirm response,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
-FE-0100,FE,AssignmentActionPage — API integration > calls respondToAssignmentAction with the token and shows an Accepted success state with a trip-created note,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
-FE-0101,FE,AssignmentActionPage — API integration > shows a Declined success state without the trip-created note,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
-FE-0102,FE,AssignmentActionPage — error state > shows the backend error message when the token is invalid or expired,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
-FE-0103,FE,AssignmentActionPage — error state > falls back to a generic expired-link message when the rejected error has no message,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
-FE-0104,FE,"YardLocationPicker > renders search input, address input, use current location button, and coordinate inputs",src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx,Passed
-FE-0105,FE,"YardLocationPicker > triggers geolocation on ""Use Current Location"" button click and updates location",src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx,Passed
-FE-0106,FE,YardLocationPicker > updates address when typing directly into the address input,src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx,Passed
-FE-0107,FE,AccountSettingsPage — Profile section > pre-fills fields from the signed-in user,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
-FE-0108,FE,"AccountSettingsPage — Profile section > saves the edited profile, updates Redux, and shows a success toast",src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
-FE-0109,FE,AccountSettingsPage — Profile section > shows the backend error message when the update fails,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
-FE-0110,FE,AccountSettingsPage — Password section > blocks submission and shows validation errors for empty fields,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
-FE-0111,FE,AccountSettingsPage — Password section > changes the password and signs the user out locally on success,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
-FE-0112,FE,AccountSettingsPage — Password section > shows the backend error message for an incorrect current password,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
-FE-0113,FE,RegisterPage — Role Selection > renders account type options when no role is in the URL,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0114,FE,RegisterPage — Shipper Registration Form > renders the shipper form with all expected fields,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0115,FE,RegisterPage — Shipper Registration Form > validates every input in advance and blocks submission on empty fields,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0116,FE,RegisterPage — Shipper Registration Form > validates password requirements and phone format in advance,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0117,FE,RegisterPage — Shipper Registration Form > submits valid shipper payload successfully and shows success toast,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0118,FE,RegisterPage — Shipper Registration Form > surfaces backend validation errors onto the specific form fields,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0119,FE,RegisterPage — Agency Registration Form > renders all agency and yard inputs,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0120,FE,RegisterPage — Agency Registration Form > validates every agency input in advance,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0121,FE,RegisterPage — Agency Registration Form > validates yard coordinate limits in advance,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0122,FE,RegisterPage — Agency Registration Form > submits valid agency payload successfully and navigates,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
-FE-0123,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 1. Role Enum Parity with Backend & Mobile > defines exactly the 4 standard system roles with matching casing,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0124,FE,"Cross-Platform Auth & Session Consistency (Y3S01-103) > 2. Contract Parity: CurrentUserResponseDto to Redux State > populates user, role, and isAuthenticated identical to mobile AuthUser",src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0125,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 2. Contract Parity: CurrentUserResponseDto to Redux State > clears session when setUser(null) is dispatched,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0126,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces Shipper permissions and role home (/loads),src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0127,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces AgencyStaff permissions and role home (/agencies),src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0128,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces Driver has no web UI per Requirement 1 (mobile application only),src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0129,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces Admin permissions across all management routes,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0130,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 4. Session & Token Storage Cleanup on Logout/401 > persists and clears refresh tokens in storage correctly,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0131,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 4. Session & Token Storage Cleanup on Logout/401 > clearAuth synchronously resets auth state on 401 response interceptor trigger,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
-FE-0132,FE,loginSchema > validates a valid login payload,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0133,FE,loginSchema > rejects an invalid email and short password,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0134,FE,shipperRegisterSchema > validates a fully valid shipper payload,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0135,FE,"shipperRegisterSchema > allows optional fields (phoneE164, businessRegNo) to be empty strings or undefined",src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0136,FE,shipperRegisterSchema > requires fullName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0137,FE,shipperRegisterSchema > requires email,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0138,FE,shipperRegisterSchema > requires password,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0139,FE,shipperRegisterSchema > requires companyName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0140,FE,shipperRegisterSchema > requires billingAddress,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0141,FE,shipperRegisterSchema > enforces strong password criteria,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0142,FE,shipperRegisterSchema > validates E.164 phone format when provided,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0143,FE,shipperRegisterSchema > validates fullName length and allowed characters,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0144,FE,shipperRegisterSchema > validates billingAddress minimum length,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0145,FE,agencyRegisterSchema > validates a fully valid agency payload,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0146,FE,"agencyRegisterSchema > allows optional fields (phoneE164, jobTitle) to be empty strings",src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0147,FE,agencyRegisterSchema > requires fullName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0148,FE,agencyRegisterSchema > requires email,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0149,FE,agencyRegisterSchema > requires password,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0150,FE,agencyRegisterSchema > requires agencyName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0151,FE,agencyRegisterSchema > requires businessRegNo,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0152,FE,agencyRegisterSchema > requires yardAddress,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0153,FE,agencyRegisterSchema > requires yardLat,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0154,FE,agencyRegisterSchema > requires yardLng,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0155,FE,agencyRegisterSchema > validates coordinate boundaries,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0156,FE,agencyRegisterSchema > rejects non-numeric coordinates,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0157,FE,"invoice mutation hooks — cache invalidation > useIssueInvoiceMutation invalidates the invoice list, its detail, and the summary",src/features/billing/tests/Integration/api/invoiceApi.test.jsx,Passed
-FE-0158,FE,"invoice mutation hooks — cache invalidation > useVoidInvoiceMutation invalidates the invoice list, its detail, and the summary",src/features/billing/tests/Integration/api/invoiceApi.test.jsx,Passed
-FE-0159,FE,"invoice mutation hooks — cache invalidation > useConfirmPaymentMutation invalidates the invoice list, its detail, and the summary",src/features/billing/tests/Integration/api/invoiceApi.test.jsx,Passed
-FE-0160,FE,InvoiceCashflowDashboard > renders an ErrorState with retry on failure — no fabricated totals,src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx,Passed
-FE-0161,FE,"InvoiceCashflowDashboard > renders totals, per-status counts, and recent activity with no action buttons anywhere",src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx,Passed
-FE-0162,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > lists only the eligible (Delivered, uninvoiced) trips fetched via hasInvoice: false",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0163,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > rejects submission with no trip selected and no amount",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0164,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > pre-fills the amount from the selected trip’s agreed price and shows the shipper name",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0165,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > submits {tripId, amount, notes, issueImmediately} with no lineItems/currency/discount/dueDate",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0166,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > lets Agency Staff override the pre-filled amount before submitting",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0167,FE,InvoiceFormModal — edit mode > has no trip picker and pre-fills the amount from the existing invoice,src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0168,FE,"InvoiceFormModal — edit mode > submits only {amount, notes} on save, scoped to the invoice id",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
-FE-0169,FE,"InvoiceStatusBadge > renders the real backend status ""Draft""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0170,FE,"InvoiceStatusBadge > renders the real backend status ""Issued""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0171,FE,"InvoiceStatusBadge > renders the real backend status ""PaymentPending""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0172,FE,"InvoiceStatusBadge > renders the real backend status ""Paid""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0173,FE,"InvoiceStatusBadge > renders the real backend status ""Failed""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0174,FE,"InvoiceStatusBadge > renders the real backend status ""Void""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0175,FE,InvoiceStatusBadge > does not reference invented statuses that the backend never returns,src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0176,FE,InvoiceStatusBadge > falls back to a neutral style for an unrecognized status rather than throwing,src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
-FE-0177,FE,"BillingPage — error state (no mock fallback) > renders a real ErrorState, not fabricated invoices, when the query fails",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
-FE-0178,FE,"BillingPage — empty state (no mock fallback) > renders the real empty state, not fabricated invoices, on a genuinely empty list",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
-FE-0179,FE,"BillingPage — list rendering & role gating > renders invoice rows with their real status, and offers Create/Edit/Issue/Void for Agency Staff",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
-FE-0180,FE,BillingPage — list rendering & role gating > hides Create Invoice for a Shipper and never shows a Draft invoice to them,src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
-FE-0181,FE,"BillingPage — list rendering & role gating > renders the read-only cashflow dashboard for Admin with no action buttons, and no Create Invoice control",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
-FE-0182,FE,AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > renders the admin disputes table with all core columns and initial data,src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
-FE-0183,FE,AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > renders state-specific action buttons strictly adhering to lifecycle rules,src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
-FE-0184,FE,"AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > triggers startReviewMutation when ""Start Review"" is clicked",src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
-FE-0185,FE,"AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > opens Resolution Modal when ""Resolve Dispute"" is clicked and requires non-empty resolution note",src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
-FE-0186,FE,"AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > opens read-only View Resolution modal when ""View Resolution"" is clicked on a resolved dispute",src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
-FE-0187,FE,claimant dispute views > renders only the role-scoped dispute response and its claimant/status context,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
-FE-0188,FE,claimant dispute views > validates a raise form and sends the fixed backend category and trip reference,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
-FE-0189,FE,claimant dispute views > shows the active-duplicate rejection as a claimant-friendly form error,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
-FE-0190,FE,claimant dispute views > renders a final resolution without any Admin review or resolve controls,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
-FE-0191,FE,Dispute State Machine Rules (Y3S01-81) > canStartReview > returns true only for Raised status,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0192,FE,Dispute State Machine Rules (Y3S01-81) > canResolveDispute > returns true only for UnderReview status (strict sequential progression),src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0193,FE,Dispute State Machine Rules (Y3S01-81) > isDisputeResolved > returns true only for Resolved status,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0194,FE,Dispute State Machine Rules (Y3S01-81) > getStatusTone > maps statuses to the appropriate design system tones,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0195,FE,Dispute State Machine Rules (Y3S01-81) > getStatusLabel > returns user-friendly labels,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0196,FE,Dispute State Machine Rules (Y3S01-81) > validateResolutionPayload > fails when resolution note is empty or whitespace only,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0197,FE,Dispute State Machine Rules (Y3S01-81) > validateResolutionPayload > fails when resolution note is too short,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0198,FE,Dispute State Machine Rules (Y3S01-81) > validateResolutionPayload > passes when a meaningful resolution note is supplied,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
-FE-0199,FE,CancelLoadDialog — validation > requires a cancellation reason before submitting,src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx,Passed
-FE-0200,FE,CancelLoadDialog — API integration > submits the reason and closes on success,src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx,Passed
-FE-0201,FE,CancelLoadDialog — API integration > shows an inline error and does not close when the mutation fails,src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx,Passed
-FE-0202,FE,RowActionsMenu — per-status action visibility (Shipper) > shows Edit and Cancel for a Draft load,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0203,FE,RowActionsMenu — per-status action visibility (Shipper) > shows Edit and Cancel (but not Publish) for a Posted load,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0204,FE,"RowActionsMenu — per-status action visibility (Shipper) > hides Edit, Cancel and Publish for a Matched load",src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0205,FE,"RowActionsMenu — per-status action visibility (Shipper) > hides Edit, Cancel and Publish for a Delivered load (only View remains)",src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0206,FE,"RowActionsMenu — per-status action visibility (Shipper) > hides Edit, Cancel and Publish for a Cancelled load",src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0207,FE,RowActionsMenu — non-Shipper roles never see mutating actions > hides Edit/Cancel/Publish for an Admin viewing a Draft load,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0208,FE,RowActionsMenu — opening a mutating item mounts its dialog > opens CancelLoadDialog when Cancel is clicked,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0209,FE,RowActionsMenu — opening a mutating item mounts its dialog > opens PublishLoadDialog when Publish is clicked,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
-FE-0210,FE,EditLoadPage — loading and error states > renders skeletons while the load is loading,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0211,FE,EditLoadPage — loading and error states > renders ErrorState with retry when the load fails to fetch,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0212,FE,EditLoadPage — loading and error states > renders an EmptyState instead of the form for a non-editable status,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0213,FE,EditLoadPage — loading and error states > renders a role-specific EmptyState message for a non-Shipper role,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0214,FE,EditLoadPage — rendering with existing values > pre-fills the form fields from the loaded record,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0215,FE,EditLoadPage — rendering with existing values > renders the submit button,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0216,FE,EditLoadPage — rendering with existing values > shows a Publish button only when the load is publishable,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0217,FE,EditLoadPage — rendering with existing values > hides the Publish button once the load is Posted,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0218,FE,EditLoadPage — API integration > calls the update mutation and shows a success toast,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0219,FE,EditLoadPage — API integration > shows a banner error when the update mutation fails,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
-FE-0220,FE,LoadsPage — loading state > renders skeleton rows while the query is loading,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0221,FE,LoadsPage — error state > renders ErrorState with a retry action when the query fails,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0222,FE,LoadsPage — empty state > renders EmptyState when there are no loads,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0223,FE,"LoadsPage — empty state > offers a ""Post a Load"" action for a Shipper",src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0224,FE,"LoadsPage — empty state > does not offer ""Post a Load"" for a non-Shipper role",src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0225,FE,"LoadsPage — list rendering > renders a row per load with its reference, cargo and status badge",src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0226,FE,LoadsPage — list rendering > shows Edit and Cancel for a Draft row but hides both for a Matched row,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
-FE-0227,FE,PostLoadPage — rendering > renders the required create-load fields,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0228,FE,PostLoadPage — rendering > renders the postImmediately control on the create form,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0229,FE,PostLoadPage — rendering > renders the submit button,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0230,FE,PostLoadPage — rendering > shows an EmptyState instead of the form for a non-Shipper role,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0231,FE,PostLoadPage — client-side validation > shows field-level errors when required fields are left blank,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0232,FE,PostLoadPage — API integration > calls the create mutation and navigates away on success,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0233,FE,PostLoadPage — API integration > shows a banner error when the create mutation fails with a non-validation error,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0234,FE,PostLoadPage — API integration > maps a VALIDATION_ERROR response onto the matching form fields,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0235,FE,PostLoadPage — API integration > makes no real network calls — the API layer is fully mocked,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
-FE-0236,FE,createLoadSchema > passes for a fully valid payload,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0237,FE,createLoadSchema > requires cargoDescription,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0238,FE,createLoadSchema > requires pickupAddress,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0239,FE,createLoadSchema > requires dropoffAddress,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0240,FE,createLoadSchema > requires pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0241,FE,createLoadSchema > requires pickupWindowEnd,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0242,FE,"createLoadSchema > requires weightKg (empty numeric field reports ""required"", not ""must be a number"")",src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0243,FE,"createLoadSchema > requires volumeM3 (empty numeric field reports ""required"", not ""must be a number"")",src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0244,FE,createLoadSchema > rejects a weight below the minimum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0245,FE,createLoadSchema > rejects a weight above the maximum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0246,FE,createLoadSchema > rejects a volume below the minimum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0247,FE,createLoadSchema > rejects a volume above the maximum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0248,FE,createLoadSchema > accepts weight/volume exactly at their boundary values,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0249,FE,createLoadSchema > rejects a pickupWindowEnd that is before pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0250,FE,createLoadSchema > rejects a pickupWindowEnd equal to pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0251,FE,createLoadSchema > accepts a pickupWindowEnd after pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0252,FE,createLoadSchema > rejects identical pickup/dropoff coordinates,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0253,FE,createLoadSchema > accepts pickup/dropoff coordinates that differ,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0254,FE,editLoadSchema > has no postImmediately field but otherwise enforces the same rules,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0255,FE,editLoadSchema > rejects identical pickup/dropoff coordinates,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0256,FE,cancelLoadSchema > requires a reason,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0257,FE,cancelLoadSchema > rejects a reason over 500 characters,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0258,FE,cancelLoadSchema > accepts a valid reason,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0259,FE,FuelRatesPage — component / list rendering > renders the current fuel rate list,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0260,FE,FuelRatesPage — component / list rendering > renders an empty state when there are no fuel rates,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0261,FE,FuelRatesPage — error state > shows an error state with a retry action when the fuel rates fetch fails,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0262,FE,FuelRatesPage — form validation > shows validation errors and does not submit when the Add Fuel Rate form is empty,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0263,FE,FuelRatesPage — API integration > submits a valid fuel rate and calls the create mutation with the mapped payload,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0264,FE,FuelRatesPage — API integration > maps a backend VALIDATION_ERROR onto the matching form field,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0265,FE,FuelRatesPage — API integration > shows a top-level banner for a non-validation backend error,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
-FE-0266,FE,fuelRateSchema > passes for a fully valid payload,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0267,FE,fuelRateSchema > requires fuelType,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0268,FE,fuelRateSchema > requires source,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0269,FE,fuelRateSchema > rejects a source over 500 characters,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0270,FE,fuelRateSchema > requires effectiveFrom,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0271,FE,"fuelRateSchema > requires pricePerLitre (empty numeric field reports ""required"", not ""must be a number"")",src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0272,FE,fuelRateSchema > rejects a pricePerLitre of zero (below the 0.01 minimum),src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0273,FE,fuelRateSchema > accepts pricePerLitre exactly at the 0.01 minimum,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0274,FE,fuelRateSchema > rejects a non-numeric pricePerLitre,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0275,FE,vehicleEfficiencySchema > passes for a fully valid payload,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0276,FE,vehicleEfficiencySchema > requires classLabel,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0277,FE,vehicleEfficiencySchema > allows maxPayloadKg to be left blank for an open-ended top tier,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0278,FE,vehicleEfficiencySchema > rejects a maxPayloadKg that is not greater than minPayloadKg,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0279,FE,vehicleEfficiencySchema > accepts a maxPayloadKg greater than minPayloadKg,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0280,FE,vehicleEfficiencySchema > allows maxVolumeM3 to be left blank for an open-ended top tier,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0281,FE,vehicleEfficiencySchema > rejects a maxVolumeM3 that is not greater than minVolumeM3,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0282,FE,vehicleEfficiencySchema > requires fuelConsumptionLPer100Km to be at least 0.01,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0283,FE,pricingFormulaSchema > passes for a fully valid payload,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0284,FE,"pricingFormulaSchema > rejects a marginPercent above 1 (100%) — the field is a fraction, not a 0-100 percent",src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0285,FE,pricingFormulaSchema > accepts marginPercent exactly at the 1 (100%) boundary,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0286,FE,pricingFormulaSchema > rejects a negative baseFare,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0287,FE,pricingFormulaSchema > requires source and effectiveFrom,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
-FE-0288,FE,"CreateTripDialog > renders with available assignments, vehicles, and drivers in dropdowns",src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
-FE-0289,FE,CreateTripDialog > shows load preview card when an assignment is selected,src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
-FE-0290,FE,"CreateTripDialog > submits the form with selected assignment, vehicle, and driver",src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
-FE-0291,FE,"CreateTripDialog > never offers manual ID entry — only the dropdown selectors, even with empty lists",src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
-FE-0292,FE,"DeleteTripDialog > renders dialog with title, trip identifier and permanent warning note",src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
-FE-0293,FE,DeleteTripDialog > submits permanent deletion when confirmed,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
-FE-0294,FE,DeleteTripDialog > closes dialog when Keep Trip or close icon is clicked,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
-FE-0295,FE,DeleteTripDialog > displays loading state while deletion is pending,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
-FE-0296,FE,DeleteTripDialog > displays error message if deletion fails,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
-FE-0297,FE,TripEvidenceCard > renders pending state when evidence is empty,src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx,Passed
-FE-0298,FE,TripEvidenceCard > renders verified status when evidence items are present,src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx,Passed
-FE-0299,FE,TripDetailPage — render states > renders loading skeleton while fetching trip,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0300,FE,TripDetailPage — render states > renders error state when trip fetch fails,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0301,FE,"TripDetailPage — render states > renders trip details, overview, timeline, and evidence cards",src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0302,FE,TripDetailPage — render states > opens status dialog when Update Status is clicked,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0303,FE,TripDetailPage — render states > opens edit dialog when Edit / Reassign is clicked,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0304,FE,TripDetailPage — render states > opens cancel dialog when Cancel Trip is clicked,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0305,FE,TripDetailPage — render states > opens delete dialog when Delete Trip is clicked on a Cancelled trip,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
-FE-0306,FE,TripsPage — loading state > renders skeleton while loading,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0307,FE,TripsPage — error state > renders ErrorState with retry button when query fails,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0308,FE,TripsPage — empty state > renders EmptyState when no trips exist,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0309,FE,TripsPage — loaded state with table > renders trips table and links to trip detail,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0310,FE,TripsPage — loaded state with table > renders delete button on active dispatched trip and opens DeleteTripDialog,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0311,FE,"TripsPage — loaded state with table > does not render delete button for trips in Delivered status, but allows deletion of Cancelled trips",src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0312,FE,"TripsPage — loaded state with table > renders Dispatch Trip button for AgencyStaff, but hides it for Admin per Requirement 3",src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0313,FE,TripsPage — loaded state with table > does not render delete button for Driver role per Requirement 4,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
-FE-0314,FE,getFileUrl > returns empty string when input is falsy,src/lib/api/tests/Unit/fileUrl.test.js,Passed
-FE-0315,FE,getFileUrl > returns original URL when already absolute http or https,src/lib/api/tests/Unit/fileUrl.test.js,Passed
-FE-0316,FE,getFileUrl > returns data or blob URLs as-is,src/lib/api/tests/Unit/fileUrl.test.js,Passed
-FE-0317,FE,getFileUrl > prepends backend files content route when given a storageKey/publicId,src/lib/api/tests/Unit/fileUrl.test.js,Passed
-FE-0318,FE,getFileUrl > prepends backend origin when path starts with /,src/lib/api/tests/Unit/fileUrl.test.js,Passed
-FE-0319,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0320,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads/new to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0321,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads/abc-123 to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0322,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads/abc-123/edit to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0323,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0324,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads/new,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0325,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads/abc-123,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0326,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads/abc-123/edit,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0327,FE,ProtectedRoute — role guard blocks roles without access > redirects a Driver away from /loads to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0328,FE,ProtectedRoute — role guard blocks roles without access > allows an Admin to reach /loads (Admin is granted /loads access),src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0329,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > allows AgencyStaff to reach /agencies,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0330,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > allows Admin to reach /agencies,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0331,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > redirects Shipper away from /agencies to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0332,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > redirects Driver away from /agencies to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0333,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > allows AgencyStaff to reach /trips,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0334,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > allows Admin to reach /trips,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0335,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > redirects Shipper away from bare /trips to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0336,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > redirects Driver away from bare /trips to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0337,FE,"ProtectedRoute — a Shipper is granted trip-detail pages (""/trips/"", trailing slash) but not the bare list > allows a Shipper to reach /trips/abc-123 (their own dispatched trip)",src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0338,FE,ProtectedRoute — /billing is open to every web role except Driver > allows Shipper to reach /billing,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0339,FE,ProtectedRoute — /billing is open to every web role except Driver > allows AgencyStaff to reach /billing,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0340,FE,ProtectedRoute — /billing is open to every web role except Driver > allows Admin to reach /billing,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0341,FE,ProtectedRoute — /billing is open to every web role except Driver > redirects a Driver away from /billing to /unauthorized (Requirement 1: Driver is mobile-only),src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
-FE-0342,FE,PublicRoute — unauthenticated visitors see the guarded page > renders the login form for an unauthenticated visitor,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
-FE-0343,FE,PublicRoute — already-authenticated users are bounced to their role home > redirects a signed-in Shipper from /login to /loads,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
-FE-0344,FE,PublicRoute — already-authenticated users are bounced to their role home > redirects a signed-in Agency Staff user from /login to /agencies,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
-FE-0345,FE,PublicRoute — already-authenticated users are bounced to their role home > redirects a signed-in Driver from /login to /unauthorized (Driver has no web home),src/routes/tests/Integration/PublicRoute.test.jsx,Passed
+FE-0021,FE,"AgencyDetailPage (admin agency profile) > shows the full profile: identity, every document with its file link, fleet and status history",src/features/agencies/tests/Integration/pages/AgencyDetailPage.test.jsx,Passed
+FE-0022,FE,AgencyDetailPage (admin agency profile) > offers Suspend for an active agency and Reactivate for a suspended one,src/features/agencies/tests/Integration/pages/AgencyDetailPage.test.jsx,Passed
+FE-0023,FE,AgencyDetailPage (admin agency profile) > does not render the profile for a non-admin role,src/features/agencies/tests/Integration/pages/AgencyDetailPage.test.jsx,Passed
+FE-0024,FE,AgencyDetailPage (admin agency profile) > shows a not-found message when the agency does not exist,src/features/agencies/tests/Integration/pages/AgencyDetailPage.test.jsx,Passed
+FE-0025,FE,"AgencyDetailPage (admin agency profile) > lets the admin verify or reject a Pending document, and offers no review actions on a Verified one",src/features/agencies/tests/Integration/pages/AgencyDetailPage.test.jsx,Passed
+FE-0026,FE,AgencyDetailPage (admin agency profile) > disables review buttons and shows progress while a review is in flight,src/features/agencies/tests/Integration/pages/AgencyDetailPage.test.jsx,Passed
+FE-0027,FE,AgencyProfilePage > renders agency identity banner and compliance metrics,src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
+FE-0028,FE,AgencyProfilePage > renders all compliance document category cards instead of a dropdown,src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
+FE-0029,FE,"AgencyProfilePage > opens upload modal when ""Upload Document"" button on an unuploaded card is clicked",src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
+FE-0030,FE,"AgencyProfilePage > freezes a verified document: shows ""Verified & locked"" with no replace action",src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
+FE-0031,FE,AgencyProfilePage > polls the document and agency queries so an admin approval shows up without a reload (issue #58),src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
+FE-0032,FE,AgencyProfilePage > counts a document as verified once the refetched data reports it Verified,src/features/agencies/tests/Integration/pages/AgencyProfilePage.test.jsx,Passed
+FE-0033,FE,AgencyVerificationPage > redirects unauthorized non-admin user,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
+FE-0034,FE,AgencyVerificationPage > renders pending agencies and compliance documents table,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
+FE-0035,FE,AgencyVerificationPage > hides all action buttons immediately when doc Verify button is clicked,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
+FE-0036,FE,AgencyVerificationPage > hides all action buttons immediately when doc Reject button is clicked,src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
+FE-0037,FE,"AgencyVerificationPage > opens document with target=""popup"" and window.open on click",src/features/agencies/tests/Integration/pages/AgencyVerificationPage.test.jsx,Passed
+FE-0038,FE,FleetDriversPage > renders roster metrics and driver list correctly,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0039,FE,FleetDriversPage > filters drivers by search text query,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0040,FE,FleetDriversPage > renders empty state when no drivers are onboarded,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0041,FE,"FleetDriversPage > opens add driver drawer when ""Add Driver"" is clicked",src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0042,FE,FleetDriversPage > validates fields and prevents submit on empty fields,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0043,FE,FleetDriversPage > submits a valid new-driver form and calls addDriverMutation,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0044,FE,FleetDriversPage > removes an Active driver from the roster when its status is changed to Inactive,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0045,FE,FleetDriversPage > reinstates an Inactive driver when its status is changed to Active,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0046,FE,FleetDriversPage > disables the status action for a driver who is OnTrip,src/features/agencies/tests/Integration/pages/FleetDriversPage.test.jsx,Passed
+FE-0047,FE,FleetVehiclesPage > renders fleet metrics and vehicle list correctly,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0048,FE,FleetVehiclesPage > filters vehicles by search text query,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0049,FE,FleetVehiclesPage > renders empty state when no vehicles are registered,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0050,FE,"FleetVehiclesPage > opens add vehicle drawer when ""Add New Vehicle"" is clicked",src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0051,FE,FleetVehiclesPage > validates fields in advance using Formik and Yup and prevents submit on empty fields,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0052,FE,FleetVehiclesPage > enforces type-based capacity limits dynamically based on vehicle type selection,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0053,FE,FleetVehiclesPage > rejects invalid non-Sri Lankan vehicle registration numbers and prevents submit,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0054,FE,FleetVehiclesPage > submits valid form successfully and calls addVehicleMutation,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0055,FE,FleetVehiclesPage > surfaces backend validation errors onto the specific form fields,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0056,FE,FleetVehiclesPage > displays top-level alert banner when backend throws non-validation error,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0057,FE,FleetVehiclesPage > displays user-friendly alert message when backend throws VehicleType conversion error,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0058,FE,FleetVehiclesPage > edits a vehicle using prefilled values and the update API,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0059,FE,FleetVehiclesPage > shows a registration conflict on the edit field,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0060,FE,FleetVehiclesPage > changes availability and confirms retirement before submitting,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0061,FE,FleetVehiclesPage > uses backend statuses in filters and locks OnTrip or Retired row actions,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0062,FE,FleetVehiclesPage > does not expose vehicle mutations to Admin web users,src/features/agencies/tests/Integration/pages/FleetVehiclesPage.test.jsx,Passed
+FE-0063,FE,vehicle management API > updates editable details without sending vehicle status,src/features/agencies/tests/Unit/api/vehicleApi.test.js,Passed
+FE-0064,FE,vehicle management API > uses the dedicated status endpoint with the backend wire value,src/features/agencies/tests/Unit/api/vehicleApi.test.js,Passed
+FE-0065,FE,agency status transitions (issue #56) > lets a suspended agency be reactivated,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0066,FE,agency status transitions (issue #56) > lets an active agency be suspended,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0067,FE,agency status transitions (issue #56) > does not let a pending agency skip verification,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0068,FE,agency status transitions (issue #56) > has no terminal status,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0069,FE,agency status transitions (issue #56) > returns no transitions for an unknown status,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0070,FE,agencyStatusChangeSchema > requires a non-blank reason,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0071,FE,agencyStatusChangeSchema > rejects a reason over 500 characters,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0072,FE,agencyStatusChangeSchema > accepts and trims a valid reason,src/features/agencies/tests/Unit/lib/agencyStatusTransitions.test.js,Passed
+FE-0073,FE,addVehicleSchema > validates a correct vehicle registration payload,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0074,FE,addVehicleSchema > rejects missing or invalid vehicleType,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0075,FE,addVehicleSchema > Sri Lankan vehicle registration number pattern > accepts valid Sri Lankan registration patterns,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0076,FE,"addVehicleSchema > Sri Lankan vehicle registration number pattern > rejects empty, malformed, or non-Sri Lankan registration numbers",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0077,FE,"addVehicleSchema > vehicle type weight limitations > enforces Lorry capacity limits (up to 10,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0078,FE,"addVehicleSchema > vehicle type weight limitations > enforces Container capacity limits (10,000 – 100,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0079,FE,"addVehicleSchema > vehicle type weight limitations > enforces Refrigerated capacity limits (up to 25,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0080,FE,"addVehicleSchema > vehicle type weight limitations > enforces Flatbed capacity limits (up to 50,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0081,FE,"addVehicleSchema > vehicle type weight limitations > enforces Tipper capacity limits (up to 30,000 kg)",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0082,FE,"addVehicleSchema > rejects volumeM3 that is non-numeric, zero, negative, or exceeds limit",src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0083,FE,updateVehicleSchema > accepts an unchanged legacy registration but validates a replacement plate,src/features/agencies/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0084,FE,AgentCallHistory > does not fetch history until the section is opened,src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx,Passed
+FE-0085,FE,AgentCallHistory > shows every past attempt with its steps and the rejected decision once opened,src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx,Passed
+FE-0086,FE,AgentCallHistory > expands a step to reveal its individual tool calls,src/features/agent-workflows/tests/Integration/components/AgentCallHistory.test.jsx,Passed
+FE-0087,FE,MatchRecommendationCard > renders recommendation details correctly,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0088,FE,MatchRecommendationCard > calls onApproveMatch when Approve Match button is clicked,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0089,FE,MatchRecommendationCard > calls onRetryMatch when Retry Match button is clicked,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0090,FE,MatchRecommendationCard > renders confirmed match state when load is already matched,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0091,FE,MatchRecommendationCard > shows only a single Request Revision action once the recommendation has been rejected (Aborted),src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0092,FE,"MatchRecommendationCard > calls onRetryMatch (a fresh trigger, not the decision endpoints) when Request Revision is clicked after rejection",src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0093,FE,MatchRecommendationCard > shows the single Request Revision action when no automatic match was found (Failed),src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0094,FE,MatchRecommendationCard > shows why matching failed instead of the evaluating spinner when a run Failed,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0095,FE,MatchRecommendationCard > still shows the evaluating state while a run is in progress,src/features/agent-workflows/tests/Integration/components/MatchRecommendationCard.test.jsx,Passed
+FE-0096,FE,WorkflowStepper > renders all 4 pipeline agents and their roles,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
+FE-0097,FE,WorkflowStepper > shows the reason on a failed agent card,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
+FE-0098,FE,WorkflowStepper > never shows a step as Completed unless the backend actually reported it,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
+FE-0099,FE,ValidationChecklist > renders recommendation status and checklist items,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
+FE-0100,FE,AlternateCandidatesList > renders alternate candidates and triggers onSelectAgency,src/features/agent-workflows/tests/Integration/components/WorkflowComponents.test.jsx,Passed
+FE-0101,FE,"AgentWorkflowConsolePage > renders page with workflow stepper, recommendation, and validation",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
+FE-0102,FE,AgentWorkflowConsolePage > triggers confirm match mutation when Approve button is clicked,src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
+FE-0103,FE,"AgentWorkflowConsolePage > automatically triggers matching once when a load has no prior run, via an explicit command",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
+FE-0104,FE,AgentWorkflowConsolePage > does not show an approvable recommendation card while matching has not actually run yet,src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
+FE-0105,FE,"AgentWorkflowConsolePage > shows only the agent call history, not the live decision UI, once the load is already Matched",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
+FE-0106,FE,"AgentWorkflowConsolePage > shows only the focused workflow run view when ?workflowRunId= is present, not the live UI or the history list",src/features/agent-workflows/tests/Integration/pages/AgentWorkflowConsolePage.test.jsx,Passed
+FE-0107,FE,explainStepFailure > returns null for a step that did not fail,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0108,FE,explainStepFailure > explains zero_eligible_agencies from Agent 2 in plain language,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0109,FE,explainStepFailure > treats the Agent 3 empty-shortlist message the same way,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0110,FE,explainStepFailure > explains routing and pricing outages,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0111,FE,explainStepFailure > keeps the Agent 4 explanation text for safety failures,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0112,FE,explainStepFailure > falls back to the raw message for an unknown failure,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0113,FE,explainWorkflowFailure > returns null unless the run is Failed,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0114,FE,explainWorkflowFailure > uses the earliest failed step,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0115,FE,explainWorkflowFailure > still returns a generic explanation when no step recorded a reason,src/features/agent-workflows/tests/Unit/workflowFailure.test.js,Passed
+FE-0116,FE,AdminAnalyticsPage > renders the summary once loaded,src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx,Passed
+FE-0117,FE,AdminAnalyticsPage > shows a loading skeleton while the query is pending,src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx,Passed
+FE-0118,FE,AdminAnalyticsPage > shows an error state with a retry action when the query fails,src/features/analytics/tests/Integration/pages/AdminAnalyticsPage.test.jsx,Passed
+FE-0119,FE,AssignmentActionPage — missing token > shows a missing-token message and never calls the API when no token is present,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
+FE-0120,FE,AssignmentActionPage — API integration > does not call the API until the user clicks Confirm response,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
+FE-0121,FE,AssignmentActionPage — API integration > calls respondToAssignmentAction with the token and shows an Accepted success state with a trip-created note,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
+FE-0122,FE,AssignmentActionPage — API integration > shows a Declined success state without the trip-created note,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
+FE-0123,FE,AssignmentActionPage — error state > shows the backend error message when the token is invalid or expired,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
+FE-0124,FE,AssignmentActionPage — error state > falls back to a generic expired-link message when the rejected error has no message,src/features/assignmentActions/tests/Integration/pages/AssignmentActionPage.test.jsx,Passed
+FE-0125,FE,"YardLocationPicker > renders search input, address input, use current location button, and coordinate inputs",src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx,Passed
+FE-0126,FE,"YardLocationPicker > triggers geolocation on ""Use Current Location"" button click and updates location",src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx,Passed
+FE-0127,FE,YardLocationPicker > updates address when typing directly into the address input,src/features/auth/tests/Integration/components/YardLocationPicker.test.jsx,Passed
+FE-0128,FE,AccountSettingsPage — Profile section > pre-fills fields from the signed-in user,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
+FE-0129,FE,"AccountSettingsPage — Profile section > saves the edited profile, updates Redux, and shows a success toast",src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
+FE-0130,FE,AccountSettingsPage — Profile section > shows the backend error message when the update fails,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
+FE-0131,FE,AccountSettingsPage — Password section > blocks submission and shows validation errors for empty fields,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
+FE-0132,FE,AccountSettingsPage — Password section > changes the password and signs the user out locally on success,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
+FE-0133,FE,AccountSettingsPage — Password section > shows the backend error message for an incorrect current password,src/features/auth/tests/Integration/pages/AccountSettingsPage.test.jsx,Passed
+FE-0134,FE,RegisterPage — Role Selection > renders account type options when no role is in the URL,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0135,FE,RegisterPage — Shipper Registration Form > renders the shipper form with all expected fields,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0136,FE,RegisterPage — Shipper Registration Form > validates every input in advance and blocks submission on empty fields,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0137,FE,RegisterPage — Shipper Registration Form > validates password requirements and phone format in advance,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0138,FE,RegisterPage — Shipper Registration Form > submits valid shipper payload successfully and shows success toast,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0139,FE,RegisterPage — Shipper Registration Form > surfaces backend validation errors onto the specific form fields,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0140,FE,RegisterPage — Agency Registration Form > renders all agency and yard inputs,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0141,FE,RegisterPage — Agency Registration Form > validates every agency input in advance,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0142,FE,RegisterPage — Agency Registration Form > validates yard coordinate limits in advance,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0143,FE,RegisterPage — Agency Registration Form > submits valid agency payload successfully and navigates,src/features/auth/tests/Integration/pages/RegisterPage.test.jsx,Passed
+FE-0144,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 1. Role Enum Parity with Backend & Mobile > defines exactly the 4 standard system roles with matching casing,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0145,FE,"Cross-Platform Auth & Session Consistency (Y3S01-103) > 2. Contract Parity: CurrentUserResponseDto to Redux State > populates user, role, and isAuthenticated identical to mobile AuthUser",src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0146,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 2. Contract Parity: CurrentUserResponseDto to Redux State > clears session when setUser(null) is dispatched,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0147,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces Shipper permissions and role home (/loads),src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0148,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces AgencyStaff permissions and role home (/agencies),src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0149,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces Driver has no web UI per Requirement 1 (mobile application only),src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0150,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 3. Role-Based Route Gating Parity > enforces Admin permissions across all management routes,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0151,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 4. Session & Token Storage Cleanup on Logout/401 > persists and clears refresh tokens in storage correctly,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0152,FE,Cross-Platform Auth & Session Consistency (Y3S01-103) > 4. Session & Token Storage Cleanup on Logout/401 > clearAuth synchronously resets auth state on 401 response interceptor trigger,src/features/auth/tests/Unit/crossPlatformAuthConsistency.test.js,Passed
+FE-0153,FE,loginSchema > validates a valid login payload,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0154,FE,loginSchema > rejects an invalid email and short password,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0155,FE,shipperRegisterSchema > validates a fully valid shipper payload,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0156,FE,"shipperRegisterSchema > allows optional fields (phoneE164, businessRegNo) to be empty strings or undefined",src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0157,FE,shipperRegisterSchema > requires fullName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0158,FE,shipperRegisterSchema > requires email,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0159,FE,shipperRegisterSchema > requires password,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0160,FE,shipperRegisterSchema > requires companyName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0161,FE,shipperRegisterSchema > requires billingAddress,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0162,FE,shipperRegisterSchema > enforces strong password criteria,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0163,FE,shipperRegisterSchema > validates E.164 phone format when provided,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0164,FE,shipperRegisterSchema > validates fullName length and allowed characters,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0165,FE,shipperRegisterSchema > validates billingAddress minimum length,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0166,FE,agencyRegisterSchema > validates a fully valid agency payload,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0167,FE,"agencyRegisterSchema > allows optional fields (phoneE164, jobTitle) to be empty strings",src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0168,FE,agencyRegisterSchema > requires fullName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0169,FE,agencyRegisterSchema > requires email,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0170,FE,agencyRegisterSchema > requires password,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0171,FE,agencyRegisterSchema > requires agencyName,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0172,FE,agencyRegisterSchema > requires businessRegNo,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0173,FE,agencyRegisterSchema > requires yardAddress,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0174,FE,agencyRegisterSchema > requires yardLat,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0175,FE,agencyRegisterSchema > requires yardLng,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0176,FE,agencyRegisterSchema > validates coordinate boundaries,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0177,FE,agencyRegisterSchema > rejects non-numeric coordinates,src/features/auth/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0178,FE,"invoice mutation hooks — cache invalidation > useIssueInvoiceMutation invalidates the invoice list, its detail, and the summary",src/features/billing/tests/Integration/api/invoiceApi.test.jsx,Passed
+FE-0179,FE,"invoice mutation hooks — cache invalidation > useVoidInvoiceMutation invalidates the invoice list, its detail, and the summary",src/features/billing/tests/Integration/api/invoiceApi.test.jsx,Passed
+FE-0180,FE,"invoice mutation hooks — cache invalidation > useConfirmPaymentMutation invalidates the invoice list, its detail, and the summary",src/features/billing/tests/Integration/api/invoiceApi.test.jsx,Passed
+FE-0181,FE,InvoiceCashflowDashboard > renders an ErrorState with retry on failure — no fabricated totals,src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx,Passed
+FE-0182,FE,"InvoiceCashflowDashboard > renders totals, per-status counts, and recent activity with no action buttons anywhere",src/features/billing/tests/Integration/components/InvoiceCashflowDashboard.test.jsx,Passed
+FE-0183,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > lists only the eligible (Delivered, uninvoiced) trips fetched via hasInvoice: false",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0184,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > rejects submission with no trip selected and no amount",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0185,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > pre-fills the amount from the selected trip’s agreed price and shows the shipper name",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0186,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > submits {tripId, amount, notes, issueImmediately} with no lineItems/currency/discount/dueDate",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0187,FE,"InvoiceFormModal — create mode (trip-linked, single amount) > lets Agency Staff override the pre-filled amount before submitting",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0188,FE,InvoiceFormModal — edit mode > has no trip picker and pre-fills the amount from the existing invoice,src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0189,FE,"InvoiceFormModal — edit mode > submits only {amount, notes} on save, scoped to the invoice id",src/features/billing/tests/Integration/components/InvoiceFormModal.test.jsx,Passed
+FE-0190,FE,"InvoiceStatusBadge > renders the real backend status ""Draft""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0191,FE,"InvoiceStatusBadge > renders the real backend status ""Issued""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0192,FE,"InvoiceStatusBadge > renders the real backend status ""PaymentPending""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0193,FE,"InvoiceStatusBadge > renders the real backend status ""Paid""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0194,FE,"InvoiceStatusBadge > renders the real backend status ""Failed""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0195,FE,"InvoiceStatusBadge > renders the real backend status ""Void""",src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0196,FE,InvoiceStatusBadge > does not reference invented statuses that the backend never returns,src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0197,FE,InvoiceStatusBadge > falls back to a neutral style for an unrecognized status rather than throwing,src/features/billing/tests/Integration/components/InvoiceStatusBadge.test.jsx,Passed
+FE-0198,FE,"BillingPage — error state (no mock fallback) > renders a real ErrorState, not fabricated invoices, when the query fails",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
+FE-0199,FE,"BillingPage — empty state (no mock fallback) > renders the real empty state, not fabricated invoices, on a genuinely empty list",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
+FE-0200,FE,"BillingPage — list rendering & role gating > renders invoice rows with their real status, and offers Create/Edit/Issue/Void for Agency Staff",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
+FE-0201,FE,BillingPage — list rendering & role gating > hides Create Invoice for a Shipper and never shows a Draft invoice to them,src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
+FE-0202,FE,"BillingPage — list rendering & role gating > renders the read-only cashflow dashboard for Admin with no action buttons, and no Create Invoice control",src/features/billing/tests/Integration/pages/BillingPage.test.jsx,Passed
+FE-0203,FE,AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > renders the admin disputes table with all core columns and initial data,src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
+FE-0204,FE,AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > renders state-specific action buttons strictly adhering to lifecycle rules,src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
+FE-0205,FE,"AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > triggers startReviewMutation when ""Start Review"" is clicked",src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
+FE-0206,FE,"AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > opens Resolution Modal when ""Resolve Dispute"" is clicked and requires non-empty resolution note",src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
+FE-0207,FE,"AdminDisputesPage — Rendering & Lifecycle Rules (Y3S01-81) > opens read-only View Resolution modal when ""View Resolution"" is clicked on a resolved dispute",src/features/disputes/tests/Integration/pages/AdminDisputesPage.test.jsx,Passed
+FE-0208,FE,claimant dispute views > renders only the role-scoped dispute response and its claimant/status context,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
+FE-0209,FE,claimant dispute views > validates a raise form and sends the fixed backend category and trip reference,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
+FE-0210,FE,claimant dispute views > shows the active-duplicate rejection as a claimant-friendly form error,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
+FE-0211,FE,claimant dispute views > renders a final resolution without any Admin review or resolve controls,src/features/disputes/tests/Integration/pages/ClaimantDisputesPage.test.jsx,Passed
+FE-0212,FE,"Invoice and Dispute Admin Dashboard Tests > FE-UT-001: Renders dispute queue table with formatted IDs, statuses, and metric counters",src/features/disputes/tests/Integration/pages/InvoiceDisputeDashboard.test.jsx,Passed
+FE-0213,FE,Invoice and Dispute Admin Dashboard Tests > FE-UT-003: Rejects submission when resolution note is under 10 characters,src/features/disputes/tests/Integration/pages/InvoiceDisputeDashboard.test.jsx,Passed
+FE-0214,FE,Invoice and Dispute Admin Dashboard Tests > FE-UT-004: ResolutionModal blocks confirmation when note validation fails,src/features/disputes/tests/Integration/pages/InvoiceDisputeDashboard.test.jsx,Passed
+FE-0215,FE,Invoice and Dispute Admin Dashboard Tests > FE-IT-003: Displays friendly ErrorState banner and triggers refetch on retry,src/features/disputes/tests/Integration/pages/InvoiceDisputeDashboard.test.jsx,Passed
+FE-0216,FE,Invoice and Dispute Admin Dashboard Tests > FE-IT-005: Redirects non-admin role to default home view,src/features/disputes/tests/Integration/pages/InvoiceDisputeDashboard.test.jsx,Passed
+FE-0217,FE,Dispute State Machine Rules (Y3S01-81) > canStartReview > returns true only for Raised status,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0218,FE,Dispute State Machine Rules (Y3S01-81) > canResolveDispute > returns true only for UnderReview status (strict sequential progression),src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0219,FE,Dispute State Machine Rules (Y3S01-81) > isDisputeResolved > returns true only for Resolved status,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0220,FE,Dispute State Machine Rules (Y3S01-81) > getStatusTone > maps statuses to the appropriate design system tones,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0221,FE,Dispute State Machine Rules (Y3S01-81) > getStatusLabel > returns user-friendly labels,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0222,FE,Dispute State Machine Rules (Y3S01-81) > validateResolutionPayload > fails when resolution note is empty or whitespace only,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0223,FE,Dispute State Machine Rules (Y3S01-81) > validateResolutionPayload > fails when resolution note is too short,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0224,FE,Dispute State Machine Rules (Y3S01-81) > validateResolutionPayload > passes when a meaningful resolution note is supplied,src/features/disputes/tests/Unit/lib/disputeRules.test.js,Passed
+FE-0225,FE,CancelLoadDialog — validation > requires a cancellation reason before submitting,src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx,Passed
+FE-0226,FE,CancelLoadDialog — API integration > submits the reason and closes on success,src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx,Passed
+FE-0227,FE,CancelLoadDialog — API integration > shows an inline error and does not close when the mutation fails,src/features/loads/tests/Integration/components/CancelLoadDialog.test.jsx,Passed
+FE-0228,FE,RowActionsMenu — per-status action visibility (Shipper) > shows Edit and Cancel for a Draft load,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0229,FE,RowActionsMenu — per-status action visibility (Shipper) > shows Edit and Cancel (but not Publish) for a Posted load,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0230,FE,"RowActionsMenu — per-status action visibility (Shipper) > hides Edit, Cancel and Publish for a Matched load",src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0231,FE,"RowActionsMenu — per-status action visibility (Shipper) > hides Edit, Cancel and Publish for a Delivered load (only View remains)",src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0232,FE,"RowActionsMenu — per-status action visibility (Shipper) > hides Edit, Cancel and Publish for a Cancelled load",src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0233,FE,RowActionsMenu — non-Shipper roles never see mutating actions > hides Edit/Cancel/Publish for an Admin viewing a Draft load,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0234,FE,RowActionsMenu — opening a mutating item mounts its dialog > opens CancelLoadDialog when Cancel is clicked,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0235,FE,RowActionsMenu — opening a mutating item mounts its dialog > opens PublishLoadDialog when Publish is clicked,src/features/loads/tests/Integration/components/RowActionsMenu.test.jsx,Passed
+FE-0236,FE,EditLoadPage — loading and error states > renders skeletons while the load is loading,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0237,FE,EditLoadPage — loading and error states > renders ErrorState with retry when the load fails to fetch,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0238,FE,EditLoadPage — loading and error states > renders an EmptyState instead of the form for a non-editable status,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0239,FE,EditLoadPage — loading and error states > renders a role-specific EmptyState message for a non-Shipper role,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0240,FE,EditLoadPage — rendering with existing values > pre-fills the form fields from the loaded record,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0241,FE,EditLoadPage — rendering with existing values > renders the submit button,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0242,FE,EditLoadPage — rendering with existing values > shows a Publish button only when the load is publishable,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0243,FE,EditLoadPage — rendering with existing values > hides the Publish button once the load is Posted,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0244,FE,EditLoadPage — API integration > calls the update mutation and shows a success toast,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0245,FE,EditLoadPage — API integration > shows a banner error when the update mutation fails,src/features/loads/tests/Integration/pages/EditLoadPage.test.jsx,Passed
+FE-0246,FE,LoadsPage — loading state > renders skeleton rows while the query is loading,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0247,FE,LoadsPage — error state > renders ErrorState with a retry action when the query fails,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0248,FE,LoadsPage — empty state > renders EmptyState when there are no loads,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0249,FE,"LoadsPage — empty state > offers a ""Post a Load"" action for a Shipper",src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0250,FE,"LoadsPage — empty state > does not offer ""Post a Load"" for a non-Shipper role",src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0251,FE,"LoadsPage — list rendering > renders a row per load with its reference, cargo and status badge",src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0252,FE,LoadsPage — list rendering > shows Edit and Cancel for a Draft row but hides both for a Matched row,src/features/loads/tests/Integration/pages/LoadsPage.test.jsx,Passed
+FE-0253,FE,PostLoadPage — rendering > renders the required create-load fields,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0254,FE,PostLoadPage — rendering > renders the postImmediately control on the create form,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0255,FE,PostLoadPage — rendering > renders the submit button,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0256,FE,PostLoadPage — rendering > shows an EmptyState instead of the form for a non-Shipper role,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0257,FE,PostLoadPage — client-side validation > shows field-level errors when required fields are left blank,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0258,FE,PostLoadPage — API integration > calls the create mutation and navigates away on success,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0259,FE,PostLoadPage — API integration > shows a banner error when the create mutation fails with a non-validation error,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0260,FE,PostLoadPage — API integration > maps a VALIDATION_ERROR response onto the matching form fields,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0261,FE,PostLoadPage — API integration > makes no real network calls — the API layer is fully mocked,src/features/loads/tests/Integration/pages/PostLoadPage.test.jsx,Passed
+FE-0262,FE,createLoadSchema > passes for a fully valid payload,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0263,FE,createLoadSchema > requires cargoDescription,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0264,FE,createLoadSchema > requires pickupAddress,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0265,FE,createLoadSchema > requires dropoffAddress,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0266,FE,createLoadSchema > requires pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0267,FE,createLoadSchema > requires pickupWindowEnd,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0268,FE,"createLoadSchema > requires weightKg (empty numeric field reports ""required"", not ""must be a number"")",src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0269,FE,"createLoadSchema > requires volumeM3 (empty numeric field reports ""required"", not ""must be a number"")",src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0270,FE,createLoadSchema > rejects a weight below the minimum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0271,FE,createLoadSchema > rejects a weight above the maximum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0272,FE,createLoadSchema > rejects a volume below the minimum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0273,FE,createLoadSchema > rejects a volume above the maximum,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0274,FE,createLoadSchema > accepts weight/volume exactly at their boundary values,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0275,FE,createLoadSchema > rejects a pickupWindowEnd that is before pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0276,FE,createLoadSchema > rejects a pickupWindowEnd equal to pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0277,FE,createLoadSchema > accepts a pickupWindowEnd after pickupWindowStart,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0278,FE,createLoadSchema > rejects identical pickup/dropoff coordinates,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0279,FE,createLoadSchema > accepts pickup/dropoff coordinates that differ,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0280,FE,editLoadSchema > has no postImmediately field but otherwise enforces the same rules,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0281,FE,editLoadSchema > rejects identical pickup/dropoff coordinates,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0282,FE,cancelLoadSchema > requires a reason,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0283,FE,cancelLoadSchema > rejects a reason over 500 characters,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0284,FE,cancelLoadSchema > accepts a valid reason,src/features/loads/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0285,FE,FuelRatesPage — component / list rendering > renders the current fuel rate list,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0286,FE,FuelRatesPage — component / list rendering > renders an empty state when there are no fuel rates,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0287,FE,FuelRatesPage — error state > shows an error state with a retry action when the fuel rates fetch fails,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0288,FE,FuelRatesPage — form validation > shows validation errors and does not submit when the Add Fuel Rate form is empty,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0289,FE,FuelRatesPage — API integration > submits a valid fuel rate and calls the create mutation with the mapped payload,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0290,FE,FuelRatesPage — API integration > maps a backend VALIDATION_ERROR onto the matching form field,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0291,FE,FuelRatesPage — API integration > shows a top-level banner for a non-validation backend error,src/features/pricingConfig/tests/Integration/pages/FuelRatesPage.test.jsx,Passed
+FE-0292,FE,fuelRateSchema > passes for a fully valid payload,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0293,FE,fuelRateSchema > requires fuelType,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0294,FE,fuelRateSchema > requires source,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0295,FE,fuelRateSchema > rejects a source over 500 characters,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0296,FE,fuelRateSchema > requires effectiveFrom,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0297,FE,"fuelRateSchema > requires pricePerLitre (empty numeric field reports ""required"", not ""must be a number"")",src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0298,FE,fuelRateSchema > rejects a pricePerLitre of zero (below the 0.01 minimum),src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0299,FE,fuelRateSchema > accepts pricePerLitre exactly at the 0.01 minimum,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0300,FE,fuelRateSchema > rejects a non-numeric pricePerLitre,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0301,FE,vehicleEfficiencySchema > passes for a fully valid payload,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0302,FE,vehicleEfficiencySchema > requires classLabel,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0303,FE,vehicleEfficiencySchema > allows maxPayloadKg to be left blank for an open-ended top tier,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0304,FE,vehicleEfficiencySchema > rejects a maxPayloadKg that is not greater than minPayloadKg,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0305,FE,vehicleEfficiencySchema > accepts a maxPayloadKg greater than minPayloadKg,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0306,FE,vehicleEfficiencySchema > allows maxVolumeM3 to be left blank for an open-ended top tier,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0307,FE,vehicleEfficiencySchema > rejects a maxVolumeM3 that is not greater than minVolumeM3,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0308,FE,vehicleEfficiencySchema > requires fuelConsumptionLPer100Km to be at least 0.01,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0309,FE,pricingFormulaSchema > passes for a fully valid payload,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0310,FE,"pricingFormulaSchema > rejects a marginPercent above 1 (100%) — the field is a fraction, not a 0-100 percent",src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0311,FE,pricingFormulaSchema > accepts marginPercent exactly at the 1 (100%) boundary,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0312,FE,pricingFormulaSchema > rejects a negative baseFare,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0313,FE,pricingFormulaSchema > requires source and effectiveFrom,src/features/pricingConfig/tests/Unit/lib/validationSchemas.test.js,Passed
+FE-0314,FE,"CreateTripDialog > renders with available assignments, vehicles, and drivers in dropdowns",src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
+FE-0315,FE,CreateTripDialog > shows load preview card when an assignment is selected,src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
+FE-0316,FE,"CreateTripDialog > submits the form with selected assignment, vehicle, and driver",src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
+FE-0317,FE,"CreateTripDialog > never offers manual ID entry — only the dropdown selectors, even with empty lists",src/features/trips/tests/Integration/components/CreateTripDialog.test.jsx,Passed
+FE-0318,FE,"DeleteTripDialog > renders dialog with title, trip identifier and permanent warning note",src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
+FE-0319,FE,DeleteTripDialog > submits permanent deletion when confirmed,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
+FE-0320,FE,DeleteTripDialog > closes dialog when Keep Trip or close icon is clicked,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
+FE-0321,FE,DeleteTripDialog > displays loading state while deletion is pending,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
+FE-0322,FE,DeleteTripDialog > displays error message if deletion fails,src/features/trips/tests/Integration/components/DeleteTripDialog.test.jsx,Passed
+FE-0323,FE,TripEvidenceCard > renders pending state when evidence is empty,src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx,Passed
+FE-0324,FE,TripEvidenceCard > renders verified status when evidence items are present,src/features/trips/tests/Integration/components/TripEvidenceCard.test.jsx,Passed
+FE-0325,FE,TripDetailPage — render states > renders loading skeleton while fetching trip,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0326,FE,TripDetailPage — render states > renders error state when trip fetch fails,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0327,FE,"TripDetailPage — render states > renders trip details, overview, timeline, and evidence cards",src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0328,FE,TripDetailPage — render states > opens status dialog when Update Status is clicked,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0329,FE,TripDetailPage — render states > opens edit dialog when Edit / Reassign is clicked,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0330,FE,TripDetailPage — render states > opens cancel dialog when Cancel Trip is clicked,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0331,FE,TripDetailPage — render states > opens delete dialog when Delete Trip is clicked on a Cancelled trip,src/features/trips/tests/Integration/pages/TripDetailPage.test.jsx,Passed
+FE-0332,FE,TripsPage — loading state > renders skeleton while loading,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0333,FE,TripsPage — error state > renders ErrorState with retry button when query fails,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0334,FE,TripsPage — empty state > renders EmptyState when no trips exist,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0335,FE,TripsPage — loaded state with table > renders trips table and links to trip detail,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0336,FE,TripsPage — loaded state with table > renders delete button on active dispatched trip and opens DeleteTripDialog,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0337,FE,"TripsPage — loaded state with table > does not render delete button for trips in Delivered status, but allows deletion of Cancelled trips",src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0338,FE,"TripsPage — loaded state with table > renders Dispatch Trip button for AgencyStaff, but hides it for Admin per Requirement 3",src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0339,FE,TripsPage — loaded state with table > does not render delete button for Driver role per Requirement 4,src/features/trips/tests/Integration/pages/TripsPage.test.jsx,Passed
+FE-0340,FE,getFileUrl > returns empty string when input is falsy,src/lib/api/tests/Unit/fileUrl.test.js,Passed
+FE-0341,FE,getFileUrl > returns original URL when already absolute http or https,src/lib/api/tests/Unit/fileUrl.test.js,Passed
+FE-0342,FE,getFileUrl > returns data or blob URLs as-is,src/lib/api/tests/Unit/fileUrl.test.js,Passed
+FE-0343,FE,getFileUrl > prepends backend files content route when given a storageKey/publicId,src/lib/api/tests/Unit/fileUrl.test.js,Passed
+FE-0344,FE,getFileUrl > prepends backend origin when path starts with /,src/lib/api/tests/Unit/fileUrl.test.js,Passed
+FE-0345,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0346,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads/new to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0347,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads/abc-123 to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0348,FE,ProtectedRoute — unauthenticated users are redirected to login > redirects an unauthenticated visitor to /loads/abc-123/edit to /login,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0349,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0350,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads/new,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0351,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads/abc-123,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0352,FE,ProtectedRoute — authenticated Shipper can access load routes > allows a Shipper to reach /loads/abc-123/edit,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0353,FE,ProtectedRoute — role guard blocks roles without access > redirects a Driver away from /loads to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0354,FE,ProtectedRoute — role guard blocks roles without access > allows an Admin to reach /loads (Admin is granted /loads access),src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0355,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > allows AgencyStaff to reach /agencies,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0356,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > allows Admin to reach /agencies,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0357,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > redirects Shipper away from /agencies to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0358,FE,ProtectedRoute — /agencies is Agency Staff/Admin only > redirects Driver away from /agencies to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0359,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > allows AgencyStaff to reach /trips,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0360,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > allows Admin to reach /trips,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0361,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > redirects Shipper away from bare /trips to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0362,FE,ProtectedRoute — bare /trips (the Agency Staff trips list) is Agency Staff/Admin only > redirects Driver away from bare /trips to /unauthorized,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0363,FE,"ProtectedRoute — a Shipper is granted trip-detail pages (""/trips/"", trailing slash) but not the bare list > allows a Shipper to reach /trips/abc-123 (their own dispatched trip)",src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0364,FE,ProtectedRoute — /billing is open to every web role except Driver > allows Shipper to reach /billing,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0365,FE,ProtectedRoute — /billing is open to every web role except Driver > allows AgencyStaff to reach /billing,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0366,FE,ProtectedRoute — /billing is open to every web role except Driver > allows Admin to reach /billing,src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0367,FE,ProtectedRoute — /billing is open to every web role except Driver > redirects a Driver away from /billing to /unauthorized (Requirement 1: Driver is mobile-only),src/routes/tests/Integration/ProtectedRoute.test.jsx,Passed
+FE-0368,FE,PublicRoute — unauthenticated visitors see the guarded page > renders the login form for an unauthenticated visitor,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
+FE-0369,FE,PublicRoute — already-authenticated users are bounced to their role home > redirects a signed-in Shipper from /login to /loads,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
+FE-0370,FE,PublicRoute — already-authenticated users are bounced to their role home > redirects a signed-in Agency Staff user from /login to /agencies,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
+FE-0371,FE,PublicRoute — already-authenticated users are bounced to their role home > redirects a signed-in Driver from /login to /unauthorized (Driver has no web home),src/routes/tests/Integration/PublicRoute.test.jsx,Passed
 MB-0001,MB,AgencyDashboardScreen renders skeleton during initial loading state,package:flutter_test/src/widget_tester.dart,Passed
 MB-0002,MB,long locked labels fit a narrow dropdown without overflowing,package:flutter_test/src/widget_tester.dart,Passed
 MB-0003,MB,"AgencyDashboardScreen renders KPIs, fleet utilization, and action tiles when loaded",package:flutter_test/src/widget_tester.dart,Passed

@@ -79,12 +79,12 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
     disputesApi.useResolveDisputeMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
     renderWithProviders(<AdminDisputesPage />, {
-      authState: { role: UserRole.Admin, isAuthenticated: true },
+      authState: { role: UserRole.ADMIN, isAuthenticated: true },
     })
 
     expect(screen.getByText('Admin Dispute Management')).toBeInTheDocument()
-    expect(screen.getByText('DISP-1042')).toBeInTheDocument()
-    expect(screen.getByText('DISP-1039')).toBeInTheDocument()
+    expect(screen.getByText('#DISP-1042')).toBeInTheDocument()
+    expect(screen.getByText('#DISP-1039')).toBeInTheDocument()
     expect(screen.getByText('Sunil Weerakkody')).toBeInTheDocument()
   })
 
@@ -142,7 +142,7 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
     disputesApi.useResolveDisputeMutation.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
 
     renderWithProviders(<AdminDisputesPage />, {
-      authState: { role: UserRole.Admin, isAuthenticated: true },
+      authState: { role: UserRole.ADMIN, isAuthenticated: true },
     })
 
     expect(screen.getByText(/Failed to load dispute records/i)).toBeInTheDocument()
@@ -157,7 +157,7 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
     disputesApi.useDisputesQuery.mockReturnValue({ data: [], isLoading: false, isError: false })
 
     renderWithProviders(<AdminDisputesPage />, {
-      authState: { role: UserRole.Shipper, isAuthenticated: true },
+      authState: { role: UserRole.SHIPPER, isAuthenticated: true },
     })
 
     // Admin table header should not be displayed because of role redirection
