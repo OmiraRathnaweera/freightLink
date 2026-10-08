@@ -82,7 +82,7 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
       authState: { role: UserRole.Admin, isAuthenticated: true },
     })
 
-    expect(screen.getByText('Dispute Adjudication')).toBeInTheDocument()
+    expect(screen.getByText('Admin Dispute Management')).toBeInTheDocument()
     expect(screen.getByText('DISP-1042')).toBeInTheDocument()
     expect(screen.getByText('DISP-1039')).toBeInTheDocument()
     expect(screen.getByText('Sunil Weerakkody')).toBeInTheDocument()
@@ -116,7 +116,7 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
     )
 
     // Type a short note
-    const textarea = screen.getByPlaceholderText(/Summarize the justification/i)
+    const textarea = screen.getByLabelText(/Resolution Note/i)
     await user.type(textarea, 'Short')
 
     // Click confirm
@@ -145,7 +145,7 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
       authState: { role: UserRole.Admin, isAuthenticated: true },
     })
 
-    expect(screen.getByText(/Failed to load disputes/i)).toBeInTheDocument()
+    expect(screen.getByText(/Failed to load dispute records/i)).toBeInTheDocument()
 
     const retryButton = screen.getByRole('button', { name: /Retry/i })
     await userEvent.click(retryButton)
@@ -161,6 +161,6 @@ describe('Invoice and Dispute Admin Dashboard Tests', () => {
     })
 
     // Admin table header should not be displayed because of role redirection
-    expect(screen.queryByText('Dispute Adjudication')).not.toBeInTheDocument()
+    expect(screen.queryByText('Admin Dispute Management')).not.toBeInTheDocument()
   })
 })
