@@ -1,1 +1,1 @@
-{"started_at": "2026-10-02T16:52:03+00:00", "duration_s": 18.37, "exit_code": 0, "command": "flutter test --coverage --file-reporter json:/Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/testing/evidence/mobile/flutter-tests.json"}
+{"started_at": "2026-10-08T10:59:34+00:00", "duration_s": 0.02, "exit_code": -1, "command": "flutter test --coverage --file-reporter json:C:\\Users\\User\\Documents\\freightlink\\testing\\evidence\\mobile\\flutter-tests.json"}

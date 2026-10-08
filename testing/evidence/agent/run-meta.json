@@ -1,1 +1,1 @@
-{"started_at": "2026-10-02T16:52:21+00:00", "duration_s": 1.36, "exit_code": 0, "command": "uv run pytest tests --junitxml=/Users/nuwanthapasindu/Developer/Universcity Projects/freightLink/testing/evidence/agent/junit.xml -q"}
+{"started_at": "2026-10-08T12:09:46+00:00", "duration_s": 14.26, "exit_code": 0, "command": ".\\venv\\Scripts\\python.exe -m pytest tests --junitxml=../testing/evidence/agent/junit.xml -q"}

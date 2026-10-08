@@ -21,6 +21,7 @@ namespace FreightLink.Api.Tests.Unit;
 /// (<c>uq_awr_load_attempt</c> / <c>ck_agentstep_stepno</c>-backed unique index), which EF Core's
 /// InMemory provider does not enforce.
 /// </summary>
+[Collection(PostgresCollection.Name)]
 public class AgentWorkflowServiceTests : IClassFixture<PostgresWebApplicationFactory>
 {
     private readonly PostgresWebApplicationFactory _postgresFactory;
