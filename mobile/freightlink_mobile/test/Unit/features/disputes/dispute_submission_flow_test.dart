@@ -4,13 +4,13 @@ import 'package:freightlink_mobile/features/disputes/models/dispute.dart';
 import 'package:freightlink_mobile/features/disputes/providers/dispute_provider.dart';
 import 'package:mocktail/mocktail.dart';
 
-import '../../../../helpers/fakes.dart';
+import '../../../helpers/fakes.dart';
 
 void main() {
   late MockDisputeRepository repository;
 
   setUpAll(() {
-    registerFallbackValue(DisputeCategory.incorrectAmount);
+    registerFallbackValue(DisputeCategory.billing);
     registerFallbackValue(DisputeStatus.raised);
   });
 
@@ -27,16 +27,16 @@ void main() {
       }
 
       // 1. Empty description
-      expect(validateSubmission(description: '', category: DisputeCategory.incorrectAmount), isFalse);
+      expect(validateSubmission(description: '', category: DisputeCategory.billing), isFalse);
 
       // 2. Description under 15 characters
-      expect(validateSubmission(description: 'Too short', category: DisputeCategory.incorrectAmount), isFalse);
+      expect(validateSubmission(description: 'Too short', category: DisputeCategory.billing), isFalse);
 
       // 3. Category missing
       expect(validateSubmission(description: 'A valid description over fifteen chars', category: null), isFalse);
 
       // 4. Valid input
-      expect(validateSubmission(description: 'Fuel surcharge overcharged by 10,000 LKR.', category: DisputeCategory.incorrectAmount), isTrue);
+      expect(validateSubmission(description: 'Fuel surcharge overcharged by 10,000 LKR.', category: DisputeCategory.billing), isTrue);
     });
 
     test('MOB-UT-002: Attachment validation enforces allowed MIME types and 5MB size limit', () {

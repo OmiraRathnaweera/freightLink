@@ -959,130 +959,134 @@ FE-0368,FE,PublicRoute � unauthenticated visitors see the guarded page > renders
 FE-0369,FE,PublicRoute � already-authenticated users are bounced to their role home > redirects a signed-in Shipper from /login to /loads,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
 FE-0370,FE,PublicRoute � already-authenticated users are bounced to their role home > redirects a signed-in Agency Staff user from /login to /agencies,src/routes/tests/Integration/PublicRoute.test.jsx,Passed
 FE-0371,FE,PublicRoute � already-authenticated users are bounced to their role home > redirects a signed-in Driver from /login to /unauthorized (Driver has no web home),src/routes/tests/Integration/PublicRoute.test.jsx,Passed
-MB-0001,MB,AgencyDashboardScreen renders skeleton during initial loading state,package:flutter_test/src/widget_tester.dart,Passed
-MB-0002,MB,long locked labels fit a narrow dropdown without overflowing,package:flutter_test/src/widget_tester.dart,Passed
-MB-0003,MB,"AgencyDashboardScreen renders KPIs, fleet utilization, and action tiles when loaded",package:flutter_test/src/widget_tester.dart,Passed
-MB-0004,MB,AgencyDashboardScreen renders ErrorState with retry button when error occurs,package:flutter_test/src/widget_tester.dart,Passed
-MB-0005,MB,AgencyDashboardScreen renders fallback greeting when agency profile is empty,package:flutter_test/src/widget_tester.dart,Passed
-MB-0006,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 1. AuthUser JSON deserialization matches backend CurrentUserResponseDto contract,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
-MB-0007,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 2. Role getters evaluate correctly for all four system roles,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
-MB-0008,MB,AccountSettingsScreen — Profile section pre-fills fields from the signed-in user,package:flutter_test/src/widget_tester.dart,Passed
-MB-0009,MB,renders one common login form with no registration link,package:flutter_test/src/widget_tester.dart,Passed
-MB-0010,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form",package:flutter_test/src/widget_tester.dart,Passed
-MB-0011,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) shows an ErrorState with retry when the trip fails to load",package:flutter_test/src/widget_tester.dart,Passed
-MB-0012,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 3. AppShell maps Shipper role to MyLoadsScreen and Loads tab,package:flutter_test/src/widget_tester.dart,Passed
+MB-0001,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 1. AuthUser JSON deserialization matches backend CurrentUserResponseDto contract,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
+MB-0002,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 2. Role getters evaluate correctly for all four system roles,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
+MB-0003,MB,AgencyDashboardScreen renders skeleton during initial loading state,package:flutter_test/src/widget_tester.dart,Passed
+MB-0004,MB,long locked labels fit a narrow dropdown without overflowing,package:flutter_test/src/widget_tester.dart,Passed
+MB-0005,MB,renders one common login form with no registration link,package:flutter_test/src/widget_tester.dart,Passed
+MB-0006,MB,AccountSettingsScreen — Profile section pre-fills fields from the signed-in user,package:flutter_test/src/widget_tester.dart,Passed
+MB-0007,MB,"AgencyDashboardScreen renders KPIs, fleet utilization, and action tiles when loaded",package:flutter_test/src/widget_tester.dart,Passed
+MB-0008,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) blocks non-Agency-Staff roles from the form",package:flutter_test/src/widget_tester.dart,Passed
+MB-0009,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) shows an ErrorState with retry when the trip fails to load",package:flutter_test/src/widget_tester.dart,Passed
+MB-0010,MB,AgencyDashboardScreen renders ErrorState with retry button when error occurs,package:flutter_test/src/widget_tester.dart,Passed
+MB-0011,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 3. AppShell maps Shipper role to MyLoadsScreen and Loads tab,package:flutter_test/src/widget_tester.dart,Passed
+MB-0012,MB,AgencyDashboardScreen renders fallback greeting when agency profile is empty,package:flutter_test/src/widget_tester.dart,Passed
 MB-0013,MB,AccountSettingsScreen — Profile section Save Changes calls updateProfile with the edited values,package:flutter_test/src/widget_tester.dart,Passed
 MB-0014,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 4. AppShell maps AgencyStaff role to JobProposalsScreen and Proposals tab,package:flutter_test/src/widget_tester.dart,Passed
-MB-0015,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 5. AppShell maps Driver role to DriverAssignedTripScreen and My Trip tab,package:flutter_test/src/widget_tester.dart,Passed
-MB-0016,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 6. Admin login is blocked with explicit Web Portal direction policy,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
-MB-0017,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 7. 401 Unauthorized invokes session clearing and switches status to guest,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
-MB-0018,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) pre-fills the amount from the trip’s agreed price and shows the shipper",package:flutter_test/src/widget_tester.dart,Passed
+MB-0015,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) pre-fills the amount from the trip’s agreed price and shows the shipper",package:flutter_test/src/widget_tester.dart,Passed
+MB-0016,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 5. AppShell maps Driver role to DriverAssignedTripScreen and My Trip tab,package:flutter_test/src/widget_tester.dart,Passed
+MB-0017,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 6. Admin login is blocked with explicit Web Portal direction policy,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
+MB-0018,MB,Cross-Platform Auth & Session Consistency (Y3S01-103) 7. 401 Unauthorized invokes session clearing and switches status to guest,Integration/features/auth/cross_platform_auth_consistency_test.dart,Passed
 MB-0019,MB,AccountSettingsScreen — Profile section shows the backend error message when updateProfile fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0020,MB,"InvoiceDetailScreen — role x status action gating Agency Staff sees Edit/Issue/Void for a Draft invoice, no Confirm Payment",package:flutter_test/src/widget_tester.dart,Passed
-MB-0021,MB,InvoiceDetailScreen — role x status action gating Agency Staff sees Confirm Payment only once a proof file is present,package:flutter_test/src/widget_tester.dart,Passed
-MB-0022,MB,InvoiceDetailScreen — role x status action gating Agency Staff sees Confirm Payment when PaymentPending with a proof file,package:flutter_test/src/widget_tester.dart,Passed
-MB-0023,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) rejects submission with a zero amount",package:flutter_test/src/widget_tester.dart,Passed
-MB-0024,MB,AccountSettingsScreen — Password section rejects a weak new password client-side without calling changePassword,package:flutter_test/src/widget_tester.dart,Passed
-MB-0025,MB,PaymentsScreen shows a loading indicator while the query is in flight,package:flutter_test/src/widget_tester.dart,Passed
-MB-0026,MB,InvoiceDetailScreen — role x status action gating Agency Staff sees no actions at all for a terminal Paid invoice,package:flutter_test/src/widget_tester.dart,Passed
-MB-0027,MB,"InvoiceDetailScreen — role x status action gating Shipper sees Submit Payment Receipt for an Issued invoice, no Agency actions",package:flutter_test/src/widget_tester.dart,Passed
-MB-0028,MB,InvoiceDetailScreen — role x status action gating Shipper sees Replace Receipt once already PaymentPending,package:flutter_test/src/widget_tester.dart,Passed
-MB-0029,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) submits {tripId, amount, notes, issueImmediately} with the pre-filled amount",package:flutter_test/src/widget_tester.dart,Passed
-MB-0030,MB,InvoiceDetailScreen — role x status action gating renders an ErrorState with retry when the fetch fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0031,MB,PaymentsScreen renders an empty message with no fabricated invoices,package:flutter_test/src/widget_tester.dart,Passed
-MB-0032,MB,AccountSettingsScreen — Password section Change Password calls changePassword with valid input,package:flutter_test/src/widget_tester.dart,Passed
-MB-0033,MB,CreateInvoiceScreen — edit mode pre-fills the amount from the existing invoice and never fetches a trip,package:flutter_test/src/widget_tester.dart,Passed
-MB-0034,MB,PaymentsScreen renders a retry action on failure,package:flutter_test/src/widget_tester.dart,Passed
+MB-0020,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) rejects submission with a zero amount",package:flutter_test/src/widget_tester.dart,Passed
+MB-0021,MB,AccountSettingsScreen — Password section rejects a weak new password client-side without calling changePassword,package:flutter_test/src/widget_tester.dart,Passed
+MB-0022,MB,"CreateInvoiceScreen — create mode (trip-linked, single amount) submits {tripId, amount, notes, issueImmediately} with the pre-filled amount",package:flutter_test/src/widget_tester.dart,Passed
+MB-0023,MB,AccountSettingsScreen — Password section Change Password calls changePassword with valid input,package:flutter_test/src/widget_tester.dart,Passed
+MB-0024,MB,CreateInvoiceScreen — edit mode pre-fills the amount from the existing invoice and never fetches a trip,package:flutter_test/src/widget_tester.dart,Passed
+MB-0025,MB,AccountSettingsScreen — Password section shows the backend error message when changePassword fails,package:flutter_test/src/widget_tester.dart,Passed
+MB-0026,MB,"InvoiceDetailScreen — role x status action gating Agency Staff sees Edit/Issue/Void for a Draft invoice, no Confirm Payment",package:flutter_test/src/widget_tester.dart,Passed
+MB-0027,MB,PaymentsScreen shows a loading indicator while the query is in flight,package:flutter_test/src/widget_tester.dart,Passed
+MB-0028,MB,InvoiceDetailScreen — role x status action gating Agency Staff sees Confirm Payment only once a proof file is present,package:flutter_test/src/widget_tester.dart,Passed
+MB-0029,MB,InvoiceDetailScreen — role x status action gating Agency Staff sees Confirm Payment when PaymentPending with a proof file,package:flutter_test/src/widget_tester.dart,Passed
+MB-0030,MB,PaymentsScreen renders an empty message with no fabricated invoices,package:flutter_test/src/widget_tester.dart,Passed
+MB-0031,MB,InvoiceDetailScreen — role x status action gating Agency Staff sees no actions at all for a terminal Paid invoice,package:flutter_test/src/widget_tester.dart,Passed
+MB-0032,MB,"InvoiceDetailScreen — role x status action gating Shipper sees Submit Payment Receipt for an Issued invoice, no Agency actions",package:flutter_test/src/widget_tester.dart,Passed
+MB-0033,MB,PaymentsScreen renders a retry action on failure,package:flutter_test/src/widget_tester.dart,Passed
+MB-0034,MB,InvoiceDetailScreen — role x status action gating Shipper sees Replace Receipt once already PaymentPending,package:flutter_test/src/widget_tester.dart,Passed
 MB-0035,MB,"PaymentsScreen offers ""View details"" (not ""Manage"") to a Shipper",package:flutter_test/src/widget_tester.dart,Passed
-MB-0036,MB,"PaymentsScreen offers ""Manage"" (not ""View details"") to Agency Staff",package:flutter_test/src/widget_tester.dart,Passed
-MB-0037,MB,AccountSettingsScreen — Password section shows the backend error message when changePassword fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0038,MB,shows the duplicate-active-dispute message instead of a generic failure,package:flutter_test/src/widget_tester.dart,Passed
+MB-0036,MB,InvoiceDetailScreen — role x status action gating renders an ErrorState with retry when the fetch fails,package:flutter_test/src/widget_tester.dart,Passed
+MB-0037,MB,shows the duplicate-active-dispute message instead of a generic failure,package:flutter_test/src/widget_tester.dart,Passed
+MB-0038,MB,"PaymentsScreen offers ""Manage"" (not ""View details"") to Agency Staff",package:flutter_test/src/widget_tester.dart,Passed
 MB-0039,MB,shows role-scoped dispute data and refreshes when status filter changes,package:flutter_test/src/widget_tester.dart,Passed
 MB-0040,MB,shows the read-only Admin resolution and no claimant mutation action,package:flutter_test/src/widget_tester.dart,Passed
 MB-0041,MB,My Loads screen shows a loading skeleton while the list is fetching,package:flutter_test/src/widget_tester.dart,Passed
-MB-0042,MB,Post Load screen renders key fields and the submit button,package:flutter_test/src/widget_tester.dart,Passed
-MB-0043,MB,My Loads screen shows the empty state when there are no loads,package:flutter_test/src/widget_tester.dart,Passed
-MB-0044,MB,ShipperDashboardScreen renders KPIs and quick actions when loaded,package:flutter_test/src/widget_tester.dart,Passed
-MB-0045,MB,InAppPushBanner renders push banner when notification is active and dismisses on close button,package:flutter_test/src/widget_tester.dart,Passed
-MB-0046,MB,NotificationBellButton and NotificationCenterSheet NotificationBellButton shows unread badge when notifications exist,package:flutter_test/src/widget_tester.dart,Passed
-MB-0047,MB,My Loads screen renders a card per load with its reference code and status,package:flutter_test/src/widget_tester.dart,Passed
-MB-0048,MB,"ShipperDashboardScreen shows ""Up to date"" when there are no pending invoices",package:flutter_test/src/widget_tester.dart,Passed
-MB-0049,MB,ShipperDashboardScreen renders ErrorState with retry button when the loads fetch fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0050,MB,Post Load screen shows validation messages when submitted blank,package:flutter_test/src/widget_tester.dart,Passed
-MB-0051,MB,NotificationBellButton and NotificationCenterSheet tapping NotificationBellButton opens NotificationCenterSheet with items,package:flutter_test/src/widget_tester.dart,Passed
-MB-0052,MB,NotificationBellButton and NotificationCenterSheet NotificationCenterSheet displays empty state when no notifications,package:flutter_test/src/widget_tester.dart,Passed
-MB-0053,MB,My Loads screen tapping a load card opens its detail screen,package:flutter_test/src/widget_tester.dart,Passed
-MB-0054,MB,Post Load screen valid input submits and pops with the created load,package:flutter_test/src/widget_tester.dart,Passed
-MB-0055,MB,Post Load screen shows the server error message on a failed submit,package:flutter_test/src/widget_tester.dart,Passed
-MB-0056,MB,DriverAssignedTripScreen shows loading indicator while fetching,package:flutter_test/src/widget_tester.dart,Passed
-MB-0057,MB,AcceptLoadAssignScreen renders proposal details and fleet selectors,package:flutter_test/src/widget_tester.dart,Passed
+MB-0042,MB,My Loads screen shows the empty state when there are no loads,package:flutter_test/src/widget_tester.dart,Passed
+MB-0043,MB,Post Load screen renders key fields and the submit button,package:flutter_test/src/widget_tester.dart,Passed
+MB-0044,MB,My Loads screen renders a card per load with its reference code and status,package:flutter_test/src/widget_tester.dart,Passed
+MB-0045,MB,Post Load screen shows validation messages when submitted blank,package:flutter_test/src/widget_tester.dart,Passed
+MB-0046,MB,My Loads screen tapping a load card opens its detail screen,package:flutter_test/src/widget_tester.dart,Passed
+MB-0047,MB,Post Load screen valid input submits and pops with the created load,package:flutter_test/src/widget_tester.dart,Passed
+MB-0048,MB,InAppPushBanner renders push banner when notification is active and dismisses on close button,package:flutter_test/src/widget_tester.dart,Passed
+MB-0049,MB,Post Load screen shows the server error message on a failed submit,package:flutter_test/src/widget_tester.dart,Passed
+MB-0050,MB,ShipperDashboardScreen renders KPIs and quick actions when loaded,package:flutter_test/src/widget_tester.dart,Passed
+MB-0051,MB,NotificationBellButton and NotificationCenterSheet NotificationBellButton shows unread badge when notifications exist,package:flutter_test/src/widget_tester.dart,Passed
+MB-0052,MB,"ShipperDashboardScreen shows ""Up to date"" when there are no pending invoices",package:flutter_test/src/widget_tester.dart,Passed
+MB-0053,MB,NotificationBellButton and NotificationCenterSheet tapping NotificationBellButton opens NotificationCenterSheet with items,package:flutter_test/src/widget_tester.dart,Passed
+MB-0054,MB,ShipperDashboardScreen renders ErrorState with retry button when the loads fetch fails,package:flutter_test/src/widget_tester.dart,Passed
+MB-0055,MB,NotificationBellButton and NotificationCenterSheet NotificationCenterSheet displays empty state when no notifications,package:flutter_test/src/widget_tester.dart,Passed
+MB-0056,MB,AcceptLoadAssignScreen renders proposal details and fleet selectors,package:flutter_test/src/widget_tester.dart,Passed
+MB-0057,MB,DriverAssignedTripScreen shows loading indicator while fetching,package:flutter_test/src/widget_tester.dart,Passed
 MB-0058,MB,DriverAssignedTripScreen displays empty card when no trip is assigned,package:flutter_test/src/widget_tester.dart,Passed
 MB-0059,MB,"DriverAssignedTripScreen displays active trip details (route, vehicle, cargo, status)",package:flutter_test/src/widget_tester.dart,Passed
-MB-0060,MB,DriverTripFilter.fromQuery parses known values and falls back to all,Integration/features/trips/screens/driver_trip_history_screen_test.dart,Passed
-MB-0061,MB,DriverAssignedTripScreen allows driver to advance status from PickedUp to InTransit,package:flutter_test/src/widget_tester.dart,Passed
+MB-0060,MB,DriverAssignedTripScreen allows driver to advance status from PickedUp to InTransit,package:flutter_test/src/widget_tester.dart,Passed
+MB-0061,MB,AcceptLoadAssignScreen dispatches trip when submitted,package:flutter_test/src/widget_tester.dart,Passed
 MB-0062,MB,DriverAssignedTripScreen displays error banner on failure with try again button,package:flutter_test/src/widget_tester.dart,Passed
-MB-0063,MB,AcceptLoadAssignScreen dispatches trip when submitted,package:flutter_test/src/widget_tester.dart,Passed
-MB-0064,MB,DriverAssignedTripScreen displays capture delivery proof button when InTransit,package:flutter_test/src/widget_tester.dart,Passed
+MB-0063,MB,DriverAssignedTripScreen displays capture delivery proof button when InTransit,package:flutter_test/src/widget_tester.dart,Passed
+MB-0064,MB,AcceptLoadAssignScreen displays 409 conflict error banner on race condition,package:flutter_test/src/widget_tester.dart,Passed
 MB-0065,MB,DriverAssignedTripScreen updates from empty state to assigned trip when Check for Assignments is tapped (Y3S01-99),package:flutter_test/src/widget_tester.dart,Passed
-MB-0066,MB,AcceptLoadAssignScreen displays 409 conflict error banner on race condition,package:flutter_test/src/widget_tester.dart,Passed
-MB-0067,MB,Driver has zero authority or controls to cancel or delete trips across all lifecycle states,package:flutter_test/src/widget_tester.dart,Passed
+MB-0066,MB,Driver has zero authority or controls to cancel or delete trips across all lifecycle states,package:flutter_test/src/widget_tester.dart,Passed
+MB-0067,MB,DriverTripFilter.fromQuery parses known values and falls back to all,Integration/features/trips/screens/driver_trip_history_screen_test.dart,Passed
 MB-0068,MB,AcceptLoadAssignScreen allows declining proposal with reason,package:flutter_test/src/widget_tester.dart,Passed
 MB-0069,MB,AcceptLoadAssignScreen renders read-only state when proposal is already Accepted,package:flutter_test/src/widget_tester.dart,Passed
-MB-0070,MB,AcceptLoadAssignScreen renders read-only state with reason when proposal is already Declined,package:flutter_test/src/widget_tester.dart,Passed
-MB-0071,MB,"DriverTripHistoryScreen lists every trip, past and present, by default",package:flutter_test/src/widget_tester.dart,Passed
-MB-0072,MB,"DriverDashboardScreen navigation ""Rides Completed"" card opens trip history (/dashboard/trip-history?filter=completed)",package:flutter_test/src/widget_tester.dart,Passed
-MB-0073,MB,DriverTripHistoryScreen opens on the requested filter and asks the API for that status only,package:flutter_test/src/widget_tester.dart,Passed
-MB-0074,MB,"DriverDashboardScreen navigation ""Cancelled"" card opens trip history (/dashboard/trip-history?filter=cancelled)",package:flutter_test/src/widget_tester.dart,Passed
-MB-0075,MB,AcceptLoadAssignScreen displays error banner when declining fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0076,MB,JobProposalsScreen renders list of proposed assignments,package:flutter_test/src/widget_tester.dart,Passed
-MB-0077,MB,"DriverDashboardScreen navigation ""Total Trips"" card opens trip history (/dashboard/trip-history)",package:flutter_test/src/widget_tester.dart,Passed
-MB-0078,MB,DriverTripHistoryScreen switching filter chips reloads with the matching status,package:flutter_test/src/widget_tester.dart,Passed
-MB-0079,MB,"DriverDashboardScreen navigation ""Active Trip"" card still opens My Trip, the live trip screen",package:flutter_test/src/widget_tester.dart,Passed
-MB-0080,MB,"DriverTripHistoryScreen Active merges Assigned, PickedUp and InTransit trips, newest first",package:flutter_test/src/widget_tester.dart,Passed
-MB-0081,MB,JobProposalsScreen handles filter chip switching,package:flutter_test/src/widget_tester.dart,Passed
-MB-0082,MB,DriverTripHistoryScreen shows a filter-specific empty state,package:flutter_test/src/widget_tester.dart,Passed
-MB-0083,MB,DriverDashboardScreen navigation Trip History quick action opens the unfiltered history,package:flutter_test/src/widget_tester.dart,Passed
-MB-0084,MB,JobProposalsScreen displays empty state when no proposals exist,package:flutter_test/src/widget_tester.dart,Passed
-MB-0085,MB,DriverTripHistoryScreen shows an error with retry that recovers,package:flutter_test/src/widget_tester.dart,Passed
-MB-0086,MB,DriverDashboardScreen renders KPIs and quick actions when loaded,package:flutter_test/src/widget_tester.dart,Passed
-MB-0087,MB,DriverDashboardScreen renders ErrorState with retry button when error occurs,package:flutter_test/src/widget_tester.dart,Passed
-MB-0088,MB,"DriverDashboardScreen shows no ""Active"" badge and greys out Cancelled when there are none",package:flutter_test/src/widget_tester.dart,Passed
-MB-0089,MB,"ProofOfDeliveryScreen renders trip details, dropoff address, policy alert, and capture buttons",package:flutter_test/src/widget_tester.dart,Passed
+MB-0070,MB,"DriverDashboardScreen navigation ""Rides Completed"" card opens trip history (/dashboard/trip-history?filter=completed)",package:flutter_test/src/widget_tester.dart,Passed
+MB-0071,MB,AcceptLoadAssignScreen renders read-only state with reason when proposal is already Declined,package:flutter_test/src/widget_tester.dart,Passed
+MB-0072,MB,"DriverDashboardScreen navigation ""Cancelled"" card opens trip history (/dashboard/trip-history?filter=cancelled)",package:flutter_test/src/widget_tester.dart,Passed
+MB-0073,MB,AcceptLoadAssignScreen displays error banner when declining fails,package:flutter_test/src/widget_tester.dart,Passed
+MB-0074,MB,"DriverDashboardScreen navigation ""Total Trips"" card opens trip history (/dashboard/trip-history)",package:flutter_test/src/widget_tester.dart,Passed
+MB-0075,MB,"DriverDashboardScreen navigation ""Active Trip"" card still opens My Trip, the live trip screen",package:flutter_test/src/widget_tester.dart,Passed
+MB-0076,MB,DriverDashboardScreen navigation Trip History quick action opens the unfiltered history,package:flutter_test/src/widget_tester.dart,Passed
+MB-0077,MB,DriverDashboardScreen renders KPIs and quick actions when loaded,package:flutter_test/src/widget_tester.dart,Passed
+MB-0078,MB,"DriverTripHistoryScreen lists every trip, past and present, by default",package:flutter_test/src/widget_tester.dart,Passed
+MB-0079,MB,DriverDashboardScreen renders ErrorState with retry button when error occurs,package:flutter_test/src/widget_tester.dart,Passed
+MB-0080,MB,DriverTripHistoryScreen opens on the requested filter and asks the API for that status only,package:flutter_test/src/widget_tester.dart,Passed
+MB-0081,MB,"DriverDashboardScreen shows no ""Active"" badge and greys out Cancelled when there are none",package:flutter_test/src/widget_tester.dart,Passed
+MB-0082,MB,DriverTripHistoryScreen switching filter chips reloads with the matching status,package:flutter_test/src/widget_tester.dart,Passed
+MB-0083,MB,"DriverTripHistoryScreen Active merges Assigned, PickedUp and InTransit trips, newest first",package:flutter_test/src/widget_tester.dart,Passed
+MB-0084,MB,"ProofOfDeliveryScreen renders trip details, dropoff address, policy alert, and capture buttons",package:flutter_test/src/widget_tester.dart,Passed
+MB-0085,MB,JobProposalsScreen renders list of proposed assignments,package:flutter_test/src/widget_tester.dart,Passed
+MB-0086,MB,DriverTripHistoryScreen shows a filter-specific empty state,package:flutter_test/src/widget_tester.dart,Passed
+MB-0087,MB,DriverTripHistoryScreen shows an error with retry that recovers,package:flutter_test/src/widget_tester.dart,Passed
+MB-0088,MB,JobProposalsScreen handles filter chip switching,package:flutter_test/src/widget_tester.dart,Passed
+MB-0089,MB,JobProposalsScreen displays empty state when no proposals exist,package:flutter_test/src/widget_tester.dart,Passed
 MB-0090,MB,ProofOfDeliveryScreen takes photo and displays preview and retake button,package:flutter_test/src/widget_tester.dart,Passed
 MB-0091,MB,ProofOfDeliveryScreen picks photo from gallery,package:flutter_test/src/widget_tester.dart,Passed
-MB-0092,MB,"ProofOfDeliveryScreen executes full upload, DeliveryProof evidence link, and status advance workflow",package:flutter_test/src/widget_tester.dart,Passed
-MB-0093,MB,ProofOfDeliveryScreen shows error banner if upload fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0094,MB,ProofOfDeliveryScreen displays verified notice if delivery proof already exists,package:flutter_test/src/widget_tester.dart,Passed
-MB-0095,MB,"ProofOfPickupScreen renders trip details, policy alert, and capture buttons",package:flutter_test/src/widget_tester.dart,Passed
+MB-0092,MB,"ProofOfPickupScreen renders trip details, policy alert, and capture buttons",package:flutter_test/src/widget_tester.dart,Passed
+MB-0093,MB,"ProofOfDeliveryScreen executes full upload, DeliveryProof evidence link, and status advance workflow",package:flutter_test/src/widget_tester.dart,Passed
+MB-0094,MB,ProofOfDeliveryScreen shows error banner if upload fails,package:flutter_test/src/widget_tester.dart,Passed
+MB-0095,MB,ProofOfDeliveryScreen displays verified notice if delivery proof already exists,package:flutter_test/src/widget_tester.dart,Passed
 MB-0096,MB,ProofOfPickupScreen takes photo and displays preview and retake button,package:flutter_test/src/widget_tester.dart,Passed
-MB-0097,MB,AutoResizeText Widget Tests renders text inside normal constraints,package:flutter_test/src/widget_tester.dart,Passed
-MB-0098,MB,AutoResizeText Widget Tests does not overflow when long text is inside a narrow container,package:flutter_test/src/widget_tester.dart,Passed
-MB-0099,MB,"ProofOfPickupScreen executes full upload, evidence link, and status advance workflow",package:flutter_test/src/widget_tester.dart,Passed
-MB-0100,MB,AutoResizeText Widget Tests AutoResizeText.kpi renders metric text without overflow,package:flutter_test/src/widget_tester.dart,Passed
-MB-0101,MB,AutoResizeText Widget Tests responsiveFont scales proportionally based on screen width,package:flutter_test/src/widget_tester.dart,Passed
-MB-0102,MB,ProofOfPickupScreen shows error banner if upload fails,package:flutter_test/src/widget_tester.dart,Passed
-MB-0103,MB,ProofOfPickupScreen displays verified notice if evidence already exists,package:flutter_test/src/widget_tester.dart,Passed
-MB-0104,MB,LoginScreen renders the sign-in form,package:flutter_test/src/widget_tester.dart,Passed
-MB-0105,MB,Auth navigation login success lands on My Loads,package:flutter_test/src/widget_tester.dart,Passed
-MB-0106,MB,Auth navigation driver login success lands on DriverAssignedTripScreen,package:flutter_test/src/widget_tester.dart,Passed
+MB-0097,MB,"ProofOfPickupScreen executes full upload, evidence link, and status advance workflow",package:flutter_test/src/widget_tester.dart,Passed
+MB-0098,MB,ProofOfPickupScreen shows error banner if upload fails,package:flutter_test/src/widget_tester.dart,Passed
+MB-0099,MB,ProofOfPickupScreen displays verified notice if evidence already exists,package:flutter_test/src/widget_tester.dart,Passed
+MB-0100,MB,Auth navigation login success lands on My Loads,package:flutter_test/src/widget_tester.dart,Passed
+MB-0101,MB,AutoResizeText Widget Tests renders text inside normal constraints,package:flutter_test/src/widget_tester.dart,Passed
+MB-0102,MB,AutoResizeText Widget Tests does not overflow when long text is inside a narrow container,package:flutter_test/src/widget_tester.dart,Passed
+MB-0103,MB,AutoResizeText Widget Tests AutoResizeText.kpi renders metric text without overflow,package:flutter_test/src/widget_tester.dart,Passed
+MB-0104,MB,AutoResizeText Widget Tests responsiveFont scales proportionally based on screen width,package:flutter_test/src/widget_tester.dart,Passed
+MB-0105,MB,Auth navigation driver login success lands on DriverAssignedTripScreen,package:flutter_test/src/widget_tester.dart,Passed
+MB-0106,MB,Auth navigation logging out from an authenticated session redirects to login,package:flutter_test/src/widget_tester.dart,Passed
 MB-0107,MB,mobile role route policy Shipper owns Loads and Billing but not Agency workspace or driver execution,Unit/core/routing/app_router_access_test.dart,Passed
 MB-0108,MB,"mobile role route policy Agency Staff owns Agency workspace, proposals, trips, and Billing",Unit/core/routing/app_router_access_test.dart,Passed
 MB-0109,MB,mobile role route policy Driver is restricted to operational trip tab and placeholder dashboard,Unit/core/routing/app_router_access_test.dart,Passed
 MB-0110,MB,mobile role route policy unknown and Admin roles are not granted a mobile route,Unit/core/routing/app_router_access_test.dart,Passed
-MB-0111,MB,Auth navigation logging out from an authenticated session redirects to login,package:flutter_test/src/widget_tester.dart,Passed
+MB-0111,MB,LoginScreen renders the sign-in form,package:flutter_test/src/widget_tester.dart,Passed
 MB-0112,MB,My Loads -> Load Detail -> back returns to the list,package:flutter_test/src/widget_tester.dart,Passed
 MB-0113,MB,Pending and Verified documents lock their type; Rejected and Expired do not,Unit/features/agencies/compliance_docs_provider_test.dart,Passed
 MB-0114,MB,uploadDoc refuses a locked type without calling the API,Unit/features/agencies/compliance_docs_provider_test.dart,Passed
 MB-0115,MB,uploadDoc allows a type whose previous document was rejected,Unit/features/agencies/compliance_docs_provider_test.dart,Passed
-MB-0116,MB,parses the backend detail payload including its read-only resolution,Unit/features/disputes/models/dispute_test.dart,Passed
-MB-0117,MB,loads status-filtered disputes into the claimant list state,Unit/features/disputes/providers/dispute_provider_test.dart,Passed
-MB-0118,MB,keeps a typed API error for a retryable claimant-list failure,Unit/features/disputes/providers/dispute_provider_test.dart,Passed
-MB-0119,MB,NotificationProvider initial state has empty notifications and zero unread count,Unit/features/notifications/notification_provider_test.dart,Passed
-MB-0120,MB,"NotificationProvider pushNotification adds notification, increments unread, and sets push banner",Unit/features/notifications/notification_provider_test.dart,Passed
-MB-0121,MB,NotificationProvider dismissPushBanner clears currentPushBanner without clearing notifications list,Unit/features/notifications/notification_provider_test.dart,Passed
-MB-0122,MB,NotificationProvider markAsRead marks specific notification as read and decrements unreadCount,Unit/features/notifications/notification_provider_test.dart,Passed
-MB-0123,MB,NotificationProvider markAllAsRead marks all notifications as read,Unit/features/notifications/notification_provider_test.dart,Passed
-MB-0124,MB,NotificationProvider clearAll removes all notifications and dismisses banner,Unit/features/notifications/notification_provider_test.dart,Passed
+MB-0116,MB,Mobile Dispute Submission & Validation Suite MOB-UT-001: Form validation blocks submission when description is empty or too short,Unit/features/disputes/dispute_submission_flow_test.dart,Passed
+MB-0117,MB,Mobile Dispute Submission & Validation Suite MOB-UT-002: Attachment validation enforces allowed MIME types and 5MB size limit,Unit/features/disputes/dispute_submission_flow_test.dart,Passed
+MB-0118,MB,Mobile Dispute Submission & Validation Suite MOB-IT-003: Gracefully captures timeout and preserves retryable error state,Unit/features/disputes/dispute_submission_flow_test.dart,Passed
+MB-0119,MB,Mobile Dispute Submission & Validation Suite MOB-IT-005: Double-tap prevention suppresses duplicate submission attempts,Unit/features/disputes/dispute_submission_flow_test.dart,Passed
+MB-0120,MB,parses the backend detail payload including its read-only resolution,Unit/features/disputes/models/dispute_test.dart,Passed
+MB-0121,MB,loads status-filtered disputes into the claimant list state,Unit/features/disputes/providers/dispute_provider_test.dart,Passed
+MB-0122,MB,keeps a typed API error for a retryable claimant-list failure,Unit/features/disputes/providers/dispute_provider_test.dart,Passed
+MB-0123,MB,NotificationProvider initial state has empty notifications and zero unread count,Unit/features/notifications/notification_provider_test.dart,Passed
+MB-0124,MB,"NotificationProvider pushNotification adds notification, increments unread, and sets push banner",Unit/features/notifications/notification_provider_test.dart,Passed
+MB-0125,MB,NotificationProvider dismissPushBanner clears currentPushBanner without clearing notifications list,Unit/features/notifications/notification_provider_test.dart,Passed
+MB-0126,MB,NotificationProvider markAsRead marks specific notification as read and decrements unreadCount,Unit/features/notifications/notification_provider_test.dart,Passed
+MB-0127,MB,NotificationProvider markAllAsRead marks all notifications as read,Unit/features/notifications/notification_provider_test.dart,Passed
+MB-0128,MB,NotificationProvider clearAll removes all notifications and dismisses banner,Unit/features/notifications/notification_provider_test.dart,Passed
 AG-0001,AG,test_create_workflow_run_request_matches_CreateAgentWorkflowRunRequestDto,tests.Integration.test_contracts,Passed
 AG-0002,AG,test_create_workflow_run_response_parses_CreateAgentWorkflowRunResponseDto_shape,tests.Integration.test_contracts,Passed
 AG-0003,AG,test_report_agent_step_request_matches_ReportAgentStepRequestDto,tests.Integration.test_contracts,Passed
