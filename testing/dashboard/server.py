@@ -32,6 +32,26 @@ ROOT = Path(__file__).resolve().parents[2]
 EV = ROOT / "testing" / "evidence"
 HERE = Path(__file__).resolve().parent
 
+def _agent_cmd():
+    if shutil.which("uv"):
+        return ["uv", "run", "pytest", "tests", f"--junitxml={EV / 'agent' / 'junit.xml'}", "-q"]
+    for cand in [
+        ROOT / "agent" / "venv" / "Scripts" / "python.exe",
+        ROOT / "agent" / ".venv" / "Scripts" / "python.exe",
+        ROOT / "agent" / "venv" / "bin" / "python",
+        ROOT / "agent" / ".venv" / "bin" / "python",
+    ]:
+        if cand.exists():
+            return [str(cand), "-m", "pytest", "tests", f"--junitxml={EV / 'agent' / 'junit.xml'}", "-q"]
+    return [sys.executable, "-m", "pytest", "tests", f"--junitxml={EV / 'agent' / 'junit.xml'}", "-q"]
+
+
+def _nfr_cmd(arg):
+    if os.name == "nt":
+        return ["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(ROOT / "testing" / "scripts" / "run-nfr.ps1"), arg]
+    return ["bash", str(ROOT / "testing" / "scripts" / "run-nfr.sh"), arg]
+
+
 SUITES = {
     "backend": dict(
         label="Backend API (xUnit)", cwd=ROOT / "backend", env={"TESTCONTAINERS_RYUK_DISABLED": "true"},
@@ -48,13 +68,13 @@ SUITES = {
     ),
     "agent": dict(
         label="Agentic AI (pytest)", cwd=ROOT / "agent", env={},
-        cmd=["uv", "run", "pytest", "tests", f"--junitxml={EV / 'agent' / 'junit.xml'}", "-q"],
+        cmd=_agent_cmd(),
     ),
     "k6": dict(
-        label="Performance (k6)", cwd=ROOT, env={}, cmd=["bash", str(ROOT / "testing" / "scripts" / "run-nfr.sh"), "k6"], nfr=True,
+        label="Performance (k6)", cwd=ROOT, env={}, cmd=_nfr_cmd("k6"), nfr=True,
     ),
     "zap": dict(
-        label="Security scan (ZAP)", cwd=ROOT, env={}, cmd=["bash", str(ROOT / "testing" / "scripts" / "run-nfr.sh"), "zap"], nfr=True,
+        label="Security scan (ZAP)", cwd=ROOT, env={}, cmd=_nfr_cmd("zap"), nfr=True,
     ),
 }
 TEST_SUITES = ["backend", "frontend", "mobile", "agent"]
